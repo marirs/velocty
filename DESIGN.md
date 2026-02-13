@@ -8,94 +8,115 @@ This document covers the visual design of both the **Admin Panel** and the **Def
 
 ### Layout
 
-Two-column layout: fixed dark sidebar + light content area.
+Full dark UI with ultra-narrow icon sidebar that expands on hover.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  VELOCTY                                   Admin ▼ │ Logout │
-├─────────────────┬────────────────────────────────────────────┤
-│                 │                                            │
-│  Sidebar Menu   │           Main Content Area                │
-│  (dark bg)      │           (light bg)                       │
-│                 │                                            │
-│  240px fixed    │           fluid, max-width 1200px          │
-│                 │                                            │
-└─────────────────┴────────────────────────────────────────────┘
+┌──┬───────────────────────────────────────────────────────────┐
+│💧│  Dashboard                           Admin ▼ │ Logout    │
+├──┼───────────────────────────────────────────────────────────┤
+│  │                                                          │
+│🏠│           Main Content Area                               │
+│  │           (dark bg, cards in slightly lighter dark)       │
+│✏️│                                                          │
+│  │           fluid, max-width 1400px, centered              │
+│🖼│                                                          │
+│  │                                                          │
+│💬│                                                          │
+│  │                                                          │
+│⚙️│                                                          │
+│  │                                                          │
+│👤│                                                          │
+└──┴───────────────────────────────────────────────────────────┘
 ```
 
-- **Top bar:** Logo left, admin name + logout right. Thin, ~50px height.
-- **Sidebar:** 240px wide, dark (`#1a1a2e`), white text, sticky/fixed.
-- **Content area:** Light (`#f8f9fa`), padded, scrollable.
-- **Responsive:** Sidebar collapses to hamburger on screens < 768px.
+- **Sidebar:** 60px wide (icon-only), expands to 200px on hover with labels. Dark (`#0a0a1a`), fixed.
+- **Top bar:** Dark (`#0f0f23`), thin ~50px. Page title left, admin avatar + logout right.
+- **Content area:** Dark (`#0f0f23`), padded, scrollable. Cards use `#1a1a2e`.
+- **Responsive:** Sidebar collapses to bottom tab bar on mobile (< 768px).
+- **Animations:** Sidebar expand 200ms ease, card hover lift, chart transitions.
 
-### Color Palette (Admin)
+### Color Palette (Admin — Full Dark UI)
 
 | Element | Color | Hex |
 |---|---|---|
-| Sidebar background | Dark navy | `#1a1a2e` |
-| Sidebar text | White | `#e0e0e0` |
-| Sidebar active item | Accent highlight | `#3b82f6` bg, `#ffffff` text |
-| Sidebar hover | Subtle lighten | `#252542` |
-| Top bar background | White | `#ffffff` |
-| Top bar border | Light gray bottom | `#e5e7eb` |
-| Content background | Off-white | `#f8f9fa` |
-| Cards / panels | White | `#ffffff` with `0 1px 3px rgba(0,0,0,0.1)` shadow |
-| Primary button | Blue | `#3b82f6` |
+| Page background | Deep dark | `#0f0f23` |
+| Card / panel background | Dark navy | `#1a1a2e` |
+| Card hover | Slightly lighter | `#222240` |
+| Sidebar background | Darkest | `#0a0a1a` |
+| Sidebar icon default | Muted gray | `#6b7280` |
+| Sidebar icon active | Teal accent | `#2dd4bf` |
+| Sidebar icon hover | Light gray | `#e0e0e0` |
+| Sidebar expanded bg | Dark | `#0f0f23` |
+| Top bar background | Deep dark | `#0f0f23` |
+| Top bar border | Subtle | `#1a1a2e` |
+| Primary / accent | Teal | `#2dd4bf` |
+| Primary hover | Darker teal | `#14b8a6` |
 | Danger button | Red | `#ef4444` |
 | Success badge | Green | `#22c55e` |
 | Warning badge | Amber | `#f59e0b` |
-| Text primary | Dark | `#111827` |
-| Text secondary | Gray | `#6b7280` |
-| Border | Light gray | `#e5e7eb` |
+| Info badge | Blue | `#3b82f6` |
+| Text primary | Near white | `#f0f0f0` |
+| Text secondary | Muted | `#9ca3af` |
+| Text tertiary | Dim | `#6b7280` |
+| Input background | Dark | `#252542` |
+| Input border | Subtle | `#3a3a5c` |
+| Input focus border | Teal | `#2dd4bf` |
+| Input text | Light | `#e0e0e0` |
+| Table row hover | Highlight | `#252542` |
+| Table header | Muted | `#9ca3af` |
+| Dividers / borders | Subtle | `#2a2a4a` |
+| Scrollbar track | Dark | `#1a1a2e` |
+| Scrollbar thumb | Muted | `#3a3a5c` |
+| Chart colors (D3) | Palette | `#2dd4bf`, `#3b82f6`, `#8b5cf6`, `#f59e0b`, `#ef4444`, `#22c55e`, `#ec4899`, `#06b6d4` |
 
 ### Typography (Admin)
 
 - **Font:** System font stack: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-- **Body:** 14px, line-height 1.5
-- **Headings:** 600 weight, `#111827`
-- **Page title:** 24px
-- **Section title:** 18px
-- **Table text:** 13px
-- **Sidebar menu items:** 14px, 400 weight
+- **Body:** 14px, `#e0e0e0`, line-height 1.5
+- **Headings:** 500 weight, `#f0f0f0`
+- **Page title:** 24px, 500 weight
+- **Section title:** 16px, 500 weight, `#9ca3af` uppercase tracking
+- **Table text:** 13px, `#e0e0e0`
+- **Sidebar icons:** 22px
+- **Sidebar labels (expanded):** 13px, 400 weight, `#e0e0e0`
+- **Stat numbers (dashboard):** 32px, 600 weight, `#f0f0f0`
+- **Stat labels (dashboard):** 12px, `#9ca3af`
+- **Chart labels (D3):** 11px, `#6b7280`
 
 ### Sidebar Menu Structure
 
+Icon-only sidebar (60px). On hover, expands to 200px showing labels.
+
 ```
-VELOCTY (logo)
-─────────────────
-📊  Dashboard
-
-CONTENT
-  ✏️  Posts
-  🖼  Portfolio
-  💬  Comments
-  🏷  Categories
-  🔖  Tags
-
-DESIGN
-  🎨  Designs
-
-TOOLS
-  📥  Import
-
-SETTINGS  (expandable ▼)
-  ├── General
-  ├── Blog
-  ├── Portfolio
-  ├── Comments
-  ├── Fonts & Typography
-  ├── Images
-  ├── SEO
-  ├── Security
-  ├── Design
-  ├── PayPal          (Phase 2)
-  └── AI              (Phase 4)
+Collapsed (60px):          Expanded (200px on hover):
+┌──────┐                   ┌──────────────────────┐
+│  �  │  ← Logo           │  💧  VELOCTY         │
+│      │                   │                      │
+│  �📊  │  ← Dashboard      │  📊  Dashboard       │
+│  ✏️  │  ← Posts          │  ✏️  Posts            │
+│  🖼  │  ← Portfolio      │  🖼  Portfolio        │
+│  💬  │  ← Comments       │  💬  Comments         │
+│  🏷  │  ← Categories     │  🏷  Categories       │
+│  🔖  │  ← Tags           │  🔖  Tags             │
+│  🎨  │  ← Designs        │  🎨  Designs          │
+│  📥  │  ← Import         │  📥  Import           │
+│  ⚙️  │  ← Settings       │  ⚙️  Settings  ▼     │
+│      │                   │     General          │
+│      │                   │     Blog             │
+│      │                   │     Portfolio        │
+│      │                   │     ...              │
+│      │                   │                      │
+│  👤  │  ← Admin avatar   │  👤  Sriram           │
+└──────┘                   └──────────────────────┘
 ```
 
-- Section headers (`CONTENT`, `DESIGN`, etc.) are uppercase, small, `#6b7280`, non-clickable
-- Active item has `#3b82f6` left border + background tint
-- Settings expands/collapses with a chevron toggle
-- Icons are optional (can use simple Unicode or Lucide-style SVG icons inline)
+- Icons are SVG (Lucide icon set — lightweight, consistent, MIT licensed)
+- Active item: teal left border (3px `#2dd4bf`) + icon turns teal
+- Hover: icon brightens to `#e0e0e0`
+- Settings icon click: expands sub-menu in the expanded sidebar view
+- Admin avatar at bottom: click for profile/logout dropdown
+- Tooltip on hover (collapsed mode): shows label in a small floating tooltip
+- Transition: `width 200ms ease` on hover expand
 
 ### Admin Routes
 
@@ -131,41 +152,138 @@ SETTINGS  (expandable ▼)
 
 ### Page Wireframes
 
-#### Dashboard (`/admin`)
+#### Dashboard (`/admin`) — D3.js Analytics Dashboard
+
+Built-in analytics — no Google Analytics, no third-party scripts. All data from SQLite `page_views` table. Visualized with D3.js (~250KB, admin-only).
+
+**Data tracked per request:** path, hashed IP, country (GeoLite2 offline DB), referrer, user-agent, device type, browser, timestamp.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Dashboard                                              │
-│                                                         │
-│  Welcome back, Sriram                                   │
-│                                                         │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
-│  │   24       │  │   156      │  │   12       │        │
-│  │   Posts    │  │   Portfolio │  │   Comments │        │
-│  │   3 drafts │  │   items    │  │   pending  │        │
-│  └────────────┘  └────────────┘  └────────────┘        │
-│                                                         │
-│  ┌────────────┐  ┌────────────┐                         │
-│  │   1,240    │  │   48       │                         │
-│  │   Total    │  │   Sales    │  ← Phase 2              │
-│  │   Likes    │  │   $2,400   │                         │
-│  └────────────┘  └────────────┘                         │
-│                                                         │
-│  ┌─ Recent Activity ──────────────────────────────────┐ │
-│  │  • New comment on "Sunset in Dubai" — 2h ago       │ │
-│  │  • Portfolio "City Lights" published — 5h ago      │ │
-│  │  • Post "Travel Tips" saved as draft — 1d ago      │ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                         │
-│  Quick Actions                                          │
-│  [+ New Post]  [+ New Portfolio Item]                   │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌──┬────────────────────────────────────────────────────────────────┐
+│  │  Dashboard              [Today ▼] [This Week ▼] [This Month]  │
+│💧│                          Last 7 days · 2,481 views             │
+│  │                                                                │
+│📊│  ┌─ Visitor Flow ─────────────────────────────────────────────┐│
+│  │  │                    SANKEY DIAGRAM (D3)                     ││
+│✏️│  │                                                            ││
+│  │  │  Google ━━━━━━━━━╗                                        ││
+│🖼│  │  Direct ━━━━━╗   ┣━━ Portfolio ━━━━ Sunset Dubai          ││
+│  │  │  Twitter ━━╗ ┃   ┃              ━━━ City Lights           ││
+│💬│  │  Insta ━━╗ ┃ ┗━━━┫                                       ││
+│  │  │          ┗━┻━━━━━━┻━━ Blog ━━━━━━━━ Travel Tips           ││
+│🏷│  │                   ┗━━ Pages ━━━━━━━ About                  ││
+│  │  │                                                            ││
+│🔖│  │  Shows: Referrer → Content Type → Top Items                ││
+│  │  └────────────────────────────────────────────────────────────┘│
+│🎨│                                                                │
+│  │  ┌─ Content Breakdown ────────┐  ┌─ Visitors by Country ─────┐│
+│📥│  │     SUNBURST CHART (D3)    │  │    WORLD CHOROPLETH (D3)  ││
+│  │  │                            │  │                           ││
+│⚙️│  │       ╭─────╮              │  │   🌍 Color intensity =    ││
+│  │  │     ╱ ╭───╮  ╲             │  │      visit count          ││
+│  │  │    │ │Total│  │            │  │                           ││
+│👤│  │    │ │2481 │  │            │  │   🇺🇸 US 34%  🇬🇧 UK 12%   ││
+│  │  │     ╲ ╰───╯  ╱             │  │   🇦🇪 UAE 10% 🇩🇪 DE 8%   ││
+│  │  │       ╰─────╯              │  │   🇯🇵 JP 6%   ...        ││
+│  │  │                            │  │                           ││
+│  │  │  Center = total views      │  │   Hover: country name +  ││
+│  │  │  Ring 1 = Blog/Port/Pages  │  │   view count + %         ││
+│  │  │  Ring 2 = Categories       │  │                           ││
+│  │  │  Ring 3 = Individual items │  │                           ││
+│  │  │  Click ring to drill down  │  │                           ││
+│  │  └────────────────────────────┘  └───────────────────────────┘│
+│  │                                                                │
+│  │  ┌─ Activity Stream ─────────────────────────────────────────┐│
+│  │  │                 STREAM GRAPH (D3)                          ││
+│  │  │                                                            ││
+│  │  │  ░░▒▒▓▓██████▓▓▒▒░░░░▒▒▓▓████▓▓▒▒░░  Portfolio views    ││
+│  │  │  ░░▒▒▓▓███▓▓▒▒░░░░░░▒▒▓▓██▓▓▒▒░░░░  Blog views         ││
+│  │  │  ░░▒▒▓▓▒▒░░░░░░░░░░░░▒▒▓▓▒▒░░░░░░  Page views          ││
+│  │  │  Mon   Tue   Wed   Thu   Fri   Sat   Sun                  ││
+│  │  │                                                            ││
+│  │  │  Hover: tooltip with exact counts per content type         ││
+│  │  └────────────────────────────────────────────────────────────┘│
+│  │                                                                │
+│  │  ┌─ Calendar Heatmap ────────────────────────────────────────┐│
+│  │  │  Like GitHub's contribution graph — color = daily views    ││
+│  │  │                                                            ││
+│  │  │  Jan ░░▒▒▓▓██░░▒▒░░░░▒▒▓▓░░▒▒░░░░▒▒▓▓██▓▓▒▒░░           ││
+│  │  │  Feb ░░▒▒▓▓██████▓▓▒▒░░▒▒▓▓                               ││
+│  │  │                                                            ││
+│  │  │  Teal intensity scale: lightest (#0a3d2e) → brightest     ││
+│  │  │  (#2dd4bf)                                                 ││
+│  │  └────────────────────────────────────────────────────────────┘│
+│  │                                                                │
+│  │  ┌─ Top Portfolio ────────────┐  ┌─ Top Referrers ───────────┐│
+│  │  │  RADIAL BAR CHART (D3)     │  │  HORIZONTAL BARS (D3)     ││
+│  │  │                            │  │                           ││
+│  │  │      ╭──╮                  │  │  google.com ████████ 42% ││
+│  │  │   ╭──╯  ╰──╮               │  │  direct     █████   28% ││
+│  │  │  ╭╯ top 10  ╰╮             │  │  twitter    ███     15% ││
+│  │  │  ╰╮  items  ╭╯             │  │  instagram  ██       8% ││
+│  │  │   ╰──╮  ╭──╯               │  │  pinterest  █        4% ││
+│  │  │      ╰──╯                  │  │  other      █        3% ││
+│  │  │                            │  │                           ││
+│  │  │  Bars radiate from center  │  │  Animated on load         ││
+│  │  │  Length = view count       │  │  Hover: exact count       ││
+│  │  │  Color = teal gradient     │  │  Click: filter dashboard  ││
+│  │  └────────────────────────────┘  └───────────────────────────┘│
+│  │                                                                │
+│  │  ┌─ Tag Relationships ───────────────────────────────────────┐│
+│  │  │              FORCE-DIRECTED GRAPH (D3)                     ││
+│  │  │                                                            ││
+│  │  │    (nature)──────(sunrise)     Nodes = tags               ││
+│  │  │       │    ╲        │          Edges = shared items       ││
+│  │  │       │     (aerial)│          Node size = popularity     ││
+│  │  │       │    ╱        │          Draggable, zoomable        ││
+│  │  │    (travel)──────(sunset)                                  ││
+│  │  │                                                            ││
+│  │  └────────────────────────────────────────────────────────────┘│
+│  │                                                                │
+│  │  ┌─ Quick Stats ─────────────────────────────────────────────┐│
+│  │  │                                                            ││
+│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐     ││
+│  │  │  │▁▃▅▇▅▃▁   │ │  ╭───╮   │ │████░░ 12 │ │▁▂▃▅▇▅▃▂ │     ││
+│  │  │  │ 24 Posts  │ │ │156│   │ │ Pending  │ │ 1,240    │     ││
+│  │  │  │ ↑3 week   │ │ │port│  │ │ comments │ │ Likes    │     ││
+│  │  │  │ sparkline │ │  ╰───╯   │ │ progress │ │ sparkline│     ││
+│  │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘     ││
+│  │  │                                                            ││
+│  │  └────────────────────────────────────────────────────────────┘│
+│  │                                                                │
+│  │  [+ New Post]  [+ New Portfolio Item]                          │
+│  │                                                                │
+└──┴────────────────────────────────────────────────────────────────┘
 ```
 
-- Stat cards: white bg, subtle shadow, large number, label below
-- Recent activity: simple list, relative timestamps
-- Quick action buttons: primary blue
+**D3.js Charts Summary:**
+
+| Chart | Type | Data Source | Interaction |
+|---|---|---|---|
+| Visitor Flow | Sankey | page_views (referrer → path) | Hover: highlight flow, tooltip with counts |
+| Content Breakdown | Sunburst | page_views grouped by type/category/item | Click to drill down, click center to zoom out |
+| Visitors by Country | World Choropleth | page_views (country from GeoLite2) | Hover: country + count + %, click to filter |
+| Activity Stream | Stream Graph | page_views over time by content type | Hover: tooltip with daily breakdown |
+| Calendar Heatmap | Calendar | page_views daily count | Hover: date + count, click to filter to day |
+| Top Portfolio | Radial Bar | page_views grouped by portfolio item | Hover: item name + count, click to view |
+| Top Referrers | Horizontal Bar | page_views grouped by referrer | Hover: exact count, click to filter |
+| Tag Relationships | Force-Directed | content_tags + page_views | Drag nodes, zoom, hover for details |
+
+**Admin API endpoints for dashboard data:**
+
+| Endpoint | Returns |
+|---|---|
+| `/admin/api/stats/overview` | Total views, posts, portfolio items, comments, likes |
+| `/admin/api/stats/flow` | Sankey data: referrer → content type → top items |
+| `/admin/api/stats/sunburst` | Hierarchical: type → category → item with view counts |
+| `/admin/api/stats/geo` | Country → view count mapping |
+| `/admin/api/stats/stream` | Daily views by content type over time range |
+| `/admin/api/stats/calendar` | Daily total views for calendar heatmap |
+| `/admin/api/stats/top-portfolio` | Top N portfolio items by views |
+| `/admin/api/stats/top-referrers` | Top N referrers by count |
+| `/admin/api/stats/tags` | Tag co-occurrence data for force graph |
+
+All endpoints accept `?from=DATE&to=DATE` query params for time range filtering.
 
 #### Posts List (`/admin/posts`)
 

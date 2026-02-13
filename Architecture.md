@@ -493,6 +493,25 @@ CREATE TABLE design_templates (
     FOREIGN KEY (design_id) REFERENCES designs(id),
     UNIQUE(design_id, template_type)
 );
+
+-- Built-in analytics (no third-party tracking)
+CREATE TABLE page_views (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL,
+    ip_hash TEXT NOT NULL,              -- SHA-256 hashed for privacy
+    country TEXT,                       -- from GeoLite2 offline DB
+    city TEXT,
+    referrer TEXT,
+    user_agent TEXT,
+    device_type TEXT,                   -- desktop / mobile / tablet
+    browser TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_views_path ON page_views(path);
+CREATE INDEX idx_views_date ON page_views(created_at);
+CREATE INDEX idx_views_country ON page_views(country);
+CREATE INDEX idx_views_referrer ON page_views(referrer);
 ```
 
 ---
@@ -517,13 +536,16 @@ velocty/
 │   │   ├── comment.rs               # Comment struct, CRUD
 │   │   ├── design.rs                # Design struct, CRUD
 │   │   ├── settings.rs              # Settings get/set helpers
-│   │   └── import.rs                # Import history
+│   │   ├── import.rs                # Import history
+│   │   └── analytics.rs             # Page views, stats queries
 │   ├── routes/
 │   │   ├── mod.rs
 │   │   ├── public.rs                # Visitor-facing routes (blog, portfolio, RSS, sitemap)
 │   │   ├── admin.rs                 # Admin panel routes (dashboard, CRUD forms)
-│   │   ├── api.rs                   # JSON API endpoints (likes, comments, search)
+│   │   ├── admin_api.rs             # Admin JSON API (dashboard stats for D3.js)
+│   │   ├── api.rs                   # Public JSON API endpoints (likes, comments, filtering)
 │   │   └── auth.rs                  # Login/logout/MFA routes
+│   ├── analytics.rs                 # Page view logging middleware, GeoLite2 lookup
 │   ├── render.rs                    # Design + content merge, placeholder replacement
 │   ├── seo.rs                       # Meta tags, JSON-LD, OG, sitemap generation
 │   ├── rss.rs                       # RSS feed generation
@@ -568,7 +590,17 @@ velocty/
 │   ├── css/
 │   │   └── admin.css
 │   └── js/
-│       └── admin.js
+│       ├── admin.js                 # General admin interactions
+│       ├── d3.v7.min.js             # D3.js library (~250KB, admin-only)
+│       └── dashboard/
+│           ├── sankey.js            # Visitor flow chart
+│           ├── sunburst.js          # Content breakdown chart
+│           ├── choropleth.js        # World map chart
+│           ├── stream.js            # Activity stream chart
+│           ├── calendar.js          # Calendar heatmap
+│           ├── radial.js            # Top portfolio radial bars
+│           ├── referrers.js         # Top referrers horizontal bars
+│           └── force-graph.js       # Tag relationships force graph
 ├── uploads/                         # User uploads (images, files)
 ├── designs/                         # Saved GrapesJS designs (Phase 3)
 └── velocty.db                       # SQLite database (created at runtime)
