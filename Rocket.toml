@@ -1,0 +1,16 @@
+[default]
+address = "0.0.0.0"
+port = 8000
+template_dir = "website/templates"
+secret_key = "hPRYyVRiMyxpw5sBB1XeCMN1kFsDCqKvBi2QJxBVHQo="
+
+[default.limits]
+form = "10 MiB"
+data-form = "50 MiB"
+file = "50 MiB"
+
+[debug]
+log_level = "normal"
+
+[release]
+log_level = "critical"

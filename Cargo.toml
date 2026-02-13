@@ -1,0 +1,69 @@
+[package]
+name = "velocty"
+version = "0.1.0"
+edition = "2021"
+description = "CMS almost at the speed of light"
+authors = ["Sriram Govindan <sriram@oneguy.net>"]
+
+[dependencies]
+# Web framework
+rocket = { version = "0.5", features = ["json", "secrets"] }
+
+# Templates
+rocket_dyn_templates = { version = "0.2", features = ["tera"] }
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.24"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Auth
+bcrypt = "0.15"
+totp-rs = { version = "5", features = ["qr"] }
+
+# Session / tokens
+rand = "0.8"
+hex = "0.4"
+sha2 = "0.10"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Image processing
+image = "0.25"
+webp = "0.3"
+
+# Markdown rendering
+pulldown-cmark = "0.11"
+
+# XML parsing (WordPress import)
+quick-xml = { version = "0.36", features = ["serialize"] }
+
+# Slug generation
+slug = "0.1"
+
+# UUID
+uuid = { version = "1", features = ["v4"] }
+
+# TOML (design meta files)
+toml = "0.8"
+
+# RSS generation
+rss = "2"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# IP geolocation (GeoLite2)
+maxminddb = "0.24"
+
+# User-agent parsing
+woothee = "0.13"
+
+# URL parsing
+url = "2"

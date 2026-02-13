@@ -1,0 +1,127 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>{% if item %}Edit Portfolio Item{% else %}New Portfolio Item{% endif %}</h2>
+    <div class="header-actions">
+        <button type="submit" form="portfolio-form" name="status" value="draft" class="btn btn-secondary">Save Draft</button>
+        <button type="submit" form="portfolio-form" name="status" value="published" class="btn btn-primary">Publish</button>
+    </div>
+</div>
+
+<form id="portfolio-form" method="post" action="{% if item %}/admin/portfolio/{{ item.id }}/edit{% else %}/admin/portfolio/new{% endif %}" enctype="multipart/form-data">
+    <div class="editor-layout">
+        <div class="editor-main">
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" value="{% if item %}{{ item.title }}{% endif %}" required class="input-lg">
+                </div>
+                <div class="form-group">
+                    <label for="slug">Slug</label>
+                    <input type="text" id="slug" name="slug" value="{% if item %}{{ item.slug }}{% endif %}" required>
+                </div>
+                <div class="form-group">
+                    <label for="image">Portfolio Image (required)</label>
+                    <input type="file" name="image" accept="image/*" {% if not item %}required{% endif %}>
+                    {% if item and item.image_path %}
+                    <div class="image-preview">
+                        <img src="/uploads/{{ item.image_path }}" alt="Portfolio image">
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description_html" rows="10" class="editor-textarea">{% if item %}{{ item.description_html | default(value="") }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="editor-sidebar">
+            <div class="form-card collapsible">
+                <h4>Categories</h4>
+                <div class="checkbox-list">
+                    {% for cat in categories %}
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="category_ids" value="{{ cat.id }}"
+                            {% if item_categories is defined and cat.id in item_categories %}checked{% endif %}>
+                        {{ cat.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-card collapsible">
+                <h4>Tags</h4>
+                <div class="form-group">
+                    <input type="text" name="tag_input" placeholder="Type to add tags..." class="tag-input">
+                    <div class="tag-list">
+                        {% if item_tags is defined %}
+                        {% for tag in tags %}
+                        {% if tag.id in item_tags %}
+                        <span class="tag-pill">{{ tag.name }} <button type="button" class="tag-remove">&times;</button></span>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-card collapsible">
+                <h4>Sell (Phase 2)</h4>
+                <div class="form-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="sell_enabled" value="1"
+                            {% if item and item.sell_enabled %}checked{% endif %} disabled>
+                        Enable selling
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="price">Price ($)</label>
+                    <input type="number" id="price" name="price" step="0.01" value="{% if item %}{{ item.price | default(value="") }}{% endif %}" disabled>
+                </div>
+            </div>
+
+            <div class="form-card collapsible">
+                <h4>SEO</h4>
+                <div class="form-group">
+                    <label for="meta_title">Meta Title</label>
+                    <input type="text" id="meta_title" name="meta_title" value="{% if item %}{{ item.meta_title | default(value="") }}{% endif %}" maxlength="60">
+                    <span class="char-count">0/60</span>
+                </div>
+                <div class="form-group">
+                    <label for="meta_description">Meta Description</label>
+                    <textarea id="meta_description" name="meta_description" rows="2" maxlength="160">{% if item %}{{ item.meta_description | default(value="") }}{% endif %}</textarea>
+                    <span class="char-count">0/160</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+    document.getElementById('title').addEventListener('input', function() {
+        const slug = document.getElementById('slug');
+        if (!slug.dataset.manual) {
+            slug.value = this.value.toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-')
+                .trim();
+        }
+    });
+    document.getElementById('slug').addEventListener('input', function() {
+        this.dataset.manual = 'true';
+    });
+    document.querySelectorAll('[maxlength]').forEach(el => {
+        const counter = el.parentElement.querySelector('.char-count');
+        if (counter) {
+            const update = () => counter.textContent = el.value.length + '/' + el.maxLength;
+            el.addEventListener('input', update);
+            update();
+        }
+    });
+</script>
+{% endblock scripts %}

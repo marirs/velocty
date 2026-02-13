@@ -1,0 +1,52 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2>Settings — Images</h2></div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/images" class="tab active">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/ai" class="tab">AI</a>
+</div>
+
+<form method="post" action="/admin/settings/images">
+    <div class="form-card">
+        <h3>Upload Settings</h3>
+        <div class="form-group">
+            <label for="images_max_upload_mb">Max Upload Size (MB)</label>
+            <input type="number" id="images_max_upload_mb" name="images_max_upload_mb" value="{{ settings.images_max_upload_mb | default(value='10') }}" min="1" max="100">
+        </div>
+        <div class="form-group">
+            <label for="images_quality">JPEG Quality (%)</label>
+            <input type="number" id="images_quality" name="images_quality" value="{{ settings.images_quality | default(value='85') }}" min="1" max="100">
+        </div>
+        <label class="checkbox-item"><input type="checkbox" name="images_webp_convert" value="true" {% if settings.images_webp_convert == "true" %}checked{% endif %}> Auto-convert to WebP</label>
+    </div>
+
+    <div class="form-card">
+        <h3>Thumbnail Sizes</h3>
+        <div class="form-group">
+            <label for="images_thumb_small">Small</label>
+            <input type="text" id="images_thumb_small" name="images_thumb_small" value="{{ settings.images_thumb_small | default(value='150x150') }}">
+        </div>
+        <div class="form-group">
+            <label for="images_thumb_medium">Medium</label>
+            <input type="text" id="images_thumb_medium" name="images_thumb_medium" value="{{ settings.images_thumb_medium | default(value='300x300') }}">
+        </div>
+        <div class="form-group">
+            <label for="images_thumb_large">Large</label>
+            <input type="text" id="images_thumb_large" name="images_thumb_large" value="{{ settings.images_thumb_large | default(value='1024x1024') }}">
+        </div>
+        <span class="form-help">Format: WIDTHxHEIGHT (e.g. 300x300)</span>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+</form>
+{% endblock content %}

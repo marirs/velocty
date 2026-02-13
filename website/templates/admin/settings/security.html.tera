@@ -1,0 +1,55 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2>Settings — Security</h2></div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/images" class="tab">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab active">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/ai" class="tab">AI</a>
+</div>
+
+<form method="post" action="/admin/settings/security">
+    <div class="form-card">
+        <h3>Password</h3>
+        <div class="form-group">
+            <label for="new_password">New Password</label>
+            <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
+        </div>
+        <div class="form-group">
+            <label for="confirm_password">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password">
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Multi-Factor Authentication (TOTP)</h3>
+        <label class="checkbox-item"><input type="checkbox" name="mfa_enabled" value="true" {% if settings.mfa_enabled == "true" %}checked{% endif %}> Enable MFA</label>
+        <span class="form-help">When enabled, you'll need a TOTP authenticator app (Google Authenticator, Authy, etc.) to log in.</span>
+        {% if settings.mfa_enabled == "true" %}
+        <p class="text-muted" style="margin-top:12px">MFA is active. Use your authenticator app for the 6-digit code at login.</p>
+        {% endif %}
+    </div>
+
+    <div class="form-card">
+        <h3>Sessions</h3>
+        <div class="form-group">
+            <label for="session_expiry_hours">Session Expiry (hours)</label>
+            <input type="number" id="session_expiry_hours" name="session_expiry_hours" value="{{ settings.session_expiry_hours | default(value='24') }}" min="1" max="720">
+        </div>
+        <div class="form-group">
+            <label for="login_rate_limit">Login Rate Limit (attempts per 15 min)</label>
+            <input type="number" id="login_rate_limit" name="login_rate_limit" value="{{ settings.login_rate_limit | default(value='5') }}" min="1" max="20">
+        </div>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+</form>
+{% endblock content %}

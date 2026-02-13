@@ -1,0 +1,79 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-number">{{ posts_count }}</div>
+            <div class="stat-label">Posts</div>
+            <div class="stat-sub">{{ posts_draft }} drafts</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ portfolio_count }}</div>
+            <div class="stat-label">Portfolio Items</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ comments_pending }}</div>
+            <div class="stat-label">Comments Pending</div>
+        </div>
+    </div>
+
+    <div class="dashboard-charts">
+        <div class="chart-card chart-wide">
+            <h3>Visitor Flow</h3>
+            <div id="chart-sankey" class="chart-container"></div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Content Breakdown</h3>
+                <div id="chart-sunburst" class="chart-container"></div>
+            </div>
+            <div class="chart-card">
+                <h3>Visitors by Country</h3>
+                <div id="chart-geo" class="chart-container"></div>
+            </div>
+        </div>
+
+        <div class="chart-card chart-wide">
+            <h3>Activity Stream</h3>
+            <div id="chart-stream" class="chart-container"></div>
+        </div>
+
+        <div class="chart-card chart-wide">
+            <h3>Activity Calendar</h3>
+            <div id="chart-calendar" class="chart-container"></div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Top Portfolio</h3>
+                <div id="chart-top-portfolio" class="chart-container"></div>
+            </div>
+            <div class="chart-card">
+                <h3>Top Referrers</h3>
+                <div id="chart-referrers" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="quick-actions">
+        <a href="/admin/posts/new" class="btn btn-primary">+ New Post</a>
+        <a href="/admin/portfolio/new" class="btn btn-primary">+ New Portfolio Item</a>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="/static/js/admin.js"></script>
+<script>
+    // Dashboard charts will be initialized here once D3 is loaded
+    // For now, show placeholder text in chart containers
+    document.querySelectorAll('.chart-container').forEach(el => {
+        if (!el.children.length) {
+            el.innerHTML = '<p class="chart-placeholder">Chart loads with visitor data</p>';
+        }
+    });
+</script>
+{% endblock scripts %}

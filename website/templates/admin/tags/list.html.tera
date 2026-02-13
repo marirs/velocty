@@ -1,0 +1,37 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Tags</h2>
+</div>
+
+<div class="table-wrapper">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th>Items</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tag in tags %}
+            <tr>
+                <td>{{ tag.name }}</td>
+                <td class="text-muted">{{ tag.slug }}</td>
+                <td class="text-muted">{{ tag.count }}</td>
+                <td class="actions">
+                    <form method="post" action="/admin/tags/{{ tag.id }}/delete" class="inline" onsubmit="return confirm('Delete this tag?')">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if tags | length == 0 %}
+            <tr><td colspan="4" class="empty-state">No tags yet.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock content %}

@@ -1,0 +1,62 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Categories</h2>
+    <button class="btn btn-primary" onclick="document.getElementById('new-cat-form').style.display='block'">+ New Category</button>
+</div>
+
+<div class="status-tabs">
+    <a href="/admin/categories" class="tab {% if not type_filter %}active{% endif %}">All</a>
+    <a href="/admin/categories?type_filter=post" class="tab {% if type_filter == 'post' %}active{% endif %}">Blog</a>
+    <a href="/admin/categories?type_filter=portfolio" class="tab {% if type_filter == 'portfolio' %}active{% endif %}">Portfolio</a>
+</div>
+
+<div id="new-cat-form" class="form-card inline-form" style="display:none">
+    <form method="post" action="/admin/categories/new">
+        <div class="form-row">
+            <input type="text" name="name" placeholder="Category name" required>
+            <input type="text" name="slug" placeholder="slug">
+            <select name="type">
+                <option value="portfolio">Portfolio</option>
+                <option value="post">Blog</option>
+                <option value="both">Both</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Add</button>
+            <button type="button" class="btn btn-secondary" onclick="this.closest('.inline-form').style.display='none'">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrapper">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th>Type</th>
+                <th>Items</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td>{{ cat.name }}</td>
+                <td class="text-muted">{{ cat.slug }}</td>
+                <td><span class="badge">{{ cat.type }}</span></td>
+                <td class="text-muted">{{ cat.count }}</td>
+                <td class="actions">
+                    <form method="post" action="/admin/categories/{{ cat.id }}/delete" class="inline" onsubmit="return confirm('Delete this category?')">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if categories | length == 0 %}
+            <tr><td colspan="5" class="empty-state">No categories yet.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock content %}

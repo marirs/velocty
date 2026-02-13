@@ -1,0 +1,38 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Designs</h2>
+</div>
+
+<div class="designs-grid">
+    {% for design in designs %}
+    <div class="design-card {% if design.is_active %}active{% endif %}">
+        <div class="design-thumb">
+            {% if design.thumbnail_path %}
+            <img src="/uploads/{{ design.thumbnail_path }}" alt="{{ design.name }}">
+            {% else %}
+            <div class="design-thumb-placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+            </div>
+            {% endif %}
+        </div>
+        <div class="design-info">
+            <h4>{{ design.name }}</h4>
+            {% if design.is_active %}
+            <span class="badge badge-published">Active</span>
+            {% else %}
+            <form method="post" action="/admin/designs/{{ design.id }}/activate" class="inline">
+                <button type="submit" class="btn btn-sm btn-primary">Activate</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% if designs | length == 0 %}
+    <div class="empty-state">No designs found.</div>
+    {% endif %}
+</div>
+
+<p class="text-muted" style="margin-top:24px">Phase 3: Design editor (GrapesJS) will allow creating and editing designs visually.</p>
+{% endblock content %}

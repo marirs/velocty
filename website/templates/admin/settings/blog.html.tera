@@ -1,0 +1,62 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Settings — Blog</h2>
+</div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/blog" class="tab active">Blog</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/images" class="tab">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/ai" class="tab">AI</a>
+</div>
+
+<form method="post" action="/admin/settings/blog">
+    <div class="form-card">
+        <h3>Blog Display</h3>
+        <div class="form-group">
+            <label for="blog_posts_per_page">Posts Per Page</label>
+            <input type="number" id="blog_posts_per_page" name="blog_posts_per_page" value="{{ settings.blog_posts_per_page | default(value='10') }}" min="1" max="100">
+        </div>
+        <div class="form-group">
+            <label for="blog_display_type">Display Type</label>
+            <select id="blog_display_type" name="blog_display_type">
+                <option value="grid" {% if settings.blog_display_type == "grid" %}selected{% endif %}>Grid</option>
+                <option value="masonry" {% if settings.blog_display_type == "masonry" %}selected{% endif %}>Masonry</option>
+                <option value="list" {% if settings.blog_display_type == "list" %}selected{% endif %}>List</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="blog_list_style">List Style</label>
+            <select id="blog_list_style" name="blog_list_style">
+                <option value="compact" {% if settings.blog_list_style == "compact" %}selected{% endif %}>Compact</option>
+                <option value="editorial" {% if settings.blog_list_style == "editorial" %}selected{% endif %}>Editorial</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="blog_excerpt_words">Excerpt Word Count</label>
+            <input type="number" id="blog_excerpt_words" name="blog_excerpt_words" value="{{ settings.blog_excerpt_words | default(value='40') }}" min="10" max="200">
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Blog Features</h3>
+        <label class="checkbox-item"><input type="checkbox" name="blog_show_author" value="true" {% if settings.blog_show_author == "true" %}checked{% endif %}> Show author name</label>
+        <label class="checkbox-item"><input type="checkbox" name="blog_show_date" value="true" {% if settings.blog_show_date == "true" %}checked{% endif %}> Show date</label>
+        <label class="checkbox-item"><input type="checkbox" name="blog_show_reading_time" value="true" {% if settings.blog_show_reading_time == "true" %}checked{% endif %}> Show reading time</label>
+        <label class="checkbox-item"><input type="checkbox" name="blog_featured_image_required" value="true" {% if settings.blog_featured_image_required == "true" %}checked{% endif %}> Require featured image</label>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+</form>
+{% endblock content %}

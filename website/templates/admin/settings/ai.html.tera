@@ -1,0 +1,45 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2>Settings — AI (Phase 4)</h2></div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/images" class="tab">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/ai" class="tab active">AI</a>
+</div>
+
+<div class="form-card">
+    <h3>AI Assistant — Phase 4</h3>
+    <p class="text-muted">Pluggable LLM integration (Ollama, OpenAI, Anthropic) for content suggestions, post generation, inline assist, and theme generation will be available in Phase 4.</p>
+
+    <form method="post" action="/admin/settings/ai" style="margin-top:20px">
+        <div class="form-group">
+            <label for="ai_provider">Provider</label>
+            <select id="ai_provider" name="ai_provider">
+                <option value="none" {% if settings.ai_provider == "none" %}selected{% endif %}>None (disabled)</option>
+                <option value="ollama" {% if settings.ai_provider == "ollama" %}selected{% endif %}>Ollama (local)</option>
+                <option value="openai" {% if settings.ai_provider == "openai" %}selected{% endif %}>OpenAI</option>
+                <option value="anthropic" {% if settings.ai_provider == "anthropic" %}selected{% endif %}>Anthropic</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="ai_api_key">API Key</label>
+            <input type="password" id="ai_api_key" name="ai_api_key" value="{{ settings.ai_api_key | default(value='') }}" placeholder="Prepare for Phase 4">
+        </div>
+        <div class="form-group">
+            <label for="ai_model">Model</label>
+            <input type="text" id="ai_model" name="ai_model" value="{{ settings.ai_model | default(value='') }}" placeholder="e.g. gpt-4, claude-3, llama3">
+        </div>
+        <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+    </form>
+</div>
+{% endblock content %}
