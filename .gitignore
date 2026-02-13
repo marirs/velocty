@@ -8,3 +8,5 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
+*.db-shm
+*.db-wal
