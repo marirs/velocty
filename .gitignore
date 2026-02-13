@@ -10,3 +10,8 @@ Thumbs.db
 
 *.db-shm
 *.db-wal
+*.db
+
+uploads/
+data/
+GeoLite2-City.mmdb
