@@ -1,0 +1,10 @@
+target/
+Cargo.lock
+
+.idea/
+.vscode/
+.windsurf/
+
+.DS_Store
+Thumbs.db
+
