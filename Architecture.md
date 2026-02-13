@@ -238,6 +238,43 @@ All settings stored in `settings` table as key-value pairs (`key TEXT PRIMARY KE
 | `portfolio_fade_animation` | Fade-in on scroll | "true" |
 | `portfolio_show_categories` | Show categories on archive | "true" |
 | `portfolio_show_tags` | Show tags on archive | "true" |
+| `portfolio_click_mode` | lightbox / single_page | "lightbox" |
+| `portfolio_lightbox_border_color` | Border color for lightbox frame | "#D4A017" |
+| `portfolio_lightbox_show_title` | Show title in lightbox | "true" |
+| `portfolio_lightbox_show_tags` | Show tags in lightbox | "true" |
+| `portfolio_lightbox_show_likes` | Show heart in lightbox | "true" |
+| `portfolio_lightbox_nav` | Show prev/next arrows | "true" |
+| `portfolio_lightbox_keyboard` | Keyboard nav (Esc, arrows) | "true" |
+
+#### Portfolio Click Behavior — Two Modes
+
+**Mode 1: Lightbox** (`portfolio_click_mode = "lightbox"`)
+- Click image → overlay opens on same page (no navigation)
+- Dark semi-transparent backdrop dims the grid behind
+- Image displayed large, centered, with a styled border (color configurable)
+- Below the image: title, categories/tags, heart/like button
+- Prev/next arrows to browse items without closing
+- Close: X button, click backdrop, or Esc key
+- Keyboard: Esc to close, arrow keys for prev/next
+- No comments in lightbox mode
+- If sell enabled (Phase 2): show price + "Buy" button
+- Vanilla JS, no library dependency
+
+**Mode 2: Single Page** (`portfolio_click_mode = "single_page"`)
+- Click image → navigates to `/portfolio/slug` (full page load)
+- Uses the `portfolio_single` design template
+- Shows: full image, title, description, categories, tags, date, heart/like
+- Comments section (if enabled)
+- PayPal buy section (Phase 2, if sell enabled)
+- Full SEO: unique URL, meta tags, JSON-LD, OG tags
+- Previous/Next navigation links
+
+**Important:** Even in lightbox mode, `/portfolio/slug` single pages are always generated server-side for:
+- SEO — search engines index individual items
+- Direct links — shareable URLs
+- Fallback — if JS fails, the `<a href="/portfolio/slug">` link still works
+
+The lightbox intercepts clicks with JS; the underlying `<a>` always points to the single page.
 
 ### Comments
 
