@@ -1,0 +1,3 @@
+[database]
+backend = "sqlite"
+path = "website/site/db/velocty.db"

@@ -618,6 +618,38 @@ pub fn robots(pool: &State<DbPool>) -> String {
     content
 }
 
+// ── Privacy Policy ─────────────────────────────────────
+
+#[get("/privacy")]
+pub fn privacy_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
+    let settings = Setting::all(pool);
+    if settings.get("privacy_policy_enabled").map(|v| v.as_str()) != Some("true") {
+        return None;
+    }
+    let html_body = settings
+        .get("privacy_policy_content")
+        .cloned()
+        .unwrap_or_default();
+    let page_html = render::render_legal_page(pool, &settings, "Privacy Policy", &html_body);
+    Some(RawHtml(page_html))
+}
+
+// ── Terms of Use ──────────────────────────────────────
+
+#[get("/terms")]
+pub fn terms_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
+    let settings = Setting::all(pool);
+    if settings.get("terms_of_use_enabled").map(|v| v.as_str()) != Some("true") {
+        return None;
+    }
+    let html_body = settings
+        .get("terms_of_use_content")
+        .cloned()
+        .unwrap_or_default();
+    let page_html = render::render_legal_page(pool, &settings, "Terms of Use", &html_body);
+    Some(RawHtml(page_html))
+}
+
 pub fn root_routes() -> Vec<rocket::Route> {
     routes![
         homepage,
@@ -626,6 +658,8 @@ pub fn root_routes() -> Vec<rocket::Route> {
         rss_feed,
         sitemap,
         robots,
+        privacy_page,
+        terms_page,
     ]
 }
 

@@ -235,7 +235,7 @@ User clicks **"AI Suggest"** → backend sends content to configured LLM → ret
 |---|---|
 | **General** | Site name, tagline, logo, favicon |
 | **Fonts** | Primary font, heading font (Google Fonts or local) |
-| **Design** | Active design, manage designs |
+| **Frontend** | Back-to-top button, cookie consent banner (style, position, theme), privacy policy page, terms of use page |
 | **Images** | Storage folder path, max upload size, auto-thumbnail sizes |
 | **PayPal** | Mode (sandbox/live), Client ID, seller email, currency |
 | **Downloads** | Max downloads per purchase, link expiry hours |

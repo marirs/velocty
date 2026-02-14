@@ -93,6 +93,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     <script>{lightbox_js}</script>
     {image_protection_js}
     {analytics_scripts}
+    {cookie_consent}
 </body>
 </html>"#,
         seo_meta = seo_meta,
@@ -117,6 +118,103 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
             ""
         },
         analytics_scripts = build_analytics_scripts(&settings),
+        cookie_consent = build_cookie_consent_banner(&settings),
+    )
+}
+
+/// Renders a legal page (Privacy Policy, Terms of Use) using the same site shell.
+pub fn render_legal_page(
+    pool: &DbPool,
+    settings: &std::collections::HashMap<String, String>,
+    title: &str,
+    html_body: &str,
+) -> String {
+    let settings_json = serde_json::to_value(settings).unwrap_or_default();
+    let css_vars = build_css_variables(&settings_json);
+    let social_html = build_social_links(&settings_json);
+
+    let site_name = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
+    let site_tagline = settings.get("site_tagline").map(|s| s.as_str()).unwrap_or("");
+    let font_primary = settings.get("font_primary").map(|s| s.as_str()).unwrap_or("Inter");
+
+    let categories = crate::models::category::Category::list(pool, Some("portfolio"));
+    let cats_json = serde_json::to_value(&categories).unwrap_or_default();
+    let ctx = serde_json::json!({ "categories": cats_json });
+    let categories_html = build_categories_sidebar(&ctx);
+
+    let analytics_scripts = build_analytics_scripts(&settings_json);
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} — {site_name}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family={font}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        {css_vars}
+        {base_css}
+        .legal-content {{
+            max-width: 780px;
+            padding: 40px 24px;
+            line-height: 1.8;
+            color: var(--color-text);
+        }}
+        .legal-content h1 {{ font-size: 2rem; font-weight: 700; margin-bottom: 8px; }}
+        .legal-content h2 {{ font-size: 1.35rem; font-weight: 600; margin-top: 2em; margin-bottom: 0.5em; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }}
+        .legal-content h3 {{ font-size: 1.1rem; font-weight: 600; margin-top: 1.5em; margin-bottom: 0.4em; }}
+        .legal-content p {{ margin-bottom: 1em; }}
+        .legal-content ul, .legal-content ol {{ margin-bottom: 1em; padding-left: 1.5em; }}
+        .legal-content li {{ margin-bottom: 0.3em; }}
+        .legal-content strong {{ font-weight: 600; }}
+        .legal-content code {{ background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }}
+        .legal-content a {{ color: var(--color-accent); text-decoration: underline; }}
+    </style>
+</head>
+<body>
+    <div class="site-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <div class="site-logo">
+                    <h1 class="site-name">{site_name}</h1>
+                    <p class="site-tagline">{tagline}</p>
+                </div>
+                <nav class="category-nav">
+                    {categories_html}
+                </nav>
+                <a href="/archives" class="archives-link">archives</a>
+            </div>
+            <div class="sidebar-bottom">
+                {social_html}
+                <div class="footer-text">
+                    <p>&copy; {year} {site_name}</p>
+                </div>
+            </div>
+        </aside>
+        <main class="content">
+            <div class="legal-content">
+                {body}
+            </div>
+        </main>
+    </div>
+    {analytics_scripts}
+    {cookie_consent}
+</body>
+</html>"#,
+        title = html_escape(title),
+        site_name = html_escape(site_name),
+        tagline = html_escape(site_tagline),
+        font = font_primary,
+        css_vars = css_vars,
+        base_css = DEFAULT_CSS,
+        categories_html = categories_html,
+        social_html = social_html,
+        year = chrono::Utc::now().format("%Y"),
+        body = html_body,
+        analytics_scripts = analytics_scripts,
+        cookie_consent = build_cookie_consent_banner(&settings_json),
     )
 }
 
@@ -222,6 +320,100 @@ fn build_webmaster_meta(settings: &Value) -> String {
     meta
 }
 
+fn build_cookie_consent_banner(settings: &Value) -> String {
+    let get = |key: &str| -> &str {
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+    };
+    if get("cookie_consent_enabled") != "true" {
+        return String::new();
+    }
+
+    let style = get("cookie_consent_style"); // minimal, modal, corner
+    let position = get("cookie_consent_position"); // bottom, top
+    let policy_url = get("cookie_consent_policy_url");
+    let policy_url = if policy_url.is_empty() { "/privacy" } else { policy_url };
+    let show_reject = get("cookie_consent_show_reject") == "true";
+    let theme = get("cookie_consent_theme"); // auto, dark, light
+
+    let reject_btn = if show_reject {
+        r#"<button id="cc-reject" style="padding:8px 20px;border-radius:6px;border:1px solid;font-size:13px;font-weight:500;cursor:pointer;background:transparent">Reject All</button>"#
+    } else {
+        ""
+    };
+
+    // Position CSS
+    let pos_css = match (style, position) {
+        ("modal", _) => "position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:99999;background:rgba(0,0,0,0.5)",
+        ("corner", _) => "position:fixed;bottom:20px;left:20px;z-index:99999;max-width:380px",
+        (_, "top") => "position:fixed;top:0;left:0;right:0;z-index:99999",
+        _ => "position:fixed;bottom:0;left:0;right:0;z-index:99999",
+    };
+
+    // Theme colors
+    let (bg, text, border, btn_bg, btn_text) = match theme {
+        "light" => ("#ffffff", "#1f2937", "#e5e7eb", "#111827", "#ffffff"),
+        "dark" => ("#1f2937", "#f3f4f6", "#374151", "#f3f4f6", "#1f2937"),
+        _ => ("#1f2937", "#f3f4f6", "#374151", "#f3f4f6", "#1f2937"), // auto = dark
+    };
+
+    let inner_style = if style == "modal" {
+        format!("background:{bg};color:{text};border:1px solid {border};border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)")
+    } else if style == "corner" {
+        format!("background:{bg};color:{text};border:1px solid {border};border-radius:12px;padding:20px 24px;box-shadow:0 8px 30px rgba(0,0,0,0.2)")
+    } else {
+        format!("background:{bg};color:{text};border-top:1px solid {border};padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap")
+    };
+
+    let layout_open = if style == "minimal" { "" } else { "" };
+    let btns_style = if style == "minimal" {
+        "display:flex;gap:8px;align-items:center;flex-shrink:0"
+    } else {
+        "display:flex;gap:8px;margin-top:16px;justify-content:flex-end"
+    };
+
+    format!(
+        r##"<div id="cc-banner" style="{pos_css}">
+<div style="{inner_style}">
+{layout_open}<div style="font-size:13px;line-height:1.6;flex:1;min-width:200px">
+<strong style="font-size:14px">🍪 We use cookies</strong><br>
+We use cookies to improve your experience. <a href="{policy_url}" style="color:{btn_bg};text-decoration:underline">Learn more</a>
+</div>
+<div style="{btns_style}">
+{reject_btn}
+<button id="cc-necessary" style="padding:8px 20px;border-radius:6px;border:1px solid {border};font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:{text}">Necessary Only</button>
+<button id="cc-accept" style="padding:8px 20px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:{btn_bg};color:{btn_text}">Accept All</button>
+</div>
+</div>
+</div>
+<script>
+(function(){{
+var b=document.getElementById('cc-banner');
+if(!b)return;
+var c=document.cookie.match(/velocty_consent=([^;]+)/);
+if(c){{b.remove();if(c[1]==='all')loadAnalytics();return;}}
+function set(v){{document.cookie='velocty_consent='+v+';path=/;max-age=31536000;SameSite=Lax';b.remove();if(v==='all')loadAnalytics();}}
+document.getElementById('cc-accept').onclick=function(){{set('all');}};
+document.getElementById('cc-necessary').onclick=function(){{set('necessary');}};
+var rj=document.getElementById('cc-reject');if(rj)rj.onclick=function(){{set('none');}};
+function loadAnalytics(){{document.querySelectorAll('script[data-consent="analytics"]').forEach(function(s){{var n=document.createElement('script');if(s.src)n.src=s.src;else n.textContent=s.textContent;n.async=true;Array.from(s.attributes).forEach(function(a){{if(a.name!=='type'&&a.name!=='data-consent')n.setAttribute(a.name,a.value);}});document.head.appendChild(n);}});}}
+}})();
+</script>"##,
+        pos_css = pos_css,
+        inner_style = inner_style,
+        layout_open = layout_open,
+        policy_url = html_escape(policy_url),
+        btn_bg = btn_bg,
+        border = border,
+        text = text,
+        btn_text = btn_text,
+        reject_btn = reject_btn,
+        btns_style = btns_style,
+    )
+}
+
 fn build_analytics_scripts(settings: &Value) -> String {
     let get = |key: &str| -> &str {
         settings
@@ -231,6 +423,14 @@ fn build_analytics_scripts(settings: &Value) -> String {
     };
     let enabled = |key: &str| -> bool { get(key) == "true" };
 
+    // When cookie consent is enabled, gate analytics behind consent
+    let consent = enabled("cookie_consent_enabled");
+    let (stag, stag_async) = if consent {
+        (r#"<script type="text/plain" data-consent="analytics""#, r#"<script type="text/plain" data-consent="analytics""#)
+    } else {
+        ("<script", "<script async")
+    };
+
     let mut scripts = String::new();
 
     // Google Analytics (GA4)
@@ -238,9 +438,11 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let id = get("seo_ga_measurement_id");
         if !id.is_empty() {
             scripts.push_str(&format!(
-                r#"<script async src="https://www.googletagmanager.com/gtag/js?id={id}"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{id}');</script>
+                r#"{stag_async} src="https://www.googletagmanager.com/gtag/js?id={id}"></script>
+{stag}>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{id}');</script>
 "#,
+                stag_async = stag_async,
+                stag = stag,
                 id = html_escape(id)
             ));
         }
@@ -253,8 +455,9 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let host = if host.is_empty() { "https://plausible.io" } else { host };
         if !domain.is_empty() {
             scripts.push_str(&format!(
-                r#"<script defer data-domain="{domain}" src="{host}/js/script.js"></script>
+                r#"{stag} defer data-domain="{domain}" src="{host}/js/script.js"></script>
 "#,
+                stag = stag,
                 domain = html_escape(domain),
                 host = html_escape(host),
             ));
@@ -266,9 +469,10 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let site_id = get("seo_fathom_site_id");
         if !site_id.is_empty() {
             scripts.push_str(&format!(
-                r#"<script src="https://cdn.usefathom.com/script.js" data-site="{}" defer></script>
+                r#"{stag} src="https://cdn.usefathom.com/script.js" data-site="{id}" defer></script>
 "#,
-                html_escape(site_id)
+                stag = stag,
+                id = html_escape(site_id)
             ));
         }
     }
@@ -279,8 +483,9 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let site_id = get("seo_matomo_site_id");
         if !url.is_empty() && !site_id.is_empty() {
             scripts.push_str(&format!(
-                r#"<script>var _paq=window._paq=window._paq||[];_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);(function(){{var u='{url}/';_paq.push(['setTrackerUrl',u+'matomo.php']);_paq.push(['setSiteId','{site_id}']);var d=document,g=d.createElement('script'),s=d.getElementsByTagName('script')[0];g.async=true;g.src=u+'matomo.js';s.parentNode.insertBefore(g,s);}})();</script>
+                r#"{stag}>var _paq=window._paq=window._paq||[];_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);(function(){{var u='{url}/';_paq.push(['setTrackerUrl',u+'matomo.php']);_paq.push(['setSiteId','{site_id}']);var d=document,g=d.createElement('script'),s=d.getElementsByTagName('script')[0];g.async=true;g.src=u+'matomo.js';s.parentNode.insertBefore(g,s);}})();</script>
 "#,
+                stag = stag,
                 url = html_escape(url),
                 site_id = html_escape(site_id),
             ));
@@ -292,9 +497,10 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let token = get("seo_cloudflare_analytics_token");
         if !token.is_empty() {
             scripts.push_str(&format!(
-                r#"<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token":"{}"}}'></script>
+                r#"{stag} defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token":"{token}"}}'></script>
 "#,
-                html_escape(token)
+                stag = stag,
+                token = html_escape(token)
             ));
         }
     }
@@ -304,8 +510,9 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let site_id = get("seo_clicky_site_id");
         if !site_id.is_empty() {
             scripts.push_str(&format!(
-                r#"<script async data-id="{id}" src="//static.getclicky.com/js"></script>
+                r#"{stag_async} data-id="{id}" src="//static.getclicky.com/js"></script>
 "#,
+                stag_async = stag_async,
                 id = html_escape(site_id)
             ));
         }
@@ -318,8 +525,9 @@ fn build_analytics_scripts(settings: &Value) -> String {
         let host = if host.is_empty() { "https://analytics.umami.is" } else { host };
         if !website_id.is_empty() {
             scripts.push_str(&format!(
-                r#"<script defer src="{host}/script.js" data-website-id="{id}"></script>
+                r#"{stag} defer src="{host}/script.js" data-website-id="{id}"></script>
 "#,
+                stag = stag,
                 host = html_escape(host),
                 id = html_escape(website_id),
             ));

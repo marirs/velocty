@@ -20,12 +20,190 @@
     <a href="/{{ admin_slug }}/settings/users" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Users</a>
 </div>
 
+<!-- Sub-tabs for Frontend -->
+<div class="sub-tabs">
+    <button type="button" class="tab active" data-panel="panel-general">General</button>
+    <button type="button" class="tab" data-panel="panel-privacy">Privacy Policy{% if settings.privacy_policy_enabled == "true" %} <span class="status-dot enabled" style="margin-left:4px"></span>{% endif %}</button>
+    <button type="button" class="tab" data-panel="panel-terms">Terms of Use{% if settings.terms_of_use_enabled == "true" %} <span class="status-dot enabled" style="margin-left:4px"></span>{% endif %}</button>
+</div>
+
 <form method="post" action="/{{ admin_slug }}/settings/design">
-    <div class="form-card">
-        <h3>UI Features</h3>
-        <label class="checkbox-item"><input type="checkbox" name="design_back_to_top" value="true" {% if settings.design_back_to_top == "true" %}checked{% endif %}> Show back-to-top button</label>
+
+    <!-- General Panel -->
+    <div id="panel-general" class="sub-panel">
+        <div class="form-card">
+            <h3>UI Features</h3>
+            <label class="checkbox-item"><input type="checkbox" name="design_back_to_top" value="true" {% if settings.design_back_to_top == "true" %}checked{% endif %}> Show back-to-top button</label>
+        </div>
+
+        <div class="form-card">
+            <h3>Cookie Consent Banner</h3>
+            <p class="text-muted" style="font-size:12px;margin-bottom:14px">Show a GDPR-compliant cookie consent banner to first-time visitors. When enabled, analytics scripts are only injected after the visitor consents.</p>
+
+            <label class="checkbox-item"><input type="checkbox" name="cookie_consent_enabled" value="true" id="cookie-consent-toggle" {% if settings.cookie_consent_enabled == "true" %}checked{% endif %}> Enable cookie consent banner</label>
+
+            <div id="cookie-consent-options" style="margin-top:14px;{% if settings.cookie_consent_enabled != 'true' %}display:none{% endif %}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Style</label>
+                        <select name="cookie_consent_style" class="form-control">
+                            <option value="minimal" {% if settings.cookie_consent_style == "minimal" %}selected{% endif %}>Minimal (bottom bar)</option>
+                            <option value="modal" {% if settings.cookie_consent_style == "modal" %}selected{% endif %}>Modal (centered overlay)</option>
+                            <option value="corner" {% if settings.cookie_consent_style == "corner" %}selected{% endif %}>Corner (bottom-left card)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Position</label>
+                        <select name="cookie_consent_position" class="form-control">
+                            <option value="bottom" {% if settings.cookie_consent_position == "bottom" %}selected{% endif %}>Bottom</option>
+                            <option value="top" {% if settings.cookie_consent_position == "top" %}selected{% endif %}>Top</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Policy URL</label>
+                        <input type="text" name="cookie_consent_policy_url" value="{{ settings.cookie_consent_policy_url | default(value='/privacy') }}" class="form-control" placeholder="/privacy">
+                    </div>
+                    <div class="form-group">
+                        <label>Color Scheme</label>
+                        <select name="cookie_consent_theme" class="form-control">
+                            <option value="auto" {% if settings.cookie_consent_theme == "auto" %}selected{% endif %}>Auto (match site)</option>
+                            <option value="dark" {% if settings.cookie_consent_theme == "dark" %}selected{% endif %}>Dark</option>
+                            <option value="light" {% if settings.cookie_consent_theme == "light" %}selected{% endif %}>Light</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="checkbox-item"><input type="checkbox" name="cookie_consent_show_reject" value="true" {% if settings.cookie_consent_show_reject == "true" %}checked{% endif %}> Show "Reject All" button</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Panel -->
+    <div id="panel-privacy" class="sub-panel" style="display:none">
+        <div class="form-card">
+            <h3>Privacy Policy</h3>
+            <p class="text-muted" style="font-size:12px;margin-bottom:14px">When enabled, a privacy policy page is available at <code>/privacy</code>. The content below is pre-filled with an industry-standard template — customize it for your site.</p>
+
+            <label class="checkbox-item" style="margin-bottom:14px"><input type="checkbox" name="privacy_policy_enabled" value="true" id="privacy-toggle" {% if settings.privacy_policy_enabled == "true" %}checked{% endif %}> Enable privacy policy page</label>
+
+            <div id="privacy-editor" style="{% if settings.privacy_policy_enabled != 'true' %}opacity:0.4;pointer-events:none{% endif %}">
+                <label>Content</label>
+                <textarea name="privacy_policy_content" id="privacy-content">{{ settings.privacy_policy_content | default(value='') | safe }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms of Use Panel -->
+    <div id="panel-terms" class="sub-panel" style="display:none">
+        <div class="form-card">
+            <h3>Terms of Use</h3>
+            <p class="text-muted" style="font-size:12px;margin-bottom:14px">When enabled, a terms of use page is available at <code>/terms</code>. The content below is pre-filled with an industry-standard template — customize it for your site.</p>
+
+            <label class="checkbox-item" style="margin-bottom:14px"><input type="checkbox" name="terms_of_use_enabled" value="true" id="terms-toggle" {% if settings.terms_of_use_enabled == "true" %}checked{% endif %}> Enable terms of use page</label>
+
+            <div id="terms-editor" style="{% if settings.terms_of_use_enabled != 'true' %}opacity:0.4;pointer-events:none{% endif %}">
+                <label>Content</label>
+                <textarea name="terms_of_use_content" id="terms-content">{{ settings.terms_of_use_content | default(value='') | safe }}</textarea>
+            </div>
+        </div>
     </div>
 
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
+
+<script>
+// Sub-tab switching with hash persistence
+function activatePanel(panelId) {
+    document.querySelectorAll('.sub-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.sub-panel').forEach(function(p) { p.style.display = 'none'; });
+    var panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.style.display = '';
+    document.querySelectorAll('.sub-tabs .tab').forEach(function(t) {
+        if (t.dataset.panel === panelId) t.classList.add('active');
+    });
+}
+document.querySelectorAll('.sub-tabs .tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+        activatePanel(tab.dataset.panel);
+        history.replaceState(null, '', '#' + tab.dataset.panel);
+    });
+});
+// Restore tab from URL hash on page load
+if (location.hash && document.getElementById(location.hash.substring(1))) {
+    activatePanel(location.hash.substring(1));
+}
+// Append current hash to form action on submit
+document.querySelector('form[action*="settings/design"]').addEventListener('submit', function() {
+    var active = document.querySelector('.sub-tabs .tab.active');
+    if (active) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = '_tab';
+        input.value = active.dataset.panel;
+        this.appendChild(input);
+    }
+});
+
+// Cookie consent toggle → show/hide options + auto-enable privacy policy
+document.getElementById('cookie-consent-toggle').addEventListener('change', function() {
+    document.getElementById('cookie-consent-options').style.display = this.checked ? '' : 'none';
+    if (this.checked) {
+        var pp = document.getElementById('privacy-toggle');
+        if (!pp.checked) { pp.checked = true; pp.dispatchEvent(new Event('change')); }
+    }
+});
+
+// Privacy policy toggle → enable/disable editor
+document.getElementById('privacy-toggle').addEventListener('change', function() {
+    document.getElementById('privacy-editor').style.opacity = this.checked ? '1' : '0.4';
+    document.getElementById('privacy-editor').style.pointerEvents = this.checked ? '' : 'none';
+});
+
+// Terms toggle → enable/disable editor
+document.getElementById('terms-toggle').addEventListener('change', function() {
+    document.getElementById('terms-editor').style.opacity = this.checked ? '1' : '0.4';
+    document.getElementById('terms-editor').style.pointerEvents = this.checked ? '' : 'none';
+});
+
+// TinyMCE lazy init — only when tab becomes visible
+var tmceInited = {};
+var tmceConfig = {
+    plugins: 'lists advlist table link autolink code searchreplace wordcount fullscreen charmap anchor visualblocks preview',
+    toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist outdent indent | link table | charmap | code fullscreen | removeformat',
+    menubar: 'edit view insert format',
+    height: 420,
+    skin: '{% if settings.admin_theme | default(value="dark") == "dark" %}oxide-dark{% else %}oxide{% endif %}',
+    content_css: false,
+    content_style: {% if settings.admin_theme | default(value='dark') == 'dark' %}'body { background: #2A282F; color: #f0f0f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.7; padding: 12px 16px; } a { color: #E8913A; } h1,h2,h3,h4 { color: #f3f4f6; } table { border-collapse: collapse; } table td, table th { border: 1px solid #363840; padding: 8px; }'{% else %}'body { background: #fff; color: #2a2a2a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.7; padding: 12px 16px; } a { color: #E8913A; } table { border-collapse: collapse; } table td, table th { border: 1px solid #e0e0e0; padding: 8px; }'{% endif %},
+    branding: false,
+    promotion: false,
+};
+function initTmce(id) {
+    if (tmceInited[id]) return;
+    tmceInited[id] = true;
+    tinymce.init(Object.assign({}, tmceConfig, { selector: '#' + id }));
+}
+
+// Hook into tab switching to init TinyMCE when panel becomes visible
+var origActivate = activatePanel;
+activatePanel = function(panelId) {
+    origActivate(panelId);
+    if (panelId === 'panel-privacy') setTimeout(function() { initTmce('privacy-content'); }, 50);
+    if (panelId === 'panel-terms') setTimeout(function() { initTmce('terms-content'); }, 50);
+};
+// If loading directly into a sub-tab via hash
+if (location.hash === '#panel-privacy') setTimeout(function() { initTmce('privacy-content'); }, 100);
+if (location.hash === '#panel-terms') setTimeout(function() { initTmce('terms-content'); }, 100);
+
+// Ensure TinyMCE content is synced before form submit
+document.querySelector('form[action*="settings/design"]').addEventListener('submit', function() {
+    if (typeof tinymce !== 'undefined') tinymce.triggerSave();
+});
+</script>
 {% endblock content %}
+
+{% block scripts %}
+<script src="/static/js/tinymce/tinymce.min.js"></script>
+{% endblock scripts %}

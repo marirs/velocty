@@ -33,6 +33,22 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 
 ---
 
+## Screenshots
+
+### Setup Wizard
+
+Velocty guides you through a 4-step setup wizard on first run:
+
+| Step 1 — Database | Step 2 — Your Site |
+|---|---|
+| ![Database Selection](docs/wizzard-1.png) | ![Site Name](docs/wizzard-2.png) |
+
+| Step 3 — Admin Account | Step 4 — Terms & Privacy |
+|---|---|
+| ![Admin Account](docs/wizzard-3.png) | ![Terms & Privacy](docs/wizzard-4.png) |
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -130,6 +146,8 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 - **Keyboard shortcuts** — Cmd+S to save from any form
 - **Flash notifications** — success/error toasts on save
 - **Health Dashboard** — system health with disk usage, DB stats, filesystem permission checks (owner:group, recommended perms, world-writable detection), resource monitoring, and maintenance tools (vacuum, WAL checkpoint, orphan scan, session cleanup, export). Backend-aware: adapts for SQLite vs MongoDB
+- **Cookie Consent Banner** — GDPR-compliant banner with 3 styles (minimal bar, modal, corner card), dark/light/auto theme, configurable position. Analytics scripts gated behind consent
+- **Privacy Policy & Terms of Use** — pre-filled industry-standard templates (Markdown), editable from Settings › Frontend, rendered at `/privacy` and `/terms`
 
 ### Security
 

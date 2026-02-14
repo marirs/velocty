@@ -800,8 +800,12 @@ pub fn settings_save(
     }
 
     if !errors.is_empty() {
+        let tab_frag = data.get("_tab")
+            .filter(|t| !t.is_empty())
+            .map(|t| format!("#{}", t))
+            .unwrap_or_default();
         return Err(Flash::error(
-            Redirect::to(format!("{}/settings/{}", admin_base(slug), section)),
+            Redirect::to(format!("{}/settings/{}{}", admin_base(slug), section, tab_frag)),
             errors.join(" | "),
         ));
     }
@@ -857,7 +861,11 @@ pub fn settings_save(
             "images_webp_convert", "video_upload_enabled", "video_generate_thumbnail",
         ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
-        "design" => &["design_back_to_top"],
+        "design" => &[
+            "design_back_to_top",
+            "cookie_consent_enabled", "cookie_consent_show_reject",
+            "privacy_policy_enabled", "terms_of_use_enabled",
+        ],
         "social" => &["social_brand_colors"],
         _ => &[],
     };
@@ -881,8 +889,13 @@ pub fn settings_save(
         }
     }
 
+    let tab_fragment = data.get("_tab")
+        .filter(|t| !t.is_empty())
+        .map(|t| format!("#{}", t))
+        .unwrap_or_default();
+
     Ok(Flash::success(
-        Redirect::to(format!("{}/settings/{}", admin_base(slug), section)),
+        Redirect::to(format!("{}/settings/{}{}", admin_base(slug), section, tab_fragment)),
         "Settings saved successfully",
     ))
 }

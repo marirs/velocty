@@ -200,6 +200,53 @@ Per-site admin tools (`/<admin_slug>/health`) work identically in both single-si
 
 ---
 
+## Cookie Consent & Legal Pages
+
+### Cookie Consent Banner
+
+Configurable GDPR-compliant cookie consent banner, disabled by default. When enabled:
+
+- **3 styles**: `minimal` (bottom/top bar), `modal` (centered overlay), `corner` (bottom-left card)
+- **3 themes**: `auto` (dark), `dark`, `light`
+- **3 actions**: Accept All, Necessary Only, Reject All (optional)
+- Sets `velocty_consent` cookie (365 days) with value `all`, `necessary`, or `none`
+- Analytics `<script>` tags are output as `type="text/plain" data-consent="analytics"` — they don't execute until the visitor accepts
+- On acceptance, the banner JS activates gated scripts by cloning them with the correct `type`
+
+### Privacy Policy & Terms of Use
+
+- Pre-filled with industry-standard Markdown templates at seed time
+- Editable from **Settings › Frontend** (sub-tabs: General, Privacy Policy, Terms of Use)
+- Rendered at `/privacy` and `/terms` using `pulldown-cmark` (Markdown → HTML)
+- Pages use the same site shell (sidebar, fonts, CSS) with clean legal typography
+- Return 404 when disabled
+- Enabling cookie consent auto-enables the privacy policy page
+
+### Settings
+
+| Key | Default | Description |
+|---|---|---|
+| `cookie_consent_enabled` | `false` | Show cookie consent banner |
+| `cookie_consent_style` | `minimal` | `minimal`, `modal`, `corner` |
+| `cookie_consent_position` | `bottom` | `bottom`, `top` |
+| `cookie_consent_policy_url` | `/privacy` | Link in "Learn more" |
+| `cookie_consent_show_reject` | `true` | Show "Reject All" button |
+| `cookie_consent_theme` | `auto` | `auto`, `dark`, `light` |
+| `privacy_policy_enabled` | `false` | Enable `/privacy` page |
+| `privacy_policy_content` | *(template)* | Markdown content |
+| `terms_of_use_enabled` | `false` | Enable `/terms` page |
+| `terms_of_use_content` | *(template)* | Markdown content |
+
+### Implementation
+
+- **Banner**: `src/render.rs` — `build_cookie_consent_banner()` generates inline HTML/CSS/JS
+- **Analytics gating**: `src/render.rs` — `build_analytics_scripts()` uses `type="text/plain"` when consent enabled
+- **Routes**: `src/routes/public.rs` — `GET /privacy`, `GET /terms`
+- **Rendering**: `src/render.rs` — `render_legal_page()` with `pulldown-cmark` Markdown → HTML
+- **Settings UI**: `website/templates/admin/settings/design.html.tera` — 3 sub-tabs
+
+---
+
 ## Design System
 
 ### Concept
