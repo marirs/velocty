@@ -2,9 +2,10 @@ use rocket::data::{Data, ToByteUnit};
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::response::Redirect;
+use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use crate::auth::AdminUser;
@@ -393,6 +394,24 @@ async fn save_upload(file: &mut TempFile<'_>, prefix: &str) -> Option<String> {
     }
 }
 
+// ── Image Upload API (for TinyMCE) ─────────────────────
+
+#[derive(FromForm)]
+pub struct ImageUploadForm<'f> {
+    pub file: TempFile<'f>,
+}
+
+#[post("/upload/image", data = "<form>")]
+pub async fn upload_image(
+    _admin: AdminUser,
+    mut form: Form<ImageUploadForm<'_>>,
+) -> Json<Value> {
+    match save_upload(&mut form.file, "editor").await {
+        Some(filename) => Json(json!({ "location": format!("/uploads/{}", filename) })),
+        None => Json(json!({ "error": "Upload failed" })),
+    }
+}
+
 #[post("/posts/new", data = "<form>")]
 pub async fn posts_create(
     _admin: AdminUser,
@@ -729,5 +748,6 @@ pub fn routes() -> Vec<rocket::Route> {
         import_wordpress,
         settings_page,
         settings_save,
+        upload_image,
     ]
 }

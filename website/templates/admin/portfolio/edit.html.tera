@@ -39,7 +39,7 @@
                 </div>
                 <div class="form-group">
                     <label for="description">Description</label>
-                    <textarea id="description" name="description_html" rows="10" class="editor-textarea">{% if item %}{{ item.description_html | default(value="") }}{% endif %}</textarea>
+                    <textarea id="description" name="description_html" rows="10" class="editor-textarea">{% if item %}{{ item.description_html | default(value="") | safe }}{% endif %}</textarea>
                 </div>
             </div>
         </div>
@@ -108,23 +108,55 @@
 {% endblock content %}
 
 {% block scripts %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
-<script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+<script src="/static/js/tinymce/tinymce.min.js"></script>
 <script>
-    // WYSIWYG editor for description
-    var easyMDE = new EasyMDE({
-        element: document.getElementById('description'),
-        spellChecker: false,
-        autosave: { enabled: true, uniqueId: 'portfolio-{% if item %}{{ item.id }}{% else %}new{% endif %}', delay: 10000 },
-        toolbar: [
-            'bold', 'italic', 'heading', '|',
-            'quote', 'unordered-list', 'ordered-list', '|',
-            'link', 'image', '|',
-            'preview', 'side-by-side', 'fullscreen', '|',
-            'guide'
+    tinymce.init({
+        selector: '#description',
+        plugins: 'lists advlist table link image media autolink code codesample searchreplace wordcount autoresize fullscreen quickbars charmap emoticons anchor visualblocks preview directionality',
+        toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat',
+        menubar: 'file edit view insert format tools table',
+        height: 400,
+        min_height: 300,
+        autoresize_bottom_margin: 50,
+        skin: '{% if settings.admin_theme | default(value="dark") == "dark" %}oxide-dark{% else %}oxide{% endif %}',
+        content_css: false,
+        content_style: {% if settings.admin_theme | default(value='dark') == 'dark' %}'body { background: #2A282F; color: #f0f0f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.7; padding: 12px 16px; } a { color: #E8913A; } pre { background: #262830; border: 1px solid #363840; border-radius: 6px; padding: 12px; } code { background: #262830; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; } table { border-collapse: collapse; } table td, table th { border: 1px solid #363840; padding: 8px; } blockquote { border-left: 3px solid #E8913A; margin-left: 0; padding-left: 16px; color: #9ca3af; } img { max-width: 100%; height: auto; border-radius: 6px; }'{% else %}'body { background: #fff; color: #2a2a2a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.7; padding: 12px 16px; } a { color: #E8913A; } pre { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; } code { background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; } table { border-collapse: collapse; } table td, table th { border: 1px solid #e0e0e0; padding: 8px; } blockquote { border-left: 3px solid #E8913A; margin-left: 0; padding-left: 16px; color: #777; } img { max-width: 100%; height: auto; border-radius: 6px; }'{% endif %},
+        branding: false,
+        promotion: false,
+        images_upload_url: '/admin/upload/image',
+        images_upload_credentials: true,
+        automatic_uploads: true,
+        images_reuse_filename: false,
+        file_picker_types: 'image',
+        image_advtab: true,
+        link_default_target: '_blank',
+        codesample_languages: [
+            { text: 'HTML/XML', value: 'markup' },
+            { text: 'JavaScript', value: 'javascript' },
+            { text: 'CSS', value: 'css' },
+            { text: 'Python', value: 'python' },
+            { text: 'Rust', value: 'rust' },
+            { text: 'Go', value: 'go' },
+            { text: 'Bash', value: 'bash' },
+            { text: 'SQL', value: 'sql' },
+            { text: 'JSON', value: 'json' },
+            { text: 'YAML', value: 'yaml' },
+            { text: 'TypeScript', value: 'typescript' },
+            { text: 'PHP', value: 'php' },
+            { text: 'Ruby', value: 'ruby' },
+            { text: 'Java', value: 'java' },
+            { text: 'C/C++', value: 'c' },
         ],
-        status: ['lines', 'words'],
-        minHeight: '200px',
+        quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote',
+        quickbars_insert_toolbar: 'image media table hr codesample',
+        setup: function(editor) {
+            editor.on('init', function() {
+                var form = document.getElementById('portfolio-form');
+                form.addEventListener('submit', function() {
+                    editor.save();
+                });
+            });
+        }
     });
 
     document.getElementById('title').addEventListener('input', function() {

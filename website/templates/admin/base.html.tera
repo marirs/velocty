@@ -101,6 +101,7 @@
             if (!mod) return;
             if (e.key === 's' || e.key === 'S') {
                 e.preventDefault();
+                if (typeof tinymce !== 'undefined') tinymce.triggerSave();
                 var form = document.querySelector('form');
                 if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); }
             }
