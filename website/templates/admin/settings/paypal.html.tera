@@ -4,40 +4,57 @@
 <div class="page-header"><h2>Settings — PayPal (Phase 2)</h2></div>
 
 <div class="settings-nav">
-    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/general" class="tab">Site</a>
     <a href="/admin/settings/blog" class="tab">Blog</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
-    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
     <a href="/admin/settings/images" class="tab">Images</a>
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/paypal" class="tab active">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
-<div class="form-card">
-    <h3>PayPal Commerce — Phase 2</h3>
-    <p class="text-muted">PayPal checkout, digital downloads, license generation, and sales dashboard will be available in Phase 2.</p>
+<form method="post" action="/admin/settings/paypal">
+    {% if settings.paypal_mode != "live" %}
+    <div class="form-card" style="border-left:3px solid #446D7F;background:#2A2A31">
+        <h3 style="color:#446D7F">⚠ Sandbox Mode</h3>
+        <p class="text-muted">PayPal is currently in sandbox (test) mode. No real transactions will be processed. Switch to Live mode when ready for production.</p>
+    </div>
+    {% endif %}
 
-    <form method="post" action="/admin/settings/paypal" style="margin-top:20px">
+    <div class="form-card">
+        <h3>PayPal Commerce — Phase 2</h3>
+        <p class="text-muted">PayPal checkout, digital downloads, license generation, and sales dashboard will be available in Phase 2.</p>
+        <div class="form-group" style="margin-top:16px">
+            <label for="paypal_mode">Mode</label>
+            <select id="paypal_mode" name="paypal_mode">
+                <option value="sandbox" {% if settings.paypal_mode == "sandbox" %}selected{% endif %}>Sandbox (Testing)</option>
+                <option value="live" {% if settings.paypal_mode == "live" %}selected{% endif %}>Live (Production)</option>
+            </select>
+        </div>
         <div class="form-group">
             <label for="paypal_client_id">PayPal Client ID</label>
-            <input type="text" id="paypal_client_id" name="paypal_client_id" value="{{ settings.paypal_client_id | default(value='') }}" placeholder="Prepare for Phase 2">
+            <input type="text" id="paypal_client_id" name="paypal_client_id" value="{{ settings.paypal_client_id | default(value='') }}">
         </div>
         <div class="form-group">
             <label for="paypal_secret">PayPal Secret</label>
             <input type="password" id="paypal_secret" name="paypal_secret" value="{{ settings.paypal_secret | default(value='') }}">
         </div>
+    </div>
+
+    <div class="form-card">
+        <h3>License</h3>
         <div class="form-group">
-            <label for="paypal_mode">Mode</label>
-            <select id="paypal_mode" name="paypal_mode">
-                <option value="sandbox" {% if settings.paypal_mode == "sandbox" %}selected{% endif %}>Sandbox</option>
-                <option value="live" {% if settings.paypal_mode == "live" %}selected{% endif %}>Live</option>
-            </select>
+            <label for="paypal_license_text">License Agreement Text</label>
+            <textarea id="paypal_license_text" name="paypal_license_text" rows="8" placeholder="Enter the license agreement text that buyers must agree to before purchasing...">{{ settings.paypal_license_text | default(value='') }}</textarea>
+            <span class="form-help">This text is shown to buyers during checkout and included in download emails.</span>
         </div>
-        <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
-    </form>
-</div>
+    </div>
+
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
 {% endblock content %}

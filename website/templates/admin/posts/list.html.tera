@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h2>Posts</h2>
-    <a href="/admin/posts/new" class="btn btn-primary">+ New Post</a>
+    <a href="/admin/posts/new" class="btn btn-primary">+ New Post <span class="kbd"><span class="kbd-mod">⌘</span>P</span></a>
 </div>
 
 <div class="status-tabs">

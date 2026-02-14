@@ -2,24 +2,25 @@
 
 {% block content %}
 <div class="page-header">
-    <h2>Settings — General</h2>
+    <h2>Settings — Site</h2>
 </div>
 
 <div class="settings-nav">
-    <a href="/admin/settings/general" class="tab active">General</a>
+    <a href="/admin/settings/general" class="tab active">Site</a>
     <a href="/admin/settings/blog" class="tab">Blog</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
-    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
     <a href="/admin/settings/images" class="tab">Images</a>
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
-<form method="post" action="/admin/settings/general" enctype="multipart/form-data">
+<form method="post" action="/admin/settings/general">
     <div class="form-card">
         <h3>Site Information</h3>
         <div class="form-group">
@@ -27,8 +28,8 @@
             <input type="text" id="site_name" name="site_name" value="{{ settings.site_name | default(value='Velocty') }}">
         </div>
         <div class="form-group">
-            <label for="site_tagline">Tagline</label>
-            <input type="text" id="site_tagline" name="site_tagline" value="{{ settings.site_tagline | default(value='') }}">
+            <label for="site_caption">Caption</label>
+            <input type="text" id="site_caption" name="site_caption" value="{{ settings.site_caption | default(value='') }}">
         </div>
         <div class="form-group">
             <label for="site_url">Site URL</label>
@@ -36,12 +37,82 @@
         </div>
         <div class="form-group">
             <label for="timezone">Timezone</label>
-            <input type="text" id="timezone" name="timezone" value="{{ settings.timezone | default(value='UTC') }}">
+            {% set tz = settings.timezone | default(value='UTC') %}
+            <select id="timezone" name="timezone">
+                <option value="UTC" {% if tz == "UTC" %}selected{% endif %}>UTC (±00:00)</option>
+                <optgroup label="Americas">
+                    <option value="America/New_York" {% if tz == "America/New_York" %}selected{% endif %}>New York (EST/EDT)</option>
+                    <option value="America/Chicago" {% if tz == "America/Chicago" %}selected{% endif %}>Chicago (CST/CDT)</option>
+                    <option value="America/Denver" {% if tz == "America/Denver" %}selected{% endif %}>Denver (MST/MDT)</option>
+                    <option value="America/Los_Angeles" {% if tz == "America/Los_Angeles" %}selected{% endif %}>Los Angeles (PST/PDT)</option>
+                    <option value="America/Anchorage" {% if tz == "America/Anchorage" %}selected{% endif %}>Anchorage (AKST)</option>
+                    <option value="Pacific/Honolulu" {% if tz == "Pacific/Honolulu" %}selected{% endif %}>Honolulu (HST)</option>
+                    <option value="America/Toronto" {% if tz == "America/Toronto" %}selected{% endif %}>Toronto (EST/EDT)</option>
+                    <option value="America/Vancouver" {% if tz == "America/Vancouver" %}selected{% endif %}>Vancouver (PST/PDT)</option>
+                    <option value="America/Sao_Paulo" {% if tz == "America/Sao_Paulo" %}selected{% endif %}>São Paulo (BRT)</option>
+                    <option value="America/Mexico_City" {% if tz == "America/Mexico_City" %}selected{% endif %}>Mexico City (CST)</option>
+                    <option value="America/Argentina/Buenos_Aires" {% if tz == "America/Argentina/Buenos_Aires" %}selected{% endif %}>Buenos Aires (ART)</option>
+                </optgroup>
+                <optgroup label="Europe">
+                    <option value="Europe/London" {% if tz == "Europe/London" %}selected{% endif %}>London (GMT/BST)</option>
+                    <option value="Europe/Paris" {% if tz == "Europe/Paris" %}selected{% endif %}>Paris (CET/CEST)</option>
+                    <option value="Europe/Berlin" {% if tz == "Europe/Berlin" %}selected{% endif %}>Berlin (CET/CEST)</option>
+                    <option value="Europe/Amsterdam" {% if tz == "Europe/Amsterdam" %}selected{% endif %}>Amsterdam (CET/CEST)</option>
+                    <option value="Europe/Madrid" {% if tz == "Europe/Madrid" %}selected{% endif %}>Madrid (CET/CEST)</option>
+                    <option value="Europe/Rome" {% if tz == "Europe/Rome" %}selected{% endif %}>Rome (CET/CEST)</option>
+                    <option value="Europe/Zurich" {% if tz == "Europe/Zurich" %}selected{% endif %}>Zurich (CET/CEST)</option>
+                    <option value="Europe/Moscow" {% if tz == "Europe/Moscow" %}selected{% endif %}>Moscow (MSK)</option>
+                    <option value="Europe/Istanbul" {% if tz == "Europe/Istanbul" %}selected{% endif %}>Istanbul (TRT)</option>
+                    <option value="Europe/Athens" {% if tz == "Europe/Athens" %}selected{% endif %}>Athens (EET/EEST)</option>
+                </optgroup>
+                <optgroup label="Asia">
+                    <option value="Asia/Dubai" {% if tz == "Asia/Dubai" %}selected{% endif %}>Dubai (GST, +04:00)</option>
+                    <option value="Asia/Muscat" {% if tz == "Asia/Muscat" %}selected{% endif %}>Muscat (GST, +04:00)</option>
+                    <option value="Asia/Kolkata" {% if tz == "Asia/Kolkata" %}selected{% endif %}>Mumbai / Kolkata (IST, +05:30)</option>
+                    <option value="Asia/Colombo" {% if tz == "Asia/Colombo" %}selected{% endif %}>Colombo (IST, +05:30)</option>
+                    <option value="Asia/Dhaka" {% if tz == "Asia/Dhaka" %}selected{% endif %}>Dhaka (BST, +06:00)</option>
+                    <option value="Asia/Bangkok" {% if tz == "Asia/Bangkok" %}selected{% endif %}>Bangkok (ICT, +07:00)</option>
+                    <option value="Asia/Singapore" {% if tz == "Asia/Singapore" %}selected{% endif %}>Singapore (SGT, +08:00)</option>
+                    <option value="Asia/Hong_Kong" {% if tz == "Asia/Hong_Kong" %}selected{% endif %}>Hong Kong (HKT, +08:00)</option>
+                    <option value="Asia/Shanghai" {% if tz == "Asia/Shanghai" %}selected{% endif %}>Shanghai (CST, +08:00)</option>
+                    <option value="Asia/Tokyo" {% if tz == "Asia/Tokyo" %}selected{% endif %}>Tokyo (JST, +09:00)</option>
+                    <option value="Asia/Seoul" {% if tz == "Asia/Seoul" %}selected{% endif %}>Seoul (KST, +09:00)</option>
+                    <option value="Asia/Riyadh" {% if tz == "Asia/Riyadh" %}selected{% endif %}>Riyadh (AST, +03:00)</option>
+                    <option value="Asia/Tehran" {% if tz == "Asia/Tehran" %}selected{% endif %}>Tehran (IRST, +03:30)</option>
+                    <option value="Asia/Karachi" {% if tz == "Asia/Karachi" %}selected{% endif %}>Karachi (PKT, +05:00)</option>
+                    <option value="Asia/Jakarta" {% if tz == "Asia/Jakarta" %}selected{% endif %}>Jakarta (WIB, +07:00)</option>
+                </optgroup>
+                <optgroup label="Africa">
+                    <option value="Africa/Cairo" {% if tz == "Africa/Cairo" %}selected{% endif %}>Cairo (EET, +02:00)</option>
+                    <option value="Africa/Lagos" {% if tz == "Africa/Lagos" %}selected{% endif %}>Lagos (WAT, +01:00)</option>
+                    <option value="Africa/Johannesburg" {% if tz == "Africa/Johannesburg" %}selected{% endif %}>Johannesburg (SAST, +02:00)</option>
+                    <option value="Africa/Nairobi" {% if tz == "Africa/Nairobi" %}selected{% endif %}>Nairobi (EAT, +03:00)</option>
+                    <option value="Africa/Casablanca" {% if tz == "Africa/Casablanca" %}selected{% endif %}>Casablanca (WET)</option>
+                </optgroup>
+                <optgroup label="Oceania">
+                    <option value="Australia/Sydney" {% if tz == "Australia/Sydney" %}selected{% endif %}>Sydney (AEST/AEDT)</option>
+                    <option value="Australia/Melbourne" {% if tz == "Australia/Melbourne" %}selected{% endif %}>Melbourne (AEST/AEDT)</option>
+                    <option value="Australia/Perth" {% if tz == "Australia/Perth" %}selected{% endif %}>Perth (AWST)</option>
+                    <option value="Pacific/Auckland" {% if tz == "Pacific/Auckland" %}selected{% endif %}>Auckland (NZST/NZDT)</option>
+                    <option value="Pacific/Fiji" {% if tz == "Pacific/Fiji" %}selected{% endif %}>Fiji (FJT, +12:00)</option>
+                </optgroup>
+            </select>
         </div>
         <div class="form-group">
             <label for="date_format">Date Format</label>
-            <input type="text" id="date_format" name="date_format" value="{{ settings.date_format | default(value='%B %d, %Y') }}">
-            <span class="form-help">Uses strftime format. Example: %B %d, %Y → February 13, 2026</span>
+            <select id="date_format" name="date_format">
+                {% set df = settings.date_format | default(value='%B %d, %Y') %}
+                <option value="%B %d, %Y" {% if df == "%B %d, %Y" %}selected{% endif %}>February 14, 2026</option>
+                <option value="%b %d, %Y" {% if df == "%b %d, %Y" %}selected{% endif %}>Feb 14, 2026</option>
+                <option value="%d %B %Y" {% if df == "%d %B %Y" %}selected{% endif %}>14 February 2026</option>
+                <option value="%d %b %Y" {% if df == "%d %b %Y" %}selected{% endif %}>14 Feb 2026</option>
+                <option value="%m/%d/%Y" {% if df == "%m/%d/%Y" %}selected{% endif %}>02/14/2026 (MM/DD/YYYY)</option>
+                <option value="%d/%m/%Y" {% if df == "%d/%m/%Y" %}selected{% endif %}>14/02/2026 (DD/MM/YYYY)</option>
+                <option value="%Y-%m-%d" {% if df == "%Y-%m-%d" %}selected{% endif %}>2026-02-14 (ISO 8601)</option>
+                <option value="%d.%m.%Y" {% if df == "%d.%m.%Y" %}selected{% endif %}>14.02.2026</option>
+                <option value="%B %Y" {% if df == "%B %Y" %}selected{% endif %}>February 2026</option>
+                <option value="%b %d" {% if df == "%b %d" %}selected{% endif %}>Feb 14</option>
+            </select>
         </div>
     </div>
 
@@ -49,14 +120,39 @@
         <h3>Branding</h3>
         <div class="form-group">
             <label>Logo</label>
-            <input type="file" name="site_logo" accept="image/*">
-            {% if settings.site_logo %}
-            <div class="image-preview"><img src="/uploads/{{ settings.site_logo }}" alt="Logo"></div>
-            {% endif %}
+            <div class="image-drop-zone {% if settings.site_logo %}has-image{% endif %}" id="logo-zone">
+                <input type="file" id="logo-file" accept="image/*">
+                <input type="hidden" id="site_logo" name="site_logo" value="{{ settings.site_logo | default(value='') }}">
+                {% if settings.site_logo %}
+                <img id="logo-preview" src="{{ settings.site_logo }}" alt="Logo">
+                {% else %}
+                <img id="logo-preview" src="" alt="Logo" style="display:none">
+                {% endif %}
+                <div class="drop-placeholder" id="logo-placeholder" {% if settings.site_logo %}style="display:none"{% endif %}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                    <span>Drop logo<br>or click</span>
+                </div>
+                <button type="button" class="drop-clear" id="logo-clear" title="Remove logo">&times;</button>
+            </div>
+            <span class="form-help">Recommended: PNG or SVG with transparent background</span>
         </div>
         <div class="form-group">
             <label>Favicon</label>
-            <input type="file" name="site_favicon" accept="image/*">
+            <div class="image-drop-zone square {% if settings.site_favicon %}has-image{% endif %}" id="favicon-zone">
+                <input type="file" id="favicon-file" accept="image/*">
+                <input type="hidden" id="site_favicon" name="site_favicon" value="{{ settings.site_favicon | default(value='') }}">
+                {% if settings.site_favicon %}
+                <img id="favicon-preview" src="{{ settings.site_favicon }}" alt="Favicon">
+                {% else %}
+                <img id="favicon-preview" src="" alt="Favicon" style="display:none">
+                {% endif %}
+                <div class="drop-placeholder" id="favicon-placeholder" {% if settings.site_favicon %}style="display:none"{% endif %}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                    <span>Drop icon<br>or click</span>
+                </div>
+                <button type="button" class="drop-clear" id="favicon-clear" title="Remove favicon">&times;</button>
+            </div>
+            <span class="form-help">Square image, at least 64×64px</span>
         </div>
         <div class="form-group">
             <label for="admin_email">Admin Email</label>
@@ -65,7 +161,78 @@
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>
 </form>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    function initDropZone(zoneId, fileId, hiddenId, previewId, placeholderId, clearId, maxW, maxH) {
+        var zone = document.getElementById(zoneId);
+        var fileInput = document.getElementById(fileId);
+        var hidden = document.getElementById(hiddenId);
+        var preview = document.getElementById(previewId);
+        var placeholder = document.getElementById(placeholderId);
+        var clearBtn = document.getElementById(clearId);
+
+        function loadFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    var w = img.width, h = img.height;
+                    if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                    if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    var dataUrl = canvas.toDataURL('image/webp', 0.9);
+                    if (dataUrl.length < 50) dataUrl = canvas.toDataURL('image/png');
+                    hidden.value = dataUrl;
+                    preview.src = dataUrl;
+                    preview.style.display = '';
+                    placeholder.style.display = 'none';
+                    zone.classList.add('has-image');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        zone.addEventListener('click', function(e) {
+            if (e.target === clearBtn || e.target.closest('.drop-clear')) return;
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) loadFile(this.files[0]);
+        });
+
+        zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+        });
+
+        clearBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            hidden.value = '';
+            preview.src = '';
+            preview.style.display = 'none';
+            placeholder.style.display = '';
+            zone.classList.remove('has-image');
+            fileInput.value = '';
+        });
+    }
+
+    initDropZone('logo-zone', 'logo-file', 'site_logo', 'logo-preview', 'logo-placeholder', 'logo-clear', 512, 256);
+    initDropZone('favicon-zone', 'favicon-file', 'site_favicon', 'favicon-preview', 'favicon-placeholder', 'favicon-clear', 128, 128);
+})();
+</script>
+{% endblock scripts %}

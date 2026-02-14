@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title | default(value="Dashboard") }} — Velocty Admin</title>
     <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
 </head>
 <body>
     <div class="admin-wrapper">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-logo">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                <img src="/static/images/favicon.png" alt="V" class="sidebar-icon">
+                <img src="/static/images/logo.png" alt="Velocty" class="sidebar-logo-full">
             </div>
             <nav class="sidebar-nav">
                 <a href="/admin" class="nav-item {% if page_title == 'Dashboard' %}active{% endif %}" title="Dashboard">
@@ -70,5 +72,28 @@
         </div>
     </div>
     {% block scripts %}{% endblock scripts %}
+    <script>
+    (function(){
+        var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+        document.querySelectorAll('.kbd-mod').forEach(function(el){ el.textContent = isMac ? '⌘' : 'Ctrl'; });
+        document.addEventListener('keydown', function(e){
+            var mod = isMac ? e.metaKey : e.ctrlKey;
+            if (!mod) return;
+            if (e.key === 's' || e.key === 'S') {
+                e.preventDefault();
+                var form = document.querySelector('form');
+                if (form) form.submit();
+            }
+            if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                window.location.href = '/admin/posts/new';
+            }
+            if (e.key === 'i' || e.key === 'I') {
+                e.preventDefault();
+                window.location.href = '/admin/portfolio/new';
+            }
+        });
+    })();
+    </script>
 </body>
 </html>

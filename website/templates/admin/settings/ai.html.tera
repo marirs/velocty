@@ -4,25 +4,25 @@
 <div class="page-header"><h2>Settings — AI (Phase 4)</h2></div>
 
 <div class="settings-nav">
-    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/general" class="tab">Site</a>
     <a href="/admin/settings/blog" class="tab">Blog</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
-    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
     <a href="/admin/settings/images" class="tab">Images</a>
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab active">AI</a>
 </div>
 
-<div class="form-card">
-    <h3>AI Assistant — Phase 4</h3>
-    <p class="text-muted">Pluggable LLM integration (Ollama, OpenAI, Anthropic) for content suggestions, post generation, inline assist, and theme generation will be available in Phase 4.</p>
-
-    <form method="post" action="/admin/settings/ai" style="margin-top:20px">
-        <div class="form-group">
+<form method="post" action="/admin/settings/ai">
+    <div class="form-card">
+        <h3>AI Assistant — Phase 4</h3>
+        <p class="text-muted">Pluggable LLM integration (Ollama, OpenAI, Anthropic) for content suggestions, post generation, inline assist, and theme generation will be available in Phase 4.</p>
+        <div class="form-group" style="margin-top:20px">
             <label for="ai_provider">Provider</label>
             <select id="ai_provider" name="ai_provider">
                 <option value="none" {% if settings.ai_provider == "none" %}selected{% endif %}>None (disabled)</option>
@@ -39,7 +39,8 @@
             <label for="ai_model">Model</label>
             <input type="text" id="ai_model" name="ai_model" value="{{ settings.ai_model | default(value='') }}" placeholder="e.g. gpt-4, claude-3, llama3">
         </div>
-        <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
-    </form>
-</div>
+    </div>
+
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
 {% endblock content %}

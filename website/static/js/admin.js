@@ -101,7 +101,7 @@
                     .attr('y', 4)
                     .attr('width', 0)
                     .attr('height', barHeight - 8)
-                    .attr('fill', '#2dd4bf')
+                    .attr('fill', '#E8913A')
                     .attr('rx', 3)
                     .transition()
                     .duration(600)
@@ -128,7 +128,7 @@
 
         const colorScale = d3.scaleLinear()
             .domain([0, maxCount])
-            .range(['#0a3d2e', '#2dd4bf']);
+            .range(['#282B34', '#E8913A']);
 
         const svg = d3.select(selector)
             .append('svg')

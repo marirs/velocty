@@ -1,0 +1,392 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2>Settings — Typography</h2></div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">Site</a>
+    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/typography" class="tab active">Typography</a>
+    <a href="/admin/settings/images" class="tab">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
+    <a href="/admin/settings/ai" class="tab">AI</a>
+</div>
+
+<div class="sub-tabs" style="margin-bottom:20px">
+    <button type="button" class="tab active" data-tab="font-sources">Font Sources</button>
+    <button type="button" class="tab" data-tab="custom-upload">Custom Upload</button>
+    <button type="button" class="tab" data-tab="fonts">Fonts</button>
+</div>
+
+<form method="post" action="/admin/settings/typography">
+
+    <!-- ═══ Tab 1: Font Sources ═══ -->
+    <div id="tab-font-sources">
+        <div class="form-card">
+            <h3>Font Source</h3>
+            <div class="form-group">
+                <label for="font_source">Where to load fonts from</label>
+                {% set fs = settings.font_source | default(value='system') %}
+                <select id="font_source" name="font_source">
+                    {% if settings.font_custom_name %}
+                    <optgroup label="— Custom —">
+                        <option value="custom" {% if fs == "custom" %}selected{% endif %}>{{ settings.font_custom_name }} (uploaded)</option>
+                    </optgroup>
+                    {% endif %}
+                    <optgroup label="— System —">
+                        <option value="system" {% if fs == "system" %}selected{% endif %}>System Default (fastest)</option>
+                        <option value="system-serif" {% if fs == "system-serif" %}selected{% endif %}>System Serif</option>
+                        <option value="system-mono" {% if fs == "system-mono" %}selected{% endif %}>System Monospace</option>
+                    </optgroup>
+                    <optgroup label="— Google Fonts —">
+                        <option value="google" {% if fs == "google" %}selected{% endif %}>Google Fonts</option>
+                    </optgroup>
+                    <optgroup label="— Adobe Fonts —">
+                        <option value="adobe" {% if fs == "adobe" %}selected{% endif %}>Adobe Fonts (Typekit)</option>
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-card" id="google-options" style="{% if fs != 'google' %}display:none{% endif %}">
+            <h3>Google Fonts</h3>
+            <label class="checkbox-item"><input type="checkbox" name="font_google_enabled" value="true" {% if settings.font_google_enabled == "true" %}checked{% endif %}> Enable Google Fonts</label>
+            <span class="form-help" style="margin-top:8px;display:block">When enabled, Google Fonts will be available in the <strong>Fonts</strong> tab for selection.</span>
+        </div>
+
+        <div class="form-card" id="adobe-options" style="{% if fs != 'adobe' %}display:none{% endif %}">
+            <h3>Adobe Fonts</h3>
+            <label class="checkbox-item"><input type="checkbox" name="font_adobe_enabled" value="true" {% if settings.font_adobe_enabled == "true" %}checked{% endif %}> Enable Adobe Fonts</label>
+            <div class="form-group" style="margin-top:12px">
+                <label for="font_adobe_project_id">Project ID</label>
+                <input type="text" id="font_adobe_project_id" name="font_adobe_project_id" value="{{ settings.font_adobe_project_id | default(value='') }}" placeholder="e.g. abc1def">
+                <span class="form-help">From your <a href="https://fonts.adobe.com/my_fonts#web_projects-section" target="_blank" style="color:var(--accent)">Adobe Fonts web project</a>. When enabled, Adobe Fonts will appear in the <strong>Fonts</strong> tab.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Tab 2: Custom Upload ═══ -->
+    <div id="tab-custom-upload" style="display:none">
+        <div class="form-card">
+            <h3>Upload Custom Font</h3>
+            <p class="text-muted" style="margin-bottom:16px">Upload a font file and it will appear in the Font Source dropdown and per-element selectors. Bold, italic, and other weights are extracted automatically.</p>
+
+            <div class="form-group">
+                <label for="font_custom_name">Font Family Name</label>
+                <input type="text" id="font_custom_name" name="font_custom_name" value="" placeholder="e.g. Montserrat, My Brand Font">
+                <span class="form-help">Give this font a name to identify it</span>
+            </div>
+
+            <div class="form-group">
+                <label>Font File</label>
+                <div class="image-drop-zone" id="font-drop-zone" style="width:100%;height:80px">
+                    <input type="file" id="font-file-input" name="font_custom_file" accept=".woff2,.woff,.ttf,.otf">
+                    <input type="hidden" id="font-file-name" name="font_custom_filename" value="">
+                    <div class="drop-placeholder" id="font-placeholder">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                        <span>Drop .woff2, .woff, .ttf, or .otf — or click to browse</span>
+                    </div>
+                    <div id="font-file-info" style="display:none;color:var(--text-primary);font-size:13px;pointer-events:none">
+                        <span id="font-file-label"></span>
+                    </div>
+                    <button type="button" class="drop-clear" id="font-clear" title="Remove file">&times;</button>
+                </div>
+                <span class="form-help">.woff2 recommended for best performance and smallest size</span>
+            </div>
+
+            <div style="margin-top:12px">
+                <button type="button" class="btn btn-primary" id="btn-add-font">Add Font</button>
+            </div>
+        </div>
+
+        <div class="form-card" style="margin-top:16px">
+            <h3>Uploaded Fonts</h3>
+            <div id="font-list">
+                {% if settings.font_custom_name %}
+                <div class="font-list-item" data-font="{{ settings.font_custom_name }}">
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                        <div>
+                            <strong style="color:var(--text-primary)">{{ settings.font_custom_name }}</strong>
+                            <span class="form-help" style="margin:0;margin-left:8px">Custom</span>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm font-remove" data-font="{{ settings.font_custom_name }}" style="padding:3px 10px;font-size:11px">Remove</button>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted" id="no-fonts-msg">No custom fonts uploaded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Tab 3: Fonts ═══ -->
+    {% set ge = settings.font_google_enabled | default(value='true') %}
+    {% set ae = settings.font_adobe_enabled | default(value='false') %}
+    <div id="tab-fonts" style="display:none">
+        <div class="form-card">
+            <h3>Font Assignment</h3>
+            <div class="form-group">
+                <label for="font_primary">Primary Font</label>
+                <select id="font_primary" name="font_primary">
+                    {% set fp = settings.font_primary | default(value='Inter') %}
+                    {% if settings.font_custom_name %}
+                    <optgroup label="Custom">
+                        <option value="{{ settings.font_custom_name }}" {% if fp == settings.font_custom_name %}selected{% endif %}>{{ settings.font_custom_name }}</option>
+                    </optgroup>
+                    {% endif %}
+                    <optgroup label="System">
+                        <option value="system-ui" {% if fp == "system-ui" %}selected{% endif %}>System Default</option>
+                        <option value="Georgia, serif" {% if fp == "Georgia, serif" %}selected{% endif %}>Georgia (Serif)</option>
+                        <option value="ui-monospace, monospace" {% if fp == "ui-monospace, monospace" %}selected{% endif %}>Monospace</option>
+                    </optgroup>
+                    {% if ge == "true" %}
+                    <optgroup label="Google Fonts">
+                        <option value="Inter" {% if fp == "Inter" %}selected{% endif %}>Inter</option>
+                        <option value="Roboto" {% if fp == "Roboto" %}selected{% endif %}>Roboto</option>
+                        <option value="Open Sans" {% if fp == "Open Sans" %}selected{% endif %}>Open Sans</option>
+                        <option value="Lato" {% if fp == "Lato" %}selected{% endif %}>Lato</option>
+                        <option value="Montserrat" {% if fp == "Montserrat" %}selected{% endif %}>Montserrat</option>
+                        <option value="Poppins" {% if fp == "Poppins" %}selected{% endif %}>Poppins</option>
+                        <option value="Raleway" {% if fp == "Raleway" %}selected{% endif %}>Raleway</option>
+                        <option value="Nunito" {% if fp == "Nunito" %}selected{% endif %}>Nunito</option>
+                        <option value="Playfair Display" {% if fp == "Playfair Display" %}selected{% endif %}>Playfair Display</option>
+                        <option value="Merriweather" {% if fp == "Merriweather" %}selected{% endif %}>Merriweather</option>
+                        <option value="Source Sans Pro" {% if fp == "Source Sans Pro" %}selected{% endif %}>Source Sans Pro</option>
+                        <option value="PT Sans" {% if fp == "PT Sans" %}selected{% endif %}>PT Sans</option>
+                        <option value="Work Sans" {% if fp == "Work Sans" %}selected{% endif %}>Work Sans</option>
+                        <option value="DM Sans" {% if fp == "DM Sans" %}selected{% endif %}>DM Sans</option>
+                        <option value="Josefin Sans" {% if fp == "Josefin Sans" %}selected{% endif %}>Josefin Sans</option>
+                    </optgroup>
+                    {% endif %}
+                    {% if ae == "true" %}
+                    <optgroup label="Adobe Fonts">
+                        <option value="adobe-project" {% if fp == "adobe-project" %}selected{% endif %}>From Adobe Project</option>
+                    </optgroup>
+                    {% endif %}
+                </select>
+                <span class="form-help">The main font used across your site{% if ge != "true" and ae != "true" %} — enable Google or Adobe Fonts in <strong>Font Sources</strong> for more options{% endif %}</span>
+            </div>
+
+            <label class="checkbox-item">
+                <input type="checkbox" id="font_sitewide" name="font_sitewide" value="true" {% if settings.font_sitewide == "true" %}checked{% endif %}>
+                Use this font site-wide
+            </label>
+            <span class="form-help" style="margin-bottom:16px;display:block">When enabled, the primary font is used for all elements. Turn off to assign different fonts per element.</span>
+
+            <div id="per-element-fonts" style="{% if settings.font_sitewide == 'true' %}display:none{% endif %}">
+                {% for el in ["body", "headings", "navigation", "buttons", "captions"] %}
+                {% set el_key = "font_" ~ el %}
+                {% set el_val = settings[el_key] | default(value='') %}
+                <div class="form-group">
+                    <label for="{{ el_key }}">{% if el == "body" %}Body Text{% elif el == "headings" %}Headings (H1–H6){% elif el == "navigation" %}Navigation{% elif el == "buttons" %}Buttons{% elif el == "captions" %}Captions / Small Text{% endif %}</label>
+                    <select id="{{ el_key }}" name="{{ el_key }}">
+                        <option value="" {% if el_val == "" %}selected{% endif %}>— Use primary —</option>
+                        {% if settings.font_custom_name %}
+                        <optgroup label="Custom">
+                            <option value="{{ settings.font_custom_name }}" {% if el_val == settings.font_custom_name %}selected{% endif %}>{{ settings.font_custom_name }}</option>
+                        </optgroup>
+                        {% endif %}
+                        <optgroup label="System">
+                            <option value="system-ui" {% if el_val == "system-ui" %}selected{% endif %}>System Default</option>
+                            {% if el == "body" or el == "headings" or el == "captions" %}
+                            <option value="Georgia, serif" {% if el_val == "Georgia, serif" %}selected{% endif %}>Georgia (Serif)</option>
+                            {% endif %}
+                            {% if el == "body" or el == "headings" or el == "captions" %}
+                            <option value="ui-monospace, monospace" {% if el_val == "ui-monospace, monospace" %}selected{% endif %}>Monospace</option>
+                            {% endif %}
+                        </optgroup>
+                        {% if ge == "true" %}
+                        <optgroup label="Google Fonts">
+                            <option value="Inter" {% if el_val == "Inter" %}selected{% endif %}>Inter</option>
+                            <option value="Roboto" {% if el_val == "Roboto" %}selected{% endif %}>Roboto</option>
+                            <option value="Open Sans" {% if el_val == "Open Sans" %}selected{% endif %}>Open Sans</option>
+                            <option value="Lato" {% if el_val == "Lato" %}selected{% endif %}>Lato</option>
+                            <option value="Montserrat" {% if el_val == "Montserrat" %}selected{% endif %}>Montserrat</option>
+                            <option value="Poppins" {% if el_val == "Poppins" %}selected{% endif %}>Poppins</option>
+                            <option value="Raleway" {% if el_val == "Raleway" %}selected{% endif %}>Raleway</option>
+                            <option value="Nunito" {% if el_val == "Nunito" %}selected{% endif %}>Nunito</option>
+                            <option value="Playfair Display" {% if el_val == "Playfair Display" %}selected{% endif %}>Playfair Display</option>
+                            <option value="Merriweather" {% if el_val == "Merriweather" %}selected{% endif %}>Merriweather</option>
+                            <option value="Source Sans Pro" {% if el_val == "Source Sans Pro" %}selected{% endif %}>Source Sans Pro</option>
+                            <option value="PT Sans" {% if el_val == "PT Sans" %}selected{% endif %}>PT Sans</option>
+                            <option value="Work Sans" {% if el_val == "Work Sans" %}selected{% endif %}>Work Sans</option>
+                            <option value="DM Sans" {% if el_val == "DM Sans" %}selected{% endif %}>DM Sans</option>
+                            <option value="Josefin Sans" {% if el_val == "Josefin Sans" %}selected{% endif %}>Josefin Sans</option>
+                        </optgroup>
+                        {% endif %}
+                        {% if ae == "true" %}
+                        <optgroup label="Adobe Fonts">
+                            <option value="adobe-project" {% if el_val == "adobe-project" %}selected{% endif %}>From Adobe Project</option>
+                        </optgroup>
+                        {% endif %}
+                    </select>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3>Font Sizes</h3>
+            <div class="form-group">
+                <label for="font_size_body">Body</label>
+                <input type="text" id="font_size_body" name="font_size_body" value="{{ settings.font_size_body | default(value='16px') }}">
+            </div>
+            <div class="form-group">
+                <label for="font_size_h1">H1</label>
+                <input type="text" id="font_size_h1" name="font_size_h1" value="{{ settings.font_size_h1 | default(value='2.5rem') }}">
+            </div>
+            <div class="form-group">
+                <label for="font_size_h2">H2</label>
+                <input type="text" id="font_size_h2" name="font_size_h2" value="{{ settings.font_size_h2 | default(value='2rem') }}">
+            </div>
+            <div class="form-group">
+                <label for="font_size_h3">H3</label>
+                <input type="text" id="font_size_h3" name="font_size_h3" value="{{ settings.font_size_h3 | default(value='1.75rem') }}">
+            </div>
+            <span class="form-help">Accepts px, rem, or em values (e.g. 16px, 2rem)</span>
+        </div>
+
+        <div class="form-card">
+            <h3>Text Transform</h3>
+            <div class="form-group">
+                <label for="font_text_transform">Default Text Transform</label>
+                <select id="font_text_transform" name="font_text_transform">
+                    <option value="none" {% if settings.font_text_transform == "none" %}selected{% endif %}>None</option>
+                    <option value="uppercase" {% if settings.font_text_transform == "uppercase" %}selected{% endif %}>UPPERCASE</option>
+                    <option value="lowercase" {% if settings.font_text_transform == "lowercase" %}selected{% endif %}>lowercase</option>
+                    <option value="capitalize" {% if settings.font_text_transform == "capitalize" %}selected{% endif %}>Capitalize</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    // Sub-tab switching
+    var tabIds = ['tab-font-sources', 'tab-custom-upload', 'tab-fonts'];
+    var tabs = document.querySelectorAll('.sub-tabs .tab');
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            this.classList.add('active');
+            var active = this.dataset.tab;
+            tabIds.forEach(function(id) {
+                document.getElementById(id).style.display = id === 'tab-' + active ? '' : 'none';
+            });
+        });
+    });
+
+    // Font source conditional panels
+    var sourceSelect = document.getElementById('font_source');
+    function toggleSourcePanels() {
+        var v = sourceSelect.value;
+        document.getElementById('google-options').style.display = v === 'google' ? '' : 'none';
+        document.getElementById('adobe-options').style.display = v === 'adobe' ? '' : 'none';
+    }
+    sourceSelect.addEventListener('change', toggleSourcePanels);
+
+    // Site-wide toggle
+    var swToggle = document.getElementById('font_sitewide');
+    var perEl = document.getElementById('per-element-fonts');
+    swToggle.addEventListener('change', function() {
+        perEl.style.display = this.checked ? 'none' : '';
+    });
+
+    // Font file dropzone
+    var fontZone = document.getElementById('font-drop-zone');
+    var fontInput = document.getElementById('font-file-input');
+    var fontPlaceholder = document.getElementById('font-placeholder');
+    var fontInfo = document.getElementById('font-file-info');
+    var fontLabel = document.getElementById('font-file-label');
+    var fontClear = document.getElementById('font-clear');
+    var fontFileName = document.getElementById('font-file-name');
+
+    function showFontFile(file) {
+        if (!file) return;
+        var ext = file.name.split('.').pop().toLowerCase();
+        if (!['woff2','woff','ttf','otf'].includes(ext)) {
+            alert('Please upload a .woff2, .woff, .ttf, or .otf file');
+            return;
+        }
+        fontLabel.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+        fontFileName.value = file.name;
+        fontPlaceholder.style.display = 'none';
+        fontInfo.style.display = '';
+        fontZone.classList.add('has-image');
+
+        // Auto-fill font name from filename if empty
+        var nameInput = document.getElementById('font_custom_name');
+        if (!nameInput.value) {
+            var name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+            name = name.replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+            nameInput.value = name;
+        }
+    }
+
+    fontZone.addEventListener('click', function(e) {
+        if (e.target === fontClear || e.target.closest('.drop-clear')) return;
+        fontInput.click();
+    });
+
+    fontInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) showFontFile(this.files[0]);
+    });
+
+    fontZone.addEventListener('dragover', function(e) { e.preventDefault(); fontZone.classList.add('dragover'); });
+    fontZone.addEventListener('dragleave', function() { fontZone.classList.remove('dragover'); });
+    fontZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        fontZone.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            fontInput.files = e.dataTransfer.files;
+            showFontFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    fontClear.addEventListener('click', function(e) {
+        e.stopPropagation();
+        fontInput.value = '';
+        fontFileName.value = '';
+        fontPlaceholder.style.display = '';
+        fontInfo.style.display = 'none';
+        fontZone.classList.remove('has-image');
+    });
+
+    // Add Font button
+    document.getElementById('btn-add-font').addEventListener('click', function() {
+        var nameInput = document.getElementById('font_custom_name');
+        if (!nameInput.value.trim()) { alert('Please enter a font family name'); nameInput.focus(); return; }
+        if (!fontInput.files || !fontInput.files[0]) { alert('Please select a font file'); return; }
+        // Submit the form to save the font
+        document.querySelector('form').submit();
+    });
+
+    // Remove font buttons
+    document.querySelectorAll('.font-remove').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (!confirm('Remove "' + this.dataset.font + '"?')) return;
+            var item = this.closest('.font-list-item');
+            item.remove();
+            // Clear the hidden font_custom_name so it gets removed on next save
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'font_custom_name';
+            hidden.value = '';
+            document.querySelector('form').appendChild(hidden);
+            document.querySelector('form').submit();
+        });
+    });
+})();
+</script>
+{% endblock scripts %}

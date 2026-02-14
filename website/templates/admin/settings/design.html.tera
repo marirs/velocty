@@ -4,29 +4,21 @@
 <div class="page-header"><h2>Settings — Design</h2></div>
 
 <div class="settings-nav">
-    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/general" class="tab">Site</a>
     <a href="/admin/settings/blog" class="tab">Blog</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
-    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
     <a href="/admin/settings/images" class="tab">Images</a>
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab active">Design</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
 <form method="post" action="/admin/settings/design">
-    <div class="form-card">
-        <h3>Active Design</h3>
-        <div class="form-group">
-            <label for="design_active_id">Active Design ID</label>
-            <input type="number" id="design_active_id" name="design_active_id" value="{{ settings.design_active_id | default(value='1') }}" min="1">
-            <span class="form-help">Manage designs from the <a href="/admin/designs">Designs page</a></span>
-        </div>
-    </div>
-
     <div class="form-card">
         <h3>UI Features</h3>
         <label class="checkbox-item"><input type="checkbox" name="design_back_to_top" value="true" {% if settings.design_back_to_top == "true" %}checked{% endif %}> Show back-to-top button</label>
@@ -34,13 +26,57 @@
 
     <div class="form-card">
         <h3>Social Links</h3>
+        <span class="form-help" style="margin-bottom:16px;display:block">Paste your profile URL for each platform. Leave blank to hide.</span>
         <div class="form-group">
-            <label for="social_links">Social Links (JSON)</label>
-            <textarea id="social_links" name="social_links" rows="6" class="mono">{{ settings.social_links | default(value='[]') }}</textarea>
-            <span class="form-help">Format: [{"platform":"twitter","url":"https://...","icon":"twitter"}]</span>
+            <label for="social_instagram">Instagram</label>
+            <input type="url" id="social_instagram" name="social_instagram" value="{{ settings.social_instagram | default(value='') }}" placeholder="https://instagram.com/yourname">
         </div>
-        <label class="checkbox-item"><input type="checkbox" name="social_brand_colors" value="true" {% if settings.social_brand_colors == "true" %}checked{% endif %}> Use brand colors for social icons</label>
+        <div class="form-group">
+            <label for="social_twitter">X (Twitter)</label>
+            <input type="url" id="social_twitter" name="social_twitter" value="{{ settings.social_twitter | default(value='') }}" placeholder="https://x.com/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_facebook">Facebook</label>
+            <input type="url" id="social_facebook" name="social_facebook" value="{{ settings.social_facebook | default(value='') }}" placeholder="https://facebook.com/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_youtube">YouTube</label>
+            <input type="url" id="social_youtube" name="social_youtube" value="{{ settings.social_youtube | default(value='') }}" placeholder="https://youtube.com/@yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_tiktok">TikTok</label>
+            <input type="url" id="social_tiktok" name="social_tiktok" value="{{ settings.social_tiktok | default(value='') }}" placeholder="https://tiktok.com/@yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_linkedin">LinkedIn</label>
+            <input type="url" id="social_linkedin" name="social_linkedin" value="{{ settings.social_linkedin | default(value='') }}" placeholder="https://linkedin.com/in/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_pinterest">Pinterest</label>
+            <input type="url" id="social_pinterest" name="social_pinterest" value="{{ settings.social_pinterest | default(value='') }}" placeholder="https://pinterest.com/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_behance">Behance</label>
+            <input type="url" id="social_behance" name="social_behance" value="{{ settings.social_behance | default(value='') }}" placeholder="https://behance.net/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_dribbble">Dribbble</label>
+            <input type="url" id="social_dribbble" name="social_dribbble" value="{{ settings.social_dribbble | default(value='') }}" placeholder="https://dribbble.com/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_github">GitHub</label>
+            <input type="url" id="social_github" name="social_github" value="{{ settings.social_github | default(value='') }}" placeholder="https://github.com/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_vimeo">Vimeo</label>
+            <input type="url" id="social_vimeo" name="social_vimeo" value="{{ settings.social_vimeo | default(value='') }}" placeholder="https://vimeo.com/yourname">
+        </div>
+        <div class="form-group">
+            <label for="social_500px">500px</label>
+            <input type="url" id="social_500px" name="social_500px" value="{{ settings.social_500px | default(value='') }}" placeholder="https://500px.com/p/yourname">
+        </div>
+        <label class="checkbox-item" style="margin-top:12px"><input type="checkbox" name="social_brand_colors" value="true" {% if settings.social_brand_colors == "true" %}checked{% endif %}> Use brand colors for social icons</label>
     </div>
-    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}

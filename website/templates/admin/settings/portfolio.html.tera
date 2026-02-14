@@ -4,32 +4,49 @@
 <div class="page-header"><h2>Settings — Portfolio</h2></div>
 
 <div class="settings-nav">
-    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/general" class="tab">Site</a>
     <a href="/admin/settings/blog" class="tab">Blog</a>
     <a href="/admin/settings/portfolio" class="tab active">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
-    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
     <a href="/admin/settings/images" class="tab">Images</a>
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
 <form method="post" action="/admin/settings/portfolio">
     <div class="form-card">
-        <h3>Grid Display</h3>
+        <h3>Display</h3>
+        <div class="form-group">
+            <label for="portfolio_display_type">Display Type</label>
+            <select id="portfolio_display_type" name="portfolio_display_type">
+                <option value="grid" {% if settings.portfolio_display_type == "grid" %}selected{% endif %}>Grid</option>
+                <option value="masonry" {% if settings.portfolio_display_type == "masonry" %}selected{% endif %}>Masonry</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="portfolio_grid_columns">Columns</label>
+            <select id="portfolio_grid_columns" name="portfolio_grid_columns">
+                <option value="2" {% if settings.portfolio_grid_columns == "2" %}selected{% endif %}>2</option>
+                <option value="3" {% if settings.portfolio_grid_columns == "3" %}selected{% endif %}>3</option>
+                <option value="4" {% if settings.portfolio_grid_columns == "4" %}selected{% endif %}>4</option>
+                <option value="5" {% if settings.portfolio_grid_columns == "5" %}selected{% endif %}>5</option>
+            </select>
+        </div>
         <div class="form-group">
             <label for="portfolio_items_per_page">Items Per Page</label>
             <input type="number" id="portfolio_items_per_page" name="portfolio_items_per_page" value="{{ settings.portfolio_items_per_page | default(value='12') }}" min="1">
         </div>
         <div class="form-group">
-            <label for="portfolio_grid_columns">Grid Columns</label>
-            <select id="portfolio_grid_columns" name="portfolio_grid_columns">
-                <option value="2" {% if settings.portfolio_grid_columns == "2" %}selected{% endif %}>2</option>
-                <option value="3" {% if settings.portfolio_grid_columns == "3" %}selected{% endif %}>3</option>
-                <option value="4" {% if settings.portfolio_grid_columns == "4" %}selected{% endif %}>4</option>
+            <label for="portfolio_pagination_type">Pagination</label>
+            <select id="portfolio_pagination_type" name="portfolio_pagination_type">
+                <option value="classic" {% if settings.portfolio_pagination_type == "classic" %}selected{% endif %}>Classic (1, 2, 3…)</option>
+                <option value="load_more" {% if settings.portfolio_pagination_type == "load_more" %}selected{% endif %}>Load More button</option>
+                <option value="infinite" {% if settings.portfolio_pagination_type == "infinite" %}selected{% endif %}>Infinite scroll (AJAX)</option>
             </select>
         </div>
     </div>
@@ -43,14 +60,37 @@
                 <option value="single" {% if settings.portfolio_click_mode == "single" %}selected{% endif %}>Single page</option>
             </select>
         </div>
-        <div class="form-group">
-            <label for="portfolio_lightbox_border_color">Lightbox Border Color</label>
-            <input type="color" id="portfolio_lightbox_border_color" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}">
+        <div id="lightbox-options" style="{% if settings.portfolio_click_mode == 'single' %}display:none{% endif %}">
+            <div class="form-group">
+                <label>Border Color</label>
+                <div class="color-picker-inline">
+                    <button type="button" class="color-dot" data-picker="border" style="background:{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}"></button>
+                    <input type="hidden" id="portfolio_lightbox_border_color" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}">
+                </div>
+            </div>
+            <div class="checkbox-color-row">
+                <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_title" value="true" {% if settings.portfolio_lightbox_show_title == "true" %}checked{% endif %}> Show title in lightbox</label>
+                <div class="color-picker-inline">
+                    <button type="button" class="color-dot" data-picker="title" style="background:{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}"></button>
+                    <input type="hidden" id="portfolio_lightbox_title_color" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}">
+                </div>
+            </div>
+            <div class="checkbox-color-row">
+                <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_tags" value="true" {% if settings.portfolio_lightbox_show_tags == "true" %}checked{% endif %}> Show tags in lightbox</label>
+                <div class="color-picker-inline">
+                    <button type="button" class="color-dot" data-picker="tags" style="background:{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}"></button>
+                    <input type="hidden" id="portfolio_lightbox_tag_color" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}">
+                </div>
+            </div>
+            <div class="checkbox-color-row">
+                <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_nav" value="true" {% if settings.portfolio_lightbox_nav == "true" %}checked{% endif %}> Show prev/next navigation</label>
+                <div class="color-picker-inline">
+                    <button type="button" class="color-dot" data-picker="nav" style="background:{{ settings.portfolio_lightbox_nav_color | default(value='#FFFFFF') }}"></button>
+                    <input type="hidden" id="portfolio_lightbox_nav_color" name="portfolio_lightbox_nav_color" value="{{ settings.portfolio_lightbox_nav_color | default(value='#FFFFFF') }}">
+                </div>
+            </div>
+            <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_keyboard" value="true" {% if settings.portfolio_lightbox_keyboard == "true" %}checked{% endif %}> Keyboard navigation</label>
         </div>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_title" value="true" {% if settings.portfolio_lightbox_show_title == "true" %}checked{% endif %}> Show title in lightbox</label>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_tags" value="true" {% if settings.portfolio_lightbox_show_tags == "true" %}checked{% endif %}> Show tags in lightbox</label>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_nav" value="true" {% if settings.portfolio_lightbox_nav == "true" %}checked{% endif %}> Show prev/next navigation</label>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_keyboard" value="true" {% if settings.portfolio_lightbox_keyboard == "true" %}checked{% endif %}> Keyboard navigation</label>
     </div>
 
     <div class="form-card">
@@ -62,6 +102,122 @@
         <label class="checkbox-item"><input type="checkbox" name="portfolio_show_tags" value="true" {% if settings.portfolio_show_tags == "true" %}checked{% endif %}> Show tags below images</label>
     </div>
 
-    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+document.getElementById('portfolio_click_mode').addEventListener('change', function() {
+    document.getElementById('lightbox-options').style.display = this.value === 'lightbox' ? '' : 'none';
+});
+
+(function() {
+    var SWATCHES = [
+        '#FF4444','#888888','#FF8800','#FFCC00','#44CC44','#44DDBB','#4488FF','#4444FF',
+        '#FFAAAA','#FF44FF','#AA44FF','#44FFAA','#44DDDD','#44AAFF','#8844FF','#AA88FF',
+        '#D4A017','#FFFFFF','#000000','#333333','#666666','#999999','#CCCCCC','#EEEEEE'
+    ];
+
+    var pickerMap = {
+        border: document.getElementById('portfolio_lightbox_border_color'),
+        title:  document.getElementById('portfolio_lightbox_title_color'),
+        tags:   document.getElementById('portfolio_lightbox_tag_color'),
+        nav:    document.getElementById('portfolio_lightbox_nav_color')
+    };
+
+    var activePopover = null;
+
+    function closePopover() {
+        if (activePopover) { activePopover.remove(); activePopover = null; }
+    }
+
+    function createPopover(dot) {
+        closePopover();
+        var key = dot.dataset.picker;
+        var hiddenInput = pickerMap[key];
+        var currentVal = hiddenInput.value || '#FFFFFF';
+
+        var pop = document.createElement('div');
+        pop.className = 'color-popover';
+
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'color-popover-close';
+        close.textContent = '\u00d7';
+        close.addEventListener('click', function(e) { e.stopPropagation(); closePopover(); });
+        pop.appendChild(close);
+
+        var grid = document.createElement('div');
+        grid.className = 'color-popover-grid';
+        SWATCHES.forEach(function(c) {
+            var s = document.createElement('button');
+            s.type = 'button';
+            s.className = 'color-popover-swatch';
+            if (c.toUpperCase() === currentVal.toUpperCase()) s.classList.add('active');
+            s.style.background = c;
+            s.dataset.color = c;
+            s.addEventListener('click', function(e) {
+                e.stopPropagation();
+                pickColor(c, dot, hiddenInput, pop);
+            });
+            grid.appendChild(s);
+        });
+        pop.appendChild(grid);
+
+        var hexRow = document.createElement('div');
+        hexRow.className = 'color-popover-hex';
+        var preview = document.createElement('span');
+        preview.className = 'color-popover-preview';
+        preview.style.background = currentVal;
+        hexRow.appendChild(preview);
+        var label = document.createElement('span');
+        label.className = 'color-popover-label';
+        label.textContent = 'HEX';
+        hexRow.appendChild(label);
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'color-popover-input';
+        inp.value = currentVal;
+        inp.maxLength = 7;
+        inp.addEventListener('input', function() {
+            var v = this.value;
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                pickColor(v.toUpperCase(), dot, hiddenInput, pop);
+            }
+        });
+        inp.addEventListener('click', function(e) { e.stopPropagation(); });
+        hexRow.appendChild(inp);
+        pop.appendChild(hexRow);
+
+        dot.parentElement.appendChild(pop);
+        activePopover = pop;
+    }
+
+    function pickColor(hex, dot, hiddenInput, pop) {
+        dot.style.background = hex;
+        hiddenInput.value = hex;
+        var preview = pop.querySelector('.color-popover-preview');
+        if (preview) preview.style.background = hex;
+        var inp = pop.querySelector('.color-popover-input');
+        if (inp && inp.value.toUpperCase() !== hex.toUpperCase()) inp.value = hex;
+        pop.querySelectorAll('.color-popover-swatch').forEach(function(s) {
+            s.classList.toggle('active', s.dataset.color.toUpperCase() === hex.toUpperCase());
+        });
+    }
+
+    document.querySelectorAll('.color-dot').forEach(function(dot) {
+        dot.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (activePopover && activePopover.parentElement === dot.parentElement) {
+                closePopover();
+            } else {
+                createPopover(dot);
+            }
+        });
+    });
+
+    document.addEventListener('click', function() { closePopover(); });
+})();
+</script>
+{% endblock scripts %}

@@ -333,8 +333,8 @@ pub fn settings_page(
     section: &str,
 ) -> Option<Template> {
     let valid_sections = [
-        "general", "blog", "portfolio", "comments", "fonts", "images", "seo", "security",
-        "design", "paypal", "ai",
+        "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
+        "design", "paypal", "users", "ai",
     ];
 
     if !valid_sections.contains(&section) {

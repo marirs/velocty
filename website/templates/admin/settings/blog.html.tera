@@ -6,16 +6,17 @@
 </div>
 
 <div class="settings-nav">
-    <a href="/admin/settings/general" class="tab">General</a>
+    <a href="/admin/settings/general" class="tab">Site</a>
     <a href="/admin/settings/blog" class="tab active">Blog</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
-    <a href="/admin/settings/fonts" class="tab">Fonts</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
     <a href="/admin/settings/images" class="tab">Images</a>
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
@@ -28,13 +29,21 @@
         </div>
         <div class="form-group">
             <label for="blog_display_type">Display Type</label>
-            <select id="blog_display_type" name="blog_display_type">
+            <select id="blog_display_type" name="blog_display_type" onchange="toggleBlogOptions()">
                 <option value="grid" {% if settings.blog_display_type == "grid" %}selected{% endif %}>Grid</option>
                 <option value="masonry" {% if settings.blog_display_type == "masonry" %}selected{% endif %}>Masonry</option>
                 <option value="list" {% if settings.blog_display_type == "list" %}selected{% endif %}>List</option>
             </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="blog-columns-group">
+            <label for="blog_grid_columns">Columns</label>
+            <select id="blog_grid_columns" name="blog_grid_columns">
+                <option value="2" {% if settings.blog_grid_columns == "2" %}selected{% endif %}>2</option>
+                <option value="3" {% if settings.blog_grid_columns == "3" %}selected{% endif %}>3</option>
+                <option value="4" {% if settings.blog_grid_columns == "4" %}selected{% endif %}>4</option>
+            </select>
+        </div>
+        <div class="form-group" id="blog-list-style-group">
             <label for="blog_list_style">List Style</label>
             <select id="blog_list_style" name="blog_list_style">
                 <option value="compact" {% if settings.blog_list_style == "compact" %}selected{% endif %}>Compact</option>
@@ -44,6 +53,15 @@
         <div class="form-group">
             <label for="blog_excerpt_words">Excerpt Word Count</label>
             <input type="number" id="blog_excerpt_words" name="blog_excerpt_words" value="{{ settings.blog_excerpt_words | default(value='40') }}" min="10" max="200">
+            <span class="form-help">Uses the post excerpt if available, otherwise auto-generates from post content.</span>
+        </div>
+        <div class="form-group">
+            <label for="blog_pagination_type">Pagination</label>
+            <select id="blog_pagination_type" name="blog_pagination_type">
+                <option value="classic" {% if settings.blog_pagination_type == "classic" %}selected{% endif %}>Classic (1, 2, 3…)</option>
+                <option value="load_more" {% if settings.blog_pagination_type == "load_more" %}selected{% endif %}>Load More button</option>
+                <option value="infinite" {% if settings.blog_pagination_type == "infinite" %}selected{% endif %}>Infinite scroll (AJAX)</option>
+            </select>
         </div>
     </div>
 
@@ -56,7 +74,18 @@
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>
 </form>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+function toggleBlogOptions() {
+    var type = document.getElementById('blog_display_type').value;
+    document.getElementById('blog-list-style-group').style.display = (type === 'list') ? '' : 'none';
+    document.getElementById('blog-columns-group').style.display = (type === 'grid' || type === 'masonry') ? '' : 'none';
+}
+toggleBlogOptions();
+</script>
+{% endblock scripts %}

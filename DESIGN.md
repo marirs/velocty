@@ -29,45 +29,72 @@ Full dark UI with ultra-narrow icon sidebar that expands on hover.
 └──┴───────────────────────────────────────────────────────────┘
 ```
 
-- **Sidebar:** 60px wide (icon-only), expands to 200px on hover with labels. Dark (`#0a0a1a`), fixed.
-- **Top bar:** Dark (`#0f0f23`), thin ~50px. Page title left, admin avatar + logout right.
-- **Content area:** Dark (`#0f0f23`), padded, scrollable. Cards use `#1a1a2e`.
+- **Sidebar:** 60px wide (icon-only), expands to 200px on hover with labels. Dark (`#262830`), fixed.
+- **Top bar:** Dark (`#282B34`), thin ~50px. Page title left, admin avatar + logout right.
+- **Content area:** Dark (`#262830`), padded, scrollable. Cards use `#2A2A31`.
 - **Responsive:** Sidebar collapses to bottom tab bar on mobile (< 768px).
 - **Animations:** Sidebar expand 200ms ease, card hover lift, chart transitions.
 
 ### Color Palette (Admin — Full Dark UI)
 
-| Element | Color | Hex |
+Based on a custom dark palette with warm grey tones and orange accent from the Velocty V_ logo.
+
+![Colour Palette](data/colour-palette.png)
+
+#### Backgrounds
+
+| Element | Hex | CSS Variable |
 |---|---|---|
-| Page background | Deep dark | `#0f0f23` |
-| Card / panel background | Dark navy | `#1a1a2e` |
-| Card hover | Slightly lighter | `#222240` |
-| Sidebar background | Darkest | `#0a0a1a` |
-| Sidebar icon default | Muted gray | `#6b7280` |
-| Sidebar icon active | Teal accent | `#2dd4bf` |
-| Sidebar icon hover | Light gray | `#e0e0e0` |
-| Sidebar expanded bg | Dark | `#0f0f23` |
-| Top bar background | Deep dark | `#0f0f23` |
-| Top bar border | Subtle | `#1a1a2e` |
-| Primary / accent | Teal | `#2dd4bf` |
-| Primary hover | Darker teal | `#14b8a6` |
-| Danger button | Red | `#ef4444` |
-| Success badge | Green | `#22c55e` |
-| Warning badge | Amber | `#f59e0b` |
-| Info badge | Blue | `#3b82f6` |
-| Text primary | Near white | `#f0f0f0` |
-| Text secondary | Muted | `#9ca3af` |
-| Text tertiary | Dim | `#6b7280` |
-| Input background | Dark | `#252542` |
-| Input border | Subtle | `#3a3a5c` |
-| Input focus border | Teal | `#2dd4bf` |
-| Input text | Light | `#e0e0e0` |
-| Table row hover | Highlight | `#252542` |
-| Table header | Muted | `#9ca3af` |
-| Dividers / borders | Subtle | `#2a2a4a` |
-| Scrollbar track | Dark | `#1a1a2e` |
-| Scrollbar thumb | Muted | `#3a3a5c` |
-| Chart colors (D3) | Palette | `#2dd4bf`, `#3b82f6`, `#8b5cf6`, `#f59e0b`, `#ef4444`, `#22c55e`, `#ec4899`, `#06b6d4` |
+| Page background | `#262830` | `--bg-page` |
+| Card / panel background | `#2A2A31` | `--bg-card` |
+| Card hover | `#2A282F` | `--bg-card-hover` |
+| Sidebar background | `#262830` | `--bg-sidebar` |
+| Sidebar expanded bg | `#282B34` | `--bg-sidebar-expanded` |
+| Top bar background | `#282B34` | `--bg-topbar` |
+| Input background | `#2A282F` | `--bg-input` |
+| Input focus background | `rgba(40,43,52,0.9)` | — |
+
+#### Borders
+
+| Element | Hex | CSS Variable |
+|---|---|---|
+| Subtle dividers / borders | `#363840` | `--border-subtle` |
+| Input / interactive borders | `#3E4148` | `--border-input` |
+
+#### Primary & Secondary Colors
+
+| Role | Color | Hex | Usage |
+|---|---|---|---|
+| **Primary / Accent** | Orange | `#E8913A` | Buttons, active states, links, focus rings, logo underline |
+| **Primary hover** | Dark orange | `#D07A2F` | Button hover, gradient end |
+| **Primary gradient dark** | Deep orange | `#B8691F` | Button gradient dark end |
+| **Secondary / Info** | Blue Surf | `#446D7F` | Info badges, banners, secondary highlights |
+| **Button dark text** | Near black | `#1E2028` | Text on bright accent buttons |
+
+#### Semantic / Status Colors
+
+| Role | Color | Hex | Usage |
+|---|---|---|---|
+| **Danger** | Red | `#ef4444` | Delete buttons, error alerts, destructive actions |
+| **Success** | Green | `#22c55e` | Published badges, success alerts, confirmations |
+| **Warning** | Amber | `#f59e0b` | Draft badges, caution alerts |
+| **Info** | Blue Surf | `#446D7F` | Info banners (e.g. sandbox mode), secondary highlights |
+
+#### Text
+
+| Element | Hex | CSS Variable |
+|---|---|---|
+| Text primary (headings, body) | `#f0f0f0` | `--text-primary` |
+| Text secondary (labels, muted) | `#9ca3af` | `--text-secondary` |
+| Text tertiary (help text, dim) | `#6b7280` | `--text-tertiary` |
+
+#### Charts (D3)
+
+| Element | Colors |
+|---|---|
+| Bar chart fill | `#E8913A` (accent) |
+| Calendar heatmap range | `#282B34` → `#E8913A` |
+| Multi-series palette | `#E8913A`, `#446D7F`, `#8b5cf6`, `#f59e0b`, `#ef4444`, `#22c55e`, `#ec4899`, `#06b6d4` |
 
 ### Typography (Admin)
 
@@ -111,7 +138,7 @@ Collapsed (60px):          Expanded (200px on hover):
 ```
 
 - Icons are SVG (Lucide icon set — lightweight, consistent, MIT licensed)
-- Active item: teal left border (3px `#2dd4bf`) + icon turns teal
+- Active item: orange left border (3px `#E8913A`) + icon turns orange
 - Hover: icon brightens to `#e0e0e0`
 - Settings icon click: expands sub-menu in the expanded sidebar view
 - Admin avatar at bottom: click for profile/logout dropdown
@@ -210,8 +237,8 @@ Built-in analytics — no Google Analytics, no third-party scripts. All data fro
 │  │  │  Jan ░░▒▒▓▓██░░▒▒░░░░▒▒▓▓░░▒▒░░░░▒▒▓▓██▓▓▒▒░░           ││
 │  │  │  Feb ░░▒▒▓▓██████▓▓▒▒░░▒▒▓▓                               ││
 │  │  │                                                            ││
-│  │  │  Teal intensity scale: lightest (#0a3d2e) → brightest     ││
-│  │  │  (#2dd4bf)                                                 ││
+│  │  │  Orange intensity scale: lightest (#282B34) → brightest    ││
+│  │  │  (#E8913A)                                                 ││
 │  │  └────────────────────────────────────────────────────────────┘│
 │  │                                                                │
 │  │  ┌─ Top Portfolio ────────────┐  ┌─ Top Referrers ───────────┐│
