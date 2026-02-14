@@ -47,14 +47,40 @@
         </div>
 
         <div class="form-card">
-            <h3>Password</h3>
+            <h3>Authentication</h3>
+            {% set email_enabled = settings.email_gmail_enabled == "true" or settings.email_resend_enabled == "true" or settings.email_ses_enabled == "true" or settings.email_postmark_enabled == "true" or settings.email_brevo_enabled == "true" or settings.email_sendpulse_enabled == "true" or settings.email_mailgun_enabled == "true" or settings.email_moosend_enabled == "true" or settings.email_mandrill_enabled == "true" or settings.email_sparkpost_enabled == "true" or settings.email_smtp_enabled == "true" %}
             <div class="form-group">
-                <label for="new_password">New Password</label>
-                <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
+                <label>Login Method</label>
+                <div class="seg-control">
+                    <input type="radio" id="login_method_password" name="login_method" value="password" {% if settings.login_method != "magic_link" %}checked{% endif %}>
+                    <label for="login_method_password">Email &amp; Password</label>
+                    <input type="radio" id="login_method_magic" name="login_method" value="magic_link" {% if settings.login_method == "magic_link" %}checked{% endif %} {% if not email_enabled %}disabled{% endif %}>
+                    <label for="login_method_magic">Magic Link</label>
+                </div>
+                {% if not email_enabled %}
+                <span class="form-help" style="color:var(--warning)">Magic Link requires an email provider. Enable one in <a href="/{{ admin_slug }}/settings/email" style="color:var(--accent)">Email settings</a> first.</span>
+                {% else %}
+                <span class="form-help">Magic Link sends a one-time login link to your email — no password needed.</span>
+                {% endif %}
             </div>
-            <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password">
+
+            <div id="auth-password-fields" {% if settings.login_method == "magic_link" %}style="display:none"{% endif %}>
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password">
+                </div>
+            </div>
+
+            <div id="auth-magic-fields" {% if settings.login_method != "magic_link" %}style="display:none"{% endif %}>
+                <div class="form-group">
+                    <label>Magic Link will be sent to</label>
+                    <input type="text" value="{{ settings.admin_email | default(value='—') }}" readonly style="opacity:0.7;cursor:default">
+                    <span class="form-help">This is your admin email from <a href="/{{ admin_slug }}/settings/users" style="color:var(--accent)">User settings</a>.</span>
+                </div>
             </div>
         </div>
 
@@ -260,6 +286,22 @@
             document.getElementById('login-captcha-fields').disabled = !this.checked;
         });
     }
+
+    // Toggle auth method: password fields vs magic link fields
+    var radios = document.querySelectorAll('input[name="login_method"]');
+    var pwFields = document.getElementById('auth-password-fields');
+    var mlFields = document.getElementById('auth-magic-fields');
+    radios.forEach(function(r) {
+        r.addEventListener('change', function() {
+            if (this.value === 'magic_link') {
+                if (pwFields) pwFields.style.display = 'none';
+                if (mlFields) mlFields.style.display = '';
+            } else {
+                if (pwFields) pwFields.style.display = '';
+                if (mlFields) mlFields.style.display = 'none';
+            }
+        });
+    });
 })();
 </script>
 {% endblock scripts %}

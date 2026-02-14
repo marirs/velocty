@@ -754,6 +754,22 @@ pub fn settings_save(
         }
     }
 
+    // Magic Link requires at least one email provider
+    if section == "security" {
+        if data.get("login_method").map(|v| v.as_str()) == Some("magic_link") {
+            let email_keys = [
+                "email_gmail_enabled", "email_resend_enabled", "email_ses_enabled",
+                "email_postmark_enabled", "email_brevo_enabled", "email_sendpulse_enabled",
+                "email_mailgun_enabled", "email_moosend_enabled", "email_mandrill_enabled",
+                "email_sparkpost_enabled", "email_smtp_enabled",
+            ];
+            let any_email = email_keys.iter().any(|k| Setting::get_or(pool, k, "false") == "true");
+            if !any_email {
+                errors.push("Magic Link login requires at least one email provider to be enabled in Email settings".to_string());
+            }
+        }
+    }
+
     // Blog/Portfolio slug: both cannot be empty at the same time
     if section == "blog" {
         let blog_slug = data.get("blog_slug").map(|v| v.trim()).unwrap_or("");
@@ -832,6 +848,21 @@ pub fn settings_save(
     }
 
     let _ = Setting::set_many(pool, &data);
+
+    // If email settings changed and no providers remain enabled, revert magic link to password
+    if section == "email" {
+        let email_keys = [
+            "email_gmail_enabled", "email_resend_enabled", "email_ses_enabled",
+            "email_postmark_enabled", "email_brevo_enabled", "email_sendpulse_enabled",
+            "email_mailgun_enabled", "email_moosend_enabled", "email_mandrill_enabled",
+            "email_sparkpost_enabled", "email_smtp_enabled",
+        ];
+        let any_email = email_keys.iter().any(|k| Setting::get_or(pool, k, "false") == "true");
+        if !any_email && Setting::get_or(pool, "login_method", "password") == "magic_link" {
+            let _ = Setting::set(pool, "login_method", "password");
+        }
+    }
+
     Ok(Flash::success(
         Redirect::to(format!("{}/settings/{}", admin_base(slug), section)),
         "Settings saved successfully",

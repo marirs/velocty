@@ -220,6 +220,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("admin_avatar", ""),
         // Security
         ("admin_slug", "admin"),
+        ("login_method", "password"),
         ("mfa_enabled", "false"),
         ("mfa_secret", ""),
         ("mfa_recovery_codes", "[]"),

@@ -749,6 +749,37 @@ input[type="file"]::file-selector-button:hover {
     box-shadow: 0 0 0 3px rgba(232,145,58,0.25);
 }
 
+/* ── Segmented Control (Pill Toggle) ─────────────── */
+.seg-control {
+    display: inline-flex;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+.seg-control input[type="radio"] { display: none; }
+.seg-control label {
+    padding: 6px 16px;
+    font-size: 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 150ms;
+    user-select: none;
+    white-space: nowrap;
+}
+.seg-control label:hover { color: var(--text-primary); }
+.seg-control input[type="radio"]:checked + label {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 500;
+}
+.seg-control input[type="radio"]:disabled + label {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* ── Keyboard Shortcut Badge ──────────────────────── */
 .kbd {
     display: inline-flex;
