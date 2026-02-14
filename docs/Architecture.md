@@ -309,7 +309,7 @@ The lightbox intercepts clicks with JS; the underlying `<a>` always points to th
 
 | Key | Description | Default |
 |---|---|---|
-| `images_storage_path` | Upload directory | "uploads/" |
+| `images_storage_path` | Upload directory | "website/site/uploads/" |
 | `images_max_upload_mb` | Max upload size in MB | "10" |
 | `images_thumb_small` | Small thumbnail dimensions | "150x150" |
 | `images_thumb_medium` | Medium thumbnail dimensions | "300x300" |
@@ -330,7 +330,39 @@ The lightbox intercepts clicks with JS; the underlying `<a>` always points to th
 | `seo_canonical_base` | Canonical URL base | "" (uses site_url) |
 | `seo_robots_txt` | Custom robots.txt content | "User-agent: *\nAllow: /" |
 
-### Design
+### SEO — Webmaster Tools
+
+| Key | Description | Default |
+|---|---|---|
+| `seo_google_verification` | Google Search Console verification code | "" |
+| `seo_bing_verification` | Bing Webmaster Tools verification code | "" |
+| `seo_yandex_verification` | Yandex Webmaster verification code | "" |
+| `seo_pinterest_verification` | Pinterest domain verification code | "" |
+| `seo_baidu_verification` | Baidu Webmaster verification code | "" |
+
+### SEO — Analytics Providers
+
+| Key | Description | Default |
+|---|---|---|
+| `seo_ga_enabled` | Enable Google Analytics (GA4) | "false" |
+| `seo_ga_measurement_id` | GA4 Measurement ID (G-XXXXXXXXXX) | "" |
+| `seo_plausible_enabled` | Enable Plausible Analytics | "false" |
+| `seo_plausible_domain` | Plausible tracked domain | "" |
+| `seo_plausible_host` | Plausible instance URL | "https://plausible.io" |
+| `seo_fathom_enabled` | Enable Fathom Analytics | "false" |
+| `seo_fathom_site_id` | Fathom Site ID | "" |
+| `seo_matomo_enabled` | Enable Matomo Analytics | "false" |
+| `seo_matomo_url` | Matomo instance URL | "" |
+| `seo_matomo_site_id` | Matomo Site ID | "1" |
+| `seo_cloudflare_analytics_enabled` | Enable Cloudflare Web Analytics | "false" |
+| `seo_cloudflare_analytics_token` | Cloudflare beacon token | "" |
+| `seo_clicky_enabled` | Enable Clicky Analytics | "false" |
+| `seo_clicky_site_id` | Clicky Site ID | "" |
+| `seo_umami_enabled` | Enable Umami Analytics | "false" |
+| `seo_umami_website_id` | Umami Website ID | "" |
+| `seo_umami_host` | Umami instance URL | "https://analytics.umami.is" |
+
+### Frontend
 
 | Key | Description | Default |
 |---|---|---|
@@ -553,57 +585,27 @@ velocty/
 │   └── import/
 │       ├── mod.rs
 │       └── wordpress.rs             # WP XML parser (Phase 1)
-├── templates/                       # Tera templates (admin panel only)
-│   ├── admin/
-│   │   ├── base.html                # Admin layout shell
-│   │   ├── login.html
-│   │   ├── dashboard.html
-│   │   ├── posts/
-│   │   │   ├── list.html
-│   │   │   └── edit.html
-│   │   ├── portfolio/
-│   │   │   ├── list.html
-│   │   │   └── edit.html
-│   │   ├── comments/
-│   │   │   └── list.html
-│   │   ├── settings/
-│   │   │   ├── general.html
-│   │   │   ├── blog.html
-│   │   │   ├── portfolio.html
-│   │   │   ├── comments.html
-│   │   │   ├── fonts.html
-│   │   │   ├── images.html
-│   │   │   ├── seo.html
-│   │   │   ├── security.html
-│   │   │   └── design.html
-│   │   └── import/
-│   │       └── index.html
-│   └── default_design/             # Hardcoded default design (Phase 1)
-│       ├── homepage.html
-│       ├── blog_list.html
-│       ├── blog_single.html
-│       ├── portfolio_grid.html
-│       ├── portfolio_single.html
-│       ├── page.html
-│       └── 404.html
-├── static/                          # Static assets for admin
-│   ├── css/
-│   │   └── admin.css
-│   └── js/
-│       ├── admin.js                 # General admin interactions
-│       ├── d3.v7.min.js             # D3.js library (~250KB, admin-only)
-│       └── dashboard/
-│           ├── sankey.js            # Visitor flow chart
-│           ├── sunburst.js          # Content breakdown chart
-│           ├── choropleth.js        # World map chart
-│           ├── stream.js            # Activity stream chart
-│           ├── calendar.js          # Calendar heatmap
-│           ├── radial.js            # Top portfolio radial bars
-│           ├── referrers.js         # Top referrers horizontal bars
-│           └── force-graph.js       # Tag relationships force graph
-├── uploads/                         # User uploads (images, files)
-├── designs/                         # Saved GrapesJS designs (Phase 3)
-└── velocty.db                       # SQLite database (created at runtime)
+├── website/
+│   ├── site/                        # Site-specific data
+│   │   ├── db/velocty.db            # SQLite database (created at runtime)
+│   │   ├── uploads/                 # User uploads (images, files)
+│   │   └── designs/                 # Saved GrapesJS designs (Phase 3)
+│   ├── static/                      # Static assets for admin
+│   │   ├── css/
+│   │   │   └── admin.css
+│   │   └── js/
+│   │       ├── admin.js
+│   │       └── tinymce/             # Self-hosted TinyMCE 7
+│   └── templates/                   # Tera templates (admin panel)
+│       └── admin/
+│           ├── base.html.tera
+│           ├── login.html.tera
+│           ├── dashboard.html.tera
+│           ├── posts/
+│           ├── portfolio/
+│           ├── comments/
+│           ├── settings/
+│           └── import/
 ```
 
 ---

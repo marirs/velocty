@@ -29,6 +29,22 @@ A **Super Admin** panel manages all sites from a central dashboard.
 
 ### Storage Layout
 
+#### Single-Site Mode (default)
+
+Site-specific data lives under `website/site/`, keeping it separate from shared assets:
+
+```
+website/
+├── site/                       # All site-specific data
+│   ├── db/velocty.db           # SQLite database
+│   ├── uploads/                # User uploads
+│   └── designs/                # Saved page designs
+├── templates/                  # Shared Tera templates
+└── static/                     # Shared static assets (CSS, JS, TinyMCE)
+```
+
+#### Multi-Site Mode (`--features multi-site`)
+
 Site folders use **random UUIDs** so the filesystem doesn't reveal which database belongs to which site. Only `sites.db` knows the mapping.
 
 ```
@@ -36,21 +52,19 @@ website/
 ├── sites.db                    # Central registry (super-admin, site list, hostname→UUID mapping)
 ├── sites/
 │   ├── a3f7c2e1-9b4d-4e8a-b6f0-1234abcd5678/
-│   │   ├── db/
-│   │   │   └── velocty.db     # Site-specific database
+│   │   ├── db/velocty.db       # Site-specific database
 │   │   ├── uploads/            # Site-specific uploads
 │   │   └── designs/            # Site-specific designs
 │   ├── e8b12f4a-7c3d-41a9-9e5f-abcdef012345/
-│   │   ├── db/
-│   │   │   └── velocty.db
+│   │   ├── db/velocty.db
 │   │   ├── uploads/
 │   │   └── designs/
 │   └── ...
-├── templates/                  # Shared Tera templates (admin + visitor)
-├── static/                     # Shared static assets (CSS, JS, TinyMCE)
-└── db/
-    └── velocty.db              # Only used in single-site mode
+├── templates/                  # Shared Tera templates
+└── static/                     # Shared static assets (CSS, JS, TinyMCE)
 ```
+
+Note: each site under `sites/<uuid>/` has the same internal structure as `site/` in single-site mode. This makes migration seamless.
 
 ### Central Registry (`sites.db`)
 
@@ -244,12 +258,31 @@ Host-based is cleaner and recommended. Path-based can be added later if needed.
 
 ## Migration Path
 
-Existing single-site installations can migrate to multi-site:
+Migration from single-site to multi-site is **fully automatic**:
+
+### Automatic Migration Flow
+
+```
+Old flat layout (pre-migration)     Boot auto-migration          Enable multi-site
+website/db/velocty.db          →  website/site/db/velocty.db  →  website/sites/<uuid>/db/velocty.db
+website/uploads/               →  website/site/uploads/       →  website/sites/<uuid>/uploads/
+website/designs/               →  website/site/designs/       →  website/sites/<uuid>/designs/
+```
+
+### Step 1: Boot Migration (automatic, single-site)
+
+On every startup, `boot::migrate_to_site_layout()` checks if the old flat layout exists (`website/db/velocty.db`). If so, it moves `db/`, `uploads/`, and `designs/` into `website/site/`. This is idempotent — it only runs once.
+
+### Step 2: Multi-Site Migration (automatic)
 
 1. Recompile with `--features multi-site`
-2. Run the binary — it detects no `sites.db` and enters super-admin setup
-3. Create super admin account
-4. "Import existing site" option moves `website/db/velocty.db` and `website/uploads/` into `website/sites/<uuid>/`
+2. Run the binary
+3. `site::migrate_single_to_multi()` detects `website/site/` and automatically:
+   - Generates a random UUID
+   - Moves `website/site/` → `website/sites/<uuid>/`
+   - Registers the site in `sites.db` with the hostname
+4. Creates super-admin setup at `/super/setup`
+5. All existing data is preserved — zero manual intervention
 
 ---
 

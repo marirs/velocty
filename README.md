@@ -103,7 +103,9 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 - **Open Graph & Twitter Card** meta tags
 - **Canonical URLs**
 - **Custom robots.txt**
-- **All configurable** from Settings > SEO
+- **Webmaster Tools** — verification codes for Google Search Console, Bing, Yandex, Pinterest, Baidu (auto-injected into `<head>`)
+- **Third-party Analytics** — Google Analytics (GA4), Plausible, Fathom, Matomo, Cloudflare Web Analytics, Clicky, Umami — each with enable/disable toggle (scripts auto-injected into visitor pages)
+- **All configurable** from Settings > SEO (tabbed: General, Webmaster Tools, plus per-provider analytics tabs)
 
 ### Analytics (Built-in, Privacy-First)
 
@@ -168,9 +170,9 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 | **Comments** | Enable/disable, moderation mode, spam protection, rate limits |
 | **Typography** | Fonts, sizes, sources, per-element assignment |
 | **Images** | Upload path, max size, thumbnail dimensions, quality, WebP |
-| **SEO** | Title template, meta defaults, sitemap, structured data, robots.txt |
+| **SEO** | Title template, meta defaults, sitemap, structured data, robots.txt, webmaster verification, 7 analytics providers |
 | **Security** | Admin slug, auth method, MFA, sessions, rate limits, captcha, anti-spam |
-| **Design** | Active design, back-to-top button |
+| **Frontend** | Active design, back-to-top button |
 | **Social** | Social media links with brand color icons |
 | **Email** | 11 provider configurations |
 | **Commerce** | 7 payment providers, currency, download limits, license template |
@@ -238,13 +240,18 @@ velocty/
 │   ├── models/                  # Data models (Post, Portfolio, Category, etc.)
 │   └── routes/                  # Route handlers (admin, auth, public, API, super_admin)
 ├── website/
+│   ├── site/                    # Site-specific data (single-site mode)
+│   │   ├── db/velocty.db        # SQLite database
+│   │   ├── uploads/             # User uploads
+│   │   └── designs/             # Saved page designs
 │   ├── templates/               # Tera templates (admin panel + super admin)
 │   ├── static/                  # CSS, JS, images, TinyMCE
-│   ├── designs/                 # Saved page designs
-│   ├── db/                      # SQLite database (single-site mode)
-│   ├── uploads/                 # User uploads (single-site mode)
 │   ├── sites.db                 # Central registry (multi-site mode only)
 │   └── sites/                   # Per-site data with UUID folders (multi-site mode only)
+│       └── <uuid>/              # Each site mirrors the site/ structure
+│           ├── db/velocty.db
+│           ├── uploads/
+│           └── designs/
 └── GeoLite2-City.mmdb           # Optional GeoIP database
 ```
 
