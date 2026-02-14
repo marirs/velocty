@@ -90,6 +90,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         </main>
     </div>
     <script>{lightbox_js}</script>
+    {image_protection_js}
 </body>
 </html>"#,
         seo_meta = seo_meta,
@@ -103,6 +104,15 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         year = chrono::Utc::now().format("%Y"),
         body_html = body_html,
         lightbox_js = LIGHTBOX_JS,
+        image_protection_js = if settings
+            .get("portfolio_image_protection")
+            .and_then(|v| v.as_str())
+            .unwrap_or("false") == "true"
+        {
+            IMAGE_PROTECTION_JS
+        } else {
+            ""
+        },
     )
 }
 
@@ -564,6 +574,20 @@ const LIGHTBOX_JS: &str = r#"
     });
 })();
 "#;
+
+const IMAGE_PROTECTION_JS: &str = r#"<script>
+(function(){
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.tagName === 'IMG') { e.preventDefault(); }
+    });
+    document.addEventListener('dragstart', function(e) {
+        if (e.target.tagName === 'IMG') { e.preventDefault(); }
+    });
+    var style = document.createElement('style');
+    style.textContent = '.masonry-grid img, .portfolio-image img, .lb-image { -webkit-user-select: none; user-select: none; pointer-events: auto; }';
+    document.head.appendChild(style);
+})();
+</script>"#;
 
 const DEFAULT_CSS: &str = r#"
 * { margin: 0; padding: 0; box-sizing: border-box; }

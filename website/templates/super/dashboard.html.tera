@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velocty Super Admin — Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+        .topbar { background: #16213e; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2a4a; }
+        .topbar h1 { font-size: 18px; color: #E8913A; }
+        .topbar a { color: #888; text-decoration: none; font-size: 13px; }
+        .topbar a:hover { color: #e0e0e0; }
+        .container { max-width: 900px; margin: 32px auto; padding: 0 24px; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-row h2 { font-size: 20px; }
+        .btn { padding: 8px 20px; background: #E8913A; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #D07A2F; }
+        table { width: 100%; border-collapse: collapse; background: #16213e; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px 16px; text-align: left; font-size: 14px; }
+        th { background: #0f3460; color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { border-top: 1px solid #2a2a4a; }
+        tr:hover td { background: rgba(232,145,58,0.05); }
+        .status { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .status-active { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .status-suspended { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .status-maintenance { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .actions a { color: #E8913A; text-decoration: none; font-size: 13px; }
+        .actions a:hover { text-decoration: underline; }
+        .empty { text-align: center; padding: 60px 20px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Velocty Super Admin</h1>
+        <a href="/super/logout">Sign Out</a>
+    </div>
+    <div class="container">
+        <div class="header-row">
+            <h2>Sites</h2>
+            <a href="/super/sites/new" class="btn">+ New Site</a>
+        </div>
+        {% if sites and sites | length > 0 %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Site</th>
+                    <th>Hostname</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for site in sites %}
+                <tr>
+                    <td><strong>{{ site.display_name }}</strong></td>
+                    <td>{{ site.hostname }}</td>
+                    <td>
+                        <span class="status status-{{ site.status }}">
+                            {% if site.status == "active" %}● Active{% elif site.status == "suspended" %}○ Suspended{% else %}◐ {{ site.status | capitalize }}{% endif %}
+                        </span>
+                    </td>
+                    <td class="actions">
+                        <a href="/super/sites/{{ site.id }}">Manage</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">
+            <p>No sites yet. Create your first site to get started.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

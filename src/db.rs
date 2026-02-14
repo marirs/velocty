@@ -5,12 +5,24 @@ use rusqlite::params;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 pub fn init_pool() -> Result<DbPool, Box<dyn std::error::Error>> {
-    let manager = SqliteConnectionManager::file("website/db/velocty.db");
-    let pool = Pool::builder().max_size(10).build(manager)?;
+    init_pool_at("website/db/velocty.db").map_err(|e| e.into())
+}
+
+pub fn init_pool_at(path: &str) -> Result<DbPool, String> {
+    // Ensure parent directory exists
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let manager = SqliteConnectionManager::file(path);
+    let pool = Pool::builder()
+        .max_size(10)
+        .build(manager)
+        .map_err(|e| e.to_string())?;
 
     // Enable WAL mode for better concurrent read performance
-    let conn = pool.get()?;
-    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+    let conn = pool.get().map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
+        .map_err(|e| e.to_string())?;
 
     Ok(pool)
 }

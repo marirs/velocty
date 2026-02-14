@@ -21,6 +21,7 @@ impl<'r> Responder<'r, 'static> for NoCacheTemplate {
 use crate::auth;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::rate_limit::RateLimiter;
 use crate::AdminSlug;
 
 #[derive(Debug, FromForm, Deserialize)]
@@ -57,13 +58,26 @@ pub fn login_submit(
     form: Form<LoginForm>,
     pool: &State<DbPool>,
     admin_slug: &State<AdminSlug>,
+    limiter: &State<RateLimiter>,
     cookies: &CookieJar<'_>,
 ) -> Result<Redirect, Template> {
+    let theme = Setting::get_or(pool, "admin_theme", "dark");
+    let ip_hash = auth::hash_ip(&form.email);
+    let rate_key = format!("login:{}", ip_hash);
+    let max_attempts = Setting::get_i64(pool, "login_rate_limit").max(1) as u64;
+    let window = std::time::Duration::from_secs(15 * 60);
+
+    // Check rate limit before processing
+    if !limiter.check_and_record(&rate_key, max_attempts, window) {
+        let mut ctx = HashMap::new();
+        ctx.insert("error".to_string(), "Too many login attempts. Please try again in 15 minutes.".to_string());
+        ctx.insert("admin_theme".to_string(), theme);
+        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        return Err(Template::render("admin/login", &ctx));
+    }
+
     let stored_hash = Setting::get(pool, "admin_password_hash").unwrap_or_default();
     let admin_email = Setting::get_or(pool, "admin_email", "");
-
-    // Verify credentials
-    let theme = Setting::get_or(pool, "admin_theme", "dark");
 
     if !admin_email.is_empty() && form.email != admin_email {
         let mut ctx = HashMap::new();

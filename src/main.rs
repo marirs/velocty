@@ -9,6 +9,7 @@ mod auth;
 mod boot;
 mod db;
 mod images;
+mod rate_limit;
 mod render;
 mod rss;
 mod seo;
@@ -17,6 +18,9 @@ mod import;
 mod license;
 mod models;
 mod routes;
+
+#[cfg(feature = "multi-site")]
+mod site;
 
 use rocket::response::content::RawHtml;
 use rocket::fairing::{Fairing, Info, Kind};
@@ -27,6 +31,12 @@ use models::settings::Setting;
 /// Holds the admin URL slug, read from DB at startup.
 /// Shared via Rocket managed state so routes, fairings, and templates can access it.
 pub struct AdminSlug(pub String);
+
+/// Holds the blog URL slug (e.g. "journal", "blog"), read from DB at startup.
+pub struct BlogSlug(pub String);
+
+/// Holds the portfolio URL slug (e.g. "portfolio", "gallery"), read from DB at startup.
+pub struct PortfolioSlug(pub String);
 
 pub struct NoCacheAdmin;
 
@@ -70,14 +80,23 @@ fn rocket() -> _ {
     db::seed_defaults(&pool).expect("Failed to seed default settings");
 
     let admin_slug = Setting::get_or(&pool, "admin_slug", "admin");
+    let blog_slug = Setting::get_or(&pool, "blog_slug", "journal");
+    let portfolio_slug = Setting::get_or(&pool, "portfolio_slug", "portfolio");
     let admin_mount = format!("/{}", admin_slug);
     let admin_api_mount = format!("/{}/api", admin_slug);
+    let blog_mount = format!("/{}", blog_slug);
+    let portfolio_mount = format!("/{}", portfolio_slug);
 
     eprintln!("Admin panel mounted at: {}", admin_mount);
+    eprintln!("Blog mounted at: {}", blog_mount);
+    eprintln!("Portfolio mounted at: {}", portfolio_mount);
 
-    rocket::build()
+    let mut rocket = rocket::build()
         .manage(pool)
         .manage(AdminSlug(admin_slug))
+        .manage(BlogSlug(blog_slug))
+        .manage(PortfolioSlug(portfolio_slug))
+        .manage(rate_limit::RateLimiter::new())
         .attach(Template::fairing())
         .attach(analytics::AnalyticsFairing)
         .attach(NoCacheAdmin)
@@ -85,7 +104,15 @@ fn rocket() -> _ {
         .mount("/uploads", FileServer::from("website/uploads"))
         .mount(
             "/",
-            routes::public::routes(),
+            routes::public::root_routes(),
+        )
+        .mount(
+            &blog_mount,
+            routes::public::blog_routes(),
+        )
+        .mount(
+            &portfolio_mount,
+            routes::public::portfolio_routes(),
         )
         .mount(
             &admin_mount,
@@ -103,5 +130,20 @@ fn rocket() -> _ {
             &admin_mount,
             routes::auth::routes(),
         )
-        .register("/", catchers![not_found, server_error])
+        .register("/", catchers![not_found, server_error]);
+
+    // Multi-site: initialize registry and mount super admin routes
+    #[cfg(feature = "multi-site")]
+    {
+        let registry = site::init_registry().expect("Failed to initialize site registry");
+        site::run_registry_migrations(&registry).expect("Failed to run registry migrations");
+        eprintln!("Multi-site mode enabled. Super admin at: /super/");
+        rocket = rocket
+            .manage(registry)
+            .manage(site::SitePoolManager::new())
+            .attach(site::SiteResolver)
+            .mount("/super", routes::super_admin::routes());
+    }
+
+    rocket
 }

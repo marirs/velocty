@@ -8,6 +8,7 @@ use crate::db::DbPool;
 use crate::models::comment::{Comment, CommentForm};
 use crate::models::portfolio::PortfolioItem;
 use crate::models::settings::Setting;
+use crate::rate_limit::RateLimiter;
 
 // ── Like / Unlike toggle ───────────────────────────────
 
@@ -119,7 +120,25 @@ pub struct CommentSubmit {
 }
 
 #[post("/comment", format = "json", data = "<form>")]
-pub fn comment_submit(pool: &State<DbPool>, form: Json<CommentSubmit>) -> Json<Value> {
+pub fn comment_submit(
+    pool: &State<DbPool>,
+    limiter: &State<RateLimiter>,
+    form: Json<CommentSubmit>,
+) -> Json<Value> {
+    // Rate limit by author email or name
+    let rate_id = form.author_email.as_deref().unwrap_or(&form.author_name);
+    let ip_hash = auth::hash_ip(rate_id);
+    let rate_key = format!("comment:{}", ip_hash);
+    let max_attempts = Setting::get_i64(pool, "comments_rate_limit").max(1) as u64;
+    let window = std::time::Duration::from_secs(15 * 60);
+
+    if !limiter.check_and_record(&rate_key, max_attempts, window) {
+        return Json(json!({
+            "success": false,
+            "error": "Too many comments. Please wait before posting again."
+        }));
+    }
+
     let comment_form = CommentForm {
         post_id: form.post_id,
         content_type: form.content_type.clone(),

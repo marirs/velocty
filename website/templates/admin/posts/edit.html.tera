@@ -93,6 +93,15 @@
                     <textarea id="meta_description" name="meta_description" rows="2" maxlength="160">{% if post %}{{ post.meta_description | default(value="") }}{% endif %}</textarea>
                     <span class="char-count">0/160</span>
                 </div>
+                {% if post %}
+                <div class="form-group" style="margin-top:12px">
+                    <button type="button" id="seo-check-btn" class="btn btn-secondary" style="width:100%" onclick="runSeoCheck('post', {{ post.id }})">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        SEO Check
+                    </button>
+                    <div id="seo-results" style="display:none;margin-top:10px"></div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -222,5 +231,30 @@
             zone.classList.remove('has-image');
         });
     })();
+
+    // SEO Check
+    function runSeoCheck(type, id) {
+        var btn = document.getElementById('seo-check-btn');
+        var results = document.getElementById('seo-results');
+        btn.disabled = true;
+        btn.textContent = 'Checking…';
+        fetch('/{{ admin_slug }}/api/seo-check/' + type + '/' + id)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { results.innerHTML = '<p style="color:var(--danger)">' + data.error + '</p>'; results.style.display=''; return; }
+                var icons = { pass: '✅', warn: '⚠️', fail: '❌' };
+                var colors = { pass: 'var(--success,#22c55e)', warn: 'var(--warning,#f59e0b)', fail: 'var(--danger,#ef4444)' };
+                var html = '<div style="text-align:center;margin-bottom:8px"><strong style="font-size:28px;color:' + colors[data.grade==='A'||data.grade==='B'?'pass':data.grade==='C'?'warn':'fail'] + '">' + data.grade + '</strong><br><span style="font-size:12px;color:var(--text-secondary)">' + data.score + '/' + data.total + ' checks passed</span></div>';
+                html += '<div style="font-size:12px;line-height:1.8">';
+                data.checks.forEach(function(c) {
+                    html += '<div style="display:flex;gap:6px;align-items:flex-start"><span>' + icons[c.status] + '</span><div><strong>' + c.check + '</strong><br><span style="color:var(--text-tertiary)">' + c.message + '</span></div></div>';
+                });
+                html += '</div>';
+                results.innerHTML = html;
+                results.style.display = '';
+            })
+            .catch(function() { results.innerHTML = '<p style="color:var(--danger)">Failed to run SEO check.</p>'; results.style.display=''; })
+            .finally(function() { btn.disabled = false; btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>SEO Check'; });
+    }
 </script>
 {% endblock scripts %}

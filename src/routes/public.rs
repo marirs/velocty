@@ -47,7 +47,7 @@ pub fn homepage(pool: &State<DbPool>) -> RawHtml<String> {
 
 // ── Blog ───────────────────────────────────────────────
 
-#[get("/blog?<page>")]
+#[get("/?<page>")]
 pub fn blog_list(pool: &State<DbPool>, page: Option<i64>) -> RawHtml<String> {
     let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
@@ -70,7 +70,7 @@ pub fn blog_list(pool: &State<DbPool>, page: Option<i64>) -> RawHtml<String> {
     RawHtml(render::render_page(pool, "blog_list", &context))
 }
 
-#[get("/blog/<slug>")]
+#[get("/<slug>", rank = 5)]
 pub fn blog_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<String>> {
     let post = Post::find_by_slug(pool, slug)?;
     if post.status != "published" {
@@ -100,7 +100,7 @@ pub fn blog_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<String>> 
     Some(RawHtml(render::render_page(pool, "blog_single", &context)))
 }
 
-#[get("/blog/category/<slug>?<page>")]
+#[get("/category/<slug>?<page>")]
 pub fn blog_by_category(
     pool: &State<DbPool>,
     slug: &str,
@@ -160,11 +160,244 @@ pub fn blog_by_category(
     Some(RawHtml(render::render_page(pool, "blog_list", &context)))
 }
 
+#[get("/tag/<slug>?<page>")]
+pub fn blog_by_tag(
+    pool: &State<DbPool>,
+    slug: &str,
+    page: Option<i64>,
+) -> Option<RawHtml<String>> {
+    let tag = Tag::find_by_slug(pool, slug)?;
+    let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+    let settings = Setting::all(pool);
+
+    let conn = pool.get().ok()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT p.* FROM posts p
+             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'post'
+             WHERE ct.tag_id = ?1 AND p.status = 'published'
+             ORDER BY p.created_at DESC LIMIT ?2 OFFSET ?3",
+        )
+        .ok()?;
+
+    let posts: Vec<Post> = stmt
+        .query_map(
+            rusqlite::params![tag.id, per_page, offset],
+            |row| {
+                Ok(Post {
+                    id: row.get("id")?,
+                    title: row.get("title")?,
+                    slug: row.get("slug")?,
+                    content_json: row.get("content_json")?,
+                    content_html: row.get("content_html")?,
+                    excerpt: row.get("excerpt")?,
+                    featured_image: row.get("featured_image")?,
+                    meta_title: row.get("meta_title")?,
+                    meta_description: row.get("meta_description")?,
+                    status: row.get("status")?,
+                    published_at: row.get("published_at")?,
+                    created_at: row.get("created_at")?,
+                    updated_at: row.get("updated_at")?,
+                })
+            },
+        )
+        .ok()?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM posts p
+             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'post'
+             WHERE ct.tag_id = ?1 AND p.status = 'published'",
+            rusqlite::params![tag.id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    let total_pages = (total as f64 / per_page as f64).ceil() as i64;
+
+    let context = json!({
+        "settings": settings,
+        "posts": posts,
+        "tag": tag,
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "page_type": "blog_list",
+        "seo": seo::build_meta(pool, Some(&tag.name), None, &format!("/blog/tag/{}", slug)),
+    });
+
+    Some(RawHtml(render::render_page(pool, "blog_list", &context)))
+}
+
+// ── Archives ──────────────────────────────────────────
+
+#[get("/archives")]
+pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
+    let settings = Setting::all(pool);
+
+    let conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => {
+            return RawHtml(render::render_page(pool, "archives", &json!({
+                "settings": settings,
+                "archives": [],
+                "page_type": "archives",
+                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+            })));
+        }
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT strftime('%Y', published_at) as year, strftime('%m', published_at) as month,
+                COUNT(*) as count
+         FROM posts WHERE status = 'published' AND published_at IS NOT NULL
+         GROUP BY year, month ORDER BY year DESC, month DESC",
+    ) {
+        Ok(s) => s,
+        Err(_) => {
+            return RawHtml(render::render_page(pool, "archives", &json!({
+                "settings": settings,
+                "archives": [],
+                "page_type": "archives",
+                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+            })));
+        }
+    };
+
+    let archive_entries: Vec<serde_json::Value> = stmt
+        .query_map([], |row| {
+            let year: String = row.get(0)?;
+            let month: String = row.get(1)?;
+            let count: i64 = row.get(2)?;
+            Ok(json!({
+                "year": year,
+                "month": month,
+                "count": count,
+            }))
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+    let context = json!({
+        "settings": settings,
+        "archives": archive_entries,
+        "page_type": "archives",
+        "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+    });
+
+    RawHtml(render::render_page(pool, "archives", &context))
+}
+
+#[get("/archives/<year>/<month>?<page>")]
+pub fn archives_month(
+    pool: &State<DbPool>,
+    year: &str,
+    month: &str,
+    page: Option<i64>,
+) -> RawHtml<String> {
+    let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+    let settings = Setting::all(pool);
+
+    let conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => {
+            return RawHtml(render::render_page(pool, "blog_list", &json!({
+                "settings": settings,
+                "posts": [],
+                "current_page": 1,
+                "total_pages": 1,
+                "page_type": "blog_list",
+                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+            })));
+        }
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT * FROM posts
+         WHERE status = 'published'
+           AND strftime('%Y', published_at) = ?1
+           AND strftime('%m', published_at) = ?2
+         ORDER BY published_at DESC LIMIT ?3 OFFSET ?4",
+    ) {
+        Ok(s) => s,
+        Err(_) => {
+            return RawHtml(render::render_page(pool, "blog_list", &json!({
+                "settings": settings,
+                "posts": [],
+                "current_page": 1,
+                "total_pages": 1,
+                "page_type": "blog_list",
+                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+            })));
+        }
+    };
+
+    let posts: Vec<Post> = stmt
+        .query_map(
+            rusqlite::params![year, month, per_page, offset],
+            |row| {
+                Ok(Post {
+                    id: row.get("id")?,
+                    title: row.get("title")?,
+                    slug: row.get("slug")?,
+                    content_json: row.get("content_json")?,
+                    content_html: row.get("content_html")?,
+                    excerpt: row.get("excerpt")?,
+                    featured_image: row.get("featured_image")?,
+                    meta_title: row.get("meta_title")?,
+                    meta_description: row.get("meta_description")?,
+                    status: row.get("status")?,
+                    published_at: row.get("published_at")?,
+                    created_at: row.get("created_at")?,
+                    updated_at: row.get("updated_at")?,
+                })
+            },
+        )
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM posts
+             WHERE status = 'published'
+               AND strftime('%Y', published_at) = ?1
+               AND strftime('%m', published_at) = ?2",
+            rusqlite::params![year, month],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    let total_pages = (total as f64 / per_page as f64).ceil() as i64;
+
+    let title = format!("Archives: {}/{}", year, month);
+    let context = json!({
+        "settings": settings,
+        "posts": posts,
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "archive_year": year,
+        "archive_month": month,
+        "page_type": "blog_list",
+        "seo": seo::build_meta(pool, Some(&title), None, &format!("/archives/{}/{}", year, month)),
+    });
+
+    RawHtml(render::render_page(pool, "blog_list", &context))
+}
+
 // ── Portfolio ──────────────────────────────────────────
 
-#[get("/portfolio")]
-pub fn portfolio_grid(pool: &State<DbPool>) -> RawHtml<String> {
-    let items = PortfolioItem::published(pool, 100, 0);
+#[get("/?<page>")]
+pub fn portfolio_grid(pool: &State<DbPool>, page: Option<i64>) -> RawHtml<String> {
+    let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+
+    let items = PortfolioItem::published(pool, per_page, offset);
+    let total = PortfolioItem::count(pool, Some("published"));
+    let total_pages = (total as f64 / per_page as f64).ceil() as i64;
     let categories = Category::list(pool, Some("portfolio"));
     let settings = Setting::all(pool);
 
@@ -185,6 +418,8 @@ pub fn portfolio_grid(pool: &State<DbPool>) -> RawHtml<String> {
         "settings": settings,
         "items": items_with_meta,
         "categories": categories,
+        "current_page": current_page,
+        "total_pages": total_pages,
         "page_type": "portfolio_grid",
         "seo": seo::build_meta(pool, Some("Portfolio"), None, "/portfolio"),
     });
@@ -192,7 +427,7 @@ pub fn portfolio_grid(pool: &State<DbPool>) -> RawHtml<String> {
     RawHtml(render::render_page(pool, "portfolio_grid", &context))
 }
 
-#[get("/portfolio/<slug>")]
+#[get("/<slug>", rank = 5)]
 pub fn portfolio_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<String>> {
     let item = PortfolioItem::find_by_slug(pool, slug)?;
     if item.status != "published" {
@@ -228,10 +463,17 @@ pub fn portfolio_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<Stri
     Some(RawHtml(render::render_page(pool, "portfolio_single", &context)))
 }
 
-#[get("/portfolio/category/<slug>")]
-pub fn portfolio_by_category(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<String>> {
+#[get("/category/<slug>?<page>")]
+pub fn portfolio_by_category(
+    pool: &State<DbPool>,
+    slug: &str,
+    page: Option<i64>,
+) -> Option<RawHtml<String>> {
     let category = Category::find_by_slug(pool, slug)?;
-    let items = PortfolioItem::by_category(pool, slug, 100, 0);
+    let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+    let items = PortfolioItem::by_category(pool, slug, per_page, offset);
     let categories = Category::list(pool, Some("portfolio"));
     let settings = Setting::all(pool);
 
@@ -253,8 +495,100 @@ pub fn portfolio_by_category(pool: &State<DbPool>, slug: &str) -> Option<RawHtml
         "items": items_with_meta,
         "categories": categories,
         "active_category": category,
+        "current_page": current_page,
+        "total_pages": ((PortfolioItem::count(pool, Some("published")) as f64 / per_page as f64).ceil() as i64),
         "page_type": "portfolio_grid",
         "seo": seo::build_meta(pool, Some(&category.name), None, &format!("/portfolio/category/{}", slug)),
+    });
+
+    Some(RawHtml(render::render_page(pool, "portfolio_grid", &context)))
+}
+
+#[get("/tag/<slug>?<page>")]
+pub fn portfolio_by_tag(
+    pool: &State<DbPool>,
+    slug: &str,
+    page: Option<i64>,
+) -> Option<RawHtml<String>> {
+    let tag = Tag::find_by_slug(pool, slug)?;
+    let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+    let categories = Category::list(pool, Some("portfolio"));
+    let settings = Setting::all(pool);
+
+    let conn = pool.get().ok()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT p.* FROM portfolio p
+             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'portfolio'
+             WHERE ct.tag_id = ?1 AND p.status = 'published'
+             ORDER BY p.created_at DESC LIMIT ?2 OFFSET ?3",
+        )
+        .ok()?;
+
+    let items: Vec<PortfolioItem> = stmt
+        .query_map(
+            rusqlite::params![tag.id, per_page, offset],
+            |row| {
+                let sell_raw: i64 = row.get("sell_enabled")?;
+                Ok(PortfolioItem {
+                    id: row.get("id")?,
+                    title: row.get("title")?,
+                    slug: row.get("slug")?,
+                    description_json: row.get("description_json")?,
+                    description_html: row.get("description_html")?,
+                    image_path: row.get("image_path")?,
+                    thumbnail_path: row.get("thumbnail_path")?,
+                    meta_title: row.get("meta_title")?,
+                    meta_description: row.get("meta_description")?,
+                    sell_enabled: sell_raw != 0,
+                    price: row.get("price")?,
+                    likes: row.get("likes")?,
+                    status: row.get("status")?,
+                    published_at: row.get("published_at")?,
+                    created_at: row.get("created_at")?,
+                    updated_at: row.get("updated_at")?,
+                })
+            },
+        )
+        .ok()?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let items_with_meta: Vec<serde_json::Value> = items
+        .iter()
+        .map(|item| {
+            let tags = Tag::for_content(pool, item.id, "portfolio");
+            let cats = Category::for_content(pool, item.id, "portfolio");
+            json!({
+                "item": item,
+                "tags": tags,
+                "categories": cats,
+            })
+        })
+        .collect();
+
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM portfolio p
+             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'portfolio'
+             WHERE ct.tag_id = ?1 AND p.status = 'published'",
+            rusqlite::params![tag.id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    let total_pages = (total as f64 / per_page as f64).ceil() as i64;
+
+    let context = json!({
+        "settings": settings,
+        "items": items_with_meta,
+        "categories": categories,
+        "active_tag": tag,
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "page_type": "portfolio_grid",
+        "seo": seo::build_meta(pool, Some(&tag.name), None, &format!("/portfolio/tag/{}", slug)),
     });
 
     Some(RawHtml(render::render_page(pool, "portfolio_grid", &context)))
@@ -284,17 +618,31 @@ pub fn robots(pool: &State<DbPool>) -> String {
     content
 }
 
-pub fn routes() -> Vec<rocket::Route> {
+pub fn root_routes() -> Vec<rocket::Route> {
     routes![
         homepage,
-        blog_list,
-        blog_single,
-        blog_by_category,
-        portfolio_grid,
-        portfolio_single,
-        portfolio_by_category,
+        archives,
+        archives_month,
         rss_feed,
         sitemap,
         robots,
+    ]
+}
+
+pub fn blog_routes() -> Vec<rocket::Route> {
+    routes![
+        blog_list,
+        blog_single,
+        blog_by_category,
+        blog_by_tag,
+    ]
+}
+
+pub fn portfolio_routes() -> Vec<rocket::Route> {
+    routes![
+        portfolio_grid,
+        portfolio_single,
+        portfolio_by_category,
+        portfolio_by_tag,
     ]
 }

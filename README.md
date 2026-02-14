@@ -69,6 +69,10 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 
 - **Journal (Blog)** — Rich text posts with TinyMCE, categories, tags, excerpts, featured images
 - **Portfolio** — Image gallery with masonry grid, lightbox, categories, tags, likes
+- **Browse by tag** — `/tag/<slug>` routes for both blog and portfolio with pagination
+- **Browse by category** — `/category/<slug>` routes for both blog and portfolio with pagination
+- **Archives** — `/archives` page with posts grouped by year/month, drill-down to `/archives/<year>/<month>`
+- **Dynamic URL slugs** — Blog and portfolio base URLs are configurable (e.g. `/journal`, `/gallery`) from settings
 - **Comments** — Built-in commenting with honeypot spam protection, rate limiting, moderation queue
 - **RSS Feed** — Auto-generated Atom/RSS feed
 - **WordPress Import** — Import posts, portfolio items, categories, tags, and comments from WP XML export
@@ -95,6 +99,7 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 ### SEO (Built-in, No Plugins)
 
 - **Meta title & description** fields on every post and portfolio item
+- **SEO Check button** — one-click 10-point analysis on each post/portfolio editor (meta title, description, slug quality, content length, image alt text, tags, heading structure) with A–F grade
 - **Auto-generated sitemap.xml**
 - **JSON-LD structured data** for blog posts and portfolio items
 - **Open Graph & Twitter Card** meta tags
@@ -134,7 +139,8 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
   - **Email & Password** — traditional login
   - **Magic Link** — passwordless login via email (requires email provider)
 - **Optional TOTP MFA** — Google Authenticator, Authy, etc.
-- **Login rate limiting** — configurable attempts per 15 minutes
+- **Login rate limiting** — in-memory IP-based enforcement, configurable attempts per 15 minutes
+- **Comment rate limiting** — in-memory enforcement, configurable per 15-minute window
 - **Login captcha** — reCAPTCHA v3, Cloudflare Turnstile, or hCaptcha
 - **Anti-spam services** — Akismet, CleanTalk, OOPSpam
 - **Session expiry** — configurable (default 24h)
@@ -192,6 +198,17 @@ cargo build --release
 
 Open `http://localhost:8000/admin/setup` to create your admin account.
 
+### Multi-Site Mode
+
+To serve multiple independent sites from a single binary:
+
+```bash
+cargo build --release --features multi-site
+./target/release/velocty
+```
+
+Open `http://localhost:8000/super/setup` to create the super admin account, then add sites from the dashboard. See [MULTI-SITE.md](docs/MULTI-SITE.md) for full architecture details.
+
 ### Configuration
 
 All configuration is done through the admin panel — no config files to edit. Settings are stored in SQLite and take effect immediately (except admin slug, which requires a restart).
@@ -206,6 +223,7 @@ velocty/
 ├── docs/                        # Documentation & design specs
 │   ├── Architecture.md
 │   ├── DESIGN.md
+│   ├── MULTI-SITE.md            # Multi-site/multi-tenancy architecture
 │   └── README-CMS.md
 ├── src/
 │   ├── main.rs                  # Rocket launch, DB init, route mounting
@@ -217,14 +235,18 @@ velocty/
 │   ├── rss.rs                   # RSS/Atom feed generation
 │   ├── images.rs                # Upload, thumbnails, WebP conversion
 │   ├── license.rs               # Purchase license.txt generation
+│   ├── rate_limit.rs            # In-memory rate limiter (login, comments)
+│   ├── site.rs                  # Multi-site: SiteContext, SitePoolManager, SiteResolver (feature-gated)
 │   ├── models/                  # Data models (Post, Portfolio, Category, etc.)
-│   └── routes/                  # Route handlers (admin, auth, public, API)
+│   └── routes/                  # Route handlers (admin, auth, public, API, super_admin)
 ├── website/
-│   ├── templates/               # Tera templates (admin panel)
+│   ├── templates/               # Tera templates (admin panel + super admin)
 │   ├── static/                  # CSS, JS, images, TinyMCE
 │   ├── designs/                 # Saved page designs
-│   ├── db/                      # SQLite database (created at runtime)
-│   └── uploads/                 # User uploads
+│   ├── db/                      # SQLite database (single-site mode)
+│   ├── uploads/                 # User uploads (single-site mode)
+│   ├── sites.db                 # Central registry (multi-site mode only)
+│   └── sites/                   # Per-site data with UUID folders (multi-site mode only)
 └── GeoLite2-City.mmdb           # Optional GeoIP database
 ```
 
@@ -232,19 +254,31 @@ velocty/
 
 ## Build Phases
 
-### Phase 1 — Core (Current)
+### Phase 1 — Core (Current) ✅
 
 - Rocket + SQLite scaffold with full schema
 - Admin panel with dark/light themes
 - Journal: posts with TinyMCE, categories, tags, comments, RSS
 - Portfolio: upload, masonry grid, lightbox, categories, tags, likes
+- Browse by tag & category with pagination for both blog and portfolio
+- Archives page (posts grouped by year/month)
+- Dynamic URL slugs for blog and portfolio (configurable from settings)
+- SEO Check button on post/portfolio editors (10-point analysis with A–F grade)
 - Built-in SEO: meta fields, sitemap.xml, JSON-LD, OG/Twitter tags
 - Built-in analytics with D3.js dashboard
 - WordPress XML importer
 - 13 settings sections with full configuration
 - Authentication: password, Magic Link, MFA, captcha
+- Login & comment rate limiting (in-memory, IP-based)
+- Image right-click protection (configurable)
 - 7 commerce provider configurations
 - 11 email provider configurations
+- **Multi-site/multi-tenancy** (optional `--features multi-site` Cargo flag)
+  - Per-site SQLite databases in UUID-named folders (opaque to filesystem)
+  - Central `sites.db` registry with hostname → UUID mapping
+  - Super Admin panel at `/super/` for managing all sites
+  - `SiteResolver` fairing for Host-based routing
+  - `DashMap`-cached per-site connection pools
 
 ### Phase 2 — Commerce
 
@@ -275,6 +309,7 @@ Detailed documentation is in the `docs/` folder:
 
 - **[Architecture.md](docs/Architecture.md)** — Technical architecture, auth system, design system, render pipeline, AI integration, full settings reference, database schema
 - **[DESIGN.md](docs/DESIGN.md)** — Visual design specification for admin panel and default visitor design, color palettes (dark & light), wireframes, responsive breakpoints
+- **[MULTI-SITE.md](docs/MULTI-SITE.md)** — Multi-site/multi-tenancy architecture: storage layout, central registry schema, request flow, key types, super admin panel, routing strategy, feature flag boundaries
 - **[README-CMS.md](docs/README-CMS.md)** — Original CMS specification, feature overview, editor details, database schema
 
 ---
