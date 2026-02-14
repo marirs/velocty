@@ -128,7 +128,7 @@ designs/
 │   └── ...
 ```
 
-### Admin → Designs Page
+### Admin → Designer Page
 
 - Thumbnail grid of all saved designs
 - **Edit** — opens GrapesJS with saved HTML/CSS loaded

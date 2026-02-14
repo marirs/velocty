@@ -680,8 +680,7 @@ pub fn run_session_cleanup(pool: &DbPool) -> ToolResult {
     }
 }
 
-pub fn run_orphan_scan(pool: &DbPool) -> ToolResult {
-    let uploads_dir = "website/site/uploads";
+pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     let dir = Path::new(uploads_dir);
     if !dir.exists() {
         return ToolResult {
@@ -798,11 +797,11 @@ pub fn run_orphan_scan(pool: &DbPool) -> ToolResult {
     }
 }
 
-pub fn run_orphan_delete(pool: &DbPool) -> ToolResult {
+pub fn run_orphan_delete(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     // Re-scan to get current orphans, then delete
-    let scan = run_orphan_scan(pool);
+    let scan = run_orphan_scan(pool, uploads_dir);
     if let Some(ref details) = scan.details {
-        let uploads_dir = Path::new("website/site/uploads");
+        let uploads_dir = Path::new(uploads_dir);
         let mut deleted = 0u64;
         let mut freed = 0u64;
         for name in details.lines() {

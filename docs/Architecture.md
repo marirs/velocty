@@ -170,11 +170,32 @@ Additional checks:
 | **Export Database** | ✓ | — | Copy `.db` file to downloads |
 | **Export Content** | ✓ | ✓ | JSON export of all content |
 
+### Multi-Site Tools
+
+In multi-site mode, the Super Admin health page (`/super/health`) includes a **Maintenance Tools** section with a site selector dropdown. Each tool operates on the selected site's database and uploads directory.
+
+| Route | Description |
+|---|---|
+| `POST /super/health/tool/<site_id>/vacuum` | Vacuum the selected site's DB |
+| `POST /super/health/tool/<site_id>/wal-checkpoint` | WAL checkpoint for the selected site |
+| `POST /super/health/tool/<site_id>/integrity-check` | Integrity check on the selected site's DB |
+| `POST /super/health/tool/<site_id>/session-cleanup` | Clean expired sessions for the selected site |
+| `POST /super/health/tool/<site_id>/orphan-scan` | Scan for orphan files in the selected site's uploads |
+| `POST /super/health/tool/<site_id>/orphan-delete` | Delete orphan files from the selected site's uploads |
+| `POST /super/health/tool/<site_id>/unused-tags` | Clean unused tags for the selected site |
+| `POST /super/health/tool/<site_id>/export-content` | Export content JSON for the selected site |
+
+The tool routes resolve the site ID → slug via the registry, then use `SitePoolManager` to get the site's `DbPool`. Orphan scan/delete use the per-site uploads path (`website/sites/<uuid>/uploads`).
+
+Per-site admin tools (`/<admin_slug>/health`) work identically in both single-site and multi-site modes — they always operate on the current site's database.
+
 ### Implementation
 
 - **Backend**: `src/health.rs` — `gather()` reads `velocty.toml` for backend, branches to `gather_db_sqlite()` or `gather_db_mongo()`
-- **Routes**: `src/routes/admin.rs` — `GET /health` + `POST /health/<tool>` endpoints
+- **Routes**: `src/routes/admin.rs` — `GET /health` + `POST /health/<tool>` endpoints (single-site)
+- **Routes**: `src/routes/super_admin.rs` — `POST /health/tool/<site_id>/<tool>` endpoints (multi-site)
 - **Template**: `website/templates/admin/health.html.tera` — Tera conditionals on `report.database.backend`
+- **Template**: `website/templates/super/health.html.tera` — System health + site selector tools
 - **MongoDB ping**: Raw TCP + OP_MSG wire protocol (same approach as setup test-mongo)
 
 ---

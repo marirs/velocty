@@ -3,12 +3,14 @@
 use rocket::form::Form;
 use rocket::http::CookieJar;
 use rocket::response::Redirect;
+use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::site::{self, RegistryPool};
+use crate::site::{self, RegistryPool, SitePoolManager};
 
 const SUPER_COOKIE: &str = "velocty_super_session";
 
@@ -166,6 +168,165 @@ pub fn health_page(
     Ok(Template::render("super/health", &ctx))
 }
 
+// ── Health Tools (per-site) ──────────────────────────────────
+
+/// Resolve a site ID to its DbPool via the registry + pool manager.
+fn get_site_pool(
+    registry: &RegistryPool,
+    pool_mgr: &SitePoolManager,
+    site_id: i64,
+) -> Result<crate::db::DbPool, String> {
+    let site = site::find_site_by_id(registry, site_id)
+        .ok_or_else(|| "Site not found".to_string())?;
+    pool_mgr.get_pool(&site.slug)
+}
+
+fn json_tool(r: crate::health::ToolResult) -> Json<Value> {
+    Json(json!({ "ok": r.ok, "message": r.message, "details": r.details }))
+}
+
+#[post("/health/tool/<site_id>/vacuum")]
+pub fn tool_vacuum(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    match get_site_pool(registry, pool_mgr, site_id) {
+        Ok(pool) => json_tool(crate::health::run_vacuum(&pool)),
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/wal-checkpoint")]
+pub fn tool_wal_checkpoint(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    match get_site_pool(registry, pool_mgr, site_id) {
+        Ok(pool) => json_tool(crate::health::run_wal_checkpoint(&pool)),
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/integrity-check")]
+pub fn tool_integrity_check(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    match get_site_pool(registry, pool_mgr, site_id) {
+        Ok(pool) => json_tool(crate::health::run_integrity_check(&pool)),
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/session-cleanup")]
+pub fn tool_session_cleanup(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    match get_site_pool(registry, pool_mgr, site_id) {
+        Ok(pool) => json_tool(crate::health::run_session_cleanup(&pool)),
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/orphan-scan")]
+pub fn tool_orphan_scan(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    let site = match site::find_site_by_id(registry, site_id) {
+        Some(s) => s,
+        None => return Json(json!({ "ok": false, "message": "Site not found" })),
+    };
+    match pool_mgr.get_pool(&site.slug) {
+        Ok(pool) => {
+            let uploads_dir = format!("website/sites/{}/uploads", site.slug);
+            json_tool(crate::health::run_orphan_scan(&pool, &uploads_dir))
+        }
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/orphan-delete")]
+pub fn tool_orphan_delete(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    let site = match site::find_site_by_id(registry, site_id) {
+        Some(s) => s,
+        None => return Json(json!({ "ok": false, "message": "Site not found" })),
+    };
+    match pool_mgr.get_pool(&site.slug) {
+        Ok(pool) => {
+            let uploads_dir = format!("website/sites/{}/uploads", site.slug);
+            json_tool(crate::health::run_orphan_delete(&pool, &uploads_dir))
+        }
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/unused-tags")]
+pub fn tool_unused_tags(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    match get_site_pool(registry, pool_mgr, site_id) {
+        Ok(pool) => json_tool(crate::health::run_unused_tags_cleanup(&pool)),
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
+#[post("/health/tool/<site_id>/export-content")]
+pub fn tool_export_content(
+    site_id: i64,
+    registry: &State<RegistryPool>,
+    pool_mgr: &State<SitePoolManager>,
+    cookies: &CookieJar<'_>,
+) -> Json<Value> {
+    if !is_super_authenticated(registry, cookies) {
+        return Json(json!({ "ok": false, "message": "Unauthorized" }));
+    }
+    match get_site_pool(registry, pool_mgr, site_id) {
+        Ok(pool) => json_tool(crate::health::export_content(&pool)),
+        Err(e) => Json(json!({ "ok": false, "message": e })),
+    }
+}
+
 // ── Settings ────────────────────────────────────────────────
 
 #[get("/settings")]
@@ -296,6 +457,14 @@ pub fn routes() -> Vec<rocket::Route> {
         logout,
         dashboard,
         health_page,
+        tool_vacuum,
+        tool_wal_checkpoint,
+        tool_integrity_check,
+        tool_session_cleanup,
+        tool_orphan_scan,
+        tool_orphan_delete,
+        tool_unused_tags,
+        tool_export_content,
         settings_page,
         new_site_page,
         new_site_submit,

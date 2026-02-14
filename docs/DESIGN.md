@@ -183,7 +183,7 @@ Collapsed (60px):          Expanded (200px on hover):
 │  💬  │  ← Comments       │  💬  Comments         │
 │  🏷  │  ← Categories     │  🏷  Categories       │
 │  🔖  │  ← Tags           │  🔖  Tags             │
-│  🎨  │  ← Designs        │  🎨  Designs          │
+│  🎨  │  ← Designer       │  🎨  Designer         │
 │  📥  │  ← Import         │  📥  Import           │
 │  ⚙️  │  ← Settings       │  ⚙️  Settings  ▼     │
 │      │                   │     General          │
@@ -217,8 +217,8 @@ Collapsed (60px):          Expanded (200px on hover):
 | `/admin/comments` | Comments list / moderation |
 | `/admin/categories` | Categories list |
 | `/admin/tags` | Tags list |
-| `/admin/designs` | Design manager |
-| `/admin/designs/:id/edit` | Edit design (GrapesJS — Phase 3) |
+| `/admin/designer` | Designer (design manager) |
+| `/admin/designer/:id/edit` | Edit design (GrapesJS — Phase 3) |
 | `/admin/import` | Import tool |
 | `/admin/settings/general` | General settings |
 | `/admin/settings/blog` | Blog settings |
@@ -552,11 +552,11 @@ Same as post editor, plus:
 
 Same layout as categories, without the type column.
 
-#### Designs (`/admin/designs`)
+#### Designer (`/admin/designer`)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Designs                             [+ New Design]     │
+│  Designer                            [+ New Design]     │
 │                                                         │
 │  ┌────────────────────┐  ┌────────────────────┐         │
 │  │ ┌────────────────┐ │  │ ┌────────────────┐ │         │

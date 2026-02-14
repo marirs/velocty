@@ -209,6 +209,7 @@ All super-admin routes are behind `#[cfg(feature = "multi-site")]`.
 | `/super/sites/new` | Create new site |
 | `/super/sites/<id>` | Edit site (hostname, display name, status) |
 | `/super/sites/<id>/delete` | Delete site (with confirmation) |
+| `POST /super/health/tool/<site_id>/<tool>` | Run a maintenance tool on a specific site (see below) |
 
 ### Navigation
 
@@ -231,6 +232,27 @@ The Super Admin health page (`/super/health`) shows system-wide health informati
 - **Sites Overview** — table of all registered sites with hostname and status
 
 The health data is gathered by `src/health.rs` which reads `velocty.toml` to detect the database backend and adapts checks accordingly.
+
+### Maintenance Tools
+
+The health page includes a **Maintenance Tools** section with a site selector dropdown. The Super Admin selects a target site, then runs any tool — it operates on that site's database and uploads directory.
+
+Available tools (per-site):
+
+| Tool | SQLite | MongoDB | Route suffix |
+|---|---|---|---|
+| **Integrity Check** | ✓ | — | `/integrity-check` |
+| **Vacuum** | ✓ | — | `/vacuum` |
+| **WAL Checkpoint** | ✓ | — | `/wal-checkpoint` |
+| **Session Cleanup** | ✓ | ✓ | `/session-cleanup` |
+| **Orphan File Scan** | ✓ | ✓ | `/orphan-scan` |
+| **Delete Orphan Files** | ✓ | ✓ | `/orphan-delete` |
+| **Unused Tags Cleanup** | ✓ | ✓ | `/unused-tags` |
+| **Export Content** | ✓ | ✓ | `/export-content` |
+
+Each tool POSTs to `/super/health/tool/<site_id>/<tool>`. The route resolves the site ID to its slug via the registry, gets the site's `DbPool` from `SitePoolManager`, and runs the tool. Orphan scan/delete use the per-site uploads path (`website/sites/<uuid>/uploads`).
+
+Per-site admin tools (`/<admin_slug>/health`) work identically in both single-site and multi-site modes — they always operate on the current site.
 
 ### Dashboard
 

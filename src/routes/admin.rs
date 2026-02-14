@@ -323,12 +323,12 @@ pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug
 
 // ── Designs ────────────────────────────────────────────
 
-#[get("/designs")]
+#[get("/designer")]
 pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let designs = Design::list(pool);
 
     let context = json!({
-        "page_title": "Designs",
+        "page_title": "Designer",
         "designs": designs,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
@@ -337,10 +337,10 @@ pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminS
     Template::render("admin/designs/list", &context)
 }
 
-#[post("/designs/<id>/activate")]
+#[post("/designer/<id>/activate")]
 pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Design::activate(pool, id);
-    Redirect::to(format!("{}/designs", admin_base(slug)))
+    Redirect::to(format!("{}/designer", admin_base(slug)))
 }
 
 // ── Import ─────────────────────────────────────────────
@@ -947,13 +947,13 @@ pub fn health_session_cleanup(_admin: AdminUser, pool: &State<DbPool>) -> Json<V
 
 #[post("/health/orphan-scan")]
 pub fn health_orphan_scan(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_orphan_scan(pool);
+    let r = crate::health::run_orphan_scan(pool, "website/site/uploads");
     json_tool_result(r)
 }
 
 #[post("/health/orphan-delete")]
 pub fn health_orphan_delete(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_orphan_delete(pool);
+    let r = crate::health::run_orphan_delete(pool, "website/site/uploads");
     json_tool_result(r)
 }
 

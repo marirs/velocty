@@ -39,6 +39,17 @@
         .status-dot-active { background: #22c55e; }
         .status-dot-suspended { background: #ef4444; }
         .status-dot-maintenance { background: #f59e0b; }
+        .tool-item { background: #0f3460; border-radius: 6px; padding: 14px; }
+        .tool-btn { padding: 6px 16px; background: #E8913A; color: #fff; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .tool-btn:hover { background: #D07A2F; }
+        .tool-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tool-btn-danger { background: #dc2626; }
+        .tool-btn-danger:hover { background: #b91c1c; }
+        .tool-result { margin-top: 8px; font-size: 12px; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.2s; }
+        .tool-result.show { max-height: 200px; overflow-y: auto; padding-top: 6px; }
+        .tool-result .ok { color: #22c55e; }
+        .tool-result .fail { color: #ef4444; }
+        .tool-result .details { color: #888; font-size: 11px; margin-top: 4px; white-space: pre-wrap; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -203,6 +214,73 @@
             <p style="color:#666;text-align:center;padding:20px">No sites configured.</p>
             {% endif %}
         </div>
+
+        <!-- Tools -->
+        {% if sites and sites | length > 0 %}
+        <div class="card" style="margin-top:24px">
+            <h3>Maintenance Tools</h3>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                <label style="font-size:13px;color:#888;white-space:nowrap">Target site:</label>
+                <select id="tool-site" style="flex:1;padding:8px 12px;border:1px solid #2a2a4a;border-radius:6px;background:#0f3460;color:#e0e0e0;font-size:13px">
+                    {% for site in sites %}
+                    <option value="{{ site.id }}">{{ site.display_name }} ({{ site.hostname }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="tools-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+                {% if report.database.backend == "sqlite" %}
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Integrity Check</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">PRAGMA integrity_check on the site's database.</div>
+                    <button class="tool-btn" onclick="runSiteTool('integrity-check', this)">Run Check</button>
+                    <div class="tool-result" id="result-integrity-check"></div>
+                </div>
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Vacuum</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Compact the database file and reclaim free pages.</div>
+                    <button class="tool-btn" onclick="runSiteTool('vacuum', this)">Run Vacuum</button>
+                    <div class="tool-result" id="result-vacuum"></div>
+                </div>
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">WAL Checkpoint</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Flush WAL to main database and truncate.</div>
+                    <button class="tool-btn" onclick="runSiteTool('wal-checkpoint', this)">Checkpoint</button>
+                    <div class="tool-result" id="result-wal-checkpoint"></div>
+                </div>
+                {% endif %}
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Session Cleanup</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Delete expired sessions for the selected site.</div>
+                    <button class="tool-btn" onclick="runSiteTool('session-cleanup', this)">Clean Sessions</button>
+                    <div class="tool-result" id="result-session-cleanup"></div>
+                </div>
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Orphan File Scan</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Find uploads not referenced by any content.</div>
+                    <button class="tool-btn" onclick="runSiteTool('orphan-scan', this)">Scan</button>
+                    <div class="tool-result" id="result-orphan-scan"></div>
+                </div>
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Delete Orphan Files</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Permanently remove orphan files from uploads.</div>
+                    <button class="tool-btn tool-btn-danger" onclick="runSiteToolConfirm('orphan-delete', this, 'Delete all orphan files for this site?')">Delete Orphans</button>
+                    <div class="tool-result" id="result-orphan-delete"></div>
+                </div>
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Unused Tags Cleanup</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Delete tags not associated with any content.</div>
+                    <button class="tool-btn" onclick="runSiteToolConfirm('unused-tags', this, 'Delete all unused tags?')">Clean Tags</button>
+                    <div class="tool-result" id="result-unused-tags"></div>
+                </div>
+                <div class="tool-item">
+                    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Export Content</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:8px">Export all content as JSON for the selected site.</div>
+                    <button class="tool-btn" onclick="runSiteTool('export-content', this)">Export JSON</button>
+                    <div class="tool-result" id="result-export-content"></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <script>
@@ -220,6 +298,36 @@
     setText('db-size', humanBytes(report.database.file_size_bytes));
     setText('db-wal', humanBytes(report.database.wal_size_bytes));
     setText('mem-value', humanBytes(report.resources.memory_rss_bytes));
+
+    // ── Tool runner ──
+    async function runSiteTool(tool, btn) {
+        var siteId = document.getElementById('tool-site').value;
+        var resultEl = document.getElementById('result-' + tool);
+        var origLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Running...';
+        resultEl.className = 'tool-result';
+        resultEl.innerHTML = '';
+        try {
+            var resp = await fetch('/super/health/tool/' + siteId + '/' + tool, { method: 'POST' });
+            var data = await resp.json();
+            var cls = data.ok ? 'ok' : 'fail';
+            var html = '<span class="' + cls + '">' + (data.ok ? '✓' : '✗') + ' ' + data.message + '</span>';
+            if (data.details) html += '<div class="details">' + data.details + '</div>';
+            resultEl.innerHTML = html;
+            resultEl.className = 'tool-result show';
+        } catch (e) {
+            resultEl.innerHTML = '<span class="fail">✗ Request failed: ' + e.message + '</span>';
+            resultEl.className = 'tool-result show';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = origLabel;
+        }
+    }
+
+    function runSiteToolConfirm(tool, btn, msg) {
+        if (confirm(msg)) runSiteTool(tool, btn);
+    }
     </script>
 </body>
 </html>

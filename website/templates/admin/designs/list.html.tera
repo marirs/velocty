@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="page-header">
-    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Designs</h2>
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Designer</h2>
 </div>
 
 <div class="designs-grid">
@@ -22,7 +22,7 @@
             {% if design.is_active %}
             <span class="badge badge-published">Active</span>
             {% else %}
-            <form method="post" action="/{{ admin_slug }}/designs/{{ design.id }}/activate" class="inline">
+            <form method="post" action="/{{ admin_slug }}/designer/{{ design.id }}/activate" class="inline">
                 <button type="submit" class="btn btn-sm btn-primary">Activate</button>
             </form>
             {% endif %}
