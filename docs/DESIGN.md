@@ -39,7 +39,7 @@ Full dark UI with ultra-narrow icon sidebar that expands on hover.
 
 Based on a custom dark palette with warm grey tones and orange accent from the Velocty V_ logo.
 
-![Colour Palette](data/colour-palette.png)
+![Colour Palette](colour-palette.png)
 
 #### Backgrounds
 
@@ -95,6 +95,64 @@ Based on a custom dark palette with warm grey tones and orange accent from the V
 | Bar chart fill | `#E8913A` (accent) |
 | Calendar heatmap range | `#282B34` → `#E8913A` |
 | Multi-series palette | `#E8913A`, `#446D7F`, `#8b5cf6`, `#f59e0b`, `#ef4444`, `#22c55e`, `#ec4899`, `#06b6d4` |
+
+### Color Palette (Admin — Light Theme)
+
+Clean, bright palette with the same orange accent. Toggled via the theme switch in the sidebar.
+
+![Colour Palette Light](colour-palette-light.png)
+
+#### Backgrounds
+
+| Element | Hex | CSS Variable |
+|---|---|---|
+| Page background | `#F3F3F3` | `--bg-page` |
+| Card / panel background | `#FFFFFF` | `--bg-card` |
+| Card hover | `#F5F5F5` | `--bg-card-hover` |
+| Sidebar background | `#FFFFFF` | `--bg-sidebar` |
+| Sidebar expanded bg | `#FFFFFF` | `--bg-sidebar-expanded` |
+| Top bar background | `#FFFFFF` | `--bg-topbar` |
+| Input background | `#F5F5F5` | `--bg-input` |
+| Input focus background | `#FFFFFF` | — |
+
+#### Borders
+
+| Element | Hex | CSS Variable |
+|---|---|---|
+| Subtle dividers / borders | `#E0E0E0` | `--border-subtle` |
+| Input / interactive borders | `#D5D5D5` | `--border-input` |
+
+#### Primary & Secondary Colors
+
+Same accent colors as dark theme — consistent brand identity across both modes.
+
+| Role | Color | Hex | Usage |
+|---|---|---|---|
+| **Primary / Accent** | Orange | `#E8913A` | Buttons, active states, links, focus rings |
+| **Primary hover** | Dark orange | `#D07A2F` | Button hover |
+| **Secondary / Info** | Blue Surf | `#446D7F` | Info badges, secondary highlights |
+| **Button primary text** | White | `#FFFFFF` | Text on accent buttons |
+
+#### Text
+
+| Element | Hex | CSS Variable |
+|---|---|---|
+| Text primary (headings, body) | `#2a2a2a` | `--text-primary` |
+| Text secondary (labels, muted) | `#555555` | `--text-secondary` |
+| Text tertiary (help text, dim) | `#999999` | `--text-tertiary` |
+
+#### Sidebar (Light)
+
+| Element | Style |
+|---|---|
+| Background | `#FFFFFF` with right border `#E0E0E0` |
+| Hover shadow | `4px 0 20px rgba(0,0,0,0.08)` |
+| Nav item color | `#999999`, hover `#2a2a2a` |
+| Active item | `#E8913A` with `rgba(232,145,58,0.08)` background |
+| Scrollbar track | `#F3F3F3` |
+| Scrollbar thumb | `#D0D0D0`, hover `#B5B5B5` |
+
+---
 
 ### Typography (Admin)
 
