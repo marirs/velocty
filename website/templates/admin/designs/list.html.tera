@@ -22,7 +22,7 @@
             {% if design.is_active %}
             <span class="badge badge-published">Active</span>
             {% else %}
-            <form method="post" action="/admin/designs/{{ design.id }}/activate" class="inline">
+            <form method="post" action="/{{ admin_slug }}/designs/{{ design.id }}/activate" class="inline">
                 <button type="submit" class="btn btn-sm btn-primary">Activate</button>
             </form>
             {% endif %}

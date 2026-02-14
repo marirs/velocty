@@ -21,6 +21,7 @@ impl<'r> Responder<'r, 'static> for NoCacheTemplate {
 use crate::auth;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::AdminSlug;
 
 #[derive(Debug, FromForm, Deserialize)]
 pub struct LoginForm {
@@ -40,20 +41,22 @@ fn needs_setup(pool: &DbPool) -> bool {
     email.is_empty() || hash.is_empty()
 }
 
-#[get("/admin/login")]
-pub fn login_page(pool: &State<DbPool>) -> Result<Template, Redirect> {
+#[get("/login")]
+pub fn login_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result<Template, Redirect> {
     if needs_setup(pool) {
-        return Err(Redirect::to("/admin/setup"));
+        return Err(Redirect::to(format!("/{}/setup", admin_slug.0)));
     }
     let mut context: HashMap<String, String> = HashMap::new();
     context.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    context.insert("admin_slug".to_string(), admin_slug.0.clone());
     Ok(Template::render("admin/login", &context))
 }
 
-#[post("/admin/login", data = "<form>")]
+#[post("/login", data = "<form>")]
 pub fn login_submit(
     form: Form<LoginForm>,
     pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
     cookies: &CookieJar<'_>,
 ) -> Result<Redirect, Template> {
     let stored_hash = Setting::get(pool, "admin_password_hash").unwrap_or_default();
@@ -66,6 +69,7 @@ pub fn login_submit(
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Invalid credentials".to_string());
         ctx.insert("admin_theme".to_string(), theme);
+        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
         return Err(Template::render("admin/login", &ctx));
     }
 
@@ -73,6 +77,7 @@ pub fn login_submit(
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Invalid credentials".to_string());
         ctx.insert("admin_theme".to_string(), theme.clone());
+        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
         return Err(Template::render("admin/login", &ctx));
     }
 
@@ -87,34 +92,35 @@ pub fn login_submit(
     match auth::create_session(pool, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
-            Ok(Redirect::to("/admin"))
+            Ok(Redirect::to(format!("/{}", admin_slug.0)))
         }
         Err(_) => {
             let mut ctx = HashMap::new();
             ctx.insert("error".to_string(), "Session creation failed".to_string());
             ctx.insert("admin_theme".to_string(), theme.clone());
+            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
             Err(Template::render("admin/login", &ctx))
         }
     }
 }
 
-#[get("/admin/logout")]
-pub fn logout(pool: &State<DbPool>, cookies: &CookieJar<'_>) -> Redirect {
+#[get("/logout")]
+pub fn logout(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, cookies: &CookieJar<'_>) -> Redirect {
     if let Some(cookie) = cookies.get_private("velocty_session") {
         let _ = auth::destroy_session(pool, cookie.value());
     }
     auth::clear_session_cookie(cookies);
-    Redirect::to("/admin/login")
+    Redirect::to(format!("/{}/login", admin_slug.0))
 }
 
-/// Catch-all for any /admin/* route that failed the AdminUser guard.
+/// Catch-all for any /<admin_slug>/* route that failed the AdminUser guard.
 /// This fires when the guard returns Forward(Unauthorized).
-#[get("/admin/<_path..>", rank = 99)]
-pub fn admin_redirect_to_login(_path: std::path::PathBuf, pool: &State<DbPool>) -> Redirect {
+#[get("/<_path..>", rank = 99)]
+pub fn admin_redirect_to_login(_path: std::path::PathBuf, pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Redirect {
     if needs_setup(pool) {
-        Redirect::to("/admin/setup")
+        Redirect::to(format!("/{}/setup", admin_slug.0))
     } else {
-        Redirect::to("/admin/login")
+        Redirect::to(format!("/{}/login", admin_slug.0))
     }
 }
 
@@ -136,10 +142,10 @@ pub struct SetupForm {
     pub accept_terms: Option<String>,
 }
 
-#[get("/admin/setup")]
-pub fn setup_page(pool: &State<DbPool>) -> Result<NoCacheTemplate, Redirect> {
+#[get("/setup")]
+pub fn setup_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result<NoCacheTemplate, Redirect> {
     if !needs_setup(pool) {
-        return Err(Redirect::to("/admin/login"));
+        return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
     let ctx = SetupContext {
         error: None,
@@ -149,13 +155,14 @@ pub fn setup_page(pool: &State<DbPool>) -> Result<NoCacheTemplate, Redirect> {
     Ok(NoCacheTemplate(Template::render("admin/setup", &ctx)))
 }
 
-#[post("/admin/setup", data = "<form>")]
+#[post("/setup", data = "<form>")]
 pub fn setup_submit(
     form: Form<SetupForm>,
     pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
 ) -> Result<Redirect, Template> {
     if !needs_setup(pool) {
-        return Ok(Redirect::to("/admin/login"));
+        return Ok(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
 
     let make_err = |msg: &str, form: &SetupForm| {
@@ -190,7 +197,7 @@ pub fn setup_submit(
     let _ = Setting::set(pool, "admin_password_hash", &hash);
     let _ = Setting::set(pool, "setup_completed", "true");
 
-    Ok(Redirect::to("/admin/login"))
+    Ok(Redirect::to(format!("/{}/login", admin_slug.0)))
 }
 
 pub fn routes() -> Vec<rocket::Route> {

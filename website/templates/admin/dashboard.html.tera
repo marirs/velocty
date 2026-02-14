@@ -58,8 +58,8 @@
     </div>
 
     <div class="quick-actions">
-        <a href="/admin/posts/new" class="btn btn-primary">+ New Post <span class="kbd"><span class="kbd-mod">⌘</span>P</span></a>
-        <a href="/admin/portfolio/new" class="btn btn-primary">+ New Portfolio <span class="kbd"><span class="kbd-mod">⌘</span>I</span></a>
+        <a href="/{{ admin_slug }}/posts/new" class="btn btn-primary">+ New Post <span class="kbd"><span class="kbd-mod">⌘</span>P</span></a>
+        <a href="/{{ admin_slug }}/portfolio/new" class="btn btn-primary">+ New Portfolio <span class="kbd"><span class="kbd-mod">⌘</span>I</span></a>
     </div>
 </div>
 {% endblock content %}

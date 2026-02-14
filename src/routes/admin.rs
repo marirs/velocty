@@ -10,6 +10,12 @@ use std::collections::HashMap;
 
 use crate::auth::AdminUser;
 use crate::db::DbPool;
+use crate::AdminSlug;
+
+/// Helper: get the admin base path from managed state
+fn admin_base(slug: &AdminSlug) -> String {
+    format!("/{}", slug.0)
+}
 use crate::models::category::{Category, CategoryForm};
 use crate::models::comment::Comment;
 use crate::models::design::Design;
@@ -22,7 +28,7 @@ use crate::models::tag::Tag;
 // ── Dashboard ──────────────────────────────────────────
 
 #[get("/")]
-pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>) -> Template {
+pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let posts_count = Post::count(pool, None);
     let posts_draft = Post::count(pool, Some("draft"));
     let portfolio_count = PortfolioItem::count(pool, None);
@@ -30,6 +36,7 @@ pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 
     let context = json!({
         "page_title": "Dashboard",
+        "admin_slug": slug.0,
         "posts_count": posts_count,
         "posts_draft": posts_draft,
         "portfolio_count": portfolio_count,
@@ -46,6 +53,7 @@ pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 pub fn posts_list(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
 ) -> Template {
@@ -68,6 +76,7 @@ pub fn posts_list(
         "count_published": Post::count(pool, Some("published")),
         "count_draft": Post::count(pool, Some("draft")),
         "count_archived": Post::count(pool, Some("archived")),
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -75,12 +84,13 @@ pub fn posts_list(
 }
 
 #[get("/posts/new")]
-pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>) -> Template {
+pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
 
     let context = json!({
         "page_title": "New Post",
+        "admin_slug": slug.0,
         "categories": categories,
         "tags": tags,
         "settings": Setting::all(pool),
@@ -90,7 +100,7 @@ pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 }
 
 #[get("/posts/<id>/edit")]
-pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Option<Template> {
+pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
     let post = Post::find_by_id(pool, id)?;
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
@@ -104,6 +114,7 @@ pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Option<Te
         "tags": tags,
         "post_categories": post_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "post_tags": post_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -111,9 +122,9 @@ pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Option<Te
 }
 
 #[post("/posts/<id>/delete")]
-pub fn posts_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn posts_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Post::delete(pool, id);
-    Redirect::to("/admin/posts")
+    Redirect::to(format!("{}/posts", admin_base(slug)))
 }
 
 // ── Portfolio ──────────────────────────────────────────
@@ -122,6 +133,7 @@ pub fn posts_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirec
 pub fn portfolio_list(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
 ) -> Template {
@@ -143,6 +155,7 @@ pub fn portfolio_list(
         "count_all": PortfolioItem::count(pool, None),
         "count_published": PortfolioItem::count(pool, Some("published")),
         "count_draft": PortfolioItem::count(pool, Some("draft")),
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -150,12 +163,13 @@ pub fn portfolio_list(
 }
 
 #[get("/portfolio/new")]
-pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>) -> Template {
+pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
 
     let context = json!({
         "page_title": "New Portfolio Item",
+        "admin_slug": slug.0,
         "categories": categories,
         "tags": tags,
         "settings": Setting::all(pool),
@@ -165,7 +179,7 @@ pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 }
 
 #[get("/portfolio/<id>/edit")]
-pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Option<Template> {
+pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
     let item = PortfolioItem::find_by_id(pool, id)?;
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
@@ -179,6 +193,7 @@ pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Optio
         "tags": tags,
         "item_categories": item_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "item_tags": item_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -186,9 +201,9 @@ pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Optio
 }
 
 #[post("/portfolio/<id>/delete")]
-pub fn portfolio_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn portfolio_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = PortfolioItem::delete(pool, id);
-    Redirect::to("/admin/portfolio")
+    Redirect::to(format!("{}/portfolio", admin_base(slug)))
 }
 
 // ── Comments ───────────────────────────────────────────
@@ -197,6 +212,7 @@ pub fn portfolio_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Red
 pub fn comments_list(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
 ) -> Template {
@@ -217,6 +233,7 @@ pub fn comments_list(
         "count_pending": Comment::count(pool, Some("pending")),
         "count_approved": Comment::count(pool, Some("approved")),
         "count_spam": Comment::count(pool, Some("spam")),
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -224,21 +241,21 @@ pub fn comments_list(
 }
 
 #[post("/comments/<id>/approve")]
-pub fn comment_approve(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn comment_approve(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Comment::update_status(pool, id, "approved");
-    Redirect::to("/admin/comments")
+    Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/spam")]
-pub fn comment_spam(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn comment_spam(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Comment::update_status(pool, id, "spam");
-    Redirect::to("/admin/comments")
+    Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/delete")]
-pub fn comment_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn comment_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Comment::delete(pool, id);
-    Redirect::to("/admin/comments")
+    Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 // ── Categories ─────────────────────────────────────────
@@ -247,6 +264,7 @@ pub fn comment_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redir
 pub fn categories_list(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     type_filter: Option<String>,
 ) -> Template {
     let categories = Category::list(pool, type_filter.as_deref());
@@ -268,6 +286,7 @@ pub fn categories_list(
         "page_title": "Categories",
         "categories": categories_with_count,
         "type_filter": type_filter,
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -277,7 +296,7 @@ pub fn categories_list(
 // ── Tags ───────────────────────────────────────────────
 
 #[get("/tags")]
-pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
+pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let tags = Tag::list(pool);
 
     let tags_with_count: Vec<serde_json::Value> = tags
@@ -295,6 +314,7 @@ pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
     let context = json!({
         "page_title": "Tags",
         "tags": tags_with_count,
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -304,12 +324,13 @@ pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 // ── Designs ────────────────────────────────────────────
 
 #[get("/designs")]
-pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
+pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let designs = Design::list(pool);
 
     let context = json!({
         "page_title": "Designs",
         "designs": designs,
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -317,20 +338,21 @@ pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 }
 
 #[post("/designs/<id>/activate")]
-pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Design::activate(pool, id);
-    Redirect::to("/admin/designs")
+    Redirect::to(format!("{}/designs", admin_base(slug)))
 }
 
 // ── Import ─────────────────────────────────────────────
 
 #[get("/import")]
-pub fn import_page(_admin: AdminUser, pool: &State<DbPool>) -> Template {
+pub fn import_page(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let history = Import::list(pool);
 
     let context = json!({
         "page_title": "Import",
         "history": history,
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -343,6 +365,7 @@ pub fn import_page(_admin: AdminUser, pool: &State<DbPool>) -> Template {
 pub fn settings_page(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     section: &str,
     flash: Option<rocket::request::FlashMessage<'_>>,
 ) -> Option<Template> {
@@ -358,6 +381,7 @@ pub fn settings_page(
     let mut context = json!({
         "page_title": format!("Settings — {}", section.chars().next().unwrap().to_uppercase().to_string() + &section[1..]),
         "section": section,
+        "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
 
@@ -422,6 +446,7 @@ pub async fn upload_image(
 pub async fn posts_create(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
     let featured = match form.featured_image.as_mut() {
@@ -453,9 +478,9 @@ pub async fn posts_create(
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "post", cat_ids);
             }
-            Redirect::to(format!("/admin/posts/{}/edit", id))
+            Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id))
         }
-        Err(_) => Redirect::to("/admin/posts"),
+        Err(_) => Redirect::to(format!("{}/posts", admin_base(slug))),
     }
 }
 
@@ -463,6 +488,7 @@ pub async fn posts_create(
 pub async fn posts_update(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     id: i64,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
@@ -494,7 +520,7 @@ pub async fn posts_update(
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "post", cat_ids);
     }
-    Redirect::to(format!("/admin/posts/{}/edit", id))
+    Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id))
 }
 
 // ── POST: Create/Update Portfolio ──────────────────────
@@ -515,6 +541,7 @@ pub struct PortfolioFormData<'f> {
 pub async fn portfolio_create(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
     let image_path = match form.image.as_mut() {
@@ -548,9 +575,9 @@ pub async fn portfolio_create(
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
             }
-            Redirect::to(format!("/admin/portfolio/{}/edit", id))
+            Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id))
         }
-        Err(_) => Redirect::to("/admin/portfolio"),
+        Err(_) => Redirect::to(format!("{}/portfolio", admin_base(slug))),
     }
 }
 
@@ -558,6 +585,7 @@ pub async fn portfolio_create(
 pub async fn portfolio_update(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     id: i64,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
@@ -593,7 +621,7 @@ pub async fn portfolio_update(
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
     }
-    Redirect::to(format!("/admin/portfolio/{}/edit", id))
+    Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id))
 }
 
 // ── POST: Category Create/Delete ───────────────────────
@@ -609,9 +637,10 @@ pub struct CategoryFormData {
 pub fn category_create(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
     form: Form<CategoryFormData>,
 ) -> Redirect {
-    let slug = if form.slug.is_empty() {
+    let cat_slug = if form.slug.is_empty() {
         slug::slugify(&form.name)
     } else {
         form.slug.clone()
@@ -620,25 +649,25 @@ pub fn category_create(
         pool,
         &CategoryForm {
             name: form.name.clone(),
-            slug,
+            slug: cat_slug,
             r#type: form.r#type.clone(),
         },
     );
-    Redirect::to("/admin/categories")
+    Redirect::to(format!("{}/categories", admin_base(admin_slug)))
 }
 
 #[post("/categories/<id>/delete")]
-pub fn category_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn category_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Category::delete(pool, id);
-    Redirect::to("/admin/categories")
+    Redirect::to(format!("{}/categories", admin_base(slug)))
 }
 
 // ── POST: Tag Delete ───────────────────────────────────
 
 #[post("/tags/<id>/delete")]
-pub fn tag_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect {
+pub fn tag_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Tag::delete(pool, id);
-    Redirect::to("/admin/tags")
+    Redirect::to(format!("{}/tags", admin_base(slug)))
 }
 
 // ── POST: Settings Save ────────────────────────────────
@@ -647,6 +676,7 @@ pub fn tag_delete(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Redirect 
 pub fn settings_save(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     section: &str,
     form: Form<HashMap<String, String>>,
 ) -> Result<Flash<Redirect>, Flash<Redirect>> {
@@ -707,9 +737,46 @@ pub fn settings_save(
         }
     }
 
+    // Always-required fields (no enable toggle)
+    let required_fields: Vec<(&str, &str)> = match section {
+        "general" => vec![
+            ("site_name", "Site Name"),
+            ("site_url", "Site URL"),
+        ],
+        "security" => vec![
+            ("admin_slug", "Admin Slug"),
+        ],
+        _ => vec![],
+    };
+    for (key, label) in &required_fields {
+        if data.get(*key).map(|v| v.trim().is_empty()).unwrap_or(true) {
+            errors.push(format!("{} is required", label));
+        }
+    }
+
+    // Blog/Portfolio slug: both cannot be empty at the same time
+    if section == "blog" {
+        let blog_slug = data.get("blog_slug").map(|v| v.trim()).unwrap_or("");
+        if blog_slug.is_empty() {
+            let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "portfolio");
+            if portfolio_slug.is_empty() {
+                errors.push("Journal Slug cannot be empty while Portfolio Slug is also empty — at least one must have a slug".to_string());
+            }
+        }
+    }
+    if section == "portfolio" {
+        let portfolio_slug = data.get("portfolio_slug").map(|v| v.trim()).unwrap_or("");
+        if portfolio_slug.is_empty() {
+            let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
+            if blog_slug.is_empty() {
+                errors.push("Portfolio Slug cannot be empty while Journal Slug is also empty — at least one must have a slug".to_string());
+            }
+        }
+    }
+
     if !errors.is_empty() {
         return Err(Flash::error(
-            Redirect::to(format!("/admin/settings/{}", section)),
+            Redirect::to(format!("{}/settings/{}", admin_base(slug), section)),
             errors.join(" | "),
         ));
     }
@@ -766,7 +833,7 @@ pub fn settings_save(
 
     let _ = Setting::set_many(pool, &data);
     Ok(Flash::success(
-        Redirect::to(format!("/admin/settings/{}", section)),
+        Redirect::to(format!("{}/settings/{}", admin_base(slug), section)),
         "Settings saved successfully",
     ))
 }
@@ -777,17 +844,18 @@ pub fn settings_save(
 pub async fn import_wordpress(
     _admin: AdminUser,
     pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
     data: Data<'_>,
 ) -> Redirect {
     // Read up to 50MB of upload data
     let bytes = match data.open(50.mebibytes()).into_bytes().await {
         Ok(b) if b.is_complete() => b.into_inner(),
-        _ => return Redirect::to("/admin/import"),
+        _ => return Redirect::to(format!("{}/import", admin_base(slug))),
     };
 
     let xml_content = String::from_utf8_lossy(&bytes).to_string();
     let _ = crate::import::wordpress::import_wxr(pool, &xml_content);
-    Redirect::to("/admin/import")
+    Redirect::to(format!("{}/import", admin_base(slug)))
 }
 
 pub fn routes() -> Vec<rocket::Route> {

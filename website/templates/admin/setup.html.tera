@@ -18,7 +18,7 @@
         <div class="alert alert-error">{{ error }}</div>
         {% endif %}
 
-        <form method="post" action="/admin/setup" id="setup-form">
+        <form method="post" action="/{{ admin_slug }}/setup" id="setup-form">
             <!-- Step 1: Site -->
             <div class="setup-step" id="step-1">
                 <h3>1. Your Site</h3>

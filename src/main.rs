@@ -14,12 +14,19 @@ mod rss;
 mod seo;
 
 mod import;
+mod license;
 mod models;
 mod routes;
 
 use rocket::response::content::RawHtml;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
+
+use models::settings::Setting;
+
+/// Holds the admin URL slug, read from DB at startup.
+/// Shared via Rocket managed state so routes, fairings, and templates can access it.
+pub struct AdminSlug(pub String);
 
 pub struct NoCacheAdmin;
 
@@ -30,7 +37,11 @@ impl Fairing for NoCacheAdmin {
     }
 
     async fn on_response<'r>(&self, req: &'r rocket::Request<'_>, res: &mut rocket::Response<'r>) {
-        if req.uri().path().starts_with("/admin") {
+        let slug = req.rocket().state::<AdminSlug>()
+            .map(|s| s.0.as_str())
+            .unwrap_or("admin");
+        let prefix = format!("/{}", slug);
+        if req.uri().path().starts_with(&*prefix) {
             res.set_header(Header::new("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"));
             res.set_header(Header::new("Pragma", "no-cache"));
         }
@@ -58,8 +69,15 @@ fn rocket() -> _ {
     db::run_migrations(&pool).expect("Failed to run database migrations");
     db::seed_defaults(&pool).expect("Failed to seed default settings");
 
+    let admin_slug = Setting::get_or(&pool, "admin_slug", "admin");
+    let admin_mount = format!("/{}", admin_slug);
+    let admin_api_mount = format!("/{}/api", admin_slug);
+
+    eprintln!("Admin panel mounted at: {}", admin_mount);
+
     rocket::build()
         .manage(pool)
+        .manage(AdminSlug(admin_slug))
         .attach(Template::fairing())
         .attach(analytics::AnalyticsFairing)
         .attach(NoCacheAdmin)
@@ -70,11 +88,11 @@ fn rocket() -> _ {
             routes::public::routes(),
         )
         .mount(
-            "/admin",
+            &admin_mount,
             routes::admin::routes(),
         )
         .mount(
-            "/admin/api",
+            &admin_api_mount,
             routes::admin_api::routes(),
         )
         .mount(
@@ -82,7 +100,7 @@ fn rocket() -> _ {
             routes::api::routes(),
         )
         .mount(
-            "/",
+            &admin_mount,
             routes::auth::routes(),
         )
         .register("/", catchers![not_found, server_error])

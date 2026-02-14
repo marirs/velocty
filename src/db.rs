@@ -219,6 +219,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("admin_bio", ""),
         ("admin_avatar", ""),
         // Security
+        ("admin_slug", "admin"),
         ("mfa_enabled", "false"),
         ("mfa_secret", ""),
         ("mfa_recovery_codes", "[]"),
@@ -383,7 +384,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("commerce_currency", "USD"),
         ("downloads_max_per_purchase", "3"),
         ("downloads_expiry_hours", "48"),
-        ("downloads_license_template", "License granted for personal use."),
+        ("downloads_license_template", "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis license is granted by Oneguy (\"Licensor\") to the purchaser (\"Licensee\").\n\n1. GRANT OF LICENSE\nThe Licensor grants the Licensee a non-exclusive, non-transferable, worldwide license to use the purchased digital file (\"Work\") subject to the terms below.\n\n2. PERMITTED USES\n- Personal use (prints, wallpapers, personal projects)\n- Commercial use in a single end product (website, marketing material, publication)\n- Social media use with credit to the Licensor\n\n3. RESTRICTIONS\n- The Work may NOT be resold, sublicensed, or redistributed as-is\n- The Work may NOT be used in on-demand print services (POD) without a separate license\n- The Work may NOT be included in any competing stock/download service\n- The Work may NOT be used to train AI or machine learning models\n\n4. ATTRIBUTION\nAttribution is appreciated but not required for personal or commercial use.\n\n5. WARRANTY\nThe Work is provided \"as is\" without warranty of any kind. The Licensor is not liable for any damages arising from the use of the Work.\n\n6. TERMINATION\nThis license is effective until terminated. It terminates automatically if the Licensee breaches any terms. Upon termination, the Licensee must destroy all copies of the Work.\n\nBy downloading the Work, the Licensee agrees to these terms."),
         // AI (Phase 4 — defaults ready)
         ("ai_failover_chain", "local,ollama,openai,gemini,cloudflare"),
         ("ai_local_enabled", "false"),

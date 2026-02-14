@@ -6,10 +6,10 @@
 </div>
 
 <div class="status-tabs">
-    <a href="/admin/comments" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
-    <a href="/admin/comments?status=pending" class="tab {% if status_filter == 'pending' %}active{% endif %}">Pending ({{ count_pending }})</a>
-    <a href="/admin/comments?status=approved" class="tab {% if status_filter == 'approved' %}active{% endif %}">Approved ({{ count_approved }})</a>
-    <a href="/admin/comments?status=spam" class="tab {% if status_filter == 'spam' %}active{% endif %}">Spam ({{ count_spam }})</a>
+    <a href="/{{ admin_slug }}/comments" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
+    <a href="/{{ admin_slug }}/comments?status=pending" class="tab {% if status_filter == 'pending' %}active{% endif %}">Pending ({{ count_pending }})</a>
+    <a href="/{{ admin_slug }}/comments?status=approved" class="tab {% if status_filter == 'approved' %}active{% endif %}">Approved ({{ count_approved }})</a>
+    <a href="/{{ admin_slug }}/comments?status=spam" class="tab {% if status_filter == 'spam' %}active{% endif %}">Spam ({{ count_spam }})</a>
 </div>
 
 <div class="comments-list">
@@ -28,16 +28,16 @@
         </div>
         <div class="comment-actions">
             {% if comment.status != "approved" %}
-            <form method="post" action="/admin/comments/{{ comment.id }}/approve" class="inline">
+            <form method="post" action="/{{ admin_slug }}/comments/{{ comment.id }}/approve" class="inline">
                 <button type="submit" class="btn btn-sm btn-success">Approve</button>
             </form>
             {% endif %}
             {% if comment.status != "spam" %}
-            <form method="post" action="/admin/comments/{{ comment.id }}/spam" class="inline">
+            <form method="post" action="/{{ admin_slug }}/comments/{{ comment.id }}/spam" class="inline">
                 <button type="submit" class="btn btn-sm btn-warning">Spam</button>
             </form>
             {% endif %}
-            <form method="post" action="/admin/comments/{{ comment.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')">
+            <form method="post" action="/{{ admin_slug }}/comments/{{ comment.id }}/delete" class="inline" onsubmit="return confirm('Delete this comment?')">
                 <button type="submit" class="btn btn-sm btn-danger">Delete</button>
             </form>
         </div>

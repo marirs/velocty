@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
+use crate::AdminSlug;
 
 /// Middleware that logs page views for every public request.
 /// Admin routes are excluded.
@@ -22,7 +23,10 @@ impl Fairing for AnalyticsFairing {
         let path = request.uri().path().to_string();
 
         // Skip admin routes, static files, and API endpoints
-        if path.starts_with("/admin")
+        let admin_prefix = request.rocket().state::<AdminSlug>()
+            .map(|s| format!("/{}", s.0))
+            .unwrap_or_else(|| "/admin".to_string());
+        if path.starts_with(&admin_prefix)
             || path.starts_with("/static")
             || path.starts_with("/uploads")
             || path.starts_with("/api")

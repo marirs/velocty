@@ -3,13 +3,13 @@
 {% block content %}
 <div class="page-header">
     <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Portfolio</h2>
-    <a href="/admin/portfolio/new" class="btn btn-primary">+ New Item</a>
+    <a href="/{{ admin_slug }}/portfolio/new" class="btn btn-primary">+ New Item</a>
 </div>
 
 <div class="status-tabs">
-    <a href="/admin/portfolio" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
-    <a href="/admin/portfolio?status=published" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
-    <a href="/admin/portfolio?status=draft" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
+    <a href="/{{ admin_slug }}/portfolio" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
+    <a href="/{{ admin_slug }}/portfolio?status=published" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
+    <a href="/{{ admin_slug }}/portfolio?status=draft" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
 </div>
 
 <div class="table-wrapper">
@@ -34,20 +34,20 @@
                     <img src="/uploads/{{ item.image_path }}" alt="" class="table-thumb">
                     {% endif %}
                 </td>
-                <td><a href="/admin/portfolio/{{ item.id }}/edit">{{ item.title }}</a></td>
+                <td><a href="/{{ admin_slug }}/portfolio/{{ item.id }}/edit">{{ item.title }}</a></td>
                 <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
                 <td class="text-muted">{{ item.likes }}</td>
                 <td class="text-muted">{{ item.created_at }}</td>
                 <td class="actions">
-                    <a href="/admin/portfolio/{{ item.id }}/edit" class="btn btn-sm">Edit</a>
-                    <form method="post" action="/admin/portfolio/{{ item.id }}/delete" class="inline" onsubmit="return confirm('Delete this item?')">
+                    <a href="/{{ admin_slug }}/portfolio/{{ item.id }}/edit" class="btn btn-sm">Edit</a>
+                    <form method="post" action="/{{ admin_slug }}/portfolio/{{ item.id }}/delete" class="inline" onsubmit="return confirm('Delete this item?')">
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>
                 </td>
             </tr>
             {% endfor %}
             {% if items | length == 0 %}
-            <tr><td colspan="6" class="empty-state">No portfolio items yet. <a href="/admin/portfolio/new">Create one</a>.</td></tr>
+            <tr><td colspan="6" class="empty-state">No portfolio items yet. <a href="/{{ admin_slug }}/portfolio/new">Create one</a>.</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -56,14 +56,14 @@
 {% if total_pages > 1 %}
 <div class="pagination">
     {% if current_page > 1 %}
-    <a href="/admin/portfolio?page={{ current_page - 1 }}">&laquo; Prev</a>
+    <a href="/{{ admin_slug }}/portfolio?page={{ current_page - 1 }}">&laquo; Prev</a>
     {% endif %}
     {% for p in range(end=total_pages) %}
     {% set page_num = p + 1 %}
-    <a href="/admin/portfolio?page={{ page_num }}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    <a href="/{{ admin_slug }}/portfolio?page={{ page_num }}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
     {% endfor %}
     {% if current_page < total_pages %}
-    <a href="/admin/portfolio?page={{ current_page + 1 }}">Next &raquo;</a>
+    <a href="/{{ admin_slug }}/portfolio?page={{ current_page + 1 }}">Next &raquo;</a>
     {% endif %}
 </div>
 {% endif %}

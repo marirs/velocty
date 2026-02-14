@@ -3,14 +3,14 @@
 {% block content %}
 <div class="page-header">
     <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Journal</h2>
-    <a href="/admin/posts/new" class="btn btn-primary">+ New Post <span class="kbd"><span class="kbd-mod">⌘</span>P</span></a>
+    <a href="/{{ admin_slug }}/posts/new" class="btn btn-primary">+ New Post <span class="kbd"><span class="kbd-mod">⌘</span>P</span></a>
 </div>
 
 <div class="status-tabs">
-    <a href="/admin/posts" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
-    <a href="/admin/posts?status=published" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
-    <a href="/admin/posts?status=draft" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
-    <a href="/admin/posts?status=archived" class="tab {% if status_filter == 'archived' %}active{% endif %}">Archived ({{ count_archived }})</a>
+    <a href="/{{ admin_slug }}/posts" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
+    <a href="/{{ admin_slug }}/posts?status=published" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
+    <a href="/{{ admin_slug }}/posts?status=draft" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
+    <a href="/{{ admin_slug }}/posts?status=archived" class="tab {% if status_filter == 'archived' %}active{% endif %}">Archived ({{ count_archived }})</a>
 </div>
 
 <div class="table-wrapper">
@@ -26,21 +26,21 @@
         <tbody>
             {% for post in posts %}
             <tr>
-                <td><a href="/admin/posts/{{ post.id }}/edit">{{ post.title }}</a></td>
+                <td><a href="/{{ admin_slug }}/posts/{{ post.id }}/edit">{{ post.title }}</a></td>
                 <td>
                     <span class="badge badge-{{ post.status }}">{{ post.status }}</span>
                 </td>
                 <td class="text-muted">{{ post.created_at }}</td>
                 <td class="actions">
-                    <a href="/admin/posts/{{ post.id }}/edit" class="btn btn-sm">Edit</a>
-                    <form method="post" action="/admin/posts/{{ post.id }}/delete" class="inline" onsubmit="return confirm('Delete this post?')">
+                    <a href="/{{ admin_slug }}/posts/{{ post.id }}/edit" class="btn btn-sm">Edit</a>
+                    <form method="post" action="/{{ admin_slug }}/posts/{{ post.id }}/delete" class="inline" onsubmit="return confirm('Delete this post?')">
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>
                 </td>
             </tr>
             {% endfor %}
             {% if posts | length == 0 %}
-            <tr><td colspan="4" class="empty-state">No posts yet. <a href="/admin/posts/new">Create one</a>.</td></tr>
+            <tr><td colspan="4" class="empty-state">No posts yet. <a href="/{{ admin_slug }}/posts/new">Create one</a>.</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -49,14 +49,14 @@
 {% if total_pages > 1 %}
 <div class="pagination">
     {% if current_page > 1 %}
-    <a href="/admin/posts?page={{ current_page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo; Prev</a>
+    <a href="/{{ admin_slug }}/posts?page={{ current_page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo; Prev</a>
     {% endif %}
     {% for p in range(end=total_pages) %}
     {% set page_num = p + 1 %}
-    <a href="/admin/posts?page={{ page_num }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    <a href="/{{ admin_slug }}/posts?page={{ page_num }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
     {% endfor %}
     {% if current_page < total_pages %}
-    <a href="/admin/posts?page={{ current_page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next &raquo;</a>
+    <a href="/{{ admin_slug }}/posts?page={{ current_page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next &raquo;</a>
     {% endif %}
 </div>
 {% endif %}

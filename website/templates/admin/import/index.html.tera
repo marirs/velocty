@@ -14,7 +14,7 @@
         </div>
         <h4>WordPress</h4>
         <p>Import from WP XML export file</p>
-        <form method="post" action="/admin/import/wordpress" enctype="multipart/form-data">
+        <form method="post" action="/{{ admin_slug }}/import/wordpress" enctype="multipart/form-data">
             <input type="file" name="file" accept=".xml" required>
             <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">Import</button>
         </form>
