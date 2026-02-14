@@ -853,6 +853,9 @@ pub fn settings_save(
             "seo_matomo_enabled", "seo_cloudflare_analytics_enabled",
             "seo_clicky_enabled", "seo_umami_enabled",
         ],
+        "images" => &[
+            "images_webp_convert", "video_upload_enabled", "video_generate_thumbnail",
+        ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &["design_back_to_top"],
         "social" => &["social_brand_colors"],

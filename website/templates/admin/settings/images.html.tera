@@ -1,7 +1,7 @@
 {% extends "admin/base" %}
 
 {% block content %}
-<div class="page-header"><h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings › Images</h2></div>
+<div class="page-header"><h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings › Media</h2></div>
 
 <div class="settings-nav">
     <a href="/{{ admin_slug }}/settings/general" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Site</a>
@@ -10,7 +10,7 @@
     <a href="/{{ admin_slug }}/settings/portfolio" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Portfolio</a>
     <a href="/{{ admin_slug }}/settings/comments" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comments</a>
     <a href="/{{ admin_slug }}/settings/typography" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>Typography</a>
-    <a href="/{{ admin_slug }}/settings/images" class="tab active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Images</a>
+    <a href="/{{ admin_slug }}/settings/images" class="tab active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Media</a>
     <a href="/{{ admin_slug }}/settings/seo" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>SEO</a>
     <a href="/{{ admin_slug }}/settings/social" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>Social</a>
     <a href="/{{ admin_slug }}/settings/email" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Email</a>
@@ -22,20 +22,20 @@
 
 <form method="post" action="/{{ admin_slug }}/settings/images">
     <div class="form-card">
-        <h3>Upload Settings</h3>
+        <h3>Image Upload</h3>
         <div class="form-group">
-            <label for="images_max_upload_mb">Max Upload Size (MB)</label>
+            <label for="images_max_upload_mb">Max Image Upload Size (MB)</label>
             <input type="number" id="images_max_upload_mb" name="images_max_upload_mb" value="{{ settings.images_max_upload_mb | default(value='10') }}" min="1" max="100">
         </div>
         <div class="form-group">
-            <label for="images_quality">JPEG Quality (%)</label>
+            <label for="images_quality">JPEG/WebP Quality (%)</label>
             <input type="number" id="images_quality" name="images_quality" value="{{ settings.images_quality | default(value='85') }}" min="1" max="100">
         </div>
         <label class="checkbox-item"><input type="checkbox" name="images_webp_convert" value="true" {% if settings.images_webp_convert == "true" %}checked{% endif %}> Auto-convert to WebP</label>
         <div class="form-group" style="margin-top:16px">
-            <label for="images_allowed_types">Allowed File Types</label>
+            <label for="images_allowed_types">Allowed Image Types</label>
             <input type="text" id="images_allowed_types" name="images_allowed_types" value="{{ settings.images_allowed_types | default(value='jpg,jpeg,png,gif,webp,svg,tiff,heic') }}">
-            <span class="form-help">Comma-separated list of allowed extensions. Only these file types can be uploaded.</span>
+            <span class="form-help">Comma-separated list of allowed image extensions.</span>
         </div>
     </div>
 
@@ -55,6 +55,54 @@
         </div>
         <span class="form-help">Format: WIDTHxHEIGHT (e.g. 300x300)</span>
     </div>
+
+    <div class="form-card">
+        <h3>Video Upload</h3>
+        <label class="checkbox-item"><input type="checkbox" id="video_upload_enabled" name="video_upload_enabled" value="true" {% if settings.video_upload_enabled == "true" %}checked{% endif %}> Enable video uploads</label>
+        <fieldset id="video-fields" {% if settings.video_upload_enabled != "true" %}disabled{% endif %}>
+        <div class="form-group" style="margin-top:16px">
+            <label for="video_max_upload_mb">Max Video Upload Size (MB)</label>
+            <input type="number" id="video_max_upload_mb" name="video_max_upload_mb" value="{{ settings.video_max_upload_mb | default(value='100') }}" min="1" max="2048">
+        </div>
+        <div class="form-group">
+            <label for="video_allowed_types">Allowed Video Types</label>
+            <input type="text" id="video_allowed_types" name="video_allowed_types" value="{{ settings.video_allowed_types | default(value='mp4,webm,mov,avi,mkv') }}">
+            <span class="form-help">Comma-separated list of allowed video extensions.</span>
+        </div>
+        <div class="form-group">
+            <label for="video_max_duration">Max Duration (seconds, 0 = no limit)</label>
+            <input type="number" id="video_max_duration" name="video_max_duration" value="{{ settings.video_max_duration | default(value='0') }}" min="0">
+        </div>
+        <label class="checkbox-item"><input type="checkbox" name="video_generate_thumbnail" value="true" {% if settings.video_generate_thumbnail != "false" %}checked{% endif %}> Auto-generate video thumbnail</label>
+        </fieldset>
+    </div>
+
+    <div class="form-card">
+        <h3>Media Organization</h3>
+        <span class="form-help" style="margin-bottom:12px;display:block">Choose how uploaded files are organized in the storage folder.</span>
+        <label class="checkbox-item"><input type="radio" name="media_organization" value="flat" {% if settings.media_organization == "flat" or settings.media_organization == "" %}checked{% endif %}> <strong>Flat</strong> — all files in one folder</label>
+        <label class="checkbox-item"><input type="radio" name="media_organization" value="year" {% if settings.media_organization == "year" %}checked{% endif %}> <strong>&lt;year&gt;/</strong> — grouped by year <span class="form-help" style="margin-left:4px">e.g. 2026/photo.jpg</span></label>
+        <label class="checkbox-item"><input type="radio" name="media_organization" value="year_month" {% if settings.media_organization == "year_month" %}checked{% endif %}> <strong>&lt;year&gt;/&lt;month&gt;/</strong> — grouped by year and month <span class="form-help" style="margin-left:4px">e.g. 2026/02/photo.jpg</span></label>
+        <label class="checkbox-item"><input type="radio" name="media_organization" value="category_year" {% if settings.media_organization == "category_year" %}checked{% endif %}> <strong>&lt;category&gt;/&lt;year&gt;/</strong> — category then year <span class="form-help" style="margin-left:4px">e.g. landscapes/2026/photo.jpg</span></label>
+        <label class="checkbox-item"><input type="radio" name="media_organization" value="category_year_month" {% if settings.media_organization == "category_year_month" %}checked{% endif %}> <strong>&lt;category&gt;/&lt;year&gt;/&lt;month&gt;/</strong> — category, year, month <span class="form-help" style="margin-left:4px">e.g. landscapes/2026/02/photo.jpg</span></label>
+        <label class="checkbox-item"><input type="radio" name="media_organization" value="category" {% if settings.media_organization == "category" %}checked{% endif %}> <strong>&lt;category&gt;/</strong> — category only <span class="form-help" style="margin-left:4px">e.g. landscapes/photo.jpg</span></label>
+    </div>
+
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
+
 {% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    var cb = document.getElementById('video_upload_enabled');
+    var fs = document.getElementById('video-fields');
+    if (cb && fs) {
+        cb.addEventListener('change', function() {
+            fs.disabled = !this.checked;
+        });
+    }
+})();
+</script>
+{% endblock scripts %}

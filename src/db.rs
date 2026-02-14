@@ -336,6 +336,14 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("images_quality", "85"),
         ("images_webp_convert", "true"),
         ("images_allowed_types", "jpg,jpeg,png,gif,webp,svg,tiff,heic"),
+        // Video
+        ("video_upload_enabled", "false"),
+        ("video_max_upload_mb", "100"),
+        ("video_allowed_types", "mp4,webm,mov,avi,mkv"),
+        ("video_max_duration", "0"),
+        ("video_generate_thumbnail", "true"),
+        // Media Organization
+        ("media_organization", "flat"),
         // SEO
         ("seo_title_template", "{{title}} — {{site_name}}"),
         ("seo_default_description", ""),
