@@ -7,7 +7,7 @@
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab active">Site</a>
-    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
     <a href="/admin/settings/typography" class="tab">Typography</a>
@@ -153,10 +153,6 @@
                 <button type="button" class="drop-clear" id="favicon-clear" title="Remove favicon">&times;</button>
             </div>
             <span class="form-help">Square image, at least 64×64px</span>
-        </div>
-        <div class="form-group">
-            <label for="admin_email">Admin Email</label>
-            <input type="email" id="admin_email" name="admin_email" value="{{ settings.admin_email | default(value='') }}">
         </div>
     </div>
 

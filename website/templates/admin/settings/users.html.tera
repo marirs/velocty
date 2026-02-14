@@ -7,7 +7,7 @@
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>
-    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
     <a href="/admin/settings/typography" class="tab">Typography</a>
@@ -54,24 +54,12 @@
         </div>
     </div>
 
-    <div class="form-card">
-        <h3>Change Password</h3>
-        <div class="form-group">
-            <label for="new_password">New Password</label>
-            <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
-        </div>
-        <div class="form-group">
-            <label for="confirm_password">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter new password">
-        </div>
-    </div>
-
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 
 <div class="form-card" style="margin-top:20px">
     <h3>Multi-User Support — Phase 3</h3>
-    <p class="text-muted">Multiple user accounts with roles (Admin, Editor, Author) will be available in Phase 3.</p>
+    <p class="text-muted">Multiple user accounts with roles (Admin, Editor, Author, Subscriber) will be available in Phase 3. Admins will see a full user list here; other roles will only see their own profile.</p>
 </div>
 {% endblock content %}
 

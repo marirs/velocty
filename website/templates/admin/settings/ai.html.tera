@@ -5,7 +5,7 @@
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>
-    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
     <a href="/admin/settings/typography" class="tab">Typography</a>
@@ -18,29 +18,150 @@
     <a href="/admin/settings/ai" class="tab active">AI</a>
 </div>
 
+<div class="sub-tabs">
+    <button type="button" class="tab active" data-ai-tab="tab-ai-failover">Failover Chain</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-ollama">Ollama</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-openai">OpenAI</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-anthropic">Anthropic</button>
+</div>
+
 <form method="post" action="/admin/settings/ai">
-    <div class="form-card">
-        <h3>AI Assistant — Phase 4</h3>
-        <p class="text-muted">Pluggable LLM integration (Ollama, OpenAI, Anthropic) for content suggestions, post generation, inline assist, and theme generation will be available in Phase 4.</p>
-        <div class="form-group" style="margin-top:20px">
-            <label for="ai_provider">Provider</label>
-            <select id="ai_provider" name="ai_provider">
-                <option value="none" {% if settings.ai_provider == "none" %}selected{% endif %}>None (disabled)</option>
-                <option value="ollama" {% if settings.ai_provider == "ollama" %}selected{% endif %}>Ollama (local)</option>
-                <option value="openai" {% if settings.ai_provider == "openai" %}selected{% endif %}>OpenAI</option>
-                <option value="anthropic" {% if settings.ai_provider == "anthropic" %}selected{% endif %}>Anthropic</option>
-            </select>
+
+    <div id="tab-ai-failover">
+        <div class="form-card">
+            <h3>AI Failover Chain</h3>
+            <p class="text-muted" style="margin-bottom:16px">Drag to reorder. If the primary provider fails, the next enabled provider in the chain will be used automatically.</p>
+            <div id="failover-chain" class="failover-list">
+                {% set chain = settings.ai_failover_chain | default(value='ollama,openai,anthropic') %}
+                {% for provider in chain | split(pat=',') %}
+                <div class="failover-item" data-provider="{{ provider }}" draggable="true">
+                    <span class="failover-handle">⠿</span>
+                    <span class="failover-name">{% if provider == 'ollama' %}Ollama (Local){% elif provider == 'openai' %}OpenAI{% elif provider == 'anthropic' %}Anthropic{% endif %}</span>
+                    <span class="failover-status">
+                        {% if provider == 'ollama' and settings.ai_ollama_enabled == 'true' %}
+                            <span class="badge badge-published">Enabled</span>
+                        {% elif provider == 'openai' and settings.ai_openai_enabled == 'true' %}
+                            <span class="badge badge-published">Enabled</span>
+                        {% elif provider == 'anthropic' and settings.ai_anthropic_enabled == 'true' %}
+                            <span class="badge badge-published">Enabled</span>
+                        {% else %}
+                            <span class="badge badge-draft">Disabled</span>
+                        {% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            <input type="hidden" id="ai_failover_chain" name="ai_failover_chain" value="{{ settings.ai_failover_chain | default(value='ollama,openai,anthropic') }}">
         </div>
-        <div class="form-group">
-            <label for="ai_api_key">API Key</label>
-            <input type="password" id="ai_api_key" name="ai_api_key" value="{{ settings.ai_api_key | default(value='') }}" placeholder="Prepare for Phase 4">
+    </div>
+
+    <div id="tab-ai-ollama" style="display:none">
+        <div class="form-card">
+            <h3>Ollama (Local)</h3>
+            <label class="checkbox-item"><input type="checkbox" name="ai_ollama_enabled" value="true" {% if settings.ai_ollama_enabled == "true" %}checked{% endif %}> Enable Ollama</label>
+            <div class="form-group" style="margin-top:16px">
+                <label for="ai_ollama_url">Server URL</label>
+                <input type="text" id="ai_ollama_url" name="ai_ollama_url" value="{{ settings.ai_ollama_url | default(value='http://localhost:11434') }}" placeholder="http://localhost:11434">
+            </div>
+            <div class="form-group">
+                <label for="ai_ollama_model">Model</label>
+                <input type="text" id="ai_ollama_model" name="ai_ollama_model" value="{{ settings.ai_ollama_model | default(value='') }}" placeholder="e.g. llama3, mistral, codellama">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="ai_model">Model</label>
-            <input type="text" id="ai_model" name="ai_model" value="{{ settings.ai_model | default(value='') }}" placeholder="e.g. gpt-4, claude-3, llama3">
+    </div>
+
+    <div id="tab-ai-openai" style="display:none">
+        <div class="form-card">
+            <h3>OpenAI</h3>
+            <label class="checkbox-item"><input type="checkbox" name="ai_openai_enabled" value="true" {% if settings.ai_openai_enabled == "true" %}checked{% endif %}> Enable OpenAI</label>
+            <div class="form-group" style="margin-top:16px">
+                <label for="ai_openai_api_key">API Key</label>
+                <input type="password" id="ai_openai_api_key" name="ai_openai_api_key" value="{{ settings.ai_openai_api_key | default(value='') }}" placeholder="sk-...">
+            </div>
+            <div class="form-group">
+                <label for="ai_openai_model">Model</label>
+                <input type="text" id="ai_openai_model" name="ai_openai_model" value="{{ settings.ai_openai_model | default(value='gpt-4') }}" placeholder="e.g. gpt-4, gpt-4o, gpt-3.5-turbo">
+            </div>
+            <div class="form-group">
+                <label for="ai_openai_base_url">Base URL (optional)</label>
+                <input type="text" id="ai_openai_base_url" name="ai_openai_base_url" value="{{ settings.ai_openai_base_url | default(value='') }}" placeholder="https://api.openai.com/v1">
+                <span class="form-help">Override for OpenAI-compatible APIs (e.g. Azure, local proxies)</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-ai-anthropic" style="display:none">
+        <div class="form-card">
+            <h3>Anthropic</h3>
+            <label class="checkbox-item"><input type="checkbox" name="ai_anthropic_enabled" value="true" {% if settings.ai_anthropic_enabled == "true" %}checked{% endif %}> Enable Anthropic</label>
+            <div class="form-group" style="margin-top:16px">
+                <label for="ai_anthropic_api_key">API Key</label>
+                <input type="password" id="ai_anthropic_api_key" name="ai_anthropic_api_key" value="{{ settings.ai_anthropic_api_key | default(value='') }}" placeholder="sk-ant-...">
+            </div>
+            <div class="form-group">
+                <label for="ai_anthropic_model">Model</label>
+                <input type="text" id="ai_anthropic_model" name="ai_anthropic_model" value="{{ settings.ai_anthropic_model | default(value='claude-3-opus-20240229') }}" placeholder="e.g. claude-3-opus, claude-3-sonnet">
+            </div>
         </div>
     </div>
 
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    // Sub-tab switching
+    var tabs = document.querySelectorAll('[data-ai-tab]');
+    var panels = ['tab-ai-failover','tab-ai-ollama','tab-ai-openai','tab-ai-anthropic'];
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            panels.forEach(function(id) {
+                document.getElementById(id).style.display = (id === tab.dataset.aiTab) ? '' : 'none';
+            });
+        });
+    });
+
+    // Failover chain drag-and-drop reorder
+    var chain = document.getElementById('failover-chain');
+    var hiddenChain = document.getElementById('ai_failover_chain');
+    var dragItem = null;
+
+    chain.addEventListener('dragstart', function(e) {
+        dragItem = e.target.closest('.failover-item');
+        if (dragItem) {
+            dragItem.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+    });
+    chain.addEventListener('dragend', function() {
+        if (dragItem) dragItem.classList.remove('dragging');
+        dragItem = null;
+        updateChainOrder();
+    });
+    chain.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        var target = e.target.closest('.failover-item');
+        if (target && target !== dragItem) {
+            var rect = target.getBoundingClientRect();
+            var mid = rect.top + rect.height / 2;
+            if (e.clientY < mid) {
+                chain.insertBefore(dragItem, target);
+            } else {
+                chain.insertBefore(dragItem, target.nextSibling);
+            }
+        }
+    });
+
+    function updateChainOrder() {
+        var items = chain.querySelectorAll('.failover-item');
+        var order = [];
+        items.forEach(function(item) { order.push(item.dataset.provider); });
+        hiddenChain.value = order.join(',');
+    }
+})();
+</script>
+{% endblock scripts %}

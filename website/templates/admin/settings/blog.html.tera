@@ -2,12 +2,12 @@
 
 {% block content %}
 <div class="page-header">
-    <h2>Settings — Blog</h2>
+    <h2>Settings — Journal</h2>
 </div>
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>
-    <a href="/admin/settings/blog" class="tab active">Blog</a>
+    <a href="/admin/settings/blog" class="tab active">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
     <a href="/admin/settings/typography" class="tab">Typography</a>
@@ -22,7 +22,19 @@
 
 <form method="post" action="/admin/settings/blog">
     <div class="form-card">
-        <h3>Blog Display</h3>
+        <h3>URL</h3>
+        <div class="form-group">
+            <label for="blog_slug">Journal Slug</label>
+            <div style="display:flex;align-items:center;gap:4px">
+                <span class="text-muted" style="font-size:13px">yoursite.com/</span>
+                <input type="text" id="blog_slug" name="blog_slug" value="{{ settings.blog_slug | default(value='journal') }}" style="width:140px" placeholder="journal">
+            </div>
+            <span class="form-help">The URL path for your journal listing page</span>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Display</h3>
         <div class="form-group">
             <label for="blog_posts_per_page">Posts Per Page</label>
             <input type="number" id="blog_posts_per_page" name="blog_posts_per_page" value="{{ settings.blog_posts_per_page | default(value='10') }}" min="1" max="100">
@@ -66,7 +78,7 @@
     </div>
 
     <div class="form-card">
-        <h3>Blog Features</h3>
+        <h3>Features</h3>
         <label class="checkbox-item"><input type="checkbox" name="blog_show_author" value="true" {% if settings.blog_show_author == "true" %}checked{% endif %}> Show author name</label>
         <label class="checkbox-item"><input type="checkbox" name="blog_show_date" value="true" {% if settings.blog_show_date == "true" %}checked{% endif %}> Show date</label>
         <label class="checkbox-item"><input type="checkbox" name="blog_show_reading_time" value="true" {% if settings.blog_show_reading_time == "true" %}checked{% endif %}> Show reading time</label>

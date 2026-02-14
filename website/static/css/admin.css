@@ -619,6 +619,7 @@ input[type="file"]::file-selector-button:hover {
     display: flex;
     gap: 6px;
     padding: 4px;
+    margin-bottom: 20px;
     background: var(--bg-card);
     border-radius: 8px;
     border: 1px solid var(--border-subtle);
@@ -631,6 +632,52 @@ input[type="file"]::file-selector-button:hover {
     border-radius: 6px;
     cursor: pointer;
     font-family: inherit;
+}
+
+/* ── AI Failover Chain ────────────────────────────── */
+.failover-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.failover-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    cursor: grab;
+    transition: background 150ms, box-shadow 150ms;
+    user-select: none;
+}
+
+.failover-item:hover {
+    background: var(--bg-card-hover);
+}
+
+.failover-item.dragging {
+    opacity: 0.5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.failover-handle {
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: grab;
+    line-height: 1;
+}
+
+.failover-name {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.failover-status {
+    flex-shrink: 0;
 }
 
 /* ── Badges ────────────────────────────────────────── */

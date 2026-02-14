@@ -5,7 +5,7 @@
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>
-    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
     <a href="/admin/settings/typography" class="tab">Typography</a>

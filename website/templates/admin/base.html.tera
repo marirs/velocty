@@ -11,17 +11,17 @@
     <div class="admin-wrapper">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-logo">
-                <img src="/static/images/favicon.png" alt="V" class="sidebar-icon">
-                <img src="/static/images/logo.png" alt="Velocty" class="sidebar-logo-full">
+                <img src="/static/images/logo-v.png" alt="V" class="sidebar-icon">
+                <img src="/static/images/logo-transparent.png" alt="Velocty" class="sidebar-logo-full">
             </div>
             <nav class="sidebar-nav">
                 <a href="/admin" class="nav-item {% if page_title == 'Dashboard' %}active{% endif %}" title="Dashboard">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                     <span class="nav-label">Dashboard</span>
                 </a>
-                <a href="/admin/posts" class="nav-item {% if page_title == 'Posts' or page_title == 'New Post' or page_title == 'Edit Post' %}active{% endif %}" title="Posts">
+                <a href="/admin/posts" class="nav-item {% if page_title == 'Journal' or page_title == 'New Post' or page_title == 'Edit Post' %}active{% endif %}" title="Journal">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    <span class="nav-label">Posts</span>
+                    <span class="nav-label">Journal</span>
                 </a>
                 <a href="/admin/portfolio" class="nav-item {% if page_title == 'Portfolio' or page_title == 'New Portfolio Item' or page_title == 'Edit Portfolio Item' %}active{% endif %}" title="Portfolio">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>

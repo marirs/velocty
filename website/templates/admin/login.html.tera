@@ -10,7 +10,7 @@
 <body class="login-page">
     <div class="login-card">
         <div class="login-logo">
-            <img src="/static/images/logo.png" alt="Velocty" style="height:32px;width:auto;margin-bottom:8px">
+            <img src="/static/images/logo-transparent.png" alt="Velocty" style="height:32px;width:auto;margin-bottom:8px">
         </div>
         {% if error %}
         <div class="alert alert-error">{{ error }}</div>

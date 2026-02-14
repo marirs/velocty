@@ -5,7 +5,7 @@
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>
-    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab active">Comments</a>
     <a href="/admin/settings/typography" class="tab">Typography</a>
@@ -22,7 +22,7 @@
     <div class="form-card">
         <h3>Comment Settings</h3>
         <label class="checkbox-item"><input type="checkbox" name="comments_enabled" value="true" {% if settings.comments_enabled == "true" %}checked{% endif %}> Enable comments globally</label>
-        <label class="checkbox-item"><input type="checkbox" name="comments_on_blog" value="true" {% if settings.comments_on_blog == "true" %}checked{% endif %}> Comments on blog posts</label>
+        <label class="checkbox-item"><input type="checkbox" name="comments_on_blog" value="true" {% if settings.comments_on_blog == "true" %}checked{% endif %}> Comments on journal posts</label>
         <label class="checkbox-item"><input type="checkbox" name="comments_on_portfolio" value="true" {% if settings.comments_on_portfolio == "true" %}checked{% endif %}> Comments on portfolio items</label>
         <div class="form-group" style="margin-top:16px">
             <label for="comments_moderation">Moderation</label>

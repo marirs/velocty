@@ -5,7 +5,7 @@
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>
-    <a href="/admin/settings/blog" class="tab">Blog</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
     <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
     <a href="/admin/settings/comments" class="tab">Comments</a>
     <a href="/admin/settings/typography" class="tab active">Typography</a>
@@ -18,7 +18,7 @@
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
-<div class="sub-tabs" style="margin-bottom:20px">
+<div class="sub-tabs">
     <button type="button" class="tab active" data-tab="font-sources">Font Sources</button>
     <button type="button" class="tab" data-tab="custom-upload">Custom Upload</button>
     <button type="button" class="tab" data-tab="fonts">Fonts</button>
