@@ -1,10 +1,22 @@
 use rocket::form::Form;
-use rocket::http::CookieJar;
-use rocket::response::Redirect;
-use rocket::State;
+use rocket::http::{CookieJar, Header};
+use rocket::response::{self, Redirect, Responder};
+use rocket::{Request, State};
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+/// Wrapper that adds no-cache headers to a Template response
+pub struct NoCacheTemplate(Template);
+
+impl<'r> Responder<'r, 'static> for NoCacheTemplate {
+    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
+        let mut resp = self.0.respond_to(req)?;
+        resp.set_header(Header::new("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"));
+        resp.set_header(Header::new("Pragma", "no-cache"));
+        Ok(resp)
+    }
+}
 
 use crate::auth;
 use crate::db::DbPool;
@@ -119,7 +131,7 @@ pub struct SetupForm {
 }
 
 #[get("/admin/setup")]
-pub fn setup_page(pool: &State<DbPool>) -> Result<Template, Redirect> {
+pub fn setup_page(pool: &State<DbPool>) -> Result<NoCacheTemplate, Redirect> {
     if !needs_setup(pool) {
         return Err(Redirect::to("/admin/login"));
     }
@@ -128,7 +140,7 @@ pub fn setup_page(pool: &State<DbPool>) -> Result<Template, Redirect> {
         site_name: "Velocty".to_string(),
         admin_email: String::new(),
     };
-    Ok(Template::render("admin/setup", &ctx))
+    Ok(NoCacheTemplate(Template::render("admin/setup", &ctx)))
 }
 
 #[post("/admin/setup", data = "<form>")]

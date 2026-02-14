@@ -18,6 +18,24 @@ mod models;
 mod routes;
 
 use rocket::response::content::RawHtml;
+use rocket::fairing::{Fairing, Info, Kind};
+use rocket::http::Header;
+
+pub struct NoCacheAdmin;
+
+#[rocket::async_trait]
+impl Fairing for NoCacheAdmin {
+    fn info(&self) -> Info {
+        Info { name: "No-Cache Admin Pages", kind: Kind::Response }
+    }
+
+    async fn on_response<'r>(&self, req: &'r rocket::Request<'_>, res: &mut rocket::Response<'r>) {
+        if req.uri().path().starts_with("/admin") {
+            res.set_header(Header::new("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"));
+            res.set_header(Header::new("Pragma", "no-cache"));
+        }
+    }
+}
 
 #[catch(404)]
 fn not_found() -> RawHtml<String> {
@@ -44,6 +62,7 @@ fn rocket() -> _ {
         .manage(pool)
         .attach(Template::fairing())
         .attach(analytics::AnalyticsFairing)
+        .attach(NoCacheAdmin)
         .mount("/static", FileServer::from("website/static"))
         .mount("/uploads", FileServer::from("website/uploads"))
         .mount(

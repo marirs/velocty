@@ -346,7 +346,7 @@ pub fn settings_page(
 ) -> Option<Template> {
     let valid_sections = [
         "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
-        "design", "paypal", "users", "ai", "email",
+        "design", "social", "paypal", "users", "ai", "email",
     ];
 
     if !valid_sections.contains(&section) {
@@ -661,6 +661,7 @@ pub fn settings_save(
             "security_turnstile_enabled", "security_hcaptcha_enabled",
         ],
         "design" => &["design_back_to_top"],
+        "social" => &["social_brand_colors"],
         _ => &[],
     };
     for key in checkbox_keys {
