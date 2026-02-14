@@ -146,6 +146,17 @@
             });
         });
     })();
+    {% if flash_msg is defined and flash_msg %}
+    (function(){
+        var el = document.createElement('div');
+        el.className = 'alert alert-{{ flash_kind | default(value="info") }} alert-flash';
+        el.innerHTML = '<span>{{ flash_msg }}</span><button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>';
+        var header = document.querySelector('.page-header');
+        if (header) header.insertAdjacentElement('afterend', el);
+        else { var main = document.querySelector('.content-area'); if (main) main.prepend(el); }
+        setTimeout(function(){ if (el.parentElement) { el.style.transition='opacity 0.4s'; el.style.opacity='0'; setTimeout(function(){ el.remove(); },400); } }, 8000);
+    })();
+    {% endif %}
     </script>
 </body>
 </html>

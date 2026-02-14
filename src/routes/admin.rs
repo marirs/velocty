@@ -1,7 +1,7 @@
 use rocket::data::{Data, ToByteUnit};
 use rocket::form::Form;
 use rocket::fs::TempFile;
-use rocket::response::Redirect;
+use rocket::response::{Flash, Redirect};
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
@@ -344,6 +344,7 @@ pub fn settings_page(
     _admin: AdminUser,
     pool: &State<DbPool>,
     section: &str,
+    flash: Option<rocket::request::FlashMessage<'_>>,
 ) -> Option<Template> {
     let valid_sections = [
         "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
@@ -354,11 +355,16 @@ pub fn settings_page(
         return None;
     }
 
-    let context = json!({
+    let mut context = json!({
         "page_title": format!("Settings — {}", section.chars().next().unwrap().to_uppercase().to_string() + &section[1..]),
         "section": section,
         "settings": Setting::all(pool),
     });
+
+    if let Some(ref f) = flash {
+        context["flash_kind"] = json!(f.kind());
+        context["flash_msg"] = json!(f.message());
+    }
 
     let template_name: String = format!("admin/settings/{}", section);
     Some(Template::render(template_name, &context))
@@ -643,7 +649,71 @@ pub fn settings_save(
     pool: &State<DbPool>,
     section: &str,
     form: Form<HashMap<String, String>>,
-) -> Redirect {
+) -> Result<Flash<Redirect>, Flash<Redirect>> {
+    let data = form.into_inner();
+
+    // Validation rules: (enable_key, human_name, &[required_field_keys])
+    let rules: Vec<(&str, &str, Vec<&str>)> = match section {
+        "security" => vec![
+            ("security_akismet_enabled", "Akismet", vec!["security_akismet_api_key"]),
+            ("security_cleantalk_enabled", "CleanTalk", vec!["security_cleantalk_api_key"]),
+            ("security_oopspam_enabled", "OOPSpam", vec!["security_oopspam_api_key"]),
+            ("security_recaptcha_enabled", "reCaptcha", vec!["security_recaptcha_site_key", "security_recaptcha_secret_key"]),
+            ("security_turnstile_enabled", "Turnstile", vec!["security_turnstile_site_key", "security_turnstile_secret_key"]),
+            ("security_hcaptcha_enabled", "hCaptcha", vec!["security_hcaptcha_site_key", "security_hcaptcha_secret_key"]),
+        ],
+        "email" => vec![
+            ("email_gmail_enabled", "Gmail", vec!["email_gmail_address", "email_gmail_app_password"]),
+            ("email_resend_enabled", "Resend", vec!["email_resend_api_key"]),
+            ("email_ses_enabled", "Amazon SES", vec!["email_ses_access_key", "email_ses_secret_key", "email_ses_region"]),
+            ("email_postmark_enabled", "Postmark", vec!["email_postmark_server_token"]),
+            ("email_brevo_enabled", "Brevo", vec!["email_brevo_api_key"]),
+            ("email_sendpulse_enabled", "SendPulse", vec!["email_sendpulse_client_id", "email_sendpulse_client_secret"]),
+            ("email_mailgun_enabled", "Mailgun", vec!["email_mailgun_api_key", "email_mailgun_domain"]),
+            ("email_moosend_enabled", "Moosend", vec!["email_moosend_api_key"]),
+            ("email_mandrill_enabled", "Mandrill", vec!["email_mandrill_api_key"]),
+            ("email_sparkpost_enabled", "SparkPost", vec!["email_sparkpost_api_key"]),
+            ("email_smtp_enabled", "Custom SMTP", vec!["email_smtp_host", "email_smtp_port", "email_smtp_username", "email_smtp_password"]),
+        ],
+        "commerce" => vec![
+            ("commerce_paypal_enabled", "PayPal", vec!["paypal_client_id", "paypal_secret"]),
+            ("commerce_payoneer_enabled", "Payoneer", vec!["payoneer_program_id", "payoneer_client_id", "payoneer_client_secret"]),
+            ("commerce_stripe_enabled", "Stripe", vec!["stripe_publishable_key", "stripe_secret_key"]),
+            ("commerce_2checkout_enabled", "2Checkout", vec!["twocheckout_merchant_code", "twocheckout_secret_key"]),
+            ("commerce_square_enabled", "Square", vec!["square_application_id", "square_access_token", "square_location_id"]),
+            ("commerce_razorpay_enabled", "Razorpay", vec!["razorpay_key_id", "razorpay_key_secret"]),
+            ("commerce_mollie_enabled", "Mollie", vec!["mollie_api_key"]),
+        ],
+        "ai" => vec![
+            ("ai_ollama_enabled", "Ollama", vec!["ai_ollama_url", "ai_ollama_model"]),
+            ("ai_openai_enabled", "OpenAI", vec!["ai_openai_api_key"]),
+            ("ai_gemini_enabled", "Gemini", vec!["ai_gemini_api_key"]),
+            ("ai_cloudflare_enabled", "Cloudflare Workers AI", vec!["ai_cloudflare_account_id", "ai_cloudflare_api_token"]),
+        ],
+        _ => vec![],
+    };
+
+    // Check validation: if enabled, all required fields must be non-empty
+    let mut errors: Vec<String> = Vec::new();
+    for (enable_key, name, required_fields) in &rules {
+        if data.get(*enable_key).map(|v| v.as_str()) == Some("true") {
+            let missing: Vec<&&str> = required_fields
+                .iter()
+                .filter(|f| data.get(**f).map(|v| v.trim().is_empty()).unwrap_or(true))
+                .collect();
+            if !missing.is_empty() {
+                errors.push(format!("{}: please fill in all required fields before enabling", name));
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(Flash::error(
+            Redirect::to(format!("/admin/settings/{}", section)),
+            errors.join(" | "),
+        ));
+    }
+
     // Checkboxes don't submit a value when unchecked, so we must
     // explicitly reset all known boolean keys for this section first.
     let checkbox_keys: &[&str] = match section {
@@ -694,9 +764,11 @@ pub fn settings_save(
         let _ = Setting::set(pool, key, "false");
     }
 
-    let data = form.into_inner();
     let _ = Setting::set_many(pool, &data);
-    Redirect::to(format!("/admin/settings/{}", section))
+    Ok(Flash::success(
+        Redirect::to(format!("/admin/settings/{}", section)),
+        "Settings saved successfully",
+    ))
 }
 
 // ── POST: WordPress Import ─────────────────────────────
