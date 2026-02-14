@@ -143,6 +143,9 @@
             var full = document.querySelector('.sidebar-logo-full');
             if (icon) icon.src = next === 'light' ? '/static/images/logo-v-light.png' : '/static/images/logo-v.png';
             if (full) full.src = next === 'light' ? '/static/images/logo-transparent-light.png' : '/static/images/logo-transparent.png';
+            document.querySelectorAll('.theme-logo').forEach(function(el) {
+                el.src = next === 'light' ? '/static/images/logo-v-light.png' : '/static/images/logo-v.png';
+            });
             fetch('/{{ admin_slug }}/api/theme', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},

@@ -8,51 +8,84 @@
 <p class="text-muted" style="margin-bottom:24px">Choose a source to import content from:</p>
 
 <div class="import-sources">
+    <!-- Velocty -->
     <div class="import-card">
-        <div class="import-icon">
-            <img src="/static/images/logo-v.png" alt="V" style="width:32px;height:32px">
+        <div class="import-card-header">
+            {% if settings.admin_theme | default(value='dark') == "light" %}
+            <img src="/static/images/logo-v-light.png" alt="V" class="theme-logo" style="width:24px;height:24px">
+            {% else %}
+            <img src="/static/images/logo-v.png" alt="V" class="theme-logo" style="width:24px;height:24px">
+            {% endif %}
+            <h4>Velocty</h4>
         </div>
-        <h4>Velocty</h4>
-        <p>Import from a Velocty JSON export</p>
-        <form method="post" action="/{{ admin_slug }}/import/velocty" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".json" required>
-            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">Import</button>
+        <p class="import-card-desc">Import posts, portfolio items, comments, categories, tags, and settings from a Velocty JSON export file.</p>
+        <form method="post" action="/{{ admin_slug }}/import/velocty" enctype="multipart/form-data" class="import-form">
+            <label class="import-dropzone" data-accept=".json">
+                <input type="file" name="file" accept=".json" required>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span class="dropzone-text">Drop .json file here or <strong>browse</strong></span>
+                <span class="dropzone-file"></span>
+            </label>
+            <div class="import-card-footer">
+                <button type="submit" class="btn btn-primary btn-sm">Import</button>
+            </div>
         </form>
     </div>
+
+    <!-- WordPress -->
     <div class="import-card">
-        <div class="import-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#E8913A" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <div class="import-card-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8913A" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <h4>WordPress</h4>
         </div>
-        <h4>WordPress</h4>
-        <p>Import from WP XML export file</p>
-        <form method="post" action="/{{ admin_slug }}/import/wordpress" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".xml" required>
-            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">Import</button>
+        <p class="import-card-desc">Import posts, pages, categories, tags, and comments from a WordPress WXR XML export file.</p>
+        <form method="post" action="/{{ admin_slug }}/import/wordpress" enctype="multipart/form-data" class="import-form">
+            <label class="import-dropzone" data-accept=".xml">
+                <input type="file" name="file" accept=".xml" required>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span class="dropzone-text">Drop .xml file here or <strong>browse</strong></span>
+                <span class="dropzone-file"></span>
+            </label>
+            <div class="import-card-footer">
+                <button type="submit" class="btn btn-primary btn-sm">Import</button>
+            </div>
         </form>
     </div>
-    <div class="import-card disabled">
-        <div class="import-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+
+    <!-- Tumblr -->
+    <div class="import-card import-card-disabled">
+        <div class="import-card-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <h4>Tumblr</h4>
         </div>
-        <h4>Tumblr</h4>
-        <p>Coming in a future update</p>
-        <button class="btn btn-sm" disabled>Coming Soon</button>
+        <p class="import-card-desc">Import posts and media from a Tumblr blog export. Coming in a future update.</p>
+        <div class="import-card-footer">
+            <span class="badge-coming">Coming Soon</span>
+        </div>
     </div>
-    <div class="import-card disabled">
-        <div class="import-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+
+    <!-- Markdown -->
+    <div class="import-card import-card-disabled">
+        <div class="import-card-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <h4>Markdown</h4>
         </div>
-        <h4>Markdown</h4>
-        <p>Import from .md files</p>
-        <button class="btn btn-sm" disabled>Coming Soon</button>
+        <p class="import-card-desc">Batch import from <code>.md</code> files with front matter support for title, date, tags, and categories.</p>
+        <div class="import-card-footer">
+            <span class="badge-coming">Coming Soon</span>
+        </div>
     </div>
-    <div class="import-card disabled">
-        <div class="import-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+
+    <!-- CSV -->
+    <div class="import-card import-card-disabled">
+        <div class="import-card-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            <h4>CSV</h4>
         </div>
-        <h4>CSV</h4>
-        <p>Import with column mapping</p>
-        <button class="btn btn-sm" disabled>Coming Soon</button>
+        <p class="import-card-desc">Import structured data from CSV files with interactive column mapping to Velocty fields.</p>
+        <div class="import-card-footer">
+            <span class="badge-coming">Coming Soon</span>
+        </div>
     </div>
 </div>
 
@@ -87,4 +120,42 @@
     </table>
 </div>
 {% endif %}
+
+<script>
+document.querySelectorAll('.import-dropzone').forEach(function(zone) {
+    var input = zone.querySelector('input[type="file"]');
+    var fileLabel = zone.querySelector('.dropzone-file');
+    var textLabel = zone.querySelector('.dropzone-text');
+
+    ['dragenter', 'dragover'].forEach(function(evt) {
+        zone.addEventListener(evt, function(e) {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(function(evt) {
+        zone.addEventListener(evt, function(e) {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+        });
+    });
+
+    zone.addEventListener('drop', function(e) {
+        if (e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            showFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    input.addEventListener('change', function() {
+        if (input.files.length) showFile(input.files[0]);
+    });
+
+    function showFile(f) {
+        fileLabel.textContent = f.name + ' (' + (f.size < 1024 ? f.size + ' B' : (f.size / 1024).toFixed(1) + ' KB') + ')';
+        textLabel.innerHTML = 'File selected — <strong>change</strong>';
+    }
+});
+</script>
 {% endblock content %}
