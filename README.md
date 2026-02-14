@@ -169,7 +169,7 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 | **Portfolio** | Grid columns, likes, lightbox, image protection, animations |
 | **Comments** | Enable/disable, moderation mode, spam protection, rate limits |
 | **Typography** | Fonts, sizes, sources, per-element assignment |
-| **Images** | Upload path, max size, thumbnail dimensions, quality, WebP |
+| **Media** | Image upload (max size, quality, WebP, thumbnails), video upload (types, size, duration), media organization (6 folder structures) |
 | **SEO** | Title template, meta defaults, sitemap, structured data, robots.txt, webmaster verification, 7 analytics providers |
 | **Security** | Admin slug, auth method, MFA, sessions, rate limits, captcha, anti-spam |
 | **Frontend** | Active design, back-to-top button |
@@ -196,7 +196,13 @@ cargo build --release
 ./target/release/velocty
 ```
 
-Open `http://localhost:8000/admin/setup` to create your admin account.
+Open `http://localhost:8000/admin/setup` — the setup wizard walks you through:
+1. **Database** — choose SQLite (default) or MongoDB (with connection test & auth config)
+2. **Site name**
+3. **Admin account**
+4. **Terms acceptance**
+
+Your choice is saved to `velocty.toml` and cannot be changed after setup.
 
 ### Multi-Site Mode
 
@@ -211,7 +217,28 @@ Open `http://localhost:8000/super/setup` to create the super admin account, then
 
 ### Configuration
 
-All configuration is done through the admin panel — no config files to edit. Settings are stored in SQLite and take effect immediately (except admin slug, which requires a restart).
+All configuration is done through the admin panel. Settings are stored in the database and take effect immediately (except admin slug, which requires a restart).
+
+`velocty.toml` is generated during first-run setup and stores the database backend choice:
+
+```toml
+# SQLite (default)
+[database]
+backend = "sqlite"
+path = "website/site/db/velocty.db"
+
+# MongoDB (alternative)
+[database]
+backend = "mongodb"
+uri = "mongodb://localhost:27017"
+name = "velocty"
+
+[database.auth]
+mechanism = "scram_sha256"
+auth_db = "admin"
+username = "myuser"
+password = "mypass"
+```
 
 ### Directory Structure
 

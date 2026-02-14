@@ -96,6 +96,42 @@
                             <label for="mongo_db_name">Database Name</label>
                             <input type="text" id="mongo_db_name" name="mongo_db_name" value="{{ mongo_db_name | default(value='velocty') }}" placeholder="velocty">
                         </div>
+                        <label class="checkbox-item" style="margin-top:12px">
+                            <input type="checkbox" id="mongo_auth_enabled" name="mongo_auth_enabled" value="true" {% if mongo_auth_enabled == "true" %}checked{% endif %} onchange="toggleMongoAuth()"> Requires authentication
+                        </label>
+                        <div id="mongo-auth-fields" style="{% if mongo_auth_enabled != 'true' %}display:none;{% endif %}margin-top:12px">
+                            <div class="form-group">
+                                <label for="mongo_auth_mechanism">Auth Mechanism</label>
+                                <select id="mongo_auth_mechanism" name="mongo_auth_mechanism">
+                                    <option value="scram_sha256" {% if mongo_auth_mechanism | default(value='scram_sha256') == "scram_sha256" %}selected{% endif %}>SCRAM-SHA-256 (default)</option>
+                                    <option value="scram_sha1" {% if mongo_auth_mechanism == "scram_sha1" %}selected{% endif %}>SCRAM-SHA-1</option>
+                                    <option value="x509" {% if mongo_auth_mechanism == "x509" %}selected{% endif %}>X.509 Certificate</option>
+                                    <option value="ldap" {% if mongo_auth_mechanism == "ldap" %}selected{% endif %}>LDAP (PLAIN)</option>
+                                    <option value="aws" {% if mongo_auth_mechanism == "aws" %}selected{% endif %}>AWS IAM</option>
+                                </select>
+                            </div>
+                            <div id="mongo-cred-fields" style="{% if mongo_auth_mechanism == 'x509' or mongo_auth_mechanism == 'aws' %}display:none;{% endif %}">
+                                <div class="form-group">
+                                    <label for="mongo_username">Username</label>
+                                    <input type="text" id="mongo_username" name="mongo_username" value="{{ mongo_username | default(value='') }}" placeholder="admin">
+                                </div>
+                                <div class="form-group">
+                                    <label for="mongo_password">Password</label>
+                                    <input type="password" id="mongo_password" name="mongo_password" value="{{ mongo_password | default(value='') }}" placeholder="••••••••">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="mongo_auth_db">Auth Database</label>
+                                <input type="text" id="mongo_auth_db" name="mongo_auth_db" value="{{ mongo_auth_db | default(value='admin') }}" placeholder="admin">
+                                <span class="form-help">Database used for authentication (usually "admin").</span>
+                            </div>
+                        </div>
+                        <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
+                            <button type="button" class="btn btn-secondary" id="test-mongo-btn" onclick="testMongoConnection()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Test Connection
+                            </button>
+                            <span id="test-mongo-status" style="font-size:13px"></span>
+                        </div>
                     </div>
                 </label>
 
@@ -180,6 +216,57 @@ function selectDb(backend) {
     }
 }
 
+function toggleMongoAuth() {
+    var cb = document.getElementById('mongo_auth_enabled');
+    document.getElementById('mongo-auth-fields').style.display = cb.checked ? '' : 'none';
+}
+
+function testMongoConnection() {
+    var btn = document.getElementById('test-mongo-btn');
+    var status = document.getElementById('test-mongo-status');
+    var uri = document.getElementById('mongo_uri').value.trim();
+    if (!uri) {
+        status.style.color = '#ef4444';
+        status.textContent = 'Please enter a Connection URI first.';
+        document.getElementById('mongo_uri').focus();
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    status.style.color = 'var(--text-secondary)';
+    status.textContent = 'Connecting...';
+    fetch('/{{ admin_slug }}/setup/test-mongo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uri: uri })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        status.style.color = data.ok ? '#22c55e' : '#ef4444';
+        status.textContent = data.message;
+    })
+    .catch(function(err) {
+        status.style.color = '#ef4444';
+        status.textContent = 'Request failed: ' + err.message;
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Test Connection';
+    });
+}
+
+// Show/hide username+password based on auth mechanism (X.509 and AWS don't need them)
+(function() {
+    var sel = document.getElementById('mongo_auth_mechanism');
+    if (sel) {
+        sel.addEventListener('change', function() {
+            var creds = document.getElementById('mongo-cred-fields');
+            var noCreds = this.value === 'x509' || this.value === 'aws';
+            creds.style.display = noCreds ? 'none' : '';
+        });
+    }
+})();
+
 function goStep(n) {
     if (n > currentStep) {
         // Step 1: DB choice — validate MongoDB fields if selected
@@ -191,6 +278,17 @@ function goStep(n) {
                 var dbName = document.getElementById('mongo_db_name');
                 if (!uri.value.trim()) { uri.focus(); return; }
                 if (!dbName.value.trim()) { dbName.focus(); return; }
+                // Validate auth fields if auth is enabled
+                var authCb = document.getElementById('mongo_auth_enabled');
+                if (authCb && authCb.checked) {
+                    var mech = document.getElementById('mongo_auth_mechanism').value;
+                    if (mech !== 'x509' && mech !== 'aws') {
+                        var user = document.getElementById('mongo_username');
+                        var pass = document.getElementById('mongo_password');
+                        if (!user.value.trim()) { user.focus(); return; }
+                        if (!pass.value.trim()) { pass.focus(); return; }
+                    }
+                }
             }
         }
         // Step 2: Site name

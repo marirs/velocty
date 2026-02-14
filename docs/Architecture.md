@@ -11,7 +11,7 @@ This document expands on `README-CMS.md` with detailed architecture decisions, s
 | Layer | Technology |
 |---|---|
 | **Backend** | Rust + Rocket |
-| **Database** | SQLite (via rusqlite) |
+| **Database** | SQLite (via rusqlite) or MongoDB (user choice at setup) |
 | **Templates (admin)** | Tera (Rocket's built-in template engine) |
 | **Page layout builder** | GrapesJS (admin only, ~200KB) |
 | **Content editor** | Editor.js (admin only, ~30KB) |
@@ -52,6 +52,70 @@ All responses include:
 - `X-XSS-Protection: 1; mode=block`
 - `Content-Security-Policy` (strict, admin pages allow GrapesJS/Editor.js)
 - `Referrer-Policy: strict-origin-when-cross-origin`
+
+---
+
+## First-Run Setup Wizard
+
+On first launch (when `setup_completed` is not set), the admin panel redirects to a 4-step setup wizard at `/<admin_slug>/setup`.
+
+### Step 1: Database Backend
+
+The user chooses between **SQLite** and **MongoDB**. Each option displays pros and cons.
+
+**SQLite** (default):
+- Zero setup, embedded, single-file database
+- Fast reads, easy backup, low resources
+- Risk: deleting the file loses all data, no replication
+
+**MongoDB**:
+- Replica sets, concurrent writes, cloud-ready (Atlas)
+- Natural multi-site fit (one database per site)
+- Requires a running MongoDB server
+
+When MongoDB is selected, additional fields appear:
+- **Connection URI** — `mongodb://` or `mongodb+srv://`
+- **Database Name**
+- **Requires authentication** checkbox, which reveals:
+  - **Auth Mechanism** — SCRAM-SHA-256, SCRAM-SHA-1, X.509, LDAP, AWS IAM
+  - **Username / Password** (hidden for X.509 and AWS)
+  - **Auth Database** (default: "admin")
+- **Test Connection** button — calls `POST /<admin_slug>/setup/test-mongo` which:
+  1. Parses the URI to extract host:port
+  2. TCP connects with 5-second timeout
+  3. Sends a MongoDB OP_MSG `isMaster` wire protocol handshake
+  4. Returns JSON `{ ok: bool, message: String }`
+
+### Step 2: Site Name
+
+### Step 3: Admin Account (email + password)
+
+### Step 4: Terms & Privacy acceptance
+
+### Output: `velocty.toml`
+
+On submit, the wizard writes `velocty.toml` at the project root:
+
+```toml
+# SQLite
+[database]
+backend = "sqlite"
+path = "website/site/db/velocty.db"
+
+# MongoDB (with auth)
+[database]
+backend = "mongodb"
+uri = "mongodb://localhost:27017"
+name = "velocty"
+
+[database.auth]
+mechanism = "scram_sha256"
+auth_db = "admin"
+username = "myuser"
+password = "mypass"
+```
+
+The backend choice is locked after first run and stored in both `velocty.toml` and the `db_backend` setting.
 
 ---
 
@@ -305,7 +369,7 @@ The lightbox intercepts clicks with JS; the underlying `<a>` always points to th
 | `font_size_h6` | H6 size | "1rem" |
 | `font_text_transform` | uppercase / lowercase / capitalize / none | "none" |
 
-### Images
+### Media — Images
 
 | Key | Description | Default |
 |---|---|---|
@@ -316,6 +380,34 @@ The lightbox intercepts clicks with JS; the underlying `<a>` always points to th
 | `images_thumb_large` | Large thumbnail dimensions | "1024x1024" |
 | `images_quality` | JPEG/WebP quality (1-100) | "85" |
 | `images_webp_convert` | Auto-convert to WebP | "true" |
+| `images_allowed_types` | Allowed image extensions | "jpg,jpeg,png,gif,webp,svg,tiff,heic" |
+
+### Media — Video
+
+| Key | Description | Default |
+|---|---|---|
+| `video_upload_enabled` | Enable video uploads | "false" |
+| `video_max_upload_mb` | Max video upload size in MB | "100" |
+| `video_allowed_types` | Allowed video extensions | "mp4,webm,mov,avi,mkv" |
+| `video_max_duration` | Max duration in seconds (0 = no limit) | "0" |
+| `video_generate_thumbnail` | Auto-generate video thumbnail | "true" |
+
+### Media — Organization
+
+| Key | Description | Default |
+|---|---|---|
+| `media_organization` | Upload folder structure | "flat" |
+
+Allowed values for `media_organization`:
+
+| Value | Structure | Example |
+|---|---|---|
+| `flat` | All files in one folder | `photo.jpg` |
+| `year` | `<year>/` | `2026/photo.jpg` |
+| `year_month` | `<year>/<month>/` | `2026/02/photo.jpg` |
+| `category_year` | `<category>/<year>/` | `landscapes/2026/photo.jpg` |
+| `category_year_month` | `<category>/<year>/<month>/` | `landscapes/2026/02/photo.jpg` |
+| `category` | `<category>/` | `landscapes/photo.jpg` |
 
 ### SEO
 

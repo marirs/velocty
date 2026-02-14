@@ -16,12 +16,30 @@ cargo build --release --features multi-site
 
 When compiled with `--features multi-site`, Velocty becomes a multi-tenant CMS where a single binary serves multiple independent sites. Each site has its own:
 
-- SQLite database
+- Database (SQLite file or MongoDB database — chosen during first-run setup)
 - Uploads folder
 - Admin panel (per-site admin)
 - Settings, content, themes, analytics
 
 A **Super Admin** panel manages all sites from a central dashboard.
+
+### Database Backend
+
+The database backend is chosen during the first-run setup wizard and stored in `velocty.toml`. Both backends are fully supported in multi-site mode:
+
+| | SQLite | MongoDB |
+|---|---|---|
+| **Per-site storage** | `website/sites/<uuid>/db/velocty.db` | One database per site in the same cluster |
+| **Central registry** | `website/sites.db` | `velocty_registry` database |
+| **Isolation** | Separate files per site | Separate databases per site |
+| **Backup** | Copy individual `.db` files | `mongodump --db <site_db>` |
+| **Best for** | Small deployments, few sites | Production, many sites, high availability |
+
+MongoDB is especially compelling for multi-site because:
+- Each site becomes a separate MongoDB database — clean isolation without filesystem management
+- Replica sets provide automatic failover across all sites
+- MongoDB Atlas allows fully managed cloud hosting
+- No risk of accidental file deletion destroying a site
 
 ---
 
