@@ -225,6 +225,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("site_url", "http://localhost:8000"),
         ("timezone", "UTC"),
         ("date_format", "%B %d, %Y"),
+        ("rss_feed_count", "25"),
         ("admin_email", ""),
         ("admin_display_name", "Admin"),
         ("admin_theme", "dark"),

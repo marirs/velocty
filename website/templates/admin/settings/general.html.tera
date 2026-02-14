@@ -158,6 +158,16 @@
         </div>
     </div>
 
+    <div class="form-card">
+        <h3>RSS Feed</h3>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Your RSS feed is available at <code>{{ settings.site_url | default(value='http://localhost:8000') }}/feed</code>.<br>Subscribers can use this URL in any RSS reader to follow your blog posts.</p>
+        <div class="form-group">
+            <label for="rss_feed_count">Number of posts in feed</label>
+            <input type="number" id="rss_feed_count" name="rss_feed_count" value="{{ settings.rss_feed_count | default(value='25') }}" min="1" max="100" style="max-width:120px">
+            <span class="form-help">How many recent posts to include in the RSS feed (1–100)</span>
+        </div>
+    </div>
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>

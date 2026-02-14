@@ -832,18 +832,26 @@ velocty/
 
 ## Build Phases (Updated)
 
-### Phase 1 — Core
+### Phase 1 — Core ✅
 - Rocket project scaffold + SQLite schema (all tables)
 - Auth: admin login with bcrypt + sessions + optional MFA (TOTP)
-- Blog: posts CRUD (Markdown/plain), comments with honeypot + rate limiting, RSS feed
+- Blog: posts CRUD (TinyMCE rich text), comments with honeypot + rate limiting, RSS feed
 - Portfolio: upload with auto-thumbnails, categories, tags, heart/like (IP-based)
 - SEO: meta fields, sitemap.xml, JSON-LD, OG/Twitter tags, canonical URLs
-- Admin panel: Tera server-rendered forms, dashboard
-- Settings: general, blog, portfolio, comments, fonts, images, SEO, security, design
+- Admin panel: Tera server-rendered forms, dashboard, dark/light themes
+- Settings: general, blog, portfolio, comments, fonts, images, SEO, security, frontend
 - Default hardcoded design (clean minimalist layout)
-- WordPress XML importer (basic)
+- WordPress XML importer with drag-and-drop UI
+- Cookie consent banner (GDPR-compliant, 3 styles, analytics gating)
+- Privacy Policy & Terms of Use pages (TinyMCE, `/privacy`, `/terms`)
+- RSS feed with configurable post count
+- Health dashboard with maintenance tools
+- 11 email providers + magic link auth
+- Login captcha (reCAPTCHA, Turnstile, hCaptcha) + anti-spam (Akismet, CleanTalk, OOPSpam)
+- Multi-site support (optional feature flag)
 
-### Phase 2 — Commerce
+### Phase 2 — Commerce & Auth
+- MFA flow: enable TOTP, register via QR code, download recovery codes, disable MFA
 - PayPal JS SDK checkout on portfolio items
 - Token-based secure downloads with expiry and count limits
 - License file generation per purchase

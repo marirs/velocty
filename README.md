@@ -88,7 +88,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Archives** — `/archives` page with posts grouped by year/month, drill-down to `/archives/<year>/<month>`
 - **Dynamic URL slugs** — Blog and portfolio base URLs are configurable (e.g. `/journal`, `/gallery`) from settings
 - **Comments** — Built-in commenting with honeypot spam protection, rate limiting, moderation queue
-- **RSS Feed** — Auto-generated Atom/RSS feed
+- **RSS Feed** — Auto-generated RSS 2.0 feed with configurable post count (Settings › Site)
 - **WordPress Import** — Import posts, portfolio items, categories, tags, and comments from WP XML export
 
 ### Portfolio & Photography
@@ -147,7 +147,8 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Flash notifications** — success/error toasts on save
 - **Health Dashboard** — system health with disk usage, DB stats, filesystem permission checks (owner:group, recommended perms, world-writable detection), resource monitoring, and maintenance tools (vacuum, WAL checkpoint, orphan scan, session cleanup, export). Backend-aware: adapts for SQLite vs MongoDB
 - **Cookie Consent Banner** — GDPR-compliant banner with 3 styles (minimal bar, modal, corner card), dark/light/auto theme, configurable position. Analytics scripts gated behind consent
-- **Privacy Policy & Terms of Use** — pre-filled industry-standard templates (Markdown), editable from Settings › Frontend, rendered at `/privacy` and `/terms`
+- **Privacy Policy & Terms of Use** — pre-filled industry-standard templates, editable with TinyMCE from Settings › Frontend, rendered at `/privacy` and `/terms`
+- **Import page** — drag-and-drop file upload with 3-column card layout for WordPress and other importers
 
 ### Security
 

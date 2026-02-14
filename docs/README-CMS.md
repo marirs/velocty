@@ -366,15 +366,23 @@ CREATE TABLE settings (
 
 ## Build Phases
 
-### Phase 1 — Core
-- Rocket project scaffold + SQLite schema
-- Blog: posts (Markdown/plain for now), comments, RSS
-- Portfolio: upload, categories, tags, likes
-- Built-in SEO: meta fields, sitemap.xml, structured data
-- Admin panel: server-rendered forms
-- Settings: general, fonts, images, comments
+### Phase 1 — Core ✅
+- Rocket project scaffold + SQLite schema (all tables)
+- Blog: posts CRUD (TinyMCE), comments with honeypot + rate limiting, RSS feed (configurable count)
+- Portfolio: upload with auto-thumbnails, categories, tags, heart/like (IP-based)
+- Built-in SEO: meta fields, sitemap.xml, JSON-LD, OG/Twitter, canonical URLs, robots.txt
+- Admin panel: Tera server-rendered forms, dashboard, dark/light themes, keyboard shortcuts
+- Settings: general, blog, portfolio, comments, fonts, images, SEO, security, frontend, social, email, AI, commerce
+- WordPress XML importer with drag-and-drop UI
+- Cookie consent banner (GDPR-compliant, 3 styles, analytics gating)
+- Privacy Policy & Terms of Use pages (TinyMCE editor, `/privacy`, `/terms`)
+- Health dashboard with maintenance tools (vacuum, orphan scan, export, etc.)
+- 11 email providers + magic link auth
+- Login captcha + anti-spam services
+- Multi-site support (optional feature flag)
 
-### Phase 2 — Commerce
+### Phase 2 — Commerce & Auth
+- MFA flow: enable TOTP, register via QR code, download recovery codes, disable MFA
 - PayPal checkout on portfolio items
 - Token-based secure downloads with expiry and limits
 - License file generation

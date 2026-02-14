@@ -8,7 +8,13 @@ pub fn generate_feed(pool: &DbPool) -> String {
     let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
     let site_tagline = Setting::get_or(pool, "site_tagline", "");
 
-    let posts = Post::published(pool, 50, 0);
+    let blog_slug = Setting::get_or(pool, "blog_slug", "blog");
+    let feed_count = Setting::get_or(pool, "rss_feed_count", "25")
+        .parse::<i64>()
+        .unwrap_or(25)
+        .clamp(1, 100);
+
+    let posts = Post::published(pool, feed_count, 0);
 
     let mut xml = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -36,14 +42,15 @@ pub fn generate_feed(pool: &DbPool) -> String {
         xml.push_str(&format!(
             r#"    <item>
         <title>{title}</title>
-        <link>{url}/blog/{slug}</link>
-        <guid isPermaLink="true">{url}/blog/{slug}</guid>
+        <link>{url}/{blog_slug}/{slug}</link>
+        <guid isPermaLink="true">{url}/{blog_slug}/{slug}</guid>
         <pubDate>{date}</pubDate>
         <description>{desc}</description>
     </item>
 "#,
             title = xml_escape(&post.title),
             url = xml_escape(&site_url),
+            blog_slug = &blog_slug,
             slug = &post.slug,
             date = pub_date,
             desc = xml_escape(excerpt),
