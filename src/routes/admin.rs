@@ -714,6 +714,15 @@ pub fn settings_save(
             ("commerce_razorpay_enabled", "Razorpay", vec!["razorpay_key_id", "razorpay_key_secret"]),
             ("commerce_mollie_enabled", "Mollie", vec!["mollie_api_key"]),
         ],
+        "seo" => vec![
+            ("seo_ga_enabled", "Google Analytics", vec!["seo_ga_measurement_id"]),
+            ("seo_plausible_enabled", "Plausible", vec!["seo_plausible_domain"]),
+            ("seo_fathom_enabled", "Fathom", vec!["seo_fathom_site_id"]),
+            ("seo_matomo_enabled", "Matomo", vec!["seo_matomo_url", "seo_matomo_site_id"]),
+            ("seo_cloudflare_analytics_enabled", "Cloudflare Analytics", vec!["seo_cloudflare_analytics_token"]),
+            ("seo_clicky_enabled", "Clicky", vec!["seo_clicky_site_id"]),
+            ("seo_umami_enabled", "Umami", vec!["seo_umami_website_id"]),
+        ],
         "ai" => vec![
             ("ai_ollama_enabled", "Ollama", vec!["ai_ollama_url", "ai_ollama_model"]),
             ("ai_openai_enabled", "OpenAI", vec!["ai_openai_api_key"]),
@@ -837,6 +846,12 @@ pub fn settings_save(
             "commerce_stripe_enabled", "commerce_2checkout_enabled",
             "commerce_square_enabled", "commerce_razorpay_enabled",
             "commerce_mollie_enabled",
+        ],
+        "seo" => &[
+            "seo_sitemap_enabled", "seo_structured_data", "seo_open_graph", "seo_twitter_cards",
+            "seo_ga_enabled", "seo_plausible_enabled", "seo_fathom_enabled",
+            "seo_matomo_enabled", "seo_cloudflare_analytics_enabled",
+            "seo_clicky_enabled", "seo_umami_enabled",
         ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &["design_back_to_top"],

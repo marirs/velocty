@@ -5,54 +5,272 @@
 
 <div class="settings-nav">
     <a href="/{{ admin_slug }}/settings/general" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Site</a>
+    <a href="/{{ admin_slug }}/settings/design" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Frontend</a>
     <a href="/{{ admin_slug }}/settings/blog" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Journal</a>
     <a href="/{{ admin_slug }}/settings/portfolio" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Portfolio</a>
     <a href="/{{ admin_slug }}/settings/comments" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comments</a>
     <a href="/{{ admin_slug }}/settings/typography" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>Typography</a>
     <a href="/{{ admin_slug }}/settings/images" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Images</a>
     <a href="/{{ admin_slug }}/settings/seo" class="tab active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>SEO</a>
-    <a href="/{{ admin_slug }}/settings/security" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Security</a>
-    <a href="/{{ admin_slug }}/settings/design" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Design</a>
-    <a href="/{{ admin_slug }}/settings/social" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Social</a>
+    <a href="/{{ admin_slug }}/settings/social" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>Social</a>
     <a href="/{{ admin_slug }}/settings/email" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Email</a>
     <a href="/{{ admin_slug }}/settings/commerce" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Commerce</a>
-    <a href="/{{ admin_slug }}/settings/users" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Users</a>
     <a href="/{{ admin_slug }}/settings/ai" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a2 2 0 0 1 0 4h-1v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-1H2a2 2 0 0 1 0-4h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>AI</a>
+    <a href="/{{ admin_slug }}/settings/security" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Security</a>
+    <a href="/{{ admin_slug }}/settings/users" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Users</a>
+</div>
+
+<div class="sub-tabs">
+    <button type="button" class="tab active" data-seo-tab="tab-seo-general">General</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-webmaster">Webmaster Tools</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-ga">Google Analytics{% if settings.seo_ga_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-plausible">Plausible{% if settings.seo_plausible_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-fathom">Fathom{% if settings.seo_fathom_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-matomo">Matomo{% if settings.seo_matomo_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-cloudflare">Cloudflare{% if settings.seo_cloudflare_analytics_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-clicky">Clicky{% if settings.seo_clicky_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-umami">Umami{% if settings.seo_umami_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
 <form method="post" action="/{{ admin_slug }}/settings/seo">
-    <div class="form-card">
-        <h3>Meta Tags</h3>
-        <div class="form-group">
-            <label for="seo_title_template">Title Template</label>
-            <input type="text" id="seo_title_template" name="seo_title_template" value="{{ settings.seo_title_template | default(value='{{title}} — {{site_name}}') }}">
-            <span class="form-help">Available: {% raw %}{{title}}, {{site_name}}{% endraw %}</span>
+
+    <!-- ── General ─────────────────────────────────────── -->
+    <div id="tab-seo-general">
+        <div class="form-card">
+            <h3>Meta Tags</h3>
+            <div class="form-group">
+                <label for="seo_title_template">Title Template</label>
+                <input type="text" id="seo_title_template" name="seo_title_template" value="{{ settings.seo_title_template | default(value='{{title}} — {{site_name}}') }}">
+                <span class="form-help">Available: {% raw %}{{title}}, {{site_name}}{% endraw %}</span>
+            </div>
+            <div class="form-group">
+                <label for="seo_default_description">Default Meta Description</label>
+                <textarea id="seo_default_description" name="seo_default_description" rows="2">{{ settings.seo_default_description | default(value='') }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="seo_canonical_base">Canonical Base URL</label>
+                <input type="url" id="seo_canonical_base" name="seo_canonical_base" value="{{ settings.seo_canonical_base | default(value='') }}">
+                <span class="form-help">Leave empty to use Site URL</span>
+            </div>
         </div>
-        <div class="form-group">
-            <label for="seo_default_description">Default Meta Description</label>
-            <textarea id="seo_default_description" name="seo_default_description" rows="2">{{ settings.seo_default_description | default(value='') }}</textarea>
+
+        <div class="form-card">
+            <h3>Features</h3>
+            <label class="checkbox-item"><input type="checkbox" name="seo_sitemap_enabled" value="true" {% if settings.seo_sitemap_enabled == "true" %}checked{% endif %}> Generate sitemap.xml</label>
+            <label class="checkbox-item"><input type="checkbox" name="seo_structured_data" value="true" {% if settings.seo_structured_data == "true" %}checked{% endif %}> JSON-LD structured data</label>
+            <label class="checkbox-item"><input type="checkbox" name="seo_open_graph" value="true" {% if settings.seo_open_graph == "true" %}checked{% endif %}> Open Graph meta tags</label>
+            <label class="checkbox-item"><input type="checkbox" name="seo_twitter_cards" value="true" {% if settings.seo_twitter_cards == "true" %}checked{% endif %}> Twitter Card meta tags</label>
         </div>
-        <div class="form-group">
-            <label for="seo_canonical_base">Canonical Base URL</label>
-            <input type="url" id="seo_canonical_base" name="seo_canonical_base" value="{{ settings.seo_canonical_base | default(value='') }}">
-            <span class="form-help">Leave empty to use Site URL</span>
+
+        <div class="form-card">
+            <h3>Robots.txt</h3>
+            <div class="form-group">
+                <textarea id="seo_robots_txt" name="seo_robots_txt" rows="5" class="mono">{{ settings.seo_robots_txt | default(value='User-agent: *\nAllow: /') }}</textarea>
+            </div>
         </div>
     </div>
 
-    <div class="form-card">
-        <h3>Features</h3>
-        <label class="checkbox-item"><input type="checkbox" name="seo_sitemap_enabled" value="true" {% if settings.seo_sitemap_enabled == "true" %}checked{% endif %}> Generate sitemap.xml</label>
-        <label class="checkbox-item"><input type="checkbox" name="seo_structured_data" value="true" {% if settings.seo_structured_data == "true" %}checked{% endif %}> JSON-LD structured data</label>
-        <label class="checkbox-item"><input type="checkbox" name="seo_open_graph" value="true" {% if settings.seo_open_graph == "true" %}checked{% endif %}> Open Graph meta tags</label>
-        <label class="checkbox-item"><input type="checkbox" name="seo_twitter_cards" value="true" {% if settings.seo_twitter_cards == "true" %}checked{% endif %}> Twitter Card meta tags</label>
-    </div>
+    <!-- ── Webmaster Tools ─────────────────────────────── -->
+    <div id="tab-seo-webmaster" style="display:none">
+        <div class="form-card">
+            <h3>Google Search Console</h3>
+            <p class="text-muted" style="margin-bottom:12px">Verify site ownership with Google. Paste the <code>content</code> value from the HTML tag verification method.</p>
+            <div class="form-group">
+                <label for="seo_google_verification">Verification Code</label>
+                <input type="text" id="seo_google_verification" name="seo_google_verification" value="{{ settings.seo_google_verification | default(value='') }}" placeholder="e.g. abc123xyz...">
+                <span class="form-help">Outputs: &lt;meta name="google-site-verification" content="..."&gt;</span>
+            </div>
+        </div>
 
-    <div class="form-card">
-        <h3>Robots.txt</h3>
-        <div class="form-group">
-            <textarea id="seo_robots_txt" name="seo_robots_txt" rows="5" class="mono">{{ settings.seo_robots_txt | default(value='User-agent: *\nAllow: /') }}</textarea>
+        <div class="form-card">
+            <h3>Bing Webmaster Tools</h3>
+            <p class="text-muted" style="margin-bottom:12px">Verify with Bing/Microsoft. Paste the <code>content</code> value from the XML tag method.</p>
+            <div class="form-group">
+                <label for="seo_bing_verification">Verification Code</label>
+                <input type="text" id="seo_bing_verification" name="seo_bing_verification" value="{{ settings.seo_bing_verification | default(value='') }}" placeholder="e.g. 1234ABCD...">
+                <span class="form-help">Outputs: &lt;meta name="msvalidate.01" content="..."&gt;</span>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3>Yandex Webmaster</h3>
+            <div class="form-group">
+                <label for="seo_yandex_verification">Verification Code</label>
+                <input type="text" id="seo_yandex_verification" name="seo_yandex_verification" value="{{ settings.seo_yandex_verification | default(value='') }}" placeholder="e.g. abc123...">
+                <span class="form-help">Outputs: &lt;meta name="yandex-verification" content="..."&gt;</span>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3>Pinterest</h3>
+            <div class="form-group">
+                <label for="seo_pinterest_verification">Verification Code</label>
+                <input type="text" id="seo_pinterest_verification" name="seo_pinterest_verification" value="{{ settings.seo_pinterest_verification | default(value='') }}" placeholder="e.g. abc123...">
+                <span class="form-help">Outputs: &lt;meta name="p:domain_verify" content="..."&gt;</span>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3>Baidu Webmaster</h3>
+            <div class="form-group">
+                <label for="seo_baidu_verification">Verification Code</label>
+                <input type="text" id="seo_baidu_verification" name="seo_baidu_verification" value="{{ settings.seo_baidu_verification | default(value='') }}" placeholder="e.g. code-abc123...">
+                <span class="form-help">Outputs: &lt;meta name="baidu-site-verification" content="..."&gt;</span>
+            </div>
         </div>
     </div>
+
+    <!-- ── Google Analytics ─────────────────────────────── -->
+    <div id="tab-seo-ga" style="display:none">
+        <div class="form-card">
+            <h3>Google Analytics (GA4)</h3>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_ga_enabled" value="true" data-provider-toggle {% if settings.seo_ga_enabled == "true" %}checked{% endif %}> Enable Google Analytics</label>
+            <fieldset {% if settings.seo_ga_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_ga_measurement_id">Measurement ID</label>
+                    <input type="text" id="seo_ga_measurement_id" name="seo_ga_measurement_id" value="{{ settings.seo_ga_measurement_id | default(value='') }}" placeholder="G-XXXXXXXXXX">
+                    <span class="form-help">Found in GA4 > Admin > Data Streams > Web</span>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- ── Plausible ────────────────────────────────────── -->
+    <div id="tab-seo-plausible" style="display:none">
+        <div class="form-card">
+            <h3>Plausible Analytics</h3>
+            <p class="text-muted" style="margin-bottom:12px">Privacy-friendly, cookie-free analytics. Self-hosted or cloud at <a href="https://plausible.io" target="_blank" style="color:var(--accent)">plausible.io</a></p>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_plausible_enabled" value="true" data-provider-toggle {% if settings.seo_plausible_enabled == "true" %}checked{% endif %}> Enable Plausible</label>
+            <fieldset {% if settings.seo_plausible_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_plausible_domain">Domain</label>
+                    <input type="text" id="seo_plausible_domain" name="seo_plausible_domain" value="{{ settings.seo_plausible_domain | default(value='') }}" placeholder="example.com">
+                </div>
+                <div class="form-group">
+                    <label for="seo_plausible_host">Script Host</label>
+                    <input type="text" id="seo_plausible_host" name="seo_plausible_host" value="{{ settings.seo_plausible_host | default(value='https://plausible.io') }}" placeholder="https://plausible.io">
+                    <span class="form-help">Change if self-hosting Plausible</span>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- ── Fathom ───────────────────────────────────────── -->
+    <div id="tab-seo-fathom" style="display:none">
+        <div class="form-card">
+            <h3>Fathom Analytics</h3>
+            <p class="text-muted" style="margin-bottom:12px">Simple, privacy-focused analytics. <a href="https://usefathom.com" target="_blank" style="color:var(--accent)">usefathom.com</a></p>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_fathom_enabled" value="true" data-provider-toggle {% if settings.seo_fathom_enabled == "true" %}checked{% endif %}> Enable Fathom</label>
+            <fieldset {% if settings.seo_fathom_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_fathom_site_id">Site ID</label>
+                    <input type="text" id="seo_fathom_site_id" name="seo_fathom_site_id" value="{{ settings.seo_fathom_site_id | default(value='') }}" placeholder="ABCDEFGH">
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- ── Matomo ───────────────────────────────────────── -->
+    <div id="tab-seo-matomo" style="display:none">
+        <div class="form-card">
+            <h3>Matomo Analytics</h3>
+            <p class="text-muted" style="margin-bottom:12px">Open-source web analytics. Self-hosted or cloud at <a href="https://matomo.org" target="_blank" style="color:var(--accent)">matomo.org</a></p>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_matomo_enabled" value="true" data-provider-toggle {% if settings.seo_matomo_enabled == "true" %}checked{% endif %}> Enable Matomo</label>
+            <fieldset {% if settings.seo_matomo_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_matomo_url">Matomo URL</label>
+                    <input type="url" id="seo_matomo_url" name="seo_matomo_url" value="{{ settings.seo_matomo_url | default(value='') }}" placeholder="https://analytics.example.com">
+                    <span class="form-help">Your Matomo instance URL (no trailing slash)</span>
+                </div>
+                <div class="form-group">
+                    <label for="seo_matomo_site_id">Site ID</label>
+                    <input type="text" id="seo_matomo_site_id" name="seo_matomo_site_id" value="{{ settings.seo_matomo_site_id | default(value='1') }}" placeholder="1">
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- ── Cloudflare Web Analytics ─────────────────────── -->
+    <div id="tab-seo-cloudflare" style="display:none">
+        <div class="form-card">
+            <h3>Cloudflare Web Analytics</h3>
+            <p class="text-muted" style="margin-bottom:12px">Free, privacy-first analytics from Cloudflare. No cookies, no tracking.</p>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_cloudflare_analytics_enabled" value="true" data-provider-toggle {% if settings.seo_cloudflare_analytics_enabled == "true" %}checked{% endif %}> Enable Cloudflare Analytics</label>
+            <fieldset {% if settings.seo_cloudflare_analytics_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_cloudflare_analytics_token">Beacon Token</label>
+                    <input type="text" id="seo_cloudflare_analytics_token" name="seo_cloudflare_analytics_token" value="{{ settings.seo_cloudflare_analytics_token | default(value='') }}" placeholder="e.g. abc123def456...">
+                    <span class="form-help">Found in Cloudflare Dashboard > Analytics > Web Analytics</span>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- ── Clicky ───────────────────────────────────────── -->
+    <div id="tab-seo-clicky" style="display:none">
+        <div class="form-card">
+            <h3>Clicky Analytics</h3>
+            <p class="text-muted" style="margin-bottom:12px">Real-time web analytics. <a href="https://clicky.com" target="_blank" style="color:var(--accent)">clicky.com</a></p>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_clicky_enabled" value="true" data-provider-toggle {% if settings.seo_clicky_enabled == "true" %}checked{% endif %}> Enable Clicky</label>
+            <fieldset {% if settings.seo_clicky_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_clicky_site_id">Site ID</label>
+                    <input type="text" id="seo_clicky_site_id" name="seo_clicky_site_id" value="{{ settings.seo_clicky_site_id | default(value='') }}" placeholder="e.g. 123456">
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- ── Umami ────────────────────────────────────────── -->
+    <div id="tab-seo-umami" style="display:none">
+        <div class="form-card">
+            <h3>Umami Analytics</h3>
+            <p class="text-muted" style="margin-bottom:12px">Open-source, privacy-focused alternative. Self-hosted or cloud at <a href="https://umami.is" target="_blank" style="color:var(--accent)">umami.is</a></p>
+            <label class="checkbox-item" style="margin-bottom:16px"><input type="checkbox" name="seo_umami_enabled" value="true" data-provider-toggle {% if settings.seo_umami_enabled == "true" %}checked{% endif %}> Enable Umami</label>
+            <fieldset {% if settings.seo_umami_enabled != "true" %}disabled{% endif %}>
+                <div class="form-group">
+                    <label for="seo_umami_website_id">Website ID</label>
+                    <input type="text" id="seo_umami_website_id" name="seo_umami_website_id" value="{{ settings.seo_umami_website_id | default(value='') }}" placeholder="e.g. a1b2c3d4-...">
+                </div>
+                <div class="form-group">
+                    <label for="seo_umami_host">Script Host</label>
+                    <input type="text" id="seo_umami_host" name="seo_umami_host" value="{{ settings.seo_umami_host | default(value='https://analytics.umami.is') }}" placeholder="https://analytics.umami.is">
+                    <span class="form-help">Change if self-hosting Umami</span>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    var tabs = document.querySelectorAll('[data-seo-tab]');
+    var panels = ['tab-seo-general','tab-seo-webmaster','tab-seo-ga','tab-seo-plausible','tab-seo-fathom','tab-seo-matomo','tab-seo-cloudflare','tab-seo-clicky','tab-seo-umami'];
+    function activateTab(name) {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+        tabs.forEach(function(t) { if (t.dataset.seoTab === name) t.classList.add('active'); });
+        var el = document.getElementById(name);
+        if (el) el.style.display = '';
+    }
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            activateTab(tab.dataset.seoTab);
+            location.hash = tab.dataset.seoTab;
+        });
+    });
+    if (location.hash) { activateTab(location.hash.substring(1)); }
+    // Toggle provider fieldsets on checkbox change
+    document.querySelectorAll('[data-provider-toggle]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var fs = this.closest('.form-card').querySelector('fieldset');
+            if (fs) fs.disabled = !this.checked;
+        });
+    });
+})();
+</script>
+{% endblock scripts %}

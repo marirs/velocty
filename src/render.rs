@@ -58,6 +58,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {seo_meta}
+    {webmaster_meta}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family={font}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -91,9 +92,11 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     </div>
     <script>{lightbox_js}</script>
     {image_protection_js}
+    {analytics_scripts}
 </body>
 </html>"#,
         seo_meta = seo_meta,
+        webmaster_meta = build_webmaster_meta(&settings),
         font = font_primary,
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
@@ -113,6 +116,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         } else {
             ""
         },
+        analytics_scripts = build_analytics_scripts(&settings),
     )
 }
 
@@ -185,6 +189,144 @@ fn build_social_links(settings: &Value) -> String {
     // For now, return empty — will be populated when user configures
     let _links: Vec<Value> = serde_json::from_str(links_json).unwrap_or_default();
     String::from(r#"<div class="social-links"></div>"#)
+}
+
+fn build_webmaster_meta(settings: &Value) -> String {
+    let get = |key: &str| -> &str {
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+    };
+
+    let mut meta = String::new();
+    let verifications = [
+        ("seo_google_verification", "google-site-verification"),
+        ("seo_bing_verification", "msvalidate.01"),
+        ("seo_yandex_verification", "yandex-verification"),
+        ("seo_pinterest_verification", "p:domain_verify"),
+        ("seo_baidu_verification", "baidu-site-verification"),
+    ];
+
+    for (key, name) in &verifications {
+        let val = get(key);
+        if !val.is_empty() {
+            meta.push_str(&format!(
+                r#"    <meta name="{}" content="{}">"#,
+                name,
+                html_escape(val)
+            ));
+            meta.push('\n');
+        }
+    }
+    meta
+}
+
+fn build_analytics_scripts(settings: &Value) -> String {
+    let get = |key: &str| -> &str {
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+    };
+    let enabled = |key: &str| -> bool { get(key) == "true" };
+
+    let mut scripts = String::new();
+
+    // Google Analytics (GA4)
+    if enabled("seo_ga_enabled") {
+        let id = get("seo_ga_measurement_id");
+        if !id.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script async src="https://www.googletagmanager.com/gtag/js?id={id}"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{id}');</script>
+"#,
+                id = html_escape(id)
+            ));
+        }
+    }
+
+    // Plausible
+    if enabled("seo_plausible_enabled") {
+        let domain = get("seo_plausible_domain");
+        let host = get("seo_plausible_host");
+        let host = if host.is_empty() { "https://plausible.io" } else { host };
+        if !domain.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script defer data-domain="{domain}" src="{host}/js/script.js"></script>
+"#,
+                domain = html_escape(domain),
+                host = html_escape(host),
+            ));
+        }
+    }
+
+    // Fathom
+    if enabled("seo_fathom_enabled") {
+        let site_id = get("seo_fathom_site_id");
+        if !site_id.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script src="https://cdn.usefathom.com/script.js" data-site="{}" defer></script>
+"#,
+                html_escape(site_id)
+            ));
+        }
+    }
+
+    // Matomo
+    if enabled("seo_matomo_enabled") {
+        let url = get("seo_matomo_url");
+        let site_id = get("seo_matomo_site_id");
+        if !url.is_empty() && !site_id.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script>var _paq=window._paq=window._paq||[];_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);(function(){{var u='{url}/';_paq.push(['setTrackerUrl',u+'matomo.php']);_paq.push(['setSiteId','{site_id}']);var d=document,g=d.createElement('script'),s=d.getElementsByTagName('script')[0];g.async=true;g.src=u+'matomo.js';s.parentNode.insertBefore(g,s);}})();</script>
+"#,
+                url = html_escape(url),
+                site_id = html_escape(site_id),
+            ));
+        }
+    }
+
+    // Cloudflare Web Analytics
+    if enabled("seo_cloudflare_analytics_enabled") {
+        let token = get("seo_cloudflare_analytics_token");
+        if !token.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token":"{}"}}'></script>
+"#,
+                html_escape(token)
+            ));
+        }
+    }
+
+    // Clicky
+    if enabled("seo_clicky_enabled") {
+        let site_id = get("seo_clicky_site_id");
+        if !site_id.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script async data-id="{id}" src="//static.getclicky.com/js"></script>
+"#,
+                id = html_escape(site_id)
+            ));
+        }
+    }
+
+    // Umami
+    if enabled("seo_umami_enabled") {
+        let website_id = get("seo_umami_website_id");
+        let host = get("seo_umami_host");
+        let host = if host.is_empty() { "https://analytics.umami.is" } else { host };
+        if !website_id.is_empty() {
+            scripts.push_str(&format!(
+                r#"<script defer src="{host}/script.js" data-website-id="{id}"></script>
+"#,
+                host = html_escape(host),
+                id = html_escape(website_id),
+            ));
+        }
+    }
+
+    scripts
 }
 
 fn render_portfolio_grid(context: &Value) -> String {

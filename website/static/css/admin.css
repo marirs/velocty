@@ -489,6 +489,12 @@ a:hover { color: var(--accent-hover); }
     box-shadow: none;
 }
 
+fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
 fieldset:disabled {
     opacity: 0.35;
     pointer-events: none;

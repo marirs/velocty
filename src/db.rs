@@ -345,6 +345,36 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("seo_twitter_cards", "true"),
         ("seo_canonical_base", ""),
         ("seo_robots_txt", "User-agent: *\nAllow: /"),
+        // SEO — Webmaster verification
+        ("seo_google_verification", ""),
+        ("seo_bing_verification", ""),
+        ("seo_yandex_verification", ""),
+        ("seo_pinterest_verification", ""),
+        ("seo_baidu_verification", ""),
+        // SEO — Google Analytics
+        ("seo_ga_enabled", "false"),
+        ("seo_ga_measurement_id", ""),
+        // SEO — Plausible
+        ("seo_plausible_enabled", "false"),
+        ("seo_plausible_domain", ""),
+        ("seo_plausible_host", "https://plausible.io"),
+        // SEO — Fathom
+        ("seo_fathom_enabled", "false"),
+        ("seo_fathom_site_id", ""),
+        // SEO — Matomo
+        ("seo_matomo_enabled", "false"),
+        ("seo_matomo_url", ""),
+        ("seo_matomo_site_id", "1"),
+        // SEO — Cloudflare Web Analytics
+        ("seo_cloudflare_analytics_enabled", "false"),
+        ("seo_cloudflare_analytics_token", ""),
+        // SEO — Clicky
+        ("seo_clicky_enabled", "false"),
+        ("seo_clicky_site_id", ""),
+        // SEO — Umami
+        ("seo_umami_enabled", "false"),
+        ("seo_umami_website_id", ""),
+        ("seo_umami_host", "https://analytics.umami.is"),
         // Design
         ("design_active_id", "1"),
         ("design_back_to_top", "true"),
