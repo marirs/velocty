@@ -237,6 +237,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("blog_default_status", "draft"),
         ("blog_featured_image_required", "false"),
         // Portfolio
+        ("portfolio_slug", "portfolio"),
         ("portfolio_display_type", "masonry"),
         ("portfolio_items_per_page", "12"),
         ("portfolio_grid_columns", "3"),

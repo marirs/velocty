@@ -26,7 +26,7 @@
         <div class="form-group">
             <label for="blog_slug">Journal Slug</label>
             <div style="display:flex;align-items:center;gap:4px">
-                <span class="text-muted" style="font-size:13px">yoursite.com/</span>
+                <span class="text-muted" style="font-size:13px">{{ settings.site_url | default(value='yoursite.com') | trim_end_matches(pat='/') }}/</span>
                 <input type="text" id="blog_slug" name="blog_slug" value="{{ settings.blog_slug | default(value='journal') }}" style="width:140px" placeholder="journal">
             </div>
             <span class="form-help">The URL path for your journal listing page</span>
