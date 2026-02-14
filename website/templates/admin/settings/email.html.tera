@@ -1,0 +1,364 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2>Settings > Email</h2></div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">Site</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
+    <a href="/admin/settings/images" class="tab">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/email" class="tab active">Email</a>
+    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
+    <a href="/admin/settings/ai" class="tab">AI</a>
+</div>
+
+<div class="sub-tabs">
+    <button type="button" class="tab active" data-email-tab="tab-email-general">General</button>
+    <button type="button" class="tab" data-email-tab="tab-email-failover">Failover</button>
+    <button type="button" class="tab" data-email-tab="tab-email-gmail">Gmail</button>
+    <button type="button" class="tab" data-email-tab="tab-email-resend">Resend</button>
+    <button type="button" class="tab" data-email-tab="tab-email-ses">Amazon SES</button>
+    <button type="button" class="tab" data-email-tab="tab-email-postmark">Postmark</button>
+    <button type="button" class="tab" data-email-tab="tab-email-brevo">Brevo</button>
+    <button type="button" class="tab" data-email-tab="tab-email-sendpulse">SendPulse</button>
+    <button type="button" class="tab" data-email-tab="tab-email-mailgun">Mailgun</button>
+    <button type="button" class="tab" data-email-tab="tab-email-moosend">Moosend</button>
+    <button type="button" class="tab" data-email-tab="tab-email-mandrill">Mandrill</button>
+    <button type="button" class="tab" data-email-tab="tab-email-sparkpost">SparkPost</button>
+    <button type="button" class="tab" data-email-tab="tab-email-smtp">SMTP</button>
+</div>
+
+<form method="post" action="/admin/settings/email">
+
+    <div id="tab-email-general">
+        <div class="form-card">
+            <h3>Email Settings</h3>
+            <p class="text-muted" style="margin-bottom:16px">Configure a provider to send transactional emails (order confirmations, password resets, notifications). Enable exactly one provider below.</p>
+            <div class="form-group">
+                <label for="email_from_name">From Name</label>
+                <input type="text" id="email_from_name" name="email_from_name" value="{{ settings.email_from_name | default(value='') }}" placeholder="My Site">
+                <span class="form-help">The sender name that appears in recipients' inboxes</span>
+            </div>
+            <div class="form-group">
+                <label for="email_from_address">From Address</label>
+                <input type="email" id="email_from_address" name="email_from_address" value="{{ settings.email_from_address | default(value='') }}" placeholder="noreply@yoursite.com">
+                <span class="form-help">The sender email address (must be verified with your provider)</span>
+            </div>
+            <div class="form-group">
+                <label for="email_reply_to">Reply-To Address (optional)</label>
+                <input type="email" id="email_reply_to" name="email_reply_to" value="{{ settings.email_reply_to | default(value='') }}" placeholder="hello@yoursite.com">
+            </div>
+        </div>
+    </div>
+
+    <!-- Failover Chain -->
+    <div id="tab-email-failover" style="display:none">
+        <div class="form-card">
+            <h3>Email Failover Chain</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_failover_enabled" value="true" {% if settings.email_failover_enabled == "true" %}checked{% endif %}> Enable Email Failover</label>
+            <p class="text-muted" style="margin:12px 0 16px">When enabled, if the primary email provider fails to send, the system will automatically try the next provider in the chain.</p>
+            <div id="email-failover-chain" class="failover-list">
+                {% set echain = settings.email_failover_chain | default(value='gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp') %}
+                {% for provider in echain | split(pat=',') %}
+                {% if provider == 'gmail' and settings.email_gmail_enabled == 'true'
+                    or provider == 'resend' and settings.email_resend_enabled == 'true'
+                    or provider == 'ses' and settings.email_ses_enabled == 'true'
+                    or provider == 'postmark' and settings.email_postmark_enabled == 'true'
+                    or provider == 'brevo' and settings.email_brevo_enabled == 'true'
+                    or provider == 'sendpulse' and settings.email_sendpulse_enabled == 'true'
+                    or provider == 'mailgun' and settings.email_mailgun_enabled == 'true'
+                    or provider == 'moosend' and settings.email_moosend_enabled == 'true'
+                    or provider == 'mandrill' and settings.email_mandrill_enabled == 'true'
+                    or provider == 'sparkpost' and settings.email_sparkpost_enabled == 'true'
+                    or provider == 'smtp' and settings.email_smtp_enabled == 'true' %}
+                <div class="failover-item" data-provider="{{ provider }}" draggable="true">
+                    <span class="failover-handle">⠿</span>
+                    <span class="failover-name">{% if provider == 'gmail' %}Gmail SMTP{% elif provider == 'resend' %}Resend{% elif provider == 'ses' %}Amazon SES{% elif provider == 'postmark' %}Postmark{% elif provider == 'brevo' %}Brevo{% elif provider == 'sendpulse' %}SendPulse{% elif provider == 'mailgun' %}Mailgun{% elif provider == 'moosend' %}Moosend{% elif provider == 'mandrill' %}Mandrill{% elif provider == 'sparkpost' %}SparkPost{% elif provider == 'smtp' %}Custom SMTP{% endif %}</span>
+                    <span class="failover-badge"><span class="badge badge-published">Enabled</span></span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <p class="text-muted" style="font-size:13px;margin-top:8px">Only enabled providers appear here. Enable providers in their respective tabs, then drag to set priority order.</p>
+            <input type="hidden" id="email_failover_chain" name="email_failover_chain" value="{{ settings.email_failover_chain | default(value='gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp') }}">
+        </div>
+    </div>
+
+    <!-- Gmail SMTP -->
+    <div id="tab-email-gmail" style="display:none">
+        <div class="form-card">
+            <h3>Gmail SMTP</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_gmail_enabled" value="true" data-provider-toggle {% if settings.email_gmail_enabled == "true" %}checked{% endif %}> Enable Gmail</label>
+            <fieldset {% if settings.email_gmail_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_gmail_address">Gmail Address</label>
+                <input type="email" id="email_gmail_address" name="email_gmail_address" value="{{ settings.email_gmail_address | default(value='') }}" placeholder="you@gmail.com">
+            </div>
+            <div class="form-group">
+                <label for="email_gmail_app_password">App Password</label>
+                <input type="password" id="email_gmail_app_password" name="email_gmail_app_password" value="{{ settings.email_gmail_app_password | default(value='') }}" placeholder="16-character app password">
+                <span class="form-help">Generate at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--accent)">myaccount.google.com/apppasswords</a>. Requires 2FA enabled.</span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Resend -->
+    <div id="tab-email-resend" style="display:none">
+        <div class="form-card">
+            <h3>Resend</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_resend_enabled" value="true" data-provider-toggle {% if settings.email_resend_enabled == "true" %}checked{% endif %}> Enable Resend</label>
+            <fieldset {% if settings.email_resend_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_resend_api_key">API Key</label>
+                <input type="password" id="email_resend_api_key" name="email_resend_api_key" value="{{ settings.email_resend_api_key | default(value='') }}" placeholder="re_...">
+                <span class="form-help">Get your API key from <a href="https://resend.com/api-keys" target="_blank" style="color:var(--accent)">resend.com</a></span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Amazon SES -->
+    <div id="tab-email-ses" style="display:none">
+        <div class="form-card">
+            <h3>Amazon SES</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_ses_enabled" value="true" data-provider-toggle {% if settings.email_ses_enabled == "true" %}checked{% endif %}> Enable Amazon SES</label>
+            <fieldset {% if settings.email_ses_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_ses_access_key">Access Key ID</label>
+                <input type="text" id="email_ses_access_key" name="email_ses_access_key" value="{{ settings.email_ses_access_key | default(value='') }}" placeholder="AKIA...">
+            </div>
+            <div class="form-group">
+                <label for="email_ses_secret_key">Secret Access Key</label>
+                <input type="password" id="email_ses_secret_key" name="email_ses_secret_key" value="{{ settings.email_ses_secret_key | default(value='') }}" placeholder="Secret key">
+            </div>
+            <div class="form-group">
+                <label for="email_ses_region">Region</label>
+                <input type="text" id="email_ses_region" name="email_ses_region" value="{{ settings.email_ses_region | default(value='us-east-1') }}" placeholder="us-east-1">
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Postmark -->
+    <div id="tab-email-postmark" style="display:none">
+        <div class="form-card">
+            <h3>Postmark</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_postmark_enabled" value="true" data-provider-toggle {% if settings.email_postmark_enabled == "true" %}checked{% endif %}> Enable Postmark</label>
+            <fieldset {% if settings.email_postmark_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_postmark_server_token">Server API Token</label>
+                <input type="password" id="email_postmark_server_token" name="email_postmark_server_token" value="{{ settings.email_postmark_server_token | default(value='') }}" placeholder="Server token">
+                <span class="form-help">Found in your Postmark server's API Tokens tab</span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Brevo (Sendinblue) -->
+    <div id="tab-email-brevo" style="display:none">
+        <div class="form-card">
+            <h3>Brevo (Sendinblue)</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_brevo_enabled" value="true" data-provider-toggle {% if settings.email_brevo_enabled == "true" %}checked{% endif %}> Enable Brevo</label>
+            <fieldset {% if settings.email_brevo_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_brevo_api_key">API Key</label>
+                <input type="password" id="email_brevo_api_key" name="email_brevo_api_key" value="{{ settings.email_brevo_api_key | default(value='') }}" placeholder="xkeysib-...">
+                <span class="form-help">Found under SMTP & API in your Brevo dashboard</span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- SendPulse -->
+    <div id="tab-email-sendpulse" style="display:none">
+        <div class="form-card">
+            <h3>SendPulse</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_sendpulse_enabled" value="true" data-provider-toggle {% if settings.email_sendpulse_enabled == "true" %}checked{% endif %}> Enable SendPulse</label>
+            <fieldset {% if settings.email_sendpulse_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_sendpulse_client_id">Client ID</label>
+                <input type="text" id="email_sendpulse_client_id" name="email_sendpulse_client_id" value="{{ settings.email_sendpulse_client_id | default(value='') }}" placeholder="Client ID">
+            </div>
+            <div class="form-group">
+                <label for="email_sendpulse_client_secret">Client Secret</label>
+                <input type="password" id="email_sendpulse_client_secret" name="email_sendpulse_client_secret" value="{{ settings.email_sendpulse_client_secret | default(value='') }}" placeholder="Client secret">
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Mailgun -->
+    <div id="tab-email-mailgun" style="display:none">
+        <div class="form-card">
+            <h3>Mailgun</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_mailgun_enabled" value="true" data-provider-toggle {% if settings.email_mailgun_enabled == "true" %}checked{% endif %}> Enable Mailgun</label>
+            <fieldset {% if settings.email_mailgun_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_mailgun_api_key">API Key</label>
+                <input type="password" id="email_mailgun_api_key" name="email_mailgun_api_key" value="{{ settings.email_mailgun_api_key | default(value='') }}" placeholder="key-...">
+            </div>
+            <div class="form-group">
+                <label for="email_mailgun_domain">Domain</label>
+                <input type="text" id="email_mailgun_domain" name="email_mailgun_domain" value="{{ settings.email_mailgun_domain | default(value='') }}" placeholder="mg.yoursite.com">
+            </div>
+            <div class="form-group">
+                <label for="email_mailgun_region">Region</label>
+                <select id="email_mailgun_region" name="email_mailgun_region">
+                    <option value="us" {% if settings.email_mailgun_region != "eu" %}selected{% endif %}>US (api.mailgun.net)</option>
+                    <option value="eu" {% if settings.email_mailgun_region == "eu" %}selected{% endif %}>EU (api.eu.mailgun.net)</option>
+                </select>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Moosend -->
+    <div id="tab-email-moosend" style="display:none">
+        <div class="form-card">
+            <h3>Moosend</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_moosend_enabled" value="true" data-provider-toggle {% if settings.email_moosend_enabled == "true" %}checked{% endif %}> Enable Moosend</label>
+            <fieldset {% if settings.email_moosend_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_moosend_api_key">API Key</label>
+                <input type="password" id="email_moosend_api_key" name="email_moosend_api_key" value="{{ settings.email_moosend_api_key | default(value='') }}" placeholder="API key">
+                <span class="form-help">Found in Settings → API Key in your Moosend account</span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Mandrill (Mailchimp Transactional) -->
+    <div id="tab-email-mandrill" style="display:none">
+        <div class="form-card">
+            <h3>Mandrill (Mailchimp Transactional)</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_mandrill_enabled" value="true" data-provider-toggle {% if settings.email_mandrill_enabled == "true" %}checked{% endif %}> Enable Mandrill</label>
+            <fieldset {% if settings.email_mandrill_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_mandrill_api_key">API Key</label>
+                <input type="password" id="email_mandrill_api_key" name="email_mandrill_api_key" value="{{ settings.email_mandrill_api_key | default(value='') }}" placeholder="Mandrill API key">
+                <span class="form-help">Found in Mailchimp → Transactional → SMTP & API Info</span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- SparkPost -->
+    <div id="tab-email-sparkpost" style="display:none">
+        <div class="form-card">
+            <h3>SparkPost</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_sparkpost_enabled" value="true" data-provider-toggle {% if settings.email_sparkpost_enabled == "true" %}checked{% endif %}> Enable SparkPost</label>
+            <fieldset {% if settings.email_sparkpost_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_sparkpost_api_key">API Key</label>
+                <input type="password" id="email_sparkpost_api_key" name="email_sparkpost_api_key" value="{{ settings.email_sparkpost_api_key | default(value='') }}" placeholder="API key">
+            </div>
+            <div class="form-group">
+                <label for="email_sparkpost_region">Region</label>
+                <select id="email_sparkpost_region" name="email_sparkpost_region">
+                    <option value="us" {% if settings.email_sparkpost_region != "eu" %}selected{% endif %}>US (api.sparkpost.com)</option>
+                    <option value="eu" {% if settings.email_sparkpost_region == "eu" %}selected{% endif %}>EU (api.eu.sparkpost.com)</option>
+                </select>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Generic SMTP -->
+    <div id="tab-email-smtp" style="display:none">
+        <div class="form-card">
+            <h3>Custom SMTP</h3>
+            <label class="checkbox-item"><input type="checkbox" name="email_smtp_enabled" value="true" data-provider-toggle {% if settings.email_smtp_enabled == "true" %}checked{% endif %}> Enable Custom SMTP</label>
+            <fieldset {% if settings.email_smtp_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="email_smtp_host">SMTP Host</label>
+                <input type="text" id="email_smtp_host" name="email_smtp_host" value="{{ settings.email_smtp_host | default(value='') }}" placeholder="smtp.example.com">
+            </div>
+            <div class="form-group">
+                <label for="email_smtp_port">Port</label>
+                <input type="number" id="email_smtp_port" name="email_smtp_port" value="{{ settings.email_smtp_port | default(value='587') }}" placeholder="587">
+            </div>
+            <div class="form-group">
+                <label for="email_smtp_username">Username</label>
+                <input type="text" id="email_smtp_username" name="email_smtp_username" value="{{ settings.email_smtp_username | default(value='') }}" placeholder="Username">
+            </div>
+            <div class="form-group">
+                <label for="email_smtp_password">Password</label>
+                <input type="password" id="email_smtp_password" name="email_smtp_password" value="{{ settings.email_smtp_password | default(value='') }}" placeholder="Password">
+            </div>
+            <div class="form-group">
+                <label for="email_smtp_encryption">Encryption</label>
+                <select id="email_smtp_encryption" name="email_smtp_encryption">
+                    <option value="tls" {% if settings.email_smtp_encryption != "ssl" and settings.email_smtp_encryption != "none" %}selected{% endif %}>STARTTLS (port 587)</option>
+                    <option value="ssl" {% if settings.email_smtp_encryption == "ssl" %}selected{% endif %}>SSL/TLS (port 465)</option>
+                    <option value="none" {% if settings.email_smtp_encryption == "none" %}selected{% endif %}>None (port 25)</option>
+                </select>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    var tabs = document.querySelectorAll('[data-email-tab]');
+    var panels = ['tab-email-general','tab-email-failover','tab-email-gmail','tab-email-resend','tab-email-ses','tab-email-postmark','tab-email-brevo','tab-email-sendpulse','tab-email-mailgun','tab-email-moosend','tab-email-mandrill','tab-email-sparkpost','tab-email-smtp'];
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            panels.forEach(function(id) {
+                document.getElementById(id).style.display = (id === tab.dataset.emailTab) ? '' : 'none';
+            });
+        });
+    });
+    // Toggle provider fieldsets on checkbox change
+    document.querySelectorAll('[data-provider-toggle]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var fs = this.closest('.form-card').querySelector('fieldset');
+            if (fs) fs.disabled = !this.checked;
+        });
+    });
+
+    // Email failover chain drag-and-drop reorder
+    var eChain = document.getElementById('email-failover-chain');
+    var eHidden = document.getElementById('email_failover_chain');
+    if (eChain) {
+        var eDragItem = null;
+        eChain.addEventListener('dragstart', function(e) {
+            eDragItem = e.target.closest('.failover-item');
+            if (eDragItem) { eDragItem.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+        });
+        eChain.addEventListener('dragend', function() {
+            if (eDragItem) eDragItem.classList.remove('dragging');
+            eDragItem = null;
+            var items = eChain.querySelectorAll('.failover-item');
+            var order = [];
+            items.forEach(function(item) { order.push(item.dataset.provider); });
+            eHidden.value = order.join(',');
+        });
+        eChain.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            var target = e.target.closest('.failover-item');
+            if (target && target !== eDragItem) {
+                var rect = target.getBoundingClientRect();
+                var mid = rect.top + rect.height / 2;
+                if (e.clientY < mid) { eChain.insertBefore(eDragItem, target); }
+                else { eChain.insertBefore(eDragItem, target.nextSibling); }
+            }
+        });
+    }
+})();
+</script>
+{% endblock scripts %}

@@ -13,6 +13,7 @@
     <a href="/admin/settings/seo" class="tab active">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/email" class="tab">Email</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>

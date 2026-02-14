@@ -13,44 +13,235 @@
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab active">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/email" class="tab">Email</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
+<div class="sub-tabs">
+    <button type="button" class="tab active" data-sec-tab="tab-sec-general">General</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-akismet">Akismet</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-cleantalk">CleanTalk</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-oopspam">OOPSpam</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-recaptcha">reCaptcha</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-turnstile">Turnstile</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-hcaptcha">hCaptcha</button>
+</div>
+
 <form method="post" action="/admin/settings/security">
-    <div class="form-card">
-        <h3>Password</h3>
-        <div class="form-group">
-            <label for="new_password">New Password</label>
-            <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
+
+    <!-- General -->
+    <div id="tab-sec-general">
+        <div class="form-card">
+            <h3>Password</h3>
+            <div class="form-group">
+                <label for="new_password">New Password</label>
+                <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="confirm_password">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password">
+
+        <div class="form-card">
+            <h3>Multi-Factor Authentication (TOTP)</h3>
+            <label class="checkbox-item"><input type="checkbox" name="mfa_enabled" value="true" {% if settings.mfa_enabled == "true" %}checked{% endif %}> Enable MFA</label>
+            <span class="form-help">When enabled, you'll need a TOTP authenticator app (Google Authenticator, Authy, etc.) to log in.</span>
+            {% if settings.mfa_enabled == "true" %}
+            <p class="text-muted" style="margin-top:12px">MFA is active. Use your authenticator app for the 6-digit code at login.</p>
+            {% endif %}
+        </div>
+
+        <div class="form-card">
+            <h3>Sessions</h3>
+            <div class="form-group">
+                <label for="session_expiry_hours">Session Expiry (hours)</label>
+                <input type="number" id="session_expiry_hours" name="session_expiry_hours" value="{{ settings.session_expiry_hours | default(value='24') }}" min="1" max="720">
+            </div>
+            <div class="form-group">
+                <label for="login_rate_limit">Login Rate Limit (attempts per 15 min)</label>
+                <input type="number" id="login_rate_limit" name="login_rate_limit" value="{{ settings.login_rate_limit | default(value='5') }}" min="1" max="20">
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3>Login Captcha</h3>
+            <label class="checkbox-item"><input type="checkbox" id="login_captcha_enabled" name="login_captcha_enabled" value="true" {% if settings.login_captcha_enabled == "true" %}checked{% endif %}> Enable Captcha on Login</label>
+            <span class="form-help">Require a captcha challenge on the admin login page to prevent brute-force attacks.</span>
+            <fieldset id="login-captcha-fields" {% if settings.login_captcha_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="login_captcha_provider">Captcha Provider</label>
+                <select id="login_captcha_provider" name="login_captcha_provider">
+                    <option value="" {% if settings.login_captcha_provider == "" %}selected{% endif %}>— Select a provider —</option>
+                    {% if settings.security_recaptcha_enabled == "true" %}
+                    <option value="recaptcha" {% if settings.login_captcha_provider == "recaptcha" %}selected{% endif %}>Google reCaptcha</option>
+                    {% endif %}
+                    {% if settings.security_turnstile_enabled == "true" %}
+                    <option value="turnstile" {% if settings.login_captcha_provider == "turnstile" %}selected{% endif %}>Cloudflare Turnstile</option>
+                    {% endif %}
+                    {% if settings.security_hcaptcha_enabled == "true" %}
+                    <option value="hcaptcha" {% if settings.login_captcha_provider == "hcaptcha" %}selected{% endif %}>hCaptcha</option>
+                    {% endif %}
+                </select>
+                <span class="form-help">Only captcha providers that are enabled in their respective tabs appear here.</span>
+            </div>
+            </fieldset>
         </div>
     </div>
 
-    <div class="form-card">
-        <h3>Multi-Factor Authentication (TOTP)</h3>
-        <label class="checkbox-item"><input type="checkbox" name="mfa_enabled" value="true" {% if settings.mfa_enabled == "true" %}checked{% endif %}> Enable MFA</label>
-        <span class="form-help">When enabled, you'll need a TOTP authenticator app (Google Authenticator, Authy, etc.) to log in.</span>
-        {% if settings.mfa_enabled == "true" %}
-        <p class="text-muted" style="margin-top:12px">MFA is active. Use your authenticator app for the 6-digit code at login.</p>
-        {% endif %}
+    <!-- Akismet -->
+    <div id="tab-sec-akismet" style="display:none">
+        <div class="form-card">
+            <h3>Akismet</h3>
+            <p class="text-muted" style="margin-bottom:12px">Industry-leading comment and form spam filtering. Used for anti-spam on comments.</p>
+            <label class="checkbox-item"><input type="checkbox" name="security_akismet_enabled" value="true" data-sec-toggle {% if settings.security_akismet_enabled == "true" %}checked{% endif %}> Enable Akismet</label>
+            <fieldset {% if settings.security_akismet_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="security_akismet_api_key">API Key</label>
+                <input type="password" id="security_akismet_api_key" name="security_akismet_api_key" value="{{ settings.security_akismet_api_key | default(value='') }}" placeholder="Your Akismet API key">
+                <span class="form-help">Get your key at <a href="https://akismet.com/account/" target="_blank" style="color:var(--accent)">akismet.com</a></span>
+            </div>
+            </fieldset>
+        </div>
     </div>
 
-    <div class="form-card">
-        <h3>Sessions</h3>
-        <div class="form-group">
-            <label for="session_expiry_hours">Session Expiry (hours)</label>
-            <input type="number" id="session_expiry_hours" name="session_expiry_hours" value="{{ settings.session_expiry_hours | default(value='24') }}" min="1" max="720">
-        </div>
-        <div class="form-group">
-            <label for="login_rate_limit">Login Rate Limit (attempts per 15 min)</label>
-            <input type="number" id="login_rate_limit" name="login_rate_limit" value="{{ settings.login_rate_limit | default(value='5') }}" min="1" max="20">
+    <!-- CleanTalk -->
+    <div id="tab-sec-cleantalk" style="display:none">
+        <div class="form-card">
+            <h3>CleanTalk</h3>
+            <p class="text-muted" style="margin-bottom:12px">Cloud-based anti-spam service. No captcha needed — invisible spam filtering for comments and forms.</p>
+            <label class="checkbox-item"><input type="checkbox" name="security_cleantalk_enabled" value="true" data-sec-toggle {% if settings.security_cleantalk_enabled == "true" %}checked{% endif %}> Enable CleanTalk</label>
+            <fieldset {% if settings.security_cleantalk_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="security_cleantalk_api_key">Access Key</label>
+                <input type="password" id="security_cleantalk_api_key" name="security_cleantalk_api_key" value="{{ settings.security_cleantalk_api_key | default(value='') }}" placeholder="Your CleanTalk access key">
+                <span class="form-help">Get your key at <a href="https://cleantalk.org/my" target="_blank" style="color:var(--accent)">cleantalk.org</a></span>
+            </div>
+            </fieldset>
         </div>
     </div>
+
+    <!-- OOPSpam -->
+    <div id="tab-sec-oopspam" style="display:none">
+        <div class="form-card">
+            <h3>OOPSpam</h3>
+            <p class="text-muted" style="margin-bottom:12px">Privacy-friendly anti-spam API. Checks content against spam patterns without tracking users.</p>
+            <label class="checkbox-item"><input type="checkbox" name="security_oopspam_enabled" value="true" data-sec-toggle {% if settings.security_oopspam_enabled == "true" %}checked{% endif %}> Enable OOPSpam</label>
+            <fieldset {% if settings.security_oopspam_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="security_oopspam_api_key">API Key</label>
+                <input type="password" id="security_oopspam_api_key" name="security_oopspam_api_key" value="{{ settings.security_oopspam_api_key | default(value='') }}" placeholder="Your OOPSpam API key">
+                <span class="form-help">Get your key at <a href="https://www.oopspam.com/dashboard" target="_blank" style="color:var(--accent)">oopspam.com</a></span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Google reCaptcha -->
+    <div id="tab-sec-recaptcha" style="display:none">
+        <div class="form-card">
+            <h3>Google reCaptcha</h3>
+            <p class="text-muted" style="margin-bottom:12px">Google's captcha service. Can be used for login protection and comment anti-spam.</p>
+            <label class="checkbox-item"><input type="checkbox" name="security_recaptcha_enabled" value="true" data-sec-toggle {% if settings.security_recaptcha_enabled == "true" %}checked{% endif %}> Enable reCaptcha</label>
+            <fieldset {% if settings.security_recaptcha_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="security_recaptcha_version">Version</label>
+                <select id="security_recaptcha_version" name="security_recaptcha_version">
+                    <option value="v2" {% if settings.security_recaptcha_version == "v2" %}selected{% endif %}>v2 (checkbox)</option>
+                    <option value="v2_invisible" {% if settings.security_recaptcha_version == "v2_invisible" %}selected{% endif %}>v2 Invisible</option>
+                    <option value="v3" {% if settings.security_recaptcha_version == "v3" or settings.security_recaptcha_version == "" %}selected{% endif %}>v3 (score-based)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="security_recaptcha_site_key">Site Key</label>
+                <input type="text" id="security_recaptcha_site_key" name="security_recaptcha_site_key" value="{{ settings.security_recaptcha_site_key | default(value='') }}" placeholder="6Le...">
+            </div>
+            <div class="form-group">
+                <label for="security_recaptcha_secret_key">Secret Key</label>
+                <input type="password" id="security_recaptcha_secret_key" name="security_recaptcha_secret_key" value="{{ settings.security_recaptcha_secret_key | default(value='') }}" placeholder="6Le...">
+                <span class="form-help">Get keys at <a href="https://www.google.com/recaptcha/admin" target="_blank" style="color:var(--accent)">google.com/recaptcha</a></span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- Cloudflare Turnstile -->
+    <div id="tab-sec-turnstile" style="display:none">
+        <div class="form-card">
+            <h3>Cloudflare Turnstile</h3>
+            <p class="text-muted" style="margin-bottom:12px">Privacy-first, user-friendly captcha alternative by Cloudflare. No puzzles — runs invisibly or with a simple widget.</p>
+            <label class="checkbox-item"><input type="checkbox" name="security_turnstile_enabled" value="true" data-sec-toggle {% if settings.security_turnstile_enabled == "true" %}checked{% endif %}> Enable Turnstile</label>
+            <fieldset {% if settings.security_turnstile_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="security_turnstile_site_key">Site Key</label>
+                <input type="text" id="security_turnstile_site_key" name="security_turnstile_site_key" value="{{ settings.security_turnstile_site_key | default(value='') }}" placeholder="0x...">
+            </div>
+            <div class="form-group">
+                <label for="security_turnstile_secret_key">Secret Key</label>
+                <input type="password" id="security_turnstile_secret_key" name="security_turnstile_secret_key" value="{{ settings.security_turnstile_secret_key | default(value='') }}" placeholder="0x...">
+                <span class="form-help">Get keys at <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" style="color:var(--accent)">Cloudflare Dashboard</a></span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <!-- hCaptcha -->
+    <div id="tab-sec-hcaptcha" style="display:none">
+        <div class="form-card">
+            <h3>hCaptcha</h3>
+            <p class="text-muted" style="margin-bottom:12px">Privacy-focused captcha that rewards website owners. GDPR-compliant alternative to reCaptcha.</p>
+            <label class="checkbox-item"><input type="checkbox" name="security_hcaptcha_enabled" value="true" data-sec-toggle {% if settings.security_hcaptcha_enabled == "true" %}checked{% endif %}> Enable hCaptcha</label>
+            <fieldset {% if settings.security_hcaptcha_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="security_hcaptcha_site_key">Site Key</label>
+                <input type="text" id="security_hcaptcha_site_key" name="security_hcaptcha_site_key" value="{{ settings.security_hcaptcha_site_key | default(value='') }}" placeholder="Site key">
+            </div>
+            <div class="form-group">
+                <label for="security_hcaptcha_secret_key">Secret Key</label>
+                <input type="password" id="security_hcaptcha_secret_key" name="security_hcaptcha_secret_key" value="{{ settings.security_hcaptcha_secret_key | default(value='') }}" placeholder="Secret key">
+                <span class="form-help">Get keys at <a href="https://dashboard.hcaptcha.com/" target="_blank" style="color:var(--accent)">hCaptcha Dashboard</a></span>
+            </div>
+            </fieldset>
+        </div>
+    </div>
+
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    // Sub-tab switching
+    var tabs = document.querySelectorAll('[data-sec-tab]');
+    var panels = ['tab-sec-general','tab-sec-akismet','tab-sec-cleantalk','tab-sec-oopspam','tab-sec-recaptcha','tab-sec-turnstile','tab-sec-hcaptcha'];
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            panels.forEach(function(id) {
+                document.getElementById(id).style.display = (id === tab.dataset.secTab) ? '' : 'none';
+            });
+        });
+    });
+
+    // Toggle provider fieldsets on checkbox change
+    document.querySelectorAll('[data-sec-toggle]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var fs = this.closest('.form-card').querySelector('fieldset');
+            if (fs) fs.disabled = !this.checked;
+        });
+    });
+
+    // Toggle login captcha fieldset
+    var loginCaptchaCb = document.getElementById('login_captcha_enabled');
+    if (loginCaptchaCb) {
+        loginCaptchaCb.addEventListener('change', function() {
+            document.getElementById('login-captcha-fields').disabled = !this.checked;
+        });
+    }
+})();
+</script>
+{% endblock scripts %}

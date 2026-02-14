@@ -13,12 +13,20 @@
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/email" class="tab">Email</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
 
 <form method="post" action="/admin/settings/portfolio">
+    <div class="form-card">
+        <h3>Module</h3>
+        <label class="checkbox-item"><input type="checkbox" id="portfolio_enabled" name="portfolio_enabled" value="true" {% if settings.portfolio_enabled == "true" %}checked{% endif %}> Enable Portfolio</label>
+        <span class="form-help">Enable Portfolio on your site. <em>At least one of Journal or Portfolio has to be enabled for full function of Velocty.</em></span>
+    </div>
+
+    <fieldset id="portfolio-fields" {% if settings.portfolio_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
     <div class="form-card">
         <h3>URL</h3>
         <div class="form-group">
@@ -114,12 +122,16 @@
         <label class="checkbox-item"><input type="checkbox" name="portfolio_show_tags" value="true" {% if settings.portfolio_show_tags == "true" %}checked{% endif %}> Show tags below images</label>
     </div>
 
+    </fieldset>
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
 
 {% block scripts %}
 <script>
+document.getElementById('portfolio_enabled').addEventListener('change', function() {
+    document.getElementById('portfolio-fields').disabled = !this.checked;
+});
 document.getElementById('portfolio_click_mode').addEventListener('change', function() {
     document.getElementById('lightbox-options').style.display = this.value === 'lightbox' ? '' : 'none';
 });

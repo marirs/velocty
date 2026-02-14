@@ -33,6 +33,7 @@ pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>) -> Template {
         "posts_draft": posts_draft,
         "portfolio_count": portfolio_count,
         "comments_pending": comments_pending,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/dashboard", &context)
@@ -66,6 +67,7 @@ pub fn posts_list(
         "count_published": Post::count(pool, Some("published")),
         "count_draft": Post::count(pool, Some("draft")),
         "count_archived": Post::count(pool, Some("archived")),
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/posts/list", &context)
@@ -80,6 +82,7 @@ pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>) -> Template {
         "page_title": "New Post",
         "categories": categories,
         "tags": tags,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/posts/edit", &context)
@@ -100,6 +103,7 @@ pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Option<Te
         "tags": tags,
         "post_categories": post_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "post_tags": post_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
+        "settings": Setting::all(pool),
     });
 
     Some(Template::render("admin/posts/edit", &context))
@@ -138,6 +142,7 @@ pub fn portfolio_list(
         "count_all": PortfolioItem::count(pool, None),
         "count_published": PortfolioItem::count(pool, Some("published")),
         "count_draft": PortfolioItem::count(pool, Some("draft")),
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/portfolio/list", &context)
@@ -152,6 +157,7 @@ pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>) -> Template {
         "page_title": "New Portfolio Item",
         "categories": categories,
         "tags": tags,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/portfolio/edit", &context)
@@ -172,6 +178,7 @@ pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, id: i64) -> Optio
         "tags": tags,
         "item_categories": item_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "item_tags": item_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
+        "settings": Setting::all(pool),
     });
 
     Some(Template::render("admin/portfolio/edit", &context))
@@ -209,6 +216,7 @@ pub fn comments_list(
         "count_pending": Comment::count(pool, Some("pending")),
         "count_approved": Comment::count(pool, Some("approved")),
         "count_spam": Comment::count(pool, Some("spam")),
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/comments/list", &context)
@@ -259,6 +267,7 @@ pub fn categories_list(
         "page_title": "Categories",
         "categories": categories_with_count,
         "type_filter": type_filter,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/categories/list", &context)
@@ -285,6 +294,7 @@ pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
     let context = json!({
         "page_title": "Tags",
         "tags": tags_with_count,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/tags/list", &context)
@@ -299,6 +309,7 @@ pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>) -> Template {
     let context = json!({
         "page_title": "Designs",
         "designs": designs,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/designs/list", &context)
@@ -319,6 +330,7 @@ pub fn import_page(_admin: AdminUser, pool: &State<DbPool>) -> Template {
     let context = json!({
         "page_title": "Import",
         "history": history,
+        "settings": Setting::all(pool),
     });
 
     Template::render("admin/import/index", &context)
@@ -334,7 +346,7 @@ pub fn settings_page(
 ) -> Option<Template> {
     let valid_sections = [
         "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
-        "design", "paypal", "users", "ai",
+        "design", "paypal", "users", "ai", "email",
     ];
 
     if !valid_sections.contains(&section) {
@@ -613,6 +625,48 @@ pub fn settings_save(
     section: &str,
     form: Form<HashMap<String, String>>,
 ) -> Redirect {
+    // Checkboxes don't submit a value when unchecked, so we must
+    // explicitly reset all known boolean keys for this section first.
+    let checkbox_keys: &[&str] = match section {
+        "ai" => &[
+            "ai_local_enabled", "ai_ollama_enabled", "ai_openai_enabled",
+            "ai_gemini_enabled", "ai_cloudflare_enabled",
+            "ai_suggest_meta", "ai_suggest_tags", "ai_suggest_categories",
+            "ai_suggest_alt_text", "ai_suggest_slug", "ai_theme_generation",
+            "ai_post_generation",
+        ],
+        "email" => &[
+            "email_failover_enabled",
+            "email_gmail_enabled", "email_resend_enabled", "email_ses_enabled",
+            "email_postmark_enabled", "email_brevo_enabled", "email_sendpulse_enabled",
+            "email_mailgun_enabled", "email_moosend_enabled", "email_mandrill_enabled",
+            "email_sparkpost_enabled", "email_smtp_enabled",
+        ],
+        "blog" => &[
+            "journal_enabled",
+            "blog_show_author", "blog_show_date", "blog_show_reading_time",
+            "blog_featured_image_required",
+        ],
+        "portfolio" => &[
+            "portfolio_enabled", "portfolio_enable_likes",
+            "portfolio_image_protection", "portfolio_fade_animation",
+        ],
+        "comments" => &[
+            "comments_enabled", "comments_on_blog", "comments_on_portfolio",
+        ],
+        "security" => &[
+            "mfa_enabled", "login_captcha_enabled",
+            "security_akismet_enabled", "security_cleantalk_enabled",
+            "security_oopspam_enabled", "security_recaptcha_enabled",
+            "security_turnstile_enabled", "security_hcaptcha_enabled",
+        ],
+        "design" => &["design_back_to_top"],
+        _ => &[],
+    };
+    for key in checkbox_keys {
+        let _ = Setting::set(pool, key, "false");
+    }
+
     let data = form.into_inner();
     let _ = Setting::set_many(pool, &data);
     Redirect::to(format!("/admin/settings/{}", section))

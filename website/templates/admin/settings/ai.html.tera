@@ -13,6 +13,7 @@
     <a href="/admin/settings/seo" class="tab">SEO</a>
     <a href="/admin/settings/security" class="tab">Security</a>
     <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/email" class="tab">Email</a>
     <a href="/admin/settings/paypal" class="tab">PayPal</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab active">AI</a>
@@ -36,27 +37,20 @@
             <div id="failover-chain" class="failover-list">
                 {% set chain = settings.ai_failover_chain | default(value='local,ollama,openai,gemini,cloudflare') %}
                 {% for provider in chain | split(pat=',') %}
+                {% if provider == 'local' and settings.ai_local_enabled == 'true'
+                    or provider == 'ollama' and settings.ai_ollama_enabled == 'true'
+                    or provider == 'openai' and settings.ai_openai_enabled == 'true'
+                    or provider == 'gemini' and settings.ai_gemini_enabled == 'true'
+                    or provider == 'cloudflare' and settings.ai_cloudflare_enabled == 'true' %}
                 <div class="failover-item" data-provider="{{ provider }}" draggable="true">
                     <span class="failover-handle">⠿</span>
                     <span class="failover-name">{% if provider == 'local' %}Local LLM (Embedded){% elif provider == 'ollama' %}Ollama (Server){% elif provider == 'openai' %}OpenAI{% elif provider == 'gemini' %}Gemini{% elif provider == 'cloudflare' %}Cloudflare Workers AI{% endif %}</span>
-                    <span class="failover-status">
-                        {% if provider == 'local' and settings.ai_local_enabled == 'true' %}
-                            <span class="badge badge-published">Enabled</span>
-                        {% elif provider == 'ollama' and settings.ai_ollama_enabled == 'true' %}
-                            <span class="badge badge-published">Enabled</span>
-                        {% elif provider == 'openai' and settings.ai_openai_enabled == 'true' %}
-                            <span class="badge badge-published">Enabled</span>
-                        {% elif provider == 'gemini' and settings.ai_gemini_enabled == 'true' %}
-                            <span class="badge badge-published">Enabled</span>
-                        {% elif provider == 'cloudflare' and settings.ai_cloudflare_enabled == 'true' %}
-                            <span class="badge badge-published">Enabled</span>
-                        {% else %}
-                            <span class="badge badge-draft">Disabled</span>
-                        {% endif %}
-                    </span>
+                    <span class="failover-badge"><span class="badge badge-published">Enabled</span></span>
                 </div>
+                {% endif %}
                 {% endfor %}
             </div>
+            <p class="text-muted" style="font-size:13px;margin-top:8px">Only enabled providers appear here. Enable providers in their respective tabs.</p>
             <input type="hidden" id="ai_failover_chain" name="ai_failover_chain" value="{{ settings.ai_failover_chain | default(value='local,ollama,openai,gemini,cloudflare') }}">
         </div>
     </div>
@@ -65,7 +59,7 @@
         <div class="form-card">
             <h3>Local LLM (Embedded)</h3>
             <p class="text-muted" style="margin-bottom:12px">Run a small language model directly inside Velocty — no external server needed. Ideal for auto-tagging, categorisation, meta descriptions, and slug suggestions.</p>
-            <label class="checkbox-item"><input type="checkbox" name="ai_local_enabled" value="true" {% if settings.ai_local_enabled == "true" %}checked{% endif %}> Enable Local LLM</label>
+            <label class="checkbox-item"><input type="checkbox" id="ai_local_enabled" name="ai_local_enabled" value="true" {% if settings.ai_local_enabled == "true" %}checked{% endif %}> Enable Local LLM</label>
             <div class="form-group" style="margin-top:16px">
                 <label for="ai_local_model">Model</label>
                 <select id="ai_local_model" name="ai_local_model">
@@ -87,7 +81,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <button type="button" id="download-local-model" class="btn btn-primary" onclick="downloadLocalModel()">
+                <button type="button" id="download-local-model" class="btn btn-primary" onclick="downloadLocalModel()" {% if settings.ai_local_enabled != "true" %}disabled{% endif %}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Download Model
                 </button>
@@ -227,6 +221,14 @@
         var order = [];
         items.forEach(function(item) { order.push(item.dataset.provider); });
         hiddenChain.value = order.join(',');
+    }
+    // Toggle download button based on Enable Local LLM checkbox
+    var localToggle = document.getElementById('ai_local_enabled');
+    var dlBtn = document.getElementById('download-local-model');
+    if (localToggle && dlBtn) {
+        localToggle.addEventListener('change', function() {
+            dlBtn.disabled = !this.checked;
+        });
     }
 })();
 
