@@ -907,6 +907,280 @@ pub async fn import_wordpress(
     Redirect::to(format!("{}/import", admin_base(slug)))
 }
 
+// ── Health ─────────────────────────────────────────────────
+
+#[get("/health")]
+pub fn health_page(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+    let report = crate::health::gather(pool);
+    let context = json!({
+        "page_title": "Health",
+        "admin_slug": slug.0,
+        "settings": Setting::all(pool),
+        "report": report,
+    });
+    Template::render("admin/health", &context)
+}
+
+#[post("/health/vacuum")]
+pub fn health_vacuum(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_vacuum(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/wal-checkpoint")]
+pub fn health_wal_checkpoint(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_wal_checkpoint(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/integrity-check")]
+pub fn health_integrity_check(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_integrity_check(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/session-cleanup")]
+pub fn health_session_cleanup(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_session_cleanup(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/orphan-scan")]
+pub fn health_orphan_scan(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_orphan_scan(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/orphan-delete")]
+pub fn health_orphan_delete(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_orphan_delete(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/unused-tags")]
+pub fn health_unused_tags(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::run_unused_tags_cleanup(pool);
+    json_tool_result(r)
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AnalyticsPruneForm {
+    pub days: u64,
+}
+
+#[post("/health/analytics-prune", format = "json", data = "<body>")]
+pub fn health_analytics_prune(_admin: AdminUser, pool: &State<DbPool>, body: Json<AnalyticsPruneForm>) -> Json<Value> {
+    let r = crate::health::run_analytics_prune(pool, body.days);
+    json_tool_result(r)
+}
+
+#[post("/health/export-db")]
+pub fn health_export_db(_admin: AdminUser) -> Json<Value> {
+    let r = crate::health::export_database();
+    json_tool_result(r)
+}
+
+#[post("/health/export-content")]
+pub fn health_export_content(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    let r = crate::health::export_content(pool);
+    json_tool_result(r)
+}
+
+#[post("/health/mongo-ping")]
+pub fn health_mongo_ping(_admin: AdminUser) -> Json<Value> {
+    let uri = crate::health::read_db_backend();
+    if uri != "mongodb" {
+        return Json(json!({ "ok": false, "message": "Not using MongoDB backend.", "details": null }));
+    }
+    let mongo_uri = std::fs::read_to_string("velocty.toml")
+        .ok()
+        .and_then(|s| s.parse::<toml::Value>().ok())
+        .and_then(|v| v.get("database")?.get("uri")?.as_str().map(|s| s.to_string()))
+        .unwrap_or_else(|| "mongodb://localhost:27017".to_string());
+
+    let start = std::time::Instant::now();
+    let report = crate::health::gather_mongo_ping(&mongo_uri);
+    let latency = start.elapsed().as_millis();
+
+    if report.0 {
+        Json(json!({ "ok": true, "message": format!("MongoDB is reachable. Latency: {} ms", report.1), "details": null }))
+    } else {
+        Json(json!({ "ok": false, "message": format!("MongoDB unreachable ({}ms timeout)", latency), "details": null }))
+    }
+}
+
+fn json_tool_result(r: crate::health::ToolResult) -> Json<Value> {
+    Json(json!({
+        "ok": r.ok,
+        "message": r.message,
+        "details": r.details,
+    }))
+}
+
+// ── Import: Velocty ───────────────────────────────────────
+
+#[post("/import/velocty", data = "<data>")]
+pub async fn import_velocty(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    data: Data<'_>,
+) -> Flash<Redirect> {
+    let bytes = match data.open(100.mebibytes()).into_bytes().await {
+        Ok(b) if b.is_complete() => b.into_inner(),
+        _ => return Flash::error(
+            Redirect::to(format!("{}/import", admin_base(slug))),
+            "Failed to read upload data.",
+        ),
+    };
+
+    let json_str = String::from_utf8_lossy(&bytes).to_string();
+    let export: serde_json::Value = match serde_json::from_str(&json_str) {
+        Ok(v) => v,
+        Err(e) => return Flash::error(
+            Redirect::to(format!("{}/import", admin_base(slug))),
+            format!("Invalid JSON: {}", e),
+        ),
+    };
+
+    let conn = match pool.get() {
+        Ok(c) => c,
+        Err(e) => return Flash::error(
+            Redirect::to(format!("{}/import", admin_base(slug))),
+            format!("DB error: {}", e),
+        ),
+    };
+
+    let mut imported_posts = 0u64;
+    let mut imported_portfolio = 0u64;
+    let mut imported_comments = 0u64;
+    let mut imported_categories = 0u64;
+    let mut imported_tags = 0u64;
+
+    // Import categories
+    if let Some(cats) = export.get("categories").and_then(|v| v.as_array()) {
+        for cat in cats {
+            let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let slug_val = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            if !name.is_empty() {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO categories (name, slug) VALUES (?1, ?2)",
+                    rusqlite::params![name, slug_val],
+                );
+                imported_categories += 1;
+            }
+        }
+    }
+
+    // Import tags
+    if let Some(tags) = export.get("tags").and_then(|v| v.as_array()) {
+        for tag in tags {
+            let name = tag.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let slug_val = tag.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            if !name.is_empty() {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO tags (name, slug) VALUES (?1, ?2)",
+                    rusqlite::params![name, slug_val],
+                );
+                imported_tags += 1;
+            }
+        }
+    }
+
+    // Import posts
+    if let Some(posts) = export.get("posts").and_then(|v| v.as_array()) {
+        for post in posts {
+            let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let slug_val = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let body = post.get("body").and_then(|v| v.as_str()).unwrap_or("");
+            let excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
+            let featured_image = post.get("featured_image").and_then(|v| v.as_str()).unwrap_or("");
+            let status = post.get("status").and_then(|v| v.as_str()).unwrap_or("draft");
+            let created_at = post.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+            let updated_at = post.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+            if !title.is_empty() {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO posts (title, slug, body, excerpt, featured_image, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    rusqlite::params![title, slug_val, body, excerpt, featured_image, status, created_at, updated_at],
+                );
+                imported_posts += 1;
+            }
+        }
+    }
+
+    // Import portfolio items
+    if let Some(items) = export.get("portfolio_items").and_then(|v| v.as_array()) {
+        for item in items {
+            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let slug_val = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let description = item.get("description").and_then(|v| v.as_str()).unwrap_or("");
+            let image_path = item.get("image_path").and_then(|v| v.as_str()).unwrap_or("");
+            let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("draft");
+            let created_at = item.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+            let updated_at = item.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+            if !title.is_empty() {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO portfolio_items (title, slug, description, image_path, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    rusqlite::params![title, slug_val, description, image_path, status, created_at, updated_at],
+                );
+                imported_portfolio += 1;
+            }
+        }
+    }
+
+    // Import comments
+    if let Some(comments) = export.get("comments").and_then(|v| v.as_array()) {
+        for comment in comments {
+            let post_id = comment.get("post_id").and_then(|v| v.as_i64()).unwrap_or(0);
+            let author_name = comment.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
+            let author_email = comment.get("author_email").and_then(|v| v.as_str()).unwrap_or("");
+            let body = comment.get("body").and_then(|v| v.as_str()).unwrap_or("");
+            let status = comment.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
+            let created_at = comment.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+            if post_id > 0 && !body.is_empty() {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO comments (post_id, author_name, author_email, body, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    rusqlite::params![post_id, author_name, author_email, body, status, created_at],
+                );
+                imported_comments += 1;
+            }
+        }
+    }
+
+    // Import settings (skip sensitive ones)
+    let skip_keys = ["admin_password_hash", "setup_completed", "admin_slug", "admin_email", "session_secret"];
+    if let Some(settings) = export.get("settings").and_then(|v| v.as_array()) {
+        for setting in settings {
+            let key = setting.get("key").and_then(|v| v.as_str()).unwrap_or("");
+            let value = setting.get("value").and_then(|v| v.as_str()).unwrap_or("");
+            if !key.is_empty() && !skip_keys.contains(&key) {
+                let _ = Setting::set(pool, key, value);
+            }
+        }
+    }
+
+    // Log import
+    let _ = conn.execute(
+        "INSERT INTO imports (source, filename, posts_count, portfolio_count, comments_count, skipped_count, imported_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))",
+        rusqlite::params![
+            "velocty",
+            "velocty_export.json",
+            imported_posts,
+            imported_portfolio,
+            imported_comments,
+            0i64,
+        ],
+    );
+
+    Flash::success(
+        Redirect::to(format!("{}/import", admin_base(slug))),
+        format!(
+            "Imported {} posts, {} portfolio items, {} comments, {} categories, {} tags.",
+            imported_posts, imported_portfolio, imported_comments, imported_categories, imported_tags
+        ),
+    )
+}
+
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         dashboard,
@@ -935,8 +1209,21 @@ pub fn routes() -> Vec<rocket::Route> {
         design_activate,
         import_page,
         import_wordpress,
+        import_velocty,
         settings_page,
         settings_save,
         upload_image,
+        health_page,
+        health_vacuum,
+        health_wal_checkpoint,
+        health_integrity_check,
+        health_session_cleanup,
+        health_orphan_scan,
+        health_orphan_delete,
+        health_unused_tags,
+        health_analytics_prune,
+        health_export_db,
+        health_export_content,
+        health_mongo_ping,
     ]
 }

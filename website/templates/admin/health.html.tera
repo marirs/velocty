@@ -1,0 +1,523 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Health</h2>
+</div>
+
+<div class="settings-tabs" style="margin-bottom:24px">
+    <a href="#status" class="tab active" onclick="switchHealthTab('status',this)">Status</a>
+    <a href="#tools" class="tab" onclick="switchHealthTab('tools',this)">Tools</a>
+</div>
+
+<!-- ═══ STATUS TAB ═══ -->
+<div id="tab-status">
+
+<div class="health-grid">
+    <!-- Disk Usage -->
+    <div class="form-card health-card">
+        <h3>Disk Usage</h3>
+        <div id="disk-chart" style="display:flex;align-items:center;justify-content:center;min-height:180px"></div>
+        <div class="health-stats">
+            <div class="health-stat">
+                <span class="health-stat-label">Total</span>
+                <span class="health-stat-value" id="disk-total">-</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Free</span>
+                <span class="health-stat-value" id="disk-free">-</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Database</span>
+                <span class="health-stat-value" id="disk-db">-</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Uploads</span>
+                <span class="health-stat-value" id="disk-uploads">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resources -->
+    <div class="form-card health-card">
+        <h3>Resources</h3>
+        <div style="display:flex;gap:24px;justify-content:center;margin:16px 0">
+            <div style="text-align:center">
+                <div id="mem-gauge" style="min-height:120px"></div>
+                <div class="text-muted" style="font-size:12px;margin-top:4px">Memory (RSS)</div>
+            </div>
+        </div>
+        <div class="health-stats">
+            <div class="health-stat">
+                <span class="health-stat-label">Uptime</span>
+                <span class="health-stat-value">{{ report.resources.uptime_human }}</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Memory</span>
+                <span class="health-stat-value" id="mem-value">-</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">OS</span>
+                <span class="health-stat-value">{{ report.resources.os }}</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Velocty</span>
+                <span class="health-stat-value">v{{ report.resources.rust_version }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database -->
+    <div class="form-card health-card">
+        <h3>Database</h3>
+        <div class="health-stats">
+            <div class="health-stat">
+                <span class="health-stat-label">Backend</span>
+                <span class="health-stat-value">{{ report.database.backend | capitalize }}</span>
+            </div>
+            {% if report.database.backend == "sqlite" %}
+            <div class="health-stat">
+                <span class="health-stat-label">Size</span>
+                <span class="health-stat-value" id="db-size">-</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">WAL Size</span>
+                <span class="health-stat-value" id="db-wal">-</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Pages</span>
+                <span class="health-stat-value">{{ report.database.page_count }}</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Fragmentation</span>
+                <span class="health-stat-value {% if report.database.fragmentation_pct > 10 %}text-warning{% endif %}">{{ report.database.fragmentation_pct | round(precision=1) }}%</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Integrity</span>
+                <span class="health-stat-value">{% if report.database.integrity_ok %}<span style="color:#22c55e">✓ OK</span>{% else %}<span style="color:#ef4444">✗ Issues</span>{% endif %}</span>
+            </div>
+            {% else %}
+            <div class="health-stat">
+                <span class="health-stat-label">Status</span>
+                <span class="health-stat-value">{% if report.database.mongo_connected %}<span style="color:#22c55e">✓ Connected</span>{% else %}<span style="color:#ef4444">✗ Disconnected</span>{% endif %}</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-stat-label">Latency</span>
+                <span class="health-stat-value {% if report.database.mongo_latency_ms > 100 %}text-warning{% endif %}">{{ report.database.mongo_latency_ms }} ms</span>
+            </div>
+            <div class="health-stat" style="grid-column:1/-1">
+                <span class="health-stat-label">URI</span>
+                <span class="health-stat-value" style="font-size:11px;word-break:break-all">{{ report.database.mongo_uri }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filesystem -->
+    <div class="form-card health-card" style="grid-column:1/-1">
+        <h3>Filesystem</h3>
+        {% if report.running_as_root %}
+        <div class="fs-alert fs-alert-danger" style="margin-bottom:12px">
+            <strong>⚠ Running as root!</strong> This is a security risk. Run Velocty as a dedicated non-root user (e.g. <code>velocty</code> or <code>www-data</code>).
+        </div>
+        {% endif %}
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Process user: <strong style="color:var(--text-primary)">{{ report.process_user }}</strong></div>
+        <table class="health-check-table">
+            <thead><tr><th>Path</th><th>Exists</th><th>Writable</th><th>Owner:Group</th><th>Perms</th><th>Expected</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for check in report.filesystem %}
+            <tr>
+                <td class="text-muted" style="font-size:12px">{{ check.path }}</td>
+                <td>{% if check.exists %}<span style="color:#22c55e">✓</span>{% else %}<span style="color:#ef4444">✗</span>{% endif %}</td>
+                <td>{% if check.writable %}<span style="color:#22c55e">✓</span>{% else %}<span style="color:#ef4444">✗</span>{% endif %}</td>
+                <td style="font-size:12px">{% if check.owned_by_root %}<span style="color:#ef4444;font-weight:600">{{ check.owner }}:{{ check.group }}</span>{% else %}<span class="text-muted">{{ check.owner }}:{{ check.group }}</span>{% endif %}</td>
+                <td style="font-size:12px">{% if check.world_writable %}<span style="color:#ef4444;font-weight:600">{{ check.permissions }}</span>{% elif check.perms_ok %}<span style="color:#22c55e">{{ check.permissions }}</span>{% else %}<span style="color:#eab308">{{ check.permissions }}</span>{% endif %}</td>
+                <td class="text-muted" style="font-size:12px">{{ check.recommended }}</td>
+                <td>{% if check.warning %}<span style="color:#ef4444">✗</span>{% elif check.exists %}<span style="color:#22c55e">✓</span>{% else %}<span style="color:#ef4444">✗</span>{% endif %}</td>
+            </tr>
+            {% if check.warning %}
+            <tr>
+                <td colspan="7" style="padding:4px 8px 8px 8px;border-bottom:1px solid var(--border-subtle)">
+                    <div class="fs-alert fs-alert-warn" style="font-size:11px">{{ check.warning }}</div>
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Content Stats -->
+<div class="form-card" style="margin-top:20px">
+    <h3>Content</h3>
+    <div id="content-chart" style="min-height:60px;margin:16px 0"></div>
+    <div class="health-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+        <div class="health-stat-box">
+            <div class="health-stat-number">{{ report.content.posts_total }}</div>
+            <div class="health-stat-label">Posts</div>
+            <div class="text-muted" style="font-size:11px">{{ report.content.posts_published }} published, {{ report.content.posts_draft }} draft</div>
+        </div>
+        <div class="health-stat-box">
+            <div class="health-stat-number">{{ report.content.portfolio_total }}</div>
+            <div class="health-stat-label">Portfolio</div>
+        </div>
+        <div class="health-stat-box">
+            <div class="health-stat-number">{{ report.content.comments_total }}</div>
+            <div class="health-stat-label">Comments</div>
+            <div class="text-muted" style="font-size:11px">{{ report.content.comments_pending }} pending</div>
+        </div>
+        <div class="health-stat-box">
+            <div class="health-stat-number">{{ report.content.categories_count }}</div>
+            <div class="health-stat-label">Categories</div>
+        </div>
+        <div class="health-stat-box">
+            <div class="health-stat-number">{{ report.content.tags_count }}</div>
+            <div class="health-stat-label">Tags</div>
+        </div>
+        <div class="health-stat-box">
+            <div class="health-stat-number">{{ report.content.sessions_total }}</div>
+            <div class="health-stat-label">Sessions</div>
+            <div class="text-muted" style="font-size:11px">{{ report.content.sessions_expired }} expired</div>
+        </div>
+    </div>
+</div>
+
+<!-- Uploads Breakdown -->
+<div class="form-card" style="margin-top:20px">
+    <h3>Uploads Breakdown</h3>
+    <div id="uploads-chart" style="min-height:60px;margin:16px 0"></div>
+    <div class="health-stats">
+        <div class="health-stat">
+            <span class="health-stat-label">Files</span>
+            <span class="health-stat-value">{{ report.disk.uploads_file_count }}</span>
+        </div>
+        <div class="health-stat">
+            <span class="health-stat-label">Images</span>
+            <span class="health-stat-value" id="uploads-img">-</span>
+        </div>
+        <div class="health-stat">
+            <span class="health-stat-label">Video</span>
+            <span class="health-stat-value" id="uploads-vid">-</span>
+        </div>
+        <div class="health-stat">
+            <span class="health-stat-label">Other</span>
+            <span class="health-stat-value" id="uploads-other">-</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- ═══ TOOLS TAB ═══ -->
+<div id="tab-tools" style="display:none">
+
+<div class="tools-grid">
+    {% if report.database.backend == "sqlite" %}
+    <div class="form-card tool-card">
+        <h4>Database Integrity Check</h4>
+        <p class="text-muted">Runs SQLite <code>PRAGMA integrity_check</code> to verify database consistency.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runTool('integrity-check', this)">Run Check</button>
+        <div class="tool-result" id="result-integrity-check"></div>
+    </div>
+
+    <div class="form-card tool-card">
+        <h4>Database Vacuum</h4>
+        <p class="text-muted">Compacts the database file by reclaiming free pages. Reduces file size.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runTool('vacuum', this)">Run Vacuum</button>
+        <div class="tool-result" id="result-vacuum"></div>
+    </div>
+
+    <div class="form-card tool-card">
+        <h4>WAL Checkpoint</h4>
+        <p class="text-muted">Flushes the Write-Ahead Log to the main database file and truncates the WAL.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runTool('wal-checkpoint', this)">Run Checkpoint</button>
+        <div class="tool-result" id="result-wal-checkpoint"></div>
+    </div>
+    {% else %}
+    <div class="form-card tool-card">
+        <h4>Connection Ping</h4>
+        <p class="text-muted">Tests the MongoDB connection and measures round-trip latency.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runTool('mongo-ping', this)">Ping</button>
+        <div class="tool-result" id="result-mongo-ping"></div>
+    </div>
+    {% endif %}
+
+    <div class="form-card tool-card">
+        <h4>Session Cleanup</h4>
+        <p class="text-muted">Deletes all expired sessions from the database.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runTool('session-cleanup', this)">Clean Sessions</button>
+        <div class="tool-result" id="result-session-cleanup"></div>
+    </div>
+
+    <div class="form-card tool-card">
+        <h4>Orphan File Scan</h4>
+        <p class="text-muted">Finds uploaded files not referenced by any post, portfolio item, or setting.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runTool('orphan-scan', this)">Scan Files</button>
+        <div class="tool-result" id="result-orphan-scan"></div>
+    </div>
+
+    <div class="form-card tool-card">
+        <h4>Delete Orphan Files</h4>
+        <p class="text-muted">Permanently removes orphan files from the uploads directory.</p>
+        <button class="btn btn-danger btn-sm" onclick="runToolConfirm('orphan-delete', this, 'This will permanently delete orphan files. Continue?')">Delete Orphans</button>
+        <div class="tool-result" id="result-orphan-delete"></div>
+    </div>
+
+    <div class="form-card tool-card">
+        <h4>Unused Tags Cleanup</h4>
+        <p class="text-muted">Deletes tags not associated with any post or portfolio item.</p>
+        <button class="btn btn-secondary btn-sm" onclick="runToolConfirm('unused-tags', this, 'Delete all unused tags?')">Clean Tags</button>
+        <div class="tool-result" id="result-unused-tags"></div>
+    </div>
+
+    <div class="form-card tool-card">
+        <h4>Analytics Data Pruning</h4>
+        <p class="text-muted">Delete analytics events older than a specified number of days.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input type="number" id="prune-days" value="90" min="1" max="3650" style="width:80px" class="form-control">
+            <span class="text-muted" style="font-size:13px">days</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="runAnalyticsPrune(this)">Prune Data</button>
+        <div class="tool-result" id="result-analytics-prune"></div>
+    </div>
+
+    {% if report.database.backend == "sqlite" %}
+    <div class="form-card tool-card">
+        <h4>Export Database</h4>
+        <p class="text-muted">Creates a backup copy of the SQLite database file.</p>
+        <button class="btn btn-primary btn-sm" onclick="runTool('export-db', this)">Export .db</button>
+        <div class="tool-result" id="result-export-db"></div>
+    </div>
+    {% endif %}
+
+    <div class="form-card tool-card">
+        <h4>Export Content</h4>
+        <p class="text-muted">Exports all posts, portfolio items, comments, categories, tags, and settings as JSON. Can be re-imported into another Velocty instance.</p>
+        <button class="btn btn-primary btn-sm" onclick="runTool('export-content', this)">Export JSON</button>
+        <div class="tool-result" id="result-export-content"></div>
+    </div>
+</div>
+
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+var adminSlug = '{{ admin_slug }}';
+
+// ── Tab switching ──
+function switchHealthTab(tab, el) {
+    document.getElementById('tab-status').style.display = tab === 'status' ? '' : 'none';
+    document.getElementById('tab-tools').style.display = tab === 'tools' ? '' : 'none';
+    document.querySelectorAll('.settings-tabs .tab').forEach(function(t){ t.classList.remove('active'); });
+    el.classList.add('active');
+}
+
+// ── Human bytes ──
+function humanBytes(b) {
+    if (b >= 1073741824) return (b / 1073741824).toFixed(1) + ' GB';
+    if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+    return b + ' B';
+}
+
+// ── Report data ──
+var report = {{ report | json_encode() | safe }};
+
+// Fill text values (safe setter for elements that may not exist on MongoDB)
+function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+setText('disk-total', humanBytes(report.disk.total_bytes));
+setText('disk-free', humanBytes(report.disk.free_bytes));
+setText('disk-db', humanBytes(report.disk.db_size_bytes));
+setText('disk-uploads', humanBytes(report.disk.uploads_size_bytes));
+setText('db-size', humanBytes(report.database.file_size_bytes));
+setText('db-wal', humanBytes(report.database.wal_size_bytes));
+setText('mem-value', humanBytes(report.resources.memory_rss_bytes));
+setText('uploads-img', humanBytes(report.disk.uploads_image_bytes));
+setText('uploads-vid', humanBytes(report.disk.uploads_video_bytes));
+setText('uploads-other', humanBytes(report.disk.uploads_other_bytes));
+
+// ── D3: Disk Donut ──
+(function() {
+    var w = 180, h = 180, r = 70, ir = 45;
+    var used = report.disk.used_bytes - report.disk.db_size_bytes - report.disk.uploads_size_bytes;
+    if (used < 0) used = 0;
+    var data = [
+        { label: 'Database', value: report.disk.db_size_bytes, color: 'var(--accent)' },
+        { label: 'Uploads', value: report.disk.uploads_size_bytes, color: '#22c55e' },
+        { label: 'Other Used', value: used, color: 'var(--text-tertiary)' },
+        { label: 'Free', value: report.disk.free_bytes, color: 'var(--border-subtle)' },
+    ].filter(function(d){ return d.value > 0; });
+
+    var svg = d3.select('#disk-chart').append('svg').attr('width', w).attr('height', h);
+    var g = svg.append('g').attr('transform', 'translate(' + w/2 + ',' + h/2 + ')');
+    var pie = d3.pie().value(function(d){ return d.value; }).sort(null);
+    var arc = d3.arc().innerRadius(ir).outerRadius(r);
+
+    g.selectAll('path').data(pie(data)).enter().append('path')
+        .attr('d', arc)
+        .attr('fill', function(d){ return d.data.color; })
+        .attr('stroke', 'var(--bg-card)').attr('stroke-width', 2);
+
+    // Center text
+    g.append('text').attr('text-anchor', 'middle').attr('dy', '-0.2em')
+        .attr('fill', 'var(--text-primary)').attr('font-size', '14px').attr('font-weight', '600')
+        .text(humanBytes(report.disk.used_bytes));
+    g.append('text').attr('text-anchor', 'middle').attr('dy', '1.2em')
+        .attr('fill', 'var(--text-secondary)').attr('font-size', '11px')
+        .text('used');
+})();
+
+// ── D3: Memory Gauge ──
+(function() {
+    var w = 120, h = 120;
+    var rss = report.resources.memory_rss_bytes;
+    // Show gauge as fraction of 512MB (reasonable scale for a CMS)
+    var maxMem = 536870912;
+    var pct = Math.min(rss / maxMem, 1);
+    var startAngle = -Math.PI * 0.75;
+    var endAngle = Math.PI * 0.75;
+    var range = endAngle - startAngle;
+
+    var svg = d3.select('#mem-gauge').append('svg').attr('width', w).attr('height', h);
+    var g = svg.append('g').attr('transform', 'translate(' + w/2 + ',' + (h/2 + 10) + ')');
+
+    var arcBg = d3.arc().innerRadius(38).outerRadius(48).startAngle(startAngle).endAngle(endAngle);
+    g.append('path').attr('d', arcBg).attr('fill', 'var(--border-subtle)');
+
+    var arcFg = d3.arc().innerRadius(38).outerRadius(48).startAngle(startAngle).endAngle(startAngle + range * pct);
+    var color = pct < 0.6 ? '#22c55e' : pct < 0.85 ? '#eab308' : '#ef4444';
+    g.append('path').attr('d', arcFg).attr('fill', color);
+
+    g.append('text').attr('text-anchor', 'middle').attr('dy', '0.1em')
+        .attr('fill', 'var(--text-primary)').attr('font-size', '13px').attr('font-weight', '600')
+        .text(humanBytes(rss));
+})();
+
+// ── D3: Content Stacked Bar ──
+(function() {
+    var container = document.getElementById('content-chart');
+    var cw = container.offsetWidth || 500;
+    var h = 32;
+    var data = [
+        { label: 'Posts', value: report.content.posts_total, color: 'var(--accent)' },
+        { label: 'Portfolio', value: report.content.portfolio_total, color: '#22c55e' },
+        { label: 'Comments', value: report.content.comments_total, color: '#eab308' },
+        { label: 'Categories', value: report.content.categories_count, color: '#8b5cf6' },
+        { label: 'Tags', value: report.content.tags_count, color: '#ec4899' },
+    ];
+    var total = d3.sum(data, function(d){ return d.value; });
+    if (total === 0) { container.innerHTML = '<span class="text-muted" style="font-size:13px">No content yet</span>'; return; }
+
+    var svg = d3.select('#content-chart').append('svg').attr('width', cw).attr('height', h);
+    var x = 0;
+    data.forEach(function(d) {
+        var w = (d.value / total) * cw;
+        if (w > 0) {
+            svg.append('rect').attr('x', x).attr('y', 0).attr('width', w).attr('height', h).attr('rx', 4).attr('fill', d.color);
+            if (w > 40) {
+                svg.append('text').attr('x', x + w/2).attr('y', h/2).attr('dy', '0.35em')
+                    .attr('text-anchor', 'middle').attr('fill', '#fff').attr('font-size', '11px').attr('font-weight', '500')
+                    .text(d.label + ' ' + d.value);
+            }
+            x += w;
+        }
+    });
+})();
+
+// ── D3: Uploads Breakdown Bar ──
+(function() {
+    var container = document.getElementById('uploads-chart');
+    var cw = container.offsetWidth || 500;
+    var h = 32;
+    var data = [
+        { label: 'Images', value: report.disk.uploads_image_bytes, color: 'var(--accent)' },
+        { label: 'Video', value: report.disk.uploads_video_bytes, color: '#8b5cf6' },
+        { label: 'Other', value: report.disk.uploads_other_bytes, color: 'var(--text-tertiary)' },
+    ];
+    var total = d3.sum(data, function(d){ return d.value; });
+    if (total === 0) { container.innerHTML = '<span class="text-muted" style="font-size:13px">No uploads yet</span>'; return; }
+
+    var svg = d3.select('#uploads-chart').append('svg').attr('width', cw).attr('height', h);
+    var x = 0;
+    data.forEach(function(d) {
+        var w = (d.value / total) * cw;
+        if (w > 0) {
+            svg.append('rect').attr('x', x).attr('y', 0).attr('width', w).attr('height', h).attr('rx', 4).attr('fill', d.color);
+            if (w > 50) {
+                svg.append('text').attr('x', x + w/2).attr('y', h/2).attr('dy', '0.35em')
+                    .attr('text-anchor', 'middle').attr('fill', '#fff').attr('font-size', '11px').attr('font-weight', '500')
+                    .text(d.label + ' ' + humanBytes(d.value));
+            }
+            x += w;
+        }
+    });
+})();
+
+// ── Tool runner ──
+function runTool(tool, btn) {
+    var originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    var resultEl = document.getElementById('result-' + tool);
+    resultEl.textContent = '';
+    resultEl.className = 'tool-result';
+
+    fetch('/' + adminSlug + '/health/' + tool, { method: 'POST' })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            resultEl.className = 'tool-result ' + (data.ok ? 'tool-ok' : 'tool-err');
+            resultEl.textContent = data.message;
+            if (data.details) {
+                var pre = document.createElement('pre');
+                pre.textContent = data.details;
+                pre.style.cssText = 'font-size:11px;margin-top:6px;max-height:120px;overflow:auto;white-space:pre-wrap';
+                resultEl.appendChild(pre);
+            }
+        })
+        .catch(function(e){
+            resultEl.className = 'tool-result tool-err';
+            resultEl.textContent = 'Request failed: ' + e.message;
+        })
+        .finally(function(){
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+        });
+}
+
+function runToolConfirm(tool, btn, msg) {
+    if (!confirm(msg)) return;
+    runTool(tool, btn);
+}
+
+function runAnalyticsPrune(btn) {
+    var days = parseInt(document.getElementById('prune-days').value) || 90;
+    if (!confirm('Delete analytics data older than ' + days + ' days?')) return;
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    var resultEl = document.getElementById('result-analytics-prune');
+    resultEl.textContent = '';
+
+    fetch('/' + adminSlug + '/health/analytics-prune', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: days })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        resultEl.className = 'tool-result ' + (data.ok ? 'tool-ok' : 'tool-err');
+        resultEl.textContent = data.message;
+    })
+    .catch(function(e){
+        resultEl.className = 'tool-result tool-err';
+        resultEl.textContent = 'Request failed: ' + e.message;
+    })
+    .finally(function(){
+        btn.disabled = false;
+        btn.textContent = 'Prune Data';
+    });
+}
+</script>
+{% endblock scripts %}

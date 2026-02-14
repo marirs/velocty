@@ -11,6 +11,8 @@
         .topbar h1 { font-size: 18px; color: #E8913A; }
         .topbar a { color: #888; text-decoration: none; font-size: 13px; }
         .topbar a:hover { color: #e0e0e0; }
+        .topbar-nav { display: flex; gap: 20px; align-items: center; }
+        .topbar-nav .nav-active { color: #E8913A; font-weight: 600; }
         .container { max-width: 900px; margin: 32px auto; padding: 0 24px; }
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header-row h2 { font-size: 20px; }
@@ -33,7 +35,12 @@
 <body>
     <div class="topbar">
         <h1>Velocty Super Admin</h1>
-        <a href="/super/logout">Sign Out</a>
+        <div class="topbar-nav">
+            <a href="/super/" class="nav-active">Sites</a>
+            <a href="/super/health">Health</a>
+            <a href="/super/settings">Settings</a>
+            <a href="/super/logout" style="margin-left:16px;opacity:0.5">Sign Out</a>
+        </div>
     </div>
     <div class="container">
         <div class="header-row">

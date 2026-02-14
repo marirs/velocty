@@ -129,6 +129,7 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 - **Responsive** — works on mobile (sidebar collapses to bottom tab bar)
 - **Keyboard shortcuts** — Cmd+S to save from any form
 - **Flash notifications** — success/error toasts on save
+- **Health Dashboard** — system health with disk usage, DB stats, filesystem permission checks (owner:group, recommended perms, world-writable detection), resource monitoring, and maintenance tools (vacuum, WAL checkpoint, orphan scan, session cleanup, export). Backend-aware: adapts for SQLite vs MongoDB
 
 ### Security
 

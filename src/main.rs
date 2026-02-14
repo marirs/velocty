@@ -8,6 +8,7 @@ mod analytics;
 mod auth;
 mod boot;
 mod db;
+mod health;
 mod images;
 mod rate_limit;
 mod render;
@@ -74,6 +75,7 @@ fn rocket() -> _ {
 
     // Boot check — verify/create directories, validate critical files
     boot::run();
+    health::init_uptime();
 
     let pool = db::init_pool().expect("Failed to initialize database pool");
     db::run_migrations(&pool).expect("Failed to run database migrations");

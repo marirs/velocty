@@ -242,6 +242,7 @@ User clicks **"AI Suggest"** → backend sends content to configured LLM → ret
 | **SEO** | Default meta, sitemap settings, structured data |
 | **AI** | Provider, endpoint, model, auto-suggest toggles |
 | **Comments** | Enable/disable, moderation, spam protection |
+| **Health** | System health dashboard — disk, DB stats, filesystem permissions, resource monitoring, maintenance tools (vacuum, orphan scan, export). Backend-aware (SQLite vs MongoDB) |
 
 ---
 

@@ -68,6 +68,9 @@ woothee = "0.13"
 # URL parsing
 url = "2"
 
+# System info (disk space, memory)
+libc = "0.2"
+
 # Multi-site (optional)
 dashmap = { version = "5", optional = true }
 

@@ -119,6 +119,66 @@ The backend choice is locked after first run and stored in both `velocty.toml` a
 
 ---
 
+## Health Dashboard
+
+The admin panel includes a **Health** page (`/<admin_slug>/health`) with two tabs: **Status** and **Tools**. The dashboard is backend-aware — it reads `velocty.toml` to detect SQLite vs MongoDB and adapts its display and available tools accordingly.
+
+### Status Tab
+
+| Section | SQLite | MongoDB |
+|---|---|---|
+| **Disk** | Total/free/used, DB file size, uploads breakdown (images, video, other) with D3 donut chart | Same but no DB file size (remote) |
+| **Database** | File size, WAL size, page count, fragmentation %, integrity check | Connection status (✓/✗), latency (ms), masked URI |
+| **Resources** | Uptime, memory RSS, OS/arch, Velocty version | Same |
+| **Filesystem** | Permission checks on `db/`, `uploads/`, `designs/`, `static/`, `templates/` | Same but skips `db/` directory |
+| **Content** | Post/portfolio/comment/category/tag/session counts with D3 bar chart | Same |
+| **Uploads** | File count, image/video/other size breakdown with D3 chart | Same |
+
+### Filesystem Checks
+
+Each checked directory shows:
+
+| Column | Description |
+|---|---|
+| **Path** | Directory path |
+| **Exists** | ✓ or ✗ |
+| **Writable** | Write test (creates + removes temp file) |
+| **Owner:Group** | Unix owner/group names (red if `root`) |
+| **Perms** | Actual octal — green if correct, yellow if wrong, red if world-writable |
+| **Expected** | Recommended octal (`750` for db, `755` for others) |
+| **Status** | Overall ✓ or ✗ |
+
+Warning rows appear below problem entries with actionable `chmod` commands.
+
+Additional checks:
+- **Running as root** — red banner if the process UID is 0
+- **Process user** — displays the effective user running Velocty
+
+### Tools Tab
+
+| Tool | SQLite | MongoDB | Description |
+|---|---|---|---|
+| **Integrity Check** | ✓ | — | `PRAGMA integrity_check` |
+| **Vacuum** | ✓ | — | `VACUUM` with old→new size and % reclaimed |
+| **WAL Checkpoint** | ✓ | — | `PRAGMA wal_checkpoint(TRUNCATE)` |
+| **Connection Ping** | — | ✓ | TCP + OP_MSG `isMaster` with latency |
+| **Session Cleanup** | ✓ | ✓ | Delete expired sessions |
+| **Orphan File Scan** | ✓ | ✓ | Find uploads not referenced by content |
+| **Delete Orphan Files** | ✓ | ✓ | Permanently remove orphans |
+| **Unused Tags Cleanup** | ✓ | ✓ | Delete tags with no associations |
+| **Analytics Pruning** | ✓ | ✓ | Delete events older than N days |
+| **Export Database** | ✓ | — | Copy `.db` file to downloads |
+| **Export Content** | ✓ | ✓ | JSON export of all content |
+
+### Implementation
+
+- **Backend**: `src/health.rs` — `gather()` reads `velocty.toml` for backend, branches to `gather_db_sqlite()` or `gather_db_mongo()`
+- **Routes**: `src/routes/admin.rs` — `GET /health` + `POST /health/<tool>` endpoints
+- **Template**: `website/templates/admin/health.html.tera` — Tera conditionals on `report.database.backend`
+- **MongoDB ping**: Raw TCP + OP_MSG wire protocol (same approach as setup test-mongo)
+
+---
+
 ## Design System
 
 ### Concept

@@ -146,6 +146,41 @@ pub fn dashboard(
     Ok(Template::render("super/dashboard", &ctx))
 }
 
+// ── Health ───────────────────────────────────────────────────
+
+#[get("/health")]
+pub fn health_page(
+    registry: &State<RegistryPool>,
+    cookies: &CookieJar<'_>,
+    pool: &State<crate::db::DbPool>,
+) -> Result<Template, Redirect> {
+    if !is_super_authenticated(registry, cookies) {
+        return Err(Redirect::to("/super/login"));
+    }
+
+    let report = crate::health::gather(pool);
+    let sites = site::list_sites(registry);
+    let mut ctx = HashMap::new();
+    ctx.insert("report".to_string(), serde_json::to_value(&report).unwrap_or_default());
+    ctx.insert("sites".to_string(), serde_json::to_value(&sites).unwrap_or_default());
+    Ok(Template::render("super/health", &ctx))
+}
+
+// ── Settings ────────────────────────────────────────────────
+
+#[get("/settings")]
+pub fn settings_page(
+    registry: &State<RegistryPool>,
+    cookies: &CookieJar<'_>,
+) -> Result<Template, Redirect> {
+    if !is_super_authenticated(registry, cookies) {
+        return Err(Redirect::to("/super/login"));
+    }
+
+    let ctx: HashMap<String, String> = HashMap::new();
+    Ok(Template::render("super/settings", &ctx))
+}
+
 // ── Create Site ──────────────────────────────────────────────
 
 #[get("/sites/new")]
@@ -260,6 +295,8 @@ pub fn routes() -> Vec<rocket::Route> {
         login_submit,
         logout,
         dashboard,
+        health_page,
+        settings_page,
         new_site_page,
         new_site_submit,
         edit_site_page,

@@ -10,6 +10,17 @@
 <div class="import-sources">
     <div class="import-card">
         <div class="import-icon">
+            <img src="/static/images/logo-v.png" alt="V" style="width:32px;height:32px">
+        </div>
+        <h4>Velocty</h4>
+        <p>Import from a Velocty JSON export</p>
+        <form method="post" action="/{{ admin_slug }}/import/velocty" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".json" required>
+            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">Import</button>
+        </form>
+    </div>
+    <div class="import-card">
+        <div class="import-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#E8913A" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
         </div>
         <h4>WordPress</h4>

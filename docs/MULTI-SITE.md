@@ -200,12 +200,37 @@ All super-admin routes are behind `#[cfg(feature = "multi-site")]`.
 
 | Route | Page |
 |---|---|
+| `/super/setup` | First-run setup (create super admin account) |
 | `/super/login` | Super admin login |
+| `/super/logout` | Logout |
 | `/super/` | Dashboard — list all sites with status |
+| `/super/health` | System health — disk, resources, DB, filesystem, sites overview |
+| `/super/settings` | Super admin settings (email, password, global defaults) |
 | `/super/sites/new` | Create new site |
 | `/super/sites/<id>` | Edit site (hostname, display name, status) |
 | `/super/sites/<id>/delete` | Delete site (with confirmation) |
-| `/super/setup` | First-run setup (create super admin account) |
+
+### Navigation
+
+The Super Admin topbar includes navigation links:
+
+| Menu | Description |
+|---|---|
+| **Sites** | Site CRUD — list, create, edit, delete, status toggle |
+| **Health** | System-level health dashboard (same data as per-site health, aggregated) |
+| **Settings** | Super admin account management and global defaults |
+
+### Health Page
+
+The Super Admin health page (`/super/health`) shows system-wide health information:
+
+- **Disk** — total/free space, uploads size, file count
+- **Resources** — uptime, memory RSS, OS, process user, Velocty version
+- **Database** — backend-aware (SQLite: file size, WAL, fragmentation, integrity; MongoDB: connection status, latency, URI)
+- **Filesystem** — permission checks with owner:group, recommended vs actual perms, world-writable detection, root ownership warnings
+- **Sites Overview** — table of all registered sites with hostname and status
+
+The health data is gathered by `src/health.rs` which reads `velocty.toml` to detect the database backend and adapts checks accordingly.
 
 ### Dashboard
 

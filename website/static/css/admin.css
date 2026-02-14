@@ -1451,6 +1451,165 @@ input[type="file"]::file-selector-button:hover {
     margin-bottom: 4px;
 }
 
+/* ── Health Page ──────────────────────────────────── */
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.health-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.health-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.health-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 13px;
+}
+
+.health-stat-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.health-stat-value {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.health-stat-box {
+    text-align: center;
+    padding: 12px 8px;
+    background: var(--bg-input);
+    border-radius: 8px;
+}
+
+.health-stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.health-check-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.health-check-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.health-check-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.tool-card h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+}
+
+.tool-card p {
+    font-size: 12px;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.tool-result {
+    margin-top: 10px;
+    font-size: 13px;
+    padding: 0;
+    border-radius: 6px;
+    transition: all 200ms;
+}
+
+.tool-result:not(:empty) {
+    padding: 8px 10px;
+}
+
+.tool-result.tool-ok {
+    background: color-mix(in srgb, #22c55e 10%, transparent);
+    color: #22c55e;
+    border: 1px solid color-mix(in srgb, #22c55e 25%, transparent);
+}
+
+.tool-result.tool-err {
+    background: color-mix(in srgb, #ef4444 10%, transparent);
+    color: #ef4444;
+    border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.text-warning {
+    color: #eab308;
+}
+
+.fs-alert {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.fs-alert-danger {
+    background: color-mix(in srgb, #ef4444 10%, transparent);
+    color: #ef4444;
+    border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+}
+
+.fs-alert-warn {
+    background: color-mix(in srgb, #eab308 8%, transparent);
+    color: #eab308;
+    border: 1px solid color-mix(in srgb, #eab308 20%, transparent);
+}
+
+.fs-alert code {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
 /* ── Compact Color Picker Popover ─────────────────── */
 .color-picker-inline {
     position: relative;

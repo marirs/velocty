@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velocty Super Admin — Settings</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+        .topbar { background: #16213e; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2a4a; }
+        .topbar h1 { font-size: 18px; color: #E8913A; }
+        .topbar a { color: #888; text-decoration: none; font-size: 13px; }
+        .topbar a:hover { color: #e0e0e0; }
+        .topbar-nav { display: flex; gap: 20px; align-items: center; }
+        .topbar-nav .nav-active { color: #E8913A; font-weight: 600; }
+        .container { max-width: 600px; margin: 40px auto; padding: 0 24px; }
+        h2 { font-size: 20px; margin-bottom: 20px; }
+        .card { background: #16213e; border-radius: 8px; padding: 24px; margin-bottom: 24px; }
+        .card h3 { font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+        .placeholder { text-align: center; padding: 40px 20px; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Velocty Super Admin</h1>
+        <div class="topbar-nav">
+            <a href="/super/">Sites</a>
+            <a href="/super/health">Health</a>
+            <a href="/super/settings" class="nav-active">Settings</a>
+            <a href="/super/logout" style="margin-left:16px;opacity:0.5">Sign Out</a>
+        </div>
+    </div>
+    <div class="container">
+        <h2>Settings</h2>
+        <div class="card">
+            <h3>Super Admin Account</h3>
+            <div class="placeholder">
+                <p>Settings management coming soon.</p>
+                <p style="margin-top:8px;font-size:12px;color:#555">Change email, password, and global defaults for new sites.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

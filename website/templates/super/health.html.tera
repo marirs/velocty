@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velocty Super Admin — System Health</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+        .topbar { background: #16213e; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2a4a; }
+        .topbar h1 { font-size: 18px; color: #E8913A; }
+        .topbar a { color: #888; text-decoration: none; font-size: 13px; }
+        .topbar a:hover { color: #e0e0e0; }
+        .topbar-nav { display: flex; gap: 20px; align-items: center; }
+        .topbar-nav .nav-active { color: #E8913A; font-weight: 600; }
+        .container { max-width: 1000px; margin: 32px auto; padding: 0 24px; }
+        h2 { font-size: 20px; margin-bottom: 20px; }
+        .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card { background: #16213e; border-radius: 8px; padding: 20px; }
+        .card h3 { font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #2a2a4a; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: #888; }
+        .stat-value { font-weight: 600; }
+        .ok { color: #22c55e; }
+        .warn { color: #eab308; }
+        .danger { color: #ef4444; }
+        .fs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .fs-table th { text-align: left; padding: 8px 10px; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; background: #0f3460; }
+        .fs-table td { padding: 8px 10px; border-top: 1px solid #2a2a4a; }
+        .alert-banner { padding: 10px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+        .alert-danger { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+        .alert-warn { background: rgba(234,179,8,0.08); color: #eab308; border: 1px solid rgba(234,179,8,0.2); }
+        .alert-warn code, .alert-danger code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+        .sites-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+        .sites-table th { text-align: left; padding: 8px 10px; color: #888; font-size: 11px; text-transform: uppercase; background: #0f3460; }
+        .sites-table td { padding: 8px 10px; border-top: 1px solid #2a2a4a; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .status-dot-active { background: #22c55e; }
+        .status-dot-suspended { background: #ef4444; }
+        .status-dot-maintenance { background: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Velocty Super Admin</h1>
+        <div class="topbar-nav">
+            <a href="/super/">Sites</a>
+            <a href="/super/health" class="nav-active">Health</a>
+            <a href="/super/settings">Settings</a>
+            <a href="/super/logout" style="margin-left:16px;opacity:0.5">Sign Out</a>
+        </div>
+    </div>
+    <div class="container">
+        <h2>System Health</h2>
+
+        {% if report.running_as_root %}
+        <div class="alert-banner alert-danger">
+            <strong>⚠ Running as root!</strong> This is a security risk. Run Velocty as a dedicated non-root user.
+        </div>
+        {% endif %}
+
+        <div class="health-grid">
+            <!-- Disk -->
+            <div class="card">
+                <h3>Disk</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Total</span>
+                    <span class="stat-value" id="disk-total">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Free</span>
+                    <span class="stat-value" id="disk-free">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Uploads</span>
+                    <span class="stat-value" id="disk-uploads">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Upload Files</span>
+                    <span class="stat-value">{{ report.disk.uploads_file_count }}</span>
+                </div>
+            </div>
+
+            <!-- Resources -->
+            <div class="card">
+                <h3>Resources</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Uptime</span>
+                    <span class="stat-value">{{ report.resources.uptime_human }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Memory (RSS)</span>
+                    <span class="stat-value" id="mem-value">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">OS</span>
+                    <span class="stat-value">{{ report.resources.os }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Process User</span>
+                    <span class="stat-value {% if report.running_as_root %}danger{% endif %}">{{ report.process_user }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Version</span>
+                    <span class="stat-value">{{ report.resources.rust_version }}</span>
+                </div>
+            </div>
+
+            <!-- Database -->
+            <div class="card">
+                <h3>Database</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Backend</span>
+                    <span class="stat-value">{{ report.database.backend | capitalize }}</span>
+                </div>
+                {% if report.database.backend == "sqlite" %}
+                <div class="stat-row">
+                    <span class="stat-label">DB Size</span>
+                    <span class="stat-value" id="db-size">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">WAL Size</span>
+                    <span class="stat-value" id="db-wal">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Fragmentation</span>
+                    <span class="stat-value {% if report.database.fragmentation_pct > 10 %}warn{% endif %}">{{ report.database.fragmentation_pct | round(precision=1) }}%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Integrity</span>
+                    <span class="stat-value">{% if report.database.integrity_ok %}<span class="ok">✓ OK</span>{% else %}<span class="danger">✗ Issues</span>{% endif %}</span>
+                </div>
+                {% else %}
+                <div class="stat-row">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value">{% if report.database.mongo_connected %}<span class="ok">✓ Connected</span>{% else %}<span class="danger">✗ Disconnected</span>{% endif %}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Latency</span>
+                    <span class="stat-value {% if report.database.mongo_latency_ms > 100 %}warn{% endif %}">{{ report.database.mongo_latency_ms }} ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">URI</span>
+                    <span class="stat-value" style="font-size:11px;word-break:break-all">{{ report.database.mongo_uri }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Filesystem -->
+        <div class="card" style="margin-bottom:24px">
+            <h3>Filesystem</h3>
+            <table class="fs-table">
+                <thead>
+                    <tr><th>Path</th><th>Exists</th><th>Writable</th><th>Owner:Group</th><th>Perms</th><th>Expected</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                {% for check in report.filesystem %}
+                <tr>
+                    <td style="color:#888">{{ check.path }}</td>
+                    <td>{% if check.exists %}<span class="ok">✓</span>{% else %}<span class="danger">✗</span>{% endif %}</td>
+                    <td>{% if check.writable %}<span class="ok">✓</span>{% else %}<span class="danger">✗</span>{% endif %}</td>
+                    <td>{% if check.owned_by_root %}<span class="danger" style="font-weight:600">{{ check.owner }}:{{ check.group }}</span>{% else %}<span style="color:#888">{{ check.owner }}:{{ check.group }}</span>{% endif %}</td>
+                    <td>{% if check.world_writable %}<span class="danger" style="font-weight:600">{{ check.permissions }}</span>{% elif check.perms_ok %}<span class="ok">{{ check.permissions }}</span>{% else %}<span class="warn">{{ check.permissions }}</span>{% endif %}</td>
+                    <td style="color:#888">{{ check.recommended }}</td>
+                    <td>{% if check.warning %}<span class="danger">✗</span>{% elif check.exists %}<span class="ok">✓</span>{% else %}<span class="danger">✗</span>{% endif %}</td>
+                </tr>
+                {% if check.warning %}
+                <tr>
+                    <td colspan="7" style="padding:4px 10px 8px">
+                        <div class="alert-banner alert-warn" style="font-size:11px;margin:0">{{ check.warning }}</div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Sites Overview -->
+        <div class="card">
+            <h3>Sites Overview</h3>
+            {% if sites and sites | length > 0 %}
+            <table class="sites-table">
+                <thead>
+                    <tr><th>Site</th><th>Hostname</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                {% for site in sites %}
+                <tr>
+                    <td><strong>{{ site.display_name }}</strong></td>
+                    <td style="color:#888">{{ site.hostname }}</td>
+                    <td>
+                        <span class="status-dot status-dot-{{ site.status }}"></span>
+                        {{ site.status | capitalize }}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color:#666;text-align:center;padding:20px">No sites configured.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function humanBytes(b) {
+        if (b >= 1073741824) return (b / 1073741824).toFixed(1) + ' GB';
+        if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+        if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+        return b + ' B';
+    }
+    function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+    var report = {{ report | json_encode() | safe }};
+    setText('disk-total', humanBytes(report.disk.total_bytes));
+    setText('disk-free', humanBytes(report.disk.free_bytes));
+    setText('disk-uploads', humanBytes(report.disk.uploads_size_bytes));
+    setText('db-size', humanBytes(report.database.file_size_bytes));
+    setText('db-wal', humanBytes(report.database.wal_size_bytes));
+    setText('mem-value', humanBytes(report.resources.memory_rss_bytes));
+    </script>
+</body>
+</html>
