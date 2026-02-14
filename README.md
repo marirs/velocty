@@ -1,8 +1,6 @@
 <p align="center">
   <img src="website/static/images/logo-transparent.png" alt="Velocty" width="200">
 </p>
-
-<h1 align="center">Velocty</h1>
 <p align="center"><strong>CMS almost at the speed of light.</strong></p>
 
 <p align="center">
