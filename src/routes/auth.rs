@@ -143,12 +143,19 @@ pub fn admin_redirect_to_login(_path: std::path::PathBuf, pool: &State<DbPool>, 
 #[derive(Debug, Serialize)]
 struct SetupContext {
     error: Option<String>,
+    admin_slug: String,
     site_name: String,
     admin_email: String,
+    db_backend: String,
+    mongo_uri: String,
+    mongo_db_name: String,
 }
 
 #[derive(Debug, FromForm, Deserialize)]
 pub struct SetupForm {
+    pub db_backend: String,
+    pub mongo_uri: Option<String>,
+    pub mongo_db_name: Option<String>,
     pub site_name: String,
     pub admin_email: String,
     pub password: String,
@@ -163,8 +170,12 @@ pub fn setup_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result
     }
     let ctx = SetupContext {
         error: None,
+        admin_slug: admin_slug.0.clone(),
         site_name: "Velocty".to_string(),
         admin_email: String::new(),
+        db_backend: "sqlite".to_string(),
+        mongo_uri: "mongodb://localhost:27017".to_string(),
+        mongo_db_name: "velocty".to_string(),
     };
     Ok(NoCacheTemplate(Template::render("admin/setup", &ctx)))
 }
@@ -182,11 +193,30 @@ pub fn setup_submit(
     let make_err = |msg: &str, form: &SetupForm| {
         let ctx = SetupContext {
             error: Some(msg.to_string()),
+            admin_slug: admin_slug.0.clone(),
             site_name: form.site_name.clone(),
             admin_email: form.admin_email.clone(),
+            db_backend: form.db_backend.clone(),
+            mongo_uri: form.mongo_uri.clone().unwrap_or_default(),
+            mongo_db_name: form.mongo_db_name.clone().unwrap_or_default(),
         };
         Template::render("admin/setup", &ctx)
     };
+
+    // Validate DB backend
+    if form.db_backend != "sqlite" && form.db_backend != "mongodb" {
+        return Err(make_err("Please select a database backend.", &form));
+    }
+    if form.db_backend == "mongodb" {
+        let uri = form.mongo_uri.as_deref().unwrap_or("").trim();
+        let db_name = form.mongo_db_name.as_deref().unwrap_or("").trim();
+        if uri.is_empty() {
+            return Err(make_err("MongoDB connection URI is required.", &form));
+        }
+        if db_name.is_empty() {
+            return Err(make_err("MongoDB database name is required.", &form));
+        }
+    }
 
     // Validate
     if form.admin_email.trim().is_empty() {
@@ -202,6 +232,20 @@ pub fn setup_submit(
         return Err(make_err("You must accept the Terms of Use and Privacy Policy.", &form));
     }
 
+    // Write velocty.toml with DB backend choice
+    let toml_content = if form.db_backend == "mongodb" {
+        format!(
+            "[database]\nbackend = \"mongodb\"\nuri = \"{}\"\nname = \"{}\"\n",
+            form.mongo_uri.as_deref().unwrap_or("mongodb://localhost:27017").trim(),
+            form.mongo_db_name.as_deref().unwrap_or("velocty").trim(),
+        )
+    } else {
+        "[database]\nbackend = \"sqlite\"\npath = \"website/site/db/velocty.db\"\n".to_string()
+    };
+    if let Err(e) = std::fs::write("velocty.toml", &toml_content) {
+        return Err(make_err(&format!("Failed to write config: {}", e), &form));
+    }
+
     // Save
     let hash = auth::hash_password(&form.password)
         .map_err(|_| make_err("Failed to hash password.", &form))?;
@@ -210,6 +254,7 @@ pub fn setup_submit(
     let _ = Setting::set(pool, "admin_email", form.admin_email.trim());
     let _ = Setting::set(pool, "admin_password_hash", &hash);
     let _ = Setting::set(pool, "setup_completed", "true");
+    let _ = Setting::set(pool, "db_backend", &form.db_backend);
 
     Ok(Redirect::to(format!("/{}/login", admin_slug.0)))
 }
