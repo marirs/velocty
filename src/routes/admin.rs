@@ -5,6 +5,7 @@ use rocket::response::{Flash, Redirect};
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -1194,6 +1195,93 @@ pub async fn import_velocty(
     )
 }
 
+// ── MFA Setup / Disable ─────────────────────────────────
+
+#[post("/mfa/setup", format = "json")]
+pub fn mfa_setup(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+) -> Json<Value> {
+    let site_name = Setting::get_or(pool, "site_name", "Velocty");
+    let admin_email = Setting::get_or(pool, "admin_email", "admin");
+
+    let secret = crate::auth::mfa_generate_secret();
+    let qr = match crate::auth::mfa_qr_data_uri(&secret, &site_name, &admin_email) {
+        Ok(uri) => uri,
+        Err(e) => return Json(json!({ "ok": false, "error": e })),
+    };
+
+    // Store the pending secret temporarily (not yet confirmed)
+    let _ = Setting::set(pool, "mfa_pending_secret", &secret);
+
+    Json(json!({ "ok": true, "qr": qr, "secret": secret }))
+}
+
+#[derive(Debug, FromForm, Deserialize)]
+pub struct MfaVerifyForm {
+    pub code: String,
+}
+
+#[post("/mfa/verify", format = "json", data = "<body>")]
+pub fn mfa_verify(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<MfaVerifyForm>,
+) -> Json<Value> {
+    let pending = Setting::get_or(pool, "mfa_pending_secret", "");
+    if pending.is_empty() {
+        return Json(json!({ "ok": false, "error": "No pending MFA setup. Start setup first." }));
+    }
+
+    if !crate::auth::mfa_verify_code(&pending, &body.code) {
+        return Json(json!({ "ok": false, "error": "Invalid code. Please try again." }));
+    }
+
+    // Code verified — activate MFA
+    let recovery_codes = crate::auth::mfa_generate_recovery_codes();
+    let codes_json = serde_json::to_string(&recovery_codes).unwrap_or_else(|_| "[]".to_string());
+
+    let _ = Setting::set(pool, "mfa_secret", &pending);
+    let _ = Setting::set(pool, "mfa_enabled", "true");
+    let _ = Setting::set(pool, "mfa_recovery_codes", &codes_json);
+    let _ = Setting::set(pool, "mfa_pending_secret", "");
+
+    Json(json!({ "ok": true, "recovery_codes": recovery_codes }))
+}
+
+#[post("/mfa/disable", format = "json", data = "<body>")]
+pub fn mfa_disable(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<MfaVerifyForm>,
+) -> Json<Value> {
+    let secret = Setting::get_or(pool, "mfa_secret", "");
+    if secret.is_empty() {
+        return Json(json!({ "ok": false, "error": "MFA is not enabled." }));
+    }
+
+    // Verify current code before disabling
+    if !crate::auth::mfa_verify_code(&secret, &body.code) {
+        return Json(json!({ "ok": false, "error": "Invalid code. MFA was not disabled." }));
+    }
+
+    let _ = Setting::set(pool, "mfa_enabled", "false");
+    let _ = Setting::set(pool, "mfa_secret", "");
+    let _ = Setting::set(pool, "mfa_recovery_codes", "[]");
+
+    Json(json!({ "ok": true }))
+}
+
+#[get("/mfa/recovery-codes")]
+pub fn mfa_recovery_codes(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+) -> Json<Value> {
+    let codes_json = Setting::get_or(pool, "mfa_recovery_codes", "[]");
+    let codes: Vec<String> = serde_json::from_str(&codes_json).unwrap_or_default();
+    Json(json!({ "ok": true, "codes": codes }))
+}
+
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         dashboard,
@@ -1238,5 +1326,9 @@ pub fn routes() -> Vec<rocket::Route> {
         health_export_db,
         health_export_content,
         health_mongo_ping,
+        mfa_setup,
+        mfa_verify,
+        mfa_disable,
+        mfa_recovery_codes,
     ]
 }

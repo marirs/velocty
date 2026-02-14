@@ -84,13 +84,76 @@
             </div>
         </div>
 
-        <div class="form-card">
+        <div class="form-card" id="mfa-card">
             <h3>Multi-Factor Authentication (TOTP)</h3>
-            <label class="checkbox-item"><input type="checkbox" name="mfa_enabled" value="true" {% if settings.mfa_enabled == "true" %}checked{% endif %}> Enable MFA</label>
-            <span class="form-help">When enabled, you'll need a TOTP authenticator app (Google Authenticator, Authy, etc.) to log in.</span>
             {% if settings.mfa_enabled == "true" %}
-            <p class="text-muted" style="margin-top:12px">MFA is active. Use your authenticator app for the 6-digit code at login.</p>
+            <p style="margin-bottom:12px"><span class="status-dot enabled" style="margin-right:6px"></span> <strong>MFA is active.</strong> You'll be prompted for a 6-digit code from your authenticator app at login.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-sm" onclick="mfaOpenDrawer('recovery')">View Recovery Codes</button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="mfaOpenDrawer('disable')">Disable MFA</button>
+            </div>
+            {% else %}
+            <p class="text-muted" style="font-size:13px;margin-bottom:14px">Add an extra layer of security to your account. You'll need a TOTP authenticator app like Google Authenticator, Authy, or 1Password.</p>
+            <button type="button" class="btn btn-sm btn-primary" id="mfa-setup-btn" onclick="mfaStartSetup()">Set Up MFA</button>
             {% endif %}
+        </div>
+
+        <!-- MFA Modal -->
+        <div id="mfa-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .2s ease" onclick="mfaCloseModal()"></div>
+        <div id="mfa-modal" style="display:none;position:fixed;top:50%;left:50%;z-index:9999;transform:translate(-50%,-50%) scale(0.95);opacity:0;transition:transform .25s cubic-bezier(.32,.72,0,1),opacity .2s ease;width:420px;max-width:90vw;max-height:70vh;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+            <div style="padding:24px 28px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+                    <h3 id="mfa-modal-title" style="margin:0;font-size:16px">Set Up MFA</h3>
+                    <button type="button" onclick="mfaCloseModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">&times;</button>
+                </div>
+
+                <!-- Setup: QR step -->
+                <div id="mfa-step-qr" style="display:none;text-align:center">
+                    <p class="text-muted" style="font-size:12px;margin-bottom:16px">Scan with your authenticator app</p>
+                    <img id="mfa-qr-img" src="" alt="QR Code" style="width:180px;height:180px;border-radius:10px;border:2px solid var(--border-subtle);margin-bottom:10px">
+                    <div style="margin-bottom:20px">
+                        <span class="text-muted" style="font-size:11px">Manual key:</span><br>
+                        <code id="mfa-secret-display" style="font-size:12px;letter-spacing:1px;user-select:all;word-break:break-all"></code>
+                    </div>
+                    <div style="border-top:1px solid var(--border-subtle);padding-top:16px">
+                        <p style="font-size:12px;margin-bottom:10px;color:var(--text-muted)">Enter the 6-digit code from your app</p>
+                        <input type="text" id="mfa-verify-code" placeholder="000000" style="width:160px;text-align:center;font-size:22px;letter-spacing:6px;margin-bottom:12px" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                        <br><button type="button" class="btn btn-sm btn-primary" onclick="mfaVerify()">Verify &amp; Enable</button>
+                        <p id="mfa-verify-error" style="color:var(--danger);font-size:12px;margin-top:10px;display:none"></p>
+                    </div>
+                </div>
+
+                <!-- Setup: Recovery codes step -->
+                <div id="mfa-step-codes" style="display:none;text-align:center">
+                    <div style="padding:10px 14px;border-radius:8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);margin-bottom:14px">
+                        <strong style="color:var(--success);font-size:13px">MFA Enabled Successfully</strong>
+                    </div>
+                    <p class="text-muted" style="font-size:12px;margin-bottom:12px"><strong>Save these recovery codes now.</strong> Each can only be used once.</p>
+                    <pre id="mfa-new-codes" style="font-family:monospace;font-size:14px;line-height:2;padding:14px;border-radius:8px;background:var(--bg-input);display:inline-block;text-align:left"></pre>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
+                        <button type="button" class="btn btn-sm" onclick="mfaDownloadNewCodes()">Download .txt</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="location.reload()">Done</button>
+                    </div>
+                </div>
+
+                <!-- Recovery codes view -->
+                <div id="mfa-recovery-view" style="display:none;text-align:center">
+                    <p class="text-muted" style="font-size:12px;margin-bottom:12px">Each code can only be used once. Store them somewhere safe.</p>
+                    <pre id="mfa-recovery-list" style="font-family:monospace;font-size:14px;line-height:2;padding:14px;border-radius:8px;background:var(--bg-input);display:inline-block;text-align:left"></pre>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
+                        <button type="button" class="btn btn-sm" onclick="mfaDownloadCodes()">Download .txt</button>
+                        <button type="button" class="btn btn-sm" onclick="mfaCloseModal()">Close</button>
+                    </div>
+                </div>
+
+                <!-- Disable view -->
+                <div id="mfa-disable-view" style="display:none;text-align:center">
+                    <p class="text-muted" style="font-size:13px;margin-bottom:16px">Enter a code from your authenticator app to confirm.</p>
+                    <input type="text" id="mfa-disable-code" placeholder="000000" style="width:160px;text-align:center;font-size:22px;letter-spacing:6px;margin-bottom:12px" maxlength="6" inputmode="numeric">
+                    <br><button type="button" class="btn btn-sm btn-danger" onclick="mfaDisable()">Confirm Disable</button>
+                    <p id="mfa-disable-error" style="color:var(--danger);font-size:12px;margin-top:10px;display:none"></p>
+                </div>
+            </div>
         </div>
 
         <div class="form-card">
@@ -303,5 +366,117 @@
         });
     });
 })();
+
+// ── MFA Modal ──────────────────────────────────────────
+var adminSlug = '{{ admin_slug }}';
+var mfaRecoveryCodes = [];
+var mfaPanels = ['mfa-step-qr','mfa-step-codes','mfa-recovery-view','mfa-disable-view'];
+
+function mfaHideAllPanels() {
+    mfaPanels.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+}
+
+function mfaShowModal(title) {
+    var overlay = document.getElementById('mfa-modal-overlay');
+    var modal = document.getElementById('mfa-modal');
+    document.getElementById('mfa-modal-title').textContent = title || 'MFA';
+    overlay.style.display = '';
+    modal.style.display = '';
+    requestAnimationFrame(function() {
+        overlay.style.opacity = '1';
+        modal.style.opacity = '1';
+        modal.style.transform = 'translate(-50%,-50%) scale(1)';
+    });
+}
+
+function mfaCloseModal() {
+    var overlay = document.getElementById('mfa-modal-overlay');
+    var modal = document.getElementById('mfa-modal');
+    overlay.style.opacity = '0';
+    modal.style.opacity = '0';
+    modal.style.transform = 'translate(-50%,-50%) scale(0.95)';
+    setTimeout(function() {
+        overlay.style.display = 'none';
+        modal.style.display = 'none';
+        mfaHideAllPanels();
+    }, 250);
+}
+
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') mfaCloseModal(); });
+
+function mfaOpenDrawer(mode) {
+    mfaHideAllPanels();
+    if (mode === 'recovery') {
+        mfaShowModal('Recovery Codes');
+        fetch('/' + adminSlug + '/mfa/recovery-codes')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.ok) return;
+                mfaRecoveryCodes = d.codes;
+                document.getElementById('mfa-recovery-list').textContent = d.codes.join('\n');
+                document.getElementById('mfa-recovery-view').style.display = '';
+            });
+    } else if (mode === 'disable') {
+        mfaShowModal('Disable MFA');
+        document.getElementById('mfa-disable-view').style.display = '';
+        setTimeout(function() { document.getElementById('mfa-disable-code').focus(); }, 300);
+    }
+}
+
+function mfaStartSetup() {
+    var btn = document.getElementById('mfa-setup-btn');
+    btn.disabled = true; btn.textContent = 'Loading…';
+    fetch('/' + adminSlug + '/mfa/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Set Up MFA';
+            if (!d.ok) { alert(d.error || 'Setup failed'); return; }
+            document.getElementById('mfa-qr-img').src = d.qr;
+            document.getElementById('mfa-secret-display').textContent = d.secret;
+            mfaHideAllPanels();
+            document.getElementById('mfa-step-qr').style.display = '';
+            mfaShowModal('Set Up MFA');
+            setTimeout(function() { document.getElementById('mfa-verify-code').focus(); }, 300);
+        })
+        .catch(function() { alert('Network error'); btn.disabled = false; btn.textContent = 'Set Up MFA'; });
+}
+
+function mfaVerify() {
+    var code = document.getElementById('mfa-verify-code').value.trim();
+    if (!code) return;
+    document.getElementById('mfa-verify-error').style.display = 'none';
+    fetch('/' + adminSlug + '/mfa/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok) { document.getElementById('mfa-verify-error').textContent = d.error; document.getElementById('mfa-verify-error').style.display = ''; return; }
+            mfaRecoveryCodes = d.recovery_codes;
+            document.getElementById('mfa-new-codes').textContent = d.recovery_codes.join('\n');
+            document.getElementById('mfa-modal-title').textContent = 'Recovery Codes';
+            mfaHideAllPanels();
+            document.getElementById('mfa-step-codes').style.display = '';
+        })
+        .catch(function() { alert('Network error'); });
+}
+
+function mfaDownloadNewCodes() { mfaDownloadFile(); }
+function mfaDownloadCodes() { mfaDownloadFile(); }
+function mfaDownloadFile() {
+    var text = 'Velocty MFA Recovery Codes\n' + '='.repeat(30) + '\n\n' + mfaRecoveryCodes.join('\n') + '\n\nEach code can only be used once.\nStore these codes in a safe place.\n';
+    var blob = new Blob([text], { type: 'text/plain' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'velocty-recovery-codes.txt'; a.click();
+}
+
+function mfaDisable() {
+    var code = document.getElementById('mfa-disable-code').value.trim();
+    if (!code) return;
+    document.getElementById('mfa-disable-error').style.display = 'none';
+    fetch('/' + adminSlug + '/mfa/disable', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok) { document.getElementById('mfa-disable-error').textContent = d.error; document.getElementById('mfa-disable-error').style.display = ''; return; }
+            location.reload();
+        })
+        .catch(function() { alert('Network error'); });
+}
 </script>
 {% endblock scripts %}

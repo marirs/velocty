@@ -98,12 +98,15 @@ pub fn login_submit(
 
     // Check MFA
     let mfa_enabled = Setting::get_bool(pool, "mfa_enabled");
-    if mfa_enabled {
-        // TODO: Store pending auth state and redirect to MFA page
-        // For now, proceed without MFA
+    let mfa_secret = Setting::get_or(pool, "mfa_secret", "");
+    if mfa_enabled && !mfa_secret.is_empty() {
+        // Store a pending token so the MFA page knows password was verified
+        let pending_token = uuid::Uuid::new_v4().to_string();
+        auth::set_mfa_pending_cookie(cookies, &pending_token);
+        return Ok(Redirect::to(format!("/{}/mfa", admin_slug.0)));
     }
 
-    // Create session
+    // Create session (no MFA)
     match auth::create_session(pool, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
@@ -115,6 +118,80 @@ pub fn login_submit(
             ctx.insert("admin_theme".to_string(), theme.clone());
             ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
             Err(Template::render("admin/login", &ctx))
+        }
+    }
+}
+
+// ── MFA Challenge (Login Flow) ───────────────────────────────────────
+
+#[get("/mfa")]
+pub fn mfa_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, cookies: &CookieJar<'_>) -> Result<NoCacheTemplate, Redirect> {
+    // Only show MFA page if there's a pending token
+    if auth::get_mfa_pending_cookie(cookies).is_none() {
+        return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
+    }
+    let mut ctx: HashMap<String, String> = HashMap::new();
+    ctx.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    Ok(NoCacheTemplate(Template::render("admin/mfa", &ctx)))
+}
+
+#[post("/mfa", data = "<form>")]
+pub fn mfa_submit(
+    form: Form<MfaForm>,
+    pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
+    cookies: &CookieJar<'_>,
+) -> Result<Redirect, Template> {
+    let theme = Setting::get_or(pool, "admin_theme", "dark");
+
+    // Verify pending token exists
+    if auth::get_mfa_pending_cookie(cookies).is_none() {
+        return Ok(Redirect::to(format!("/{}/login", admin_slug.0)));
+    }
+
+    let mfa_secret = Setting::get_or(pool, "mfa_secret", "");
+    let code = form.code.trim();
+
+    // Try TOTP code first
+    let mut valid = crate::auth::mfa_verify_code(&mfa_secret, code);
+
+    // If TOTP failed, try recovery code
+    if !valid {
+        let codes_json = Setting::get_or(pool, "mfa_recovery_codes", "[]");
+        let mut codes: Vec<String> = serde_json::from_str(&codes_json).unwrap_or_default();
+        let code_upper = code.to_uppercase();
+        if let Some(pos) = codes.iter().position(|c| c == &code_upper) {
+            codes.remove(pos);
+            let updated = serde_json::to_string(&codes).unwrap_or_else(|_| "[]".to_string());
+            let _ = Setting::set(pool, "mfa_recovery_codes", &updated);
+            valid = true;
+        }
+    }
+
+    if !valid {
+        let mut ctx = HashMap::new();
+        ctx.insert("error".to_string(), "Invalid code. Please try again.".to_string());
+        ctx.insert("admin_theme".to_string(), theme);
+        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        return Err(Template::render("admin/mfa", &ctx));
+    }
+
+    // Clear the pending cookie
+    let _ = auth::take_mfa_pending_cookie(cookies);
+
+    // Create session
+    match auth::create_session(pool, None, None) {
+        Ok(session_id) => {
+            auth::set_session_cookie(cookies, &session_id);
+            Ok(Redirect::to(format!("/{}", admin_slug.0)))
+        }
+        Err(_) => {
+            let mut ctx = HashMap::new();
+            ctx.insert("error".to_string(), "Session creation failed".to_string());
+            ctx.insert("admin_theme".to_string(), theme);
+            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+            Err(Template::render("admin/mfa", &ctx))
         }
     }
 }
@@ -492,5 +569,5 @@ pub fn test_mongo_connection(body: Json<TestMongoForm>) -> Json<TestMongoResult>
 }
 
 pub fn routes() -> Vec<rocket::Route> {
-    routes![login_page, login_submit, logout, admin_redirect_to_login, setup_page, setup_submit, test_mongo_connection]
+    routes![login_page, login_submit, mfa_page, mfa_submit, logout, admin_redirect_to_login, setup_page, setup_submit, test_mongo_connection]
 }

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Factor Authentication — Velocty Admin</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+</head>
+<body class="login-page" data-theme="{{ admin_theme | default(value='dark') }}">
+    <div class="login-card">
+        <div class="login-logo">
+            {% if admin_theme | default(value='dark') == "light" %}
+            <img src="/static/images/logo-transparent-light.png" alt="Velocty" style="height:32px;width:auto;margin-bottom:8px">
+            {% else %}
+            <img src="/static/images/logo-transparent.png" alt="Velocty" style="height:32px;width:auto;margin-bottom:8px">
+            {% endif %}
+        </div>
+        <p style="text-align:center;margin-bottom:16px;font-size:13px;opacity:0.7">Enter the 6-digit code from your authenticator app, or a recovery code.</p>
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/{{ admin_slug }}/mfa">
+            <div class="form-group">
+                <label for="code">Authentication Code</label>
+                <input type="text" id="code" name="code" required autofocus autocomplete="one-time-code" inputmode="numeric" maxlength="10" placeholder="000000" style="text-align:center;font-size:20px;letter-spacing:6px">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Verify</button>
+        </form>
+        <div style="text-align:center;margin-top:14px">
+            <a href="/{{ admin_slug }}/login" style="font-size:12px;opacity:0.5;text-decoration:none">← Back to login</a>
+        </div>
+    </div>
+</body>
+</html>

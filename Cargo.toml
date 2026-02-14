@@ -23,7 +23,7 @@ serde_json = "1"
 
 # Auth
 bcrypt = "0.15"
-totp-rs = { version = "5", features = ["qr"] }
+totp-rs = { version = "5", features = ["qr", "gen_secret"] }
 
 # Session / tokens
 rand = "0.8"
