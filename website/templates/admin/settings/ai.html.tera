@@ -22,11 +22,11 @@
 
 <div class="sub-tabs">
     <button type="button" class="tab active" data-ai-tab="tab-ai-failover">Failover Chain</button>
-    <button type="button" class="tab" data-ai-tab="tab-ai-local">Local LLM</button>
-    <button type="button" class="tab" data-ai-tab="tab-ai-ollama">Ollama</button>
-    <button type="button" class="tab" data-ai-tab="tab-ai-openai">OpenAI</button>
-    <button type="button" class="tab" data-ai-tab="tab-ai-gemini">Gemini</button>
-    <button type="button" class="tab" data-ai-tab="tab-ai-cloudflare">Cloudflare</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-local">Local LLM{% if settings.ai_local_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-ollama">Ollama{% if settings.ai_ollama_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-openai">OpenAI{% if settings.ai_openai_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-gemini">Gemini{% if settings.ai_gemini_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-cloudflare">Cloudflare{% if settings.ai_cloudflare_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
 <form method="post" action="/admin/settings/ai">

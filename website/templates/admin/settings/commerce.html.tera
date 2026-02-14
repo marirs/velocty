@@ -22,13 +22,13 @@
 
 <div class="sub-tabs" id="commerce-tabs">
     <button class="tab active" data-tab="general">General</button>
-    <button class="tab" data-tab="paypal">PayPal</button>
-    <button class="tab" data-tab="payoneer">Payoneer</button>
-    <button class="tab" data-tab="stripe">Stripe</button>
-    <button class="tab" data-tab="twocheckout">2Checkout</button>
-    <button class="tab" data-tab="square">Square</button>
-    <button class="tab" data-tab="razorpay">Razorpay</button>
-    <button class="tab" data-tab="mollie">Mollie</button>
+    <button class="tab" data-tab="paypal">PayPal{% if settings.commerce_paypal_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button class="tab" data-tab="payoneer">Payoneer{% if settings.commerce_payoneer_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button class="tab" data-tab="stripe">Stripe{% if settings.commerce_stripe_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button class="tab" data-tab="twocheckout">2Checkout{% if settings.commerce_2checkout_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button class="tab" data-tab="square">Square{% if settings.commerce_square_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button class="tab" data-tab="razorpay">Razorpay{% if settings.commerce_razorpay_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button class="tab" data-tab="mollie">Mollie{% if settings.commerce_mollie_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
 <form method="post" action="/admin/settings/commerce">

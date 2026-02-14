@@ -22,12 +22,12 @@
 
 <div class="sub-tabs">
     <button type="button" class="tab active" data-sec-tab="tab-sec-general">General</button>
-    <button type="button" class="tab" data-sec-tab="tab-sec-akismet">Akismet</button>
-    <button type="button" class="tab" data-sec-tab="tab-sec-cleantalk">CleanTalk</button>
-    <button type="button" class="tab" data-sec-tab="tab-sec-oopspam">OOPSpam</button>
-    <button type="button" class="tab" data-sec-tab="tab-sec-recaptcha">reCaptcha</button>
-    <button type="button" class="tab" data-sec-tab="tab-sec-turnstile">Turnstile</button>
-    <button type="button" class="tab" data-sec-tab="tab-sec-hcaptcha">hCaptcha</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-akismet">Akismet{% if settings.security_akismet_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-cleantalk">CleanTalk{% if settings.security_cleantalk_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-oopspam">OOPSpam{% if settings.security_oopspam_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-recaptcha">reCaptcha{% if settings.security_recaptcha_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-turnstile">Turnstile{% if settings.security_turnstile_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-hcaptcha">hCaptcha{% if settings.security_hcaptcha_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
 <form method="post" action="/admin/settings/security">

@@ -23,17 +23,17 @@
 <div class="sub-tabs">
     <button type="button" class="tab active" data-email-tab="tab-email-general">General</button>
     <button type="button" class="tab" data-email-tab="tab-email-failover">Failover</button>
-    <button type="button" class="tab" data-email-tab="tab-email-gmail">Gmail</button>
-    <button type="button" class="tab" data-email-tab="tab-email-resend">Resend</button>
-    <button type="button" class="tab" data-email-tab="tab-email-ses">Amazon SES</button>
-    <button type="button" class="tab" data-email-tab="tab-email-postmark">Postmark</button>
-    <button type="button" class="tab" data-email-tab="tab-email-brevo">Brevo</button>
-    <button type="button" class="tab" data-email-tab="tab-email-sendpulse">SendPulse</button>
-    <button type="button" class="tab" data-email-tab="tab-email-mailgun">Mailgun</button>
-    <button type="button" class="tab" data-email-tab="tab-email-moosend">Moosend</button>
-    <button type="button" class="tab" data-email-tab="tab-email-mandrill">Mandrill</button>
-    <button type="button" class="tab" data-email-tab="tab-email-sparkpost">SparkPost</button>
-    <button type="button" class="tab" data-email-tab="tab-email-smtp">SMTP</button>
+    <button type="button" class="tab" data-email-tab="tab-email-gmail">Gmail{% if settings.email_gmail_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-resend">Resend{% if settings.email_resend_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-ses">Amazon SES{% if settings.email_ses_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-postmark">Postmark{% if settings.email_postmark_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-brevo">Brevo{% if settings.email_brevo_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-sendpulse">SendPulse{% if settings.email_sendpulse_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-mailgun">Mailgun{% if settings.email_mailgun_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-moosend">Moosend{% if settings.email_moosend_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-mandrill">Mandrill{% if settings.email_mandrill_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-sparkpost">SparkPost{% if settings.email_sparkpost_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-smtp">SMTP{% if settings.email_smtp_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
 <form method="post" action="/admin/settings/email">

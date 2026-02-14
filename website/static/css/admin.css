@@ -908,6 +908,16 @@ input[type="file"]::file-selector-button:hover {
 .badge-spam { background: rgba(239,68,68,0.15); color: var(--danger); }
 
 /* ── Tabs ──────────────────────────────────────────── */
+.sub-tabs .tab .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    margin-left: 6px;
+    vertical-align: 1px;
+}
+
 .status-tabs, .settings-nav {
     display: flex;
     gap: 4px;
