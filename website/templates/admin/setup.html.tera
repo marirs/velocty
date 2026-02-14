@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup — Velocty</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+</head>
+<body class="login-page">
+    <div class="setup-card">
+        <div class="setup-logo">
+            <img src="/static/images/logo-transparent.png" alt="Velocty" style="height:36px;width:auto;margin-bottom:4px">
+            <p class="text-muted" style="font-size:13px;margin:0">Welcome! Let's get your site set up.</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/admin/setup" id="setup-form">
+            <!-- Step 1: Site -->
+            <div class="setup-step" id="step-1">
+                <h3>1. Your Site</h3>
+                <div class="form-group">
+                    <label for="site_name">Site Name</label>
+                    <input type="text" id="site_name" name="site_name" value="{{ site_name }}" placeholder="My Awesome Site" required autofocus>
+                </div>
+                <div class="form-actions" style="justify-content:flex-end">
+                    <button type="button" class="btn btn-primary" onclick="goStep(2)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Admin Account -->
+            <div class="setup-step" id="step-2" style="display:none">
+                <h3>2. Admin Account</h3>
+                <div class="form-group">
+                    <label for="admin_email">Email</label>
+                    <input type="email" id="admin_email" name="admin_email" value="{{ admin_email }}" placeholder="you@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Minimum 8 characters" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter password" required>
+                </div>
+                <div class="form-actions" style="justify-content:space-between">
+                    <button type="button" class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+                    <button type="button" class="btn btn-primary" onclick="goStep(3)">Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Terms -->
+            <div class="setup-step" id="step-3" style="display:none">
+                <h3>3. Terms & Privacy</h3>
+                <div class="terms-box">
+                    <h4>Terms of Use</h4>
+                    <p>By using Velocty, you agree to use this software responsibly. Velocty is provided "as is" without warranty of any kind. You are responsible for the content you publish and for maintaining the security of your admin credentials.</p>
+                    <h4 style="margin-top:16px">Privacy Policy</h4>
+                    <p>Velocty stores all data locally on your server. No data is sent to external services unless you explicitly configure third-party integrations (e.g. AI providers, PayPal, Google Fonts). Analytics data is collected locally and never shared.</p>
+                </div>
+                <label class="checkbox-item" style="margin-top:16px">
+                    <input type="checkbox" name="accept_terms" value="true" id="accept_terms">
+                    I accept the Terms of Use and Privacy Policy
+                </label>
+                <div class="form-actions" style="justify-content:space-between;margin-top:20px">
+                    <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+                    <button type="submit" class="btn btn-primary" id="finish-btn" disabled>Finish Setup</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="setup-progress">
+            <div class="progress-dot active" id="dot-1"></div>
+            <div class="progress-dot" id="dot-2"></div>
+            <div class="progress-dot" id="dot-3"></div>
+        </div>
+    </div>
+
+<script>
+var currentStep = 1;
+function goStep(n) {
+    // Validate before advancing
+    if (n > currentStep) {
+        if (currentStep === 1) {
+            var name = document.getElementById('site_name');
+            if (!name.value.trim()) { name.focus(); return; }
+        }
+        if (currentStep === 2) {
+            var email = document.getElementById('admin_email');
+            var pw = document.getElementById('password');
+            var cpw = document.getElementById('confirm_password');
+            if (!email.value.trim()) { email.focus(); return; }
+            if (pw.value.length < 8) { pw.focus(); pw.setCustomValidity('Minimum 8 characters'); pw.reportValidity(); return; }
+            pw.setCustomValidity('');
+            if (pw.value !== cpw.value) { cpw.setCustomValidity('Passwords do not match'); cpw.reportValidity(); return; }
+            cpw.setCustomValidity('');
+        }
+    }
+    document.getElementById('step-' + currentStep).style.display = 'none';
+    document.getElementById('step-' + n).style.display = '';
+    for (var i = 1; i <= 3; i++) {
+        var dot = document.getElementById('dot-' + i);
+        dot.classList.toggle('active', i <= n);
+    }
+    currentStep = n;
+    // Focus first input in new step
+    var firstInput = document.querySelector('#step-' + n + ' input');
+    if (firstInput) firstInput.focus();
+}
+
+document.getElementById('accept_terms').addEventListener('change', function() {
+    document.getElementById('finish-btn').disabled = !this.checked;
+});
+</script>
+</body>
+</html>

@@ -1015,6 +1015,72 @@ input[type="file"]::file-selector-button:hover {
     margin-top: 12px;
 }
 
+/* ── Setup Wizard ─────────────────────────────────── */
+.setup-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 40px;
+    width: 100%;
+    max-width: 460px;
+}
+
+.setup-logo {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.setup-step h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.terms-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.terms-box h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.terms-box p {
+    margin-bottom: 8px;
+}
+
+.setup-progress {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+.progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-subtle);
+    transition: background 200ms;
+}
+
+.progress-dot.active {
+    background: var(--accent);
+}
+
 /* ── Compact Color Picker Popover ─────────────────── */
 .color-picker-inline {
     position: relative;

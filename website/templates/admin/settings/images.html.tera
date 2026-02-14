@@ -1,7 +1,7 @@
 {% extends "admin/base" %}
 
 {% block content %}
-<div class="page-header"><h2>Settings — Images</h2></div>
+<div class="page-header"><h2>Settings > Images</h2></div>
 
 <div class="settings-nav">
     <a href="/admin/settings/general" class="tab">Site</a>

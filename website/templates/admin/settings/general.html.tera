@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="page-header">
-    <h2>Settings — Site</h2>
+    <h2>Settings > Site</h2>
 </div>
 
 <div class="settings-nav">
