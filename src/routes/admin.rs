@@ -660,6 +660,7 @@ pub fn settings_save(
             "security_oopspam_enabled", "security_recaptcha_enabled",
             "security_turnstile_enabled", "security_hcaptcha_enabled",
         ],
+        "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &["design_back_to_top"],
         "social" => &["social_brand_colors"],
         _ => &[],
