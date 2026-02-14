@@ -57,7 +57,7 @@ pub fn posts_list(
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
     let context = json!({
-        "page_title": "Posts",
+        "page_title": "Journal",
         "posts": posts,
         "current_page": current_page,
         "total_pages": total_pages,
