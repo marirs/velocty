@@ -22,9 +22,9 @@
 
 <form method="post" action="/admin/settings/paypal">
     {% if settings.paypal_mode != "live" %}
-    <div class="form-card" style="border-left:3px solid #446D7F;background:#2A2A31">
-        <h3 style="color:#446D7F">⚠ Sandbox Mode</h3>
-        <p class="text-muted">PayPal is currently in sandbox (test) mode. No real transactions will be processed. Switch to Live mode when ready for production.</p>
+    <div class="alert alert-info" style="border-left:3px solid var(--info)">
+        <strong>⚠ Sandbox Mode</strong><br>
+        PayPal is currently in sandbox (test) mode. No real transactions will be processed. Switch to Live mode when ready for production.
     </div>
     {% endif %}
 

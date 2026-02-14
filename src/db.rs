@@ -215,6 +215,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("date_format", "%B %d, %Y"),
         ("admin_email", ""),
         ("admin_display_name", "Admin"),
+        ("admin_theme", "dark"),
         ("admin_bio", ""),
         ("admin_avatar", ""),
         // Security

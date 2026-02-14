@@ -27,6 +27,134 @@
     --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+/* ── Light Theme ───────────────────────────────────── */
+[data-theme="light"] {
+    --bg-page: #F3F3F3;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F5F5F5;
+    --bg-sidebar: #FFFFFF;
+    --bg-sidebar-expanded: #FFFFFF;
+    --bg-topbar: #FFFFFF;
+    --bg-input: #F5F5F5;
+    --border-subtle: #E0E0E0;
+    --border-input: #D0D0D0;
+    --accent: #E8913A;
+    --accent-hover: #D07A2F;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --warning: #d97706;
+    --info: #446D7F;
+    --text-primary: #2a2a2a;
+    --text-secondary: #777777;
+    --text-tertiary: #999999;
+}
+
+[data-theme="light"] .sidebar {
+    background: #FFFFFF;
+    border-right: 1px solid #E0E0E0;
+}
+
+[data-theme="light"] .sidebar:hover {
+    background: #FFFFFF;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .sidebar .nav-item {
+    color: #999999;
+}
+
+[data-theme="light"] .sidebar .nav-item:hover {
+    color: #2a2a2a;
+    background: rgba(0,0,0,0.04);
+}
+
+[data-theme="light"] .sidebar .nav-item.active {
+    color: #E8913A;
+    background: rgba(232,145,58,0.08);
+}
+
+[data-theme="light"] .sidebar .sidebar-user-row .nav-label {
+    color: #999999;
+}
+
+[data-theme="light"] .sidebar .sidebar-logo {
+    border-bottom-color: #E0E0E0;
+}
+
+[data-theme="light"] .sidebar .sidebar-bottom {
+    border-top-color: #E0E0E0;
+}
+
+[data-theme="light"] .sidebar .theme-toggle {
+    background: #F3F3F3;
+    color: #999999;
+}
+
+[data-theme="light"] .sidebar .theme-toggle:hover {
+    background: #E0E0E0;
+    color: #2a2a2a;
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+    background: #FFFFFF;
+}
+
+[data-theme="light"] .btn {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+[data-theme="light"] .btn:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .btn-primary {
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(232,145,58,0.25);
+}
+
+[data-theme="light"] .btn-primary:hover:not(:disabled) {
+    color: #FFFFFF;
+    box-shadow: 0 4px 16px rgba(232,145,58,0.35);
+}
+
+[data-theme="light"] .checkbox-item input[type="checkbox"]::after {
+    background: #FFFFFF;
+}
+
+[data-theme="light"] .checkbox-item input[type="checkbox"]:checked::after {
+    background: #FFFFFF;
+}
+
+[data-theme="light"] .user-avatar {
+    color: #FFFFFF;
+}
+
+[data-theme="light"] .stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .data-table th {
+    background: #F5F5F5;
+}
+
+[data-theme="light"] .kbd {
+    background: rgba(0,0,0,0.06);
+}
+
+[data-theme="light"] .color-popover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+[data-theme="light"] select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555555' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track { background: #F3F3F3; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #D0D0D0; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #B5B5B5; }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -141,6 +269,57 @@ a:hover { color: var(--accent-hover); }
 
 .sidebar-user .nav-label {
     font-weight: 500;
+}
+
+.sidebar-user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 19px;
+    white-space: nowrap;
+}
+
+.sidebar-user-row .user-avatar {
+    flex-shrink: 0;
+}
+
+.sidebar-user-row .nav-label {
+    flex: 1;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    opacity: 0;
+    transition: opacity 150ms;
+}
+
+.sidebar:hover .sidebar-user-row .nav-label {
+    opacity: 1;
+}
+
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg-input);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: background 150ms, color 150ms;
+    opacity: 0;
+    flex-shrink: 0;
+}
+
+.sidebar:hover .theme-toggle {
+    opacity: 1;
+}
+
+.theme-toggle:hover {
+    background: var(--border-input);
+    color: var(--text-primary);
 }
 
 .nav-item {
@@ -1013,6 +1192,18 @@ input[type="file"]::file-selector-button:hover {
     background: rgba(34,197,94,0.15);
     color: var(--success);
     border: 1px solid rgba(34,197,94,0.3);
+}
+
+.alert-warning {
+    background: rgba(245,158,11,0.12);
+    color: var(--warning);
+    border: 1px solid rgba(245,158,11,0.3);
+}
+
+.alert-info {
+    background: rgba(68,109,127,0.12);
+    color: var(--info);
+    border: 1px solid rgba(68,109,127,0.3);
 }
 
 /* ── Login Page ────────────────────────────────────── */

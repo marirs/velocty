@@ -45,7 +45,8 @@ pub fn login_page(pool: &State<DbPool>) -> Result<Template, Redirect> {
     if needs_setup(pool) {
         return Err(Redirect::to("/admin/setup"));
     }
-    let context: HashMap<String, String> = HashMap::new();
+    let mut context: HashMap<String, String> = HashMap::new();
+    context.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
     Ok(Template::render("admin/login", &context))
 }
 
@@ -59,15 +60,19 @@ pub fn login_submit(
     let admin_email = Setting::get_or(pool, "admin_email", "");
 
     // Verify credentials
+    let theme = Setting::get_or(pool, "admin_theme", "dark");
+
     if !admin_email.is_empty() && form.email != admin_email {
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Invalid credentials".to_string());
+        ctx.insert("admin_theme".to_string(), theme);
         return Err(Template::render("admin/login", &ctx));
     }
 
     if !auth::verify_password(&form.password, &stored_hash) {
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Invalid credentials".to_string());
+        ctx.insert("admin_theme".to_string(), theme.clone());
         return Err(Template::render("admin/login", &ctx));
     }
 
@@ -87,6 +92,7 @@ pub fn login_submit(
         Err(_) => {
             let mut ctx = HashMap::new();
             ctx.insert("error".to_string(), "Session creation failed".to_string());
+            ctx.insert("admin_theme".to_string(), theme.clone());
             Err(Template::render("admin/login", &ctx))
         }
     }

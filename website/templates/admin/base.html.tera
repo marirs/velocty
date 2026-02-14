@@ -7,12 +7,17 @@
     <link rel="stylesheet" href="/static/css/admin.css">
     <link rel="icon" type="image/png" href="/static/images/favicon.png">
 </head>
-<body>
+<body data-theme="{{ settings.admin_theme | default(value='dark') }}">
     <div class="admin-wrapper">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-logo">
+                {% if settings.admin_theme | default(value='dark') == "light" %}
+                <img src="/static/images/logo-v-light.png" alt="V" class="sidebar-icon">
+                <img src="/static/images/logo-transparent-light.png" alt="Velocty" class="sidebar-logo-full">
+                {% else %}
                 <img src="/static/images/logo-v.png" alt="V" class="sidebar-icon">
                 <img src="/static/images/logo-transparent.png" alt="Velocty" class="sidebar-logo-full">
+                {% endif %}
             </div>
             <nav class="sidebar-nav">
                 <a href="/admin" class="nav-item {% if page_title == 'Dashboard' %}active{% endif %}" title="Dashboard">
@@ -57,10 +62,19 @@
                 </a>
             </nav>
             <div class="sidebar-bottom">
-                <a href="/admin/settings/users" class="nav-item sidebar-user" title="{{ settings.admin_display_name | default(value='Admin') }}">
-                    <span class="user-avatar">{{ settings.admin_display_name | default(value='A') | truncate(length=1, end='') | upper }}</span>
-                    <span class="nav-label">{{ settings.admin_display_name | default(value='Admin') }}</span>
-                </a>
+                <div class="sidebar-user-row">
+                    <a href="/admin/settings/users" title="{{ settings.admin_display_name | default(value='Admin') }}" style="text-decoration:none">
+                        <span class="user-avatar">{{ settings.admin_display_name | default(value='A') | truncate(length=1, end='') | upper }}</span>
+                    </a>
+                    <a href="/admin/settings/users" class="nav-label" style="text-decoration:none;color:var(--text-tertiary)">{{ settings.admin_display_name | default(value='Admin') }}</a>
+                    <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme">
+                        {% if settings.admin_theme | default(value='dark') == "light" %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        {% else %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                        {% endif %}
+                    </button>
+                </div>
                 <a href="/admin/logout" class="nav-item" title="Logout">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     <span class="nav-label">Logout</span>
@@ -98,6 +112,31 @@
                 e.preventDefault();
                 window.location.href = '/admin/portfolio/new';
             }
+        });
+    })();
+    // Theme toggle
+    (function(){
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        var sunSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+        var moonSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var body = document.body;
+            var current = body.getAttribute('data-theme') || 'dark';
+            var next = current === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', next);
+            btn.innerHTML = next === 'light' ? moonSvg : sunSvg;
+            btn.title = next === 'light' ? 'Switch to dark' : 'Switch to light';
+            var icon = document.querySelector('.sidebar-icon');
+            var full = document.querySelector('.sidebar-logo-full');
+            if (icon) icon.src = next === 'light' ? '/static/images/logo-v-light.png' : '/static/images/logo-v.png';
+            if (full) full.src = next === 'light' ? '/static/images/logo-transparent-light.png' : '/static/images/logo-transparent.png';
+            fetch('/admin/api/theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({theme: next})
+            });
         });
     })();
     </script>

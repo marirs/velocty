@@ -5,6 +5,7 @@ use serde_json::Value;
 use crate::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
+use crate::models::settings::Setting;
 
 #[get("/stats/overview?<from>&<to>")]
 pub fn stats_overview(
@@ -107,6 +108,18 @@ pub fn stats_tags(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
+#[post("/theme", data = "<body>")]
+pub fn set_theme(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<Value>,
+) -> Json<Value> {
+    let theme = body.get("theme").and_then(|v| v.as_str()).unwrap_or("dark");
+    let theme = if theme == "light" { "light" } else { "dark" };
+    let _ = Setting::set(pool, "admin_theme", theme);
+    Json(serde_json::json!({"ok": true, "theme": theme}))
+}
+
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         stats_overview,
@@ -117,5 +130,6 @@ pub fn routes() -> Vec<rocket::Route> {
         stats_top_portfolio,
         stats_top_referrers,
         stats_tags,
+        set_theme,
     ]
 }
