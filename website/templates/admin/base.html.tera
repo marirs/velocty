@@ -102,7 +102,7 @@
             if (e.key === 's' || e.key === 'S') {
                 e.preventDefault();
                 var form = document.querySelector('form');
-                if (form) form.submit();
+                if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); }
             }
             if (e.key === 'p' || e.key === 'P') {
                 e.preventDefault();
@@ -114,6 +114,12 @@
             }
         });
     })();
+    // Preserve sub-tab hash on form submit
+    document.querySelectorAll('form').forEach(function(f){
+        f.addEventListener('submit', function(){
+            if (location.hash) f.action = f.action.split('#')[0] + location.hash;
+        });
+    });
     // Theme toggle
     (function(){
         var btn = document.getElementById('theme-toggle');

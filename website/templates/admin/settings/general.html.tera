@@ -17,7 +17,7 @@
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/social" class="tab">Social</a>
     <a href="/admin/settings/email" class="tab">Email</a>
-    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/commerce" class="tab">Commerce</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>

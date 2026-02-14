@@ -1,0 +1,413 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2>Settings › Commerce</h2></div>
+
+<div class="settings-nav">
+    <a href="/admin/settings/general" class="tab">Site</a>
+    <a href="/admin/settings/blog" class="tab">Journal</a>
+    <a href="/admin/settings/portfolio" class="tab">Portfolio</a>
+    <a href="/admin/settings/comments" class="tab">Comments</a>
+    <a href="/admin/settings/typography" class="tab">Typography</a>
+    <a href="/admin/settings/images" class="tab">Images</a>
+    <a href="/admin/settings/seo" class="tab">SEO</a>
+    <a href="/admin/settings/security" class="tab">Security</a>
+    <a href="/admin/settings/design" class="tab">Design</a>
+    <a href="/admin/settings/social" class="tab">Social</a>
+    <a href="/admin/settings/email" class="tab">Email</a>
+    <a href="/admin/settings/commerce" class="tab active">Commerce</a>
+    <a href="/admin/settings/users" class="tab">Users</a>
+    <a href="/admin/settings/ai" class="tab">AI</a>
+</div>
+
+<div class="sub-tabs" id="commerce-tabs">
+    <button class="tab active" data-tab="general">General</button>
+    <button class="tab" data-tab="paypal">PayPal</button>
+    <button class="tab" data-tab="payoneer">Payoneer</button>
+    <button class="tab" data-tab="stripe">Stripe</button>
+    <button class="tab" data-tab="twocheckout">2Checkout</button>
+    <button class="tab" data-tab="square">Square</button>
+    <button class="tab" data-tab="razorpay">Razorpay</button>
+    <button class="tab" data-tab="mollie">Mollie</button>
+</div>
+
+<form method="post" action="/admin/settings/commerce">
+
+<!-- ── PayPal ──────────────────────────────────────── -->
+<div class="tab-panel" id="panel-paypal" style="display:none">
+    <div class="form-card">
+        <h3>PayPal</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_paypal_enabled" name="commerce_paypal_enabled" value="true"
+                    {% if settings.commerce_paypal_enabled == "true" %}checked{% endif %}>
+                Enable PayPal
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-paypal" {% if settings.commerce_paypal_enabled != "true" %}disabled{% endif %}>
+        {% if settings.paypal_mode != "live" %}
+        <div class="alert alert-info" style="border-left:3px solid var(--info)">
+            <strong>⚠ Sandbox Mode</strong><br>
+            PayPal is in sandbox (test) mode. No real transactions will be processed.
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>PayPal Configuration</h3>
+            <div class="form-group">
+                <label for="paypal_mode">Mode</label>
+                <select id="paypal_mode" name="paypal_mode">
+                    <option value="sandbox" {% if settings.paypal_mode == "sandbox" %}selected{% endif %}>Sandbox (Testing)</option>
+                    <option value="live" {% if settings.paypal_mode == "live" %}selected{% endif %}>Live (Production)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="paypal_client_id">Client ID</label>
+                <input type="text" id="paypal_client_id" name="paypal_client_id" value="{{ settings.paypal_client_id | default(value='') }}" placeholder="PayPal Client ID">
+            </div>
+            <div class="form-group">
+                <label for="paypal_secret">Secret</label>
+                <input type="password" id="paypal_secret" name="paypal_secret" value="{{ settings.paypal_secret | default(value='') }}" placeholder="PayPal Secret Key">
+            </div>
+            <div class="form-group">
+                <label for="paypal_email">PayPal Email</label>
+                <input type="email" id="paypal_email" name="paypal_email" value="{{ settings.paypal_email | default(value='') }}" placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+                <label for="paypal_currency">Currency</label>
+                <input type="text" id="paypal_currency" name="paypal_currency" value="{{ settings.paypal_currency | default(value='USD') }}" placeholder="USD">
+            </div>
+            <div class="form-group">
+                <label for="paypal_button_color">Button Color</label>
+                <select id="paypal_button_color" name="paypal_button_color">
+                    <option value="gold" {% if settings.paypal_button_color == "gold" %}selected{% endif %}>Gold</option>
+                    <option value="blue" {% if settings.paypal_button_color == "blue" %}selected{% endif %}>Blue</option>
+                    <option value="silver" {% if settings.paypal_button_color == "silver" %}selected{% endif %}>Silver</option>
+                    <option value="white" {% if settings.paypal_button_color == "white" %}selected{% endif %}>White</option>
+                    <option value="black" {% if settings.paypal_button_color == "black" %}selected{% endif %}>Black</option>
+                </select>
+            </div>
+        </div>
+
+    </fieldset>
+</div>
+
+<!-- ── Payoneer ────────────────────────────────────── -->
+<div class="tab-panel" id="panel-payoneer" style="display:none">
+    <div class="form-card">
+        <h3>Payoneer</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_payoneer_enabled" name="commerce_payoneer_enabled" value="true"
+                    {% if settings.commerce_payoneer_enabled == "true" %}checked{% endif %}>
+                Enable Payoneer
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-payoneer" {% if settings.commerce_payoneer_enabled != "true" %}disabled{% endif %}>
+        {% if settings.payoneer_mode != "live" %}
+        <div class="alert alert-info" style="border-left:3px solid var(--info)">
+            <strong>⚠ Sandbox Mode</strong><br>
+            Payoneer is in sandbox (test) mode. No real transactions will be processed.
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>Payoneer Configuration</h3>
+            <div class="form-group">
+                <label for="payoneer_mode">Mode</label>
+                <select id="payoneer_mode" name="payoneer_mode">
+                    <option value="sandbox" {% if settings.payoneer_mode == "sandbox" %}selected{% endif %}>Sandbox</option>
+                    <option value="live" {% if settings.payoneer_mode == "live" %}selected{% endif %}>Live</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="payoneer_program_id">Program ID</label>
+                <input type="text" id="payoneer_program_id" name="payoneer_program_id" value="{{ settings.payoneer_program_id | default(value='') }}" placeholder="Your Program ID">
+            </div>
+            <div class="form-group">
+                <label for="payoneer_client_id">Client ID</label>
+                <input type="text" id="payoneer_client_id" name="payoneer_client_id" value="{{ settings.payoneer_client_id | default(value='') }}" placeholder="Your Payoneer Client ID">
+            </div>
+            <div class="form-group">
+                <label for="payoneer_client_secret">Client Secret</label>
+                <input type="password" id="payoneer_client_secret" name="payoneer_client_secret" value="{{ settings.payoneer_client_secret | default(value='') }}" placeholder="Your Payoneer Client Secret">
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- ── Stripe ──────────────────────────────────────── -->
+<div class="tab-panel" id="panel-stripe" style="display:none">
+    <div class="form-card">
+        <h3>Stripe</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_stripe_enabled" name="commerce_stripe_enabled" value="true"
+                    {% if settings.commerce_stripe_enabled == "true" %}checked{% endif %}>
+                Enable Stripe
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-stripe" {% if settings.commerce_stripe_enabled != "true" %}disabled{% endif %}>
+        {% if settings.stripe_mode != "live" %}
+        <div class="alert alert-info" style="border-left:3px solid var(--info)">
+            <strong>⚠ Test Mode</strong><br>
+            Stripe is in test mode. No real transactions will be processed.
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>Stripe Configuration</h3>
+            <div class="form-group">
+                <label for="stripe_mode">Mode</label>
+                <select id="stripe_mode" name="stripe_mode">
+                    <option value="test" {% if settings.stripe_mode == "test" %}selected{% endif %}>Test</option>
+                    <option value="live" {% if settings.stripe_mode == "live" %}selected{% endif %}>Live</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="stripe_publishable_key">Publishable Key</label>
+                <input type="text" id="stripe_publishable_key" name="stripe_publishable_key" value="{{ settings.stripe_publishable_key | default(value='') }}" placeholder="pk_test_...">
+            </div>
+            <div class="form-group">
+                <label for="stripe_secret_key">Secret Key</label>
+                <input type="password" id="stripe_secret_key" name="stripe_secret_key" value="{{ settings.stripe_secret_key | default(value='') }}" placeholder="sk_test_...">
+            </div>
+            <div class="form-group">
+                <label for="stripe_webhook_secret">Webhook Secret</label>
+                <input type="password" id="stripe_webhook_secret" name="stripe_webhook_secret" value="{{ settings.stripe_webhook_secret | default(value='') }}" placeholder="whsec_...">
+                <span class="form-help">From Stripe Dashboard → Developers → Webhooks. Endpoint: <code>{{ settings.site_url | default(value='') }}/api/stripe/webhook</code></span>
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- ── 2Checkout ───────────────────────────────────── -->
+<div class="tab-panel" id="panel-twocheckout" style="display:none">
+    <div class="form-card">
+        <h3>2Checkout</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_2checkout_enabled" name="commerce_2checkout_enabled" value="true"
+                    {% if settings.commerce_2checkout_enabled == "true" %}checked{% endif %}>
+                Enable 2Checkout
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-twocheckout" {% if settings.commerce_2checkout_enabled != "true" %}disabled{% endif %}>
+        {% if settings.twocheckout_mode != "live" %}
+        <div class="alert alert-info" style="border-left:3px solid var(--info)">
+            <strong>⚠ Sandbox Mode</strong><br>
+            2Checkout is in sandbox (test) mode. No real transactions will be processed.
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>2Checkout Configuration</h3>
+            <div class="form-group">
+                <label for="twocheckout_mode">Mode</label>
+                <select id="twocheckout_mode" name="twocheckout_mode">
+                    <option value="sandbox" {% if settings.twocheckout_mode == "sandbox" %}selected{% endif %}>Sandbox</option>
+                    <option value="live" {% if settings.twocheckout_mode == "live" %}selected{% endif %}>Live</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="twocheckout_merchant_code">Merchant Code</label>
+                <input type="text" id="twocheckout_merchant_code" name="twocheckout_merchant_code" value="{{ settings.twocheckout_merchant_code | default(value='') }}" placeholder="Your merchant code">
+            </div>
+            <div class="form-group">
+                <label for="twocheckout_secret_key">Secret Key</label>
+                <input type="password" id="twocheckout_secret_key" name="twocheckout_secret_key" value="{{ settings.twocheckout_secret_key | default(value='') }}" placeholder="Your secret key">
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- ── Square ──────────────────────────────────────── -->
+<div class="tab-panel" id="panel-square" style="display:none">
+    <div class="form-card">
+        <h3>Square</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_square_enabled" name="commerce_square_enabled" value="true"
+                    {% if settings.commerce_square_enabled == "true" %}checked{% endif %}>
+                Enable Square
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-square" {% if settings.commerce_square_enabled != "true" %}disabled{% endif %}>
+        {% if settings.square_mode != "live" %}
+        <div class="alert alert-info" style="border-left:3px solid var(--info)">
+            <strong>⚠ Sandbox Mode</strong><br>
+            Square is in sandbox (test) mode. No real transactions will be processed.
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>Square Configuration</h3>
+            <div class="form-group">
+                <label for="square_mode">Mode</label>
+                <select id="square_mode" name="square_mode">
+                    <option value="sandbox" {% if settings.square_mode == "sandbox" %}selected{% endif %}>Sandbox</option>
+                    <option value="live" {% if settings.square_mode == "live" %}selected{% endif %}>Live</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="square_application_id">Application ID</label>
+                <input type="text" id="square_application_id" name="square_application_id" value="{{ settings.square_application_id | default(value='') }}" placeholder="sq0idp-...">
+            </div>
+            <div class="form-group">
+                <label for="square_access_token">Access Token</label>
+                <input type="password" id="square_access_token" name="square_access_token" value="{{ settings.square_access_token | default(value='') }}" placeholder="Your access token">
+            </div>
+            <div class="form-group">
+                <label for="square_location_id">Location ID</label>
+                <input type="text" id="square_location_id" name="square_location_id" value="{{ settings.square_location_id | default(value='') }}" placeholder="Your location ID">
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- ── Razorpay ────────────────────────────────────── -->
+<div class="tab-panel" id="panel-razorpay" style="display:none">
+    <div class="form-card">
+        <h3>Razorpay</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_razorpay_enabled" name="commerce_razorpay_enabled" value="true"
+                    {% if settings.commerce_razorpay_enabled == "true" %}checked{% endif %}>
+                Enable Razorpay
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-razorpay" {% if settings.commerce_razorpay_enabled != "true" %}disabled{% endif %}>
+        <div class="form-card">
+            <h3>Razorpay Configuration</h3>
+            <div class="form-group">
+                <label for="razorpay_key_id">Key ID</label>
+                <input type="text" id="razorpay_key_id" name="razorpay_key_id" value="{{ settings.razorpay_key_id | default(value='') }}" placeholder="rzp_test_...">
+            </div>
+            <div class="form-group">
+                <label for="razorpay_key_secret">Key Secret</label>
+                <input type="password" id="razorpay_key_secret" name="razorpay_key_secret" value="{{ settings.razorpay_key_secret | default(value='') }}" placeholder="Your key secret">
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- ── Mollie ──────────────────────────────────────── -->
+<div class="tab-panel" id="panel-mollie" style="display:none">
+    <div class="form-card">
+        <h3>Mollie</h3>
+        <div class="checkbox-list">
+            <label class="checkbox-item">
+                <input type="checkbox" id="commerce_mollie_enabled" name="commerce_mollie_enabled" value="true"
+                    {% if settings.commerce_mollie_enabled == "true" %}checked{% endif %}>
+                Enable Mollie
+            </label>
+        </div>
+    </div>
+
+    <fieldset id="fs-mollie" {% if settings.commerce_mollie_enabled != "true" %}disabled{% endif %}>
+        <div class="form-card">
+            <h3>Mollie Configuration</h3>
+            <div class="form-group">
+                <label for="mollie_api_key">API Key</label>
+                <input type="password" id="mollie_api_key" name="mollie_api_key" value="{{ settings.mollie_api_key | default(value='') }}" placeholder="test_... or live_...">
+                <span class="form-help">Find your API key in the Mollie Dashboard under Developers → API keys.</span>
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- ── General ─────────────────────────────────────── -->
+<div class="tab-panel" id="panel-general">
+    <div class="form-card">
+        <h3>General Commerce Settings</h3>
+        <div class="form-group">
+            <label for="commerce_currency">Default Currency</label>
+            <select id="commerce_currency" name="commerce_currency">
+                <option value="USD" {% if settings.commerce_currency == "USD" %}selected{% endif %}>USD — US Dollar</option>
+                <option value="EUR" {% if settings.commerce_currency == "EUR" %}selected{% endif %}>EUR — Euro</option>
+                <option value="GBP" {% if settings.commerce_currency == "GBP" %}selected{% endif %}>GBP — British Pound</option>
+                <option value="CAD" {% if settings.commerce_currency == "CAD" %}selected{% endif %}>CAD — Canadian Dollar</option>
+                <option value="AUD" {% if settings.commerce_currency == "AUD" %}selected{% endif %}>AUD — Australian Dollar</option>
+                <option value="JPY" {% if settings.commerce_currency == "JPY" %}selected{% endif %}>JPY — Japanese Yen</option>
+                <option value="INR" {% if settings.commerce_currency == "INR" %}selected{% endif %}>INR — Indian Rupee</option>
+                <option value="AED" {% if settings.commerce_currency == "AED" %}selected{% endif %}>AED — UAE Dirham</option>
+                <option value="SGD" {% if settings.commerce_currency == "SGD" %}selected{% endif %}>SGD — Singapore Dollar</option>
+                <option value="CHF" {% if settings.commerce_currency == "CHF" %}selected{% endif %}>CHF — Swiss Franc</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Downloads</h3>
+        <div class="form-group">
+            <label for="downloads_max_per_purchase">Max Downloads per Purchase</label>
+            <input type="number" id="downloads_max_per_purchase" name="downloads_max_per_purchase" value="{{ settings.downloads_max_per_purchase | default(value='3') }}" min="1" max="100">
+        </div>
+        <div class="form-group">
+            <label for="downloads_expiry_hours">Download Link Expiry (hours)</label>
+            <input type="number" id="downloads_expiry_hours" name="downloads_expiry_hours" value="{{ settings.downloads_expiry_hours | default(value='48') }}" min="1" max="8760">
+        </div>
+        <div class="form-group">
+            <label for="downloads_license_template">Default License Template</label>
+            <textarea id="downloads_license_template" name="downloads_license_template" rows="4">{{ settings.downloads_license_template | default(value='') }}</textarea>
+            <span class="form-help">Applied to all payment providers. Shown to buyers during checkout and included in download emails.</span>
+        </div>
+    </div>
+</div>
+
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+(function(){
+    var tabs = document.querySelectorAll('#commerce-tabs .tab');
+    var panels = document.querySelectorAll('.tab-panel');
+    function activateTab(name) {
+        tabs.forEach(function(t){ t.classList.remove('active'); });
+        panels.forEach(function(p){ p.style.display = 'none'; });
+        tabs.forEach(function(t){ if (t.getAttribute('data-tab') === name) t.classList.add('active'); });
+        var panel = document.getElementById('panel-' + name);
+        if (panel) panel.style.display = '';
+    }
+    tabs.forEach(function(tab){
+        tab.addEventListener('click', function(){
+            var target = tab.getAttribute('data-tab');
+            activateTab(target);
+            location.hash = target;
+        });
+    });
+    if (location.hash) { var h = location.hash.substring(1); activateTab(h); }
+
+    var toggles = [
+        { cb: 'commerce_paypal_enabled', fs: 'fs-paypal' },
+        { cb: 'commerce_payoneer_enabled', fs: 'fs-payoneer' },
+        { cb: 'commerce_stripe_enabled', fs: 'fs-stripe' },
+        { cb: 'commerce_2checkout_enabled', fs: 'fs-twocheckout' },
+        { cb: 'commerce_square_enabled', fs: 'fs-square' },
+        { cb: 'commerce_razorpay_enabled', fs: 'fs-razorpay' },
+        { cb: 'commerce_mollie_enabled', fs: 'fs-mollie' },
+    ];
+    toggles.forEach(function(t){
+        var cb = document.getElementById(t.cb);
+        var fs = document.getElementById(t.fs);
+        if (cb && fs) {
+            cb.addEventListener('change', function(){ fs.disabled = !cb.checked; });
+        }
+    });
+})();
+</script>
+{% endblock scripts %}

@@ -15,7 +15,7 @@
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/social" class="tab">Social</a>
     <a href="/admin/settings/email" class="tab">Email</a>
-    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/commerce" class="tab">Commerce</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab active">AI</a>
 </div>
@@ -176,15 +176,20 @@
     // Sub-tab switching
     var tabs = document.querySelectorAll('[data-ai-tab]');
     var panels = ['tab-ai-failover','tab-ai-local','tab-ai-ollama','tab-ai-openai','tab-ai-gemini','tab-ai-cloudflare'];
+    function activateTab(name) {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+        tabs.forEach(function(t) { if (t.dataset.aiTab === name) t.classList.add('active'); });
+        var el = document.getElementById(name);
+        if (el) el.style.display = '';
+    }
     tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            tab.classList.add('active');
-            panels.forEach(function(id) {
-                document.getElementById(id).style.display = (id === tab.dataset.aiTab) ? '' : 'none';
-            });
+            activateTab(tab.dataset.aiTab);
+            location.hash = tab.dataset.aiTab;
         });
     });
+    if (location.hash) { activateTab(location.hash.substring(1)); }
 
     // Failover chain drag-and-drop reorder
     var chain = document.getElementById('failover-chain');

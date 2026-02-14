@@ -15,7 +15,7 @@
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/social" class="tab">Social</a>
     <a href="/admin/settings/email" class="tab">Email</a>
-    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/commerce" class="tab">Commerce</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
@@ -218,15 +218,20 @@
     // Sub-tab switching
     var tabs = document.querySelectorAll('[data-sec-tab]');
     var panels = ['tab-sec-general','tab-sec-akismet','tab-sec-cleantalk','tab-sec-oopspam','tab-sec-recaptcha','tab-sec-turnstile','tab-sec-hcaptcha'];
+    function activateTab(name) {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+        tabs.forEach(function(t) { if (t.dataset.secTab === name) t.classList.add('active'); });
+        var el = document.getElementById(name);
+        if (el) el.style.display = '';
+    }
     tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            tab.classList.add('active');
-            panels.forEach(function(id) {
-                document.getElementById(id).style.display = (id === tab.dataset.secTab) ? '' : 'none';
-            });
+            activateTab(tab.dataset.secTab);
+            location.hash = tab.dataset.secTab;
         });
     });
+    if (location.hash) { activateTab(location.hash.substring(1)); }
 
     // Toggle provider fieldsets on checkbox change
     document.querySelectorAll('[data-sec-toggle]').forEach(function(cb) {

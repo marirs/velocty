@@ -15,7 +15,7 @@
     <a href="/admin/settings/design" class="tab">Design</a>
     <a href="/admin/settings/social" class="tab">Social</a>
     <a href="/admin/settings/email" class="tab active">Email</a>
-    <a href="/admin/settings/paypal" class="tab">PayPal</a>
+    <a href="/admin/settings/commerce" class="tab">Commerce</a>
     <a href="/admin/settings/users" class="tab">Users</a>
     <a href="/admin/settings/ai" class="tab">AI</a>
 </div>
@@ -65,9 +65,10 @@
             <h3>Email Failover Chain</h3>
             <label class="checkbox-item"><input type="checkbox" name="email_failover_enabled" value="true" {% if settings.email_failover_enabled == "true" %}checked{% endif %}> Enable Email Failover</label>
             <p class="text-muted" style="margin:12px 0 16px">When enabled, if the primary email provider fails to send, the system will automatically try the next provider in the chain.</p>
+            {% set all_providers = "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp" %}
+            {% set echain = settings.email_failover_chain | default(value=all_providers) %}
             <div id="email-failover-chain" class="failover-list">
-                {% set echain = settings.email_failover_chain | default(value='gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp') %}
-                {% for provider in echain | split(pat=',') %}
+                {% for provider in all_providers | split(pat=',') %}
                 {% if provider == 'gmail' and settings.email_gmail_enabled == 'true'
                     or provider == 'resend' and settings.email_resend_enabled == 'true'
                     or provider == 'ses' and settings.email_ses_enabled == 'true'
@@ -88,7 +89,7 @@
                 {% endfor %}
             </div>
             <p class="text-muted" style="font-size:13px;margin-top:8px">Only enabled providers appear here. Enable providers in their respective tabs, then drag to set priority order.</p>
-            <input type="hidden" id="email_failover_chain" name="email_failover_chain" value="{{ settings.email_failover_chain | default(value='gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp') }}">
+            <input type="hidden" id="email_failover_chain" name="email_failover_chain" value="{{ all_providers }}">
         </div>
     </div>
 
@@ -315,15 +316,20 @@
 (function() {
     var tabs = document.querySelectorAll('[data-email-tab]');
     var panels = ['tab-email-general','tab-email-failover','tab-email-gmail','tab-email-resend','tab-email-ses','tab-email-postmark','tab-email-brevo','tab-email-sendpulse','tab-email-mailgun','tab-email-moosend','tab-email-mandrill','tab-email-sparkpost','tab-email-smtp'];
+    function activateTab(name) {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+        tabs.forEach(function(t) { if (t.dataset.emailTab === name) t.classList.add('active'); });
+        var el = document.getElementById(name);
+        if (el) el.style.display = '';
+    }
     tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            tab.classList.add('active');
-            panels.forEach(function(id) {
-                document.getElementById(id).style.display = (id === tab.dataset.emailTab) ? '' : 'none';
-            });
+            activateTab(tab.dataset.emailTab);
+            location.hash = tab.dataset.emailTab;
         });
     });
+    if (location.hash) { activateTab(location.hash.substring(1)); }
     // Toggle provider fieldsets on checkbox change
     document.querySelectorAll('[data-provider-toggle]').forEach(function(cb) {
         cb.addEventListener('change', function() {

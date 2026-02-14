@@ -346,7 +346,7 @@ pub fn settings_page(
 ) -> Option<Template> {
     let valid_sections = [
         "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
-        "design", "social", "paypal", "users", "ai", "email",
+        "design", "social", "commerce", "paypal", "users", "ai", "email",
     ];
 
     if !valid_sections.contains(&section) {
@@ -659,6 +659,12 @@ pub fn settings_save(
             "security_akismet_enabled", "security_cleantalk_enabled",
             "security_oopspam_enabled", "security_recaptcha_enabled",
             "security_turnstile_enabled", "security_hcaptcha_enabled",
+        ],
+        "commerce" => &[
+            "commerce_paypal_enabled", "commerce_payoneer_enabled",
+            "commerce_stripe_enabled", "commerce_2checkout_enabled",
+            "commerce_square_enabled", "commerce_razorpay_enabled",
+            "commerce_mollie_enabled",
         ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &["design_back_to_top"],
