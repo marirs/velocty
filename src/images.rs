@@ -18,7 +18,7 @@ pub fn process_upload(
     file_bytes: &[u8],
     original_filename: &str,
 ) -> Result<ProcessedImage, String> {
-    let storage_path = Setting::get_or(pool, "images_storage_path", "website/uploads/");
+    let storage_path = Setting::get_or(pool, "images_storage_path", "website/site/uploads/");
     let quality = Setting::get_i64(pool, "images_quality") as u8;
     let quality = if quality == 0 { 85 } else { quality };
 
@@ -67,7 +67,7 @@ pub fn generate_thumbnails(
     pool: &DbPool,
     image_path: &str,
 ) -> Result<Vec<(String, String)>, String> {
-    let storage_path = Setting::get_or(pool, "images_storage_path", "website/uploads/");
+    let storage_path = Setting::get_or(pool, "images_storage_path", "website/site/uploads/");
     let full_path = format!("{}{}", storage_path, image_path);
 
     let img = image::open(&full_path).map_err(|e| e.to_string())?;
@@ -123,7 +123,7 @@ pub fn check_file_size(pool: &DbPool, size_bytes: usize) -> bool {
 
 /// Delete an image and its thumbnails
 pub fn delete_image(pool: &DbPool, image_path: &str) -> Result<(), String> {
-    let storage_path = Setting::get_or(pool, "images_storage_path", "website/uploads/");
+    let storage_path = Setting::get_or(pool, "images_storage_path", "website/site/uploads/");
 
     let full_path = format!("{}{}", storage_path, image_path);
     let _ = fs::remove_file(&full_path);

@@ -101,7 +101,7 @@ fn rocket() -> _ {
         .attach(analytics::AnalyticsFairing)
         .attach(NoCacheAdmin)
         .mount("/static", FileServer::from("website/static"))
-        .mount("/uploads", FileServer::from("website/uploads"))
+        .mount("/uploads", FileServer::from("website/site/uploads"))
         .mount(
             "/",
             routes::public::root_routes(),
@@ -137,6 +137,12 @@ fn rocket() -> _ {
     {
         let registry = site::init_registry().expect("Failed to initialize site registry");
         site::run_registry_migrations(&registry).expect("Failed to run registry migrations");
+
+        // Auto-migrate single-site data into multi-site if website/site/ exists
+        if let Err(e) = site::migrate_single_to_multi(&registry, "localhost", "My Site") {
+            eprintln!("Warning: single→multi migration failed: {}", e);
+        }
+
         eprintln!("Multi-site mode enabled. Super admin at: /super/");
         rocket = rocket
             .manage(registry)

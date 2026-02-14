@@ -416,8 +416,8 @@ async fn save_upload(file: &mut TempFile<'_>, prefix: &str) -> Option<String> {
         .map(|e| e.to_string())
         .unwrap_or_else(|| "jpg".to_string());
     let filename = format!("{}_{}.{}", prefix, uuid::Uuid::new_v4(), ext);
-    let dest = std::path::Path::new("website/uploads").join(&filename);
-    let _ = std::fs::create_dir_all("website/uploads");
+    let dest = std::path::Path::new("website/site/uploads").join(&filename);
+    let _ = std::fs::create_dir_all("website/site/uploads");
     match file.persist_to(&dest).await {
         Ok(_) => Some(filename),
         Err(_) => None,

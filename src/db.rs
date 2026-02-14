@@ -5,7 +5,7 @@ use rusqlite::params;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 pub fn init_pool() -> Result<DbPool, Box<dyn std::error::Error>> {
-    init_pool_at("website/db/velocty.db").map_err(|e| e.into())
+    init_pool_at("website/site/db/velocty.db").map_err(|e| e.into())
 }
 
 pub fn init_pool_at(path: &str) -> Result<DbPool, String> {
@@ -328,7 +328,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("font_captions", ""),
         ("font_text_transform", "none"),
         // Images
-        ("images_storage_path", "website/uploads/"),
+        ("images_storage_path", "website/site/uploads/"),
         ("images_max_upload_mb", "10"),
         ("images_thumb_small", "150x150"),
         ("images_thumb_medium", "300x300"),

@@ -81,6 +81,46 @@ pub fn init_registry() -> Result<RegistryPool, String> {
     crate::db::init_pool_at("website/sites.db")
 }
 
+/// Detect a single-site installation at `website/site/` and migrate it
+/// into the multi-site `website/sites/<uuid>/` layout, registering it
+/// in the central registry with the given hostname.
+pub fn migrate_single_to_multi(registry: &RegistryPool, hostname: &str, display_name: &str) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let single = Path::new("website/site");
+    if !single.exists() || !single.join("db/velocty.db").exists() {
+        return Ok(()); // nothing to migrate
+    }
+
+    // Check if any sites already exist in the registry — if so, skip
+    if !list_sites(registry).is_empty() {
+        return Ok(());
+    }
+
+    log::info!("Migrating single-site to multi-site layout...");
+
+    let slug = uuid::Uuid::new_v4().to_string();
+    let dest = format!("website/sites/{}", slug);
+
+    // Move the entire website/site/ directory to website/sites/<uuid>/
+    fs::create_dir_all("website/sites").map_err(|e| e.to_string())?;
+    fs::rename("website/site", &dest).map_err(|e| {
+        format!("Failed to move website/site → {}: {}", dest, e)
+    })?;
+
+    // Register in the central registry
+    let conn = registry.get().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO sites (slug, hostname, display_name) VALUES (?1, ?2, ?3)",
+        params![slug, hostname, display_name],
+    )
+    .map_err(|e| e.to_string())?;
+
+    log::info!("Single-site migrated to multi-site as '{}' (slug: {})", hostname, slug);
+    Ok(())
+}
+
 pub fn run_registry_migrations(pool: &RegistryPool) -> Result<(), String> {
     let conn = pool.get().map_err(|e| e.to_string())?;
     conn.execute_batch(
