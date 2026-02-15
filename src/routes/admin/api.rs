@@ -2,7 +2,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde_json::Value;
 
-use crate::security::auth::{AdminUser, EditorUser};
+use crate::security::auth::EditorUser;
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
 use crate::models::portfolio::PortfolioItem;
@@ -318,20 +318,4 @@ pub fn seo_check_portfolio(
         Some(&item.image_path),
         item.id,
     ))
-}
-
-pub fn routes() -> Vec<rocket::Route> {
-    routes![
-        stats_overview,
-        stats_flow,
-        stats_geo,
-        stats_stream,
-        stats_calendar,
-        stats_top_portfolio,
-        stats_top_referrers,
-        stats_tags,
-        set_theme,
-        seo_check_post,
-        seo_check_portfolio,
-    ]
 }

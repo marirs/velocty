@@ -129,7 +129,7 @@ fn rocket() -> _ {
         )
         .mount(
             &admin_api_mount,
-            routes::admin_api::routes(),
+            routes::admin::api_routes(),
         )
         .mount(
             &admin_api_mount,

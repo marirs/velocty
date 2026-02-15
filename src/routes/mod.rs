@@ -1,5 +1,4 @@
 pub mod admin;
-pub mod admin_api;
 pub mod ai;
 pub mod api;
 pub mod commerce;
