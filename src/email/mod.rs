@@ -1,3 +1,15 @@
+pub mod gmail;
+pub mod smtp;
+pub mod resend;
+pub mod ses;
+pub mod postmark;
+pub mod brevo;
+pub mod sendpulse;
+pub mod mailgun;
+pub mod moosend;
+pub mod mandrill;
+pub mod sparkpost;
+
 use std::collections::HashMap;
 
 use lettre::message::header::ContentType;
@@ -61,6 +73,12 @@ pub fn send_purchase_email(
 
 /// Determine the "from" email address from configured providers.
 fn get_from_email(settings: &HashMap<String, String>) -> Option<String> {
+    // Use explicit from address if configured
+    let from_addr = settings.get("email_from_address").cloned().unwrap_or_default();
+    if !from_addr.is_empty() {
+        return Some(from_addr);
+    }
+
     // Check providers in priority order
     if settings.get("email_gmail_enabled").map(|v| v.as_str()) == Some("true") {
         return settings.get("email_gmail_address").cloned().filter(|s| !s.is_empty());
@@ -82,9 +100,7 @@ fn get_from_email(settings: &HashMap<String, String>) -> Option<String> {
     None
 }
 
-/// Send email via the first configured SMTP-compatible provider.
-/// For Phase 2, we support Gmail SMTP and custom SMTP.
-/// API-based providers (Resend, SES, etc.) would need HTTP clients — stubbed for now.
+/// Send email via the first configured provider in the failover chain.
 fn send_via_configured_provider(
     settings: &HashMap<String, String>,
     from: &str,
@@ -92,39 +108,63 @@ fn send_via_configured_provider(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    // Gmail SMTP
-    if settings.get("email_gmail_enabled").map(|v| v.as_str()) == Some("true") {
-        let address = settings.get("email_gmail_address").cloned().unwrap_or_default();
-        let app_password = settings.get("email_gmail_app_password").cloned().unwrap_or_default();
-        if !address.is_empty() && !app_password.is_empty() {
-            return send_smtp(
-                "smtp.gmail.com",
-                587,
-                &address,
-                &app_password,
-                from,
-                to,
-                subject,
-                body,
-            );
+    let failover_enabled = settings.get("email_failover_enabled").map(|v| v.as_str()) == Some("true");
+
+    let chain_str = settings
+        .get("email_failover_chain")
+        .cloned()
+        .unwrap_or_else(|| "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp".to_string());
+
+    let chain: Vec<&str> = chain_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+
+    let mut last_error = String::new();
+
+    for provider_name in &chain {
+        let enabled_key = format!("email_{}_enabled", provider_name);
+        if settings.get(&enabled_key).map(|v| v.as_str()) != Some("true") {
+            continue;
+        }
+
+        let result = match *provider_name {
+            "gmail" => gmail::send(settings, from, to, subject, body),
+            "smtp" => smtp::send(settings, from, to, subject, body),
+            "resend" => resend::send(settings, from, to, subject, body),
+            "ses" => ses::send(settings, from, to, subject, body),
+            "postmark" => postmark::send(settings, from, to, subject, body),
+            "brevo" => brevo::send(settings, from, to, subject, body),
+            "sendpulse" => sendpulse::send(settings, from, to, subject, body),
+            "mailgun" => mailgun::send(settings, from, to, subject, body),
+            "moosend" => moosend::send(settings, from, to, subject, body),
+            "mandrill" => mandrill::send(settings, from, to, subject, body),
+            "sparkpost" => sparkpost::send(settings, from, to, subject, body),
+            _ => {
+                log::warn!("Unknown email provider: {}", provider_name);
+                continue;
+            }
+        };
+
+        match result {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                log::warn!("Email provider {} failed: {}", provider_name, e);
+                last_error = e;
+                if !failover_enabled {
+                    // No failover — fail immediately
+                    return Err(last_error);
+                }
+            }
         }
     }
 
-    // Custom SMTP
-    if settings.get("email_smtp_enabled").map(|v| v.as_str()) == Some("true") {
-        let host = settings.get("email_smtp_host").cloned().unwrap_or_default();
-        let port: u16 = settings.get("email_smtp_port").and_then(|v| v.parse().ok()).unwrap_or(587);
-        let username = settings.get("email_smtp_username").cloned().unwrap_or_default();
-        let password = settings.get("email_smtp_password").cloned().unwrap_or_default();
-        if !host.is_empty() && !username.is_empty() {
-            return send_smtp(&host, port, &username, &password, from, to, subject, body);
-        }
+    if last_error.is_empty() {
+        Err("No email provider configured or enabled".into())
+    } else {
+        Err(format!("All email providers failed. Last error: {}", last_error))
     }
-
-    Err("No SMTP provider configured. API-based providers require HTTP integration.".to_string())
 }
 
-fn send_smtp(
+/// Shared SMTP send function used by gmail.rs and smtp.rs
+pub fn send_smtp(
     host: &str,
     port: u16,
     username: &str,
