@@ -338,18 +338,12 @@ fn build_cookie_consent_banner(settings: &Value) -> String {
     let show_reject = get("cookie_consent_show_reject") == "true";
     let theme = get("cookie_consent_theme"); // auto, dark, light
 
-    let reject_btn = if show_reject {
-        r#"<button id="cc-reject" style="padding:8px 20px;border-radius:6px;border:1px solid;font-size:13px;font-weight:500;cursor:pointer;background:transparent">Reject All</button>"#
-    } else {
-        ""
-    };
-
     // Position CSS
     let pos_css = match (style, position) {
         ("modal", _) => "position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:99999;background:rgba(0,0,0,0.5)",
         ("corner", _) => "position:fixed;bottom:20px;left:20px;z-index:99999;max-width:380px",
-        (_, "top") => "position:fixed;top:0;left:0;right:0;z-index:99999",
-        _ => "position:fixed;bottom:0;left:0;right:0;z-index:99999",
+        (_, "top") => "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:99999;max-width:580px;width:calc(100% - 40px)",
+        _ => "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99999;max-width:580px;width:calc(100% - 40px)",
     };
 
     // Theme colors
@@ -359,27 +353,31 @@ fn build_cookie_consent_banner(settings: &Value) -> String {
         _ => ("#1f2937", "#f3f4f6", "#374151", "#f3f4f6", "#1f2937"), // auto = dark
     };
 
+    // Link color: use text color so it's always readable
+    let link_color = text;
+
+    let reject_btn = if show_reject {
+        format!(r#"<button id="cc-reject" style="padding:8px 20px;border-radius:6px;border:1px solid {border};font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:{text}">Reject All</button>"#)
+    } else {
+        String::new()
+    };
+
     let inner_style = if style == "modal" {
         format!("background:{bg};color:{text};border:1px solid {border};border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)")
     } else if style == "corner" {
         format!("background:{bg};color:{text};border:1px solid {border};border-radius:12px;padding:20px 24px;box-shadow:0 8px 30px rgba(0,0,0,0.2)")
     } else {
-        format!("background:{bg};color:{text};border-top:1px solid {border};padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap")
+        format!("background:{bg};color:{text};border:1px solid {border};border-radius:12px;padding:18px 24px;box-shadow:0 8px 30px rgba(0,0,0,0.25)")
     };
 
-    let layout_open = if style == "minimal" { "" } else { "" };
-    let btns_style = if style == "minimal" {
-        "display:flex;gap:8px;align-items:center;flex-shrink:0"
-    } else {
-        "display:flex;gap:8px;margin-top:16px;justify-content:flex-end"
-    };
+    let btns_style = "display:flex;gap:8px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap";
 
     format!(
         r##"<div id="cc-banner" style="{pos_css}">
 <div style="{inner_style}">
-{layout_open}<div style="font-size:13px;line-height:1.6;flex:1;min-width:200px">
+<div style="font-size:13px;line-height:1.6">
 <strong style="font-size:14px">🍪 We use cookies</strong><br>
-We use cookies to improve your experience. <a href="{policy_url}" style="color:{btn_bg};text-decoration:underline">Learn more</a>
+We use cookies to improve your experience. <a href="{policy_url}" style="color:{link_color};text-decoration:underline">Learn more</a>
 </div>
 <div style="{btns_style}">
 {reject_btn}
@@ -403,8 +401,8 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
 </script>"##,
         pos_css = pos_css,
         inner_style = inner_style,
-        layout_open = layout_open,
         policy_url = html_escape(policy_url),
+        link_color = link_color,
         btn_bg = btn_bg,
         border = border,
         text = text,
