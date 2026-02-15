@@ -11,6 +11,67 @@ use crate::models::user::User;
 
 const SESSION_COOKIE: &str = "velocty_session";
 
+// ── Client IP request guard ──
+
+/// Extracts the real client IP from the request.
+/// Checks headers in priority order:
+///   1. CF-Connecting-IP (Cloudflare)
+///   2. True-Client-IP (Cloudflare Enterprise / Akamai)
+///   3. X-Real-IP (nginx proxy_set_header)
+///   4. X-Forwarded-For (first IP in the chain = original client)
+///   5. Rocket's client_ip() (socket peer address)
+pub struct ClientIp(pub String);
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for ClientIp {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let headers = request.headers();
+
+        // Cloudflare
+        if let Some(ip) = headers.get_one("CF-Connecting-IP") {
+            let ip = ip.trim();
+            if !ip.is_empty() {
+                return Outcome::Success(ClientIp(ip.to_string()));
+            }
+        }
+
+        // Cloudflare Enterprise / Akamai
+        if let Some(ip) = headers.get_one("True-Client-IP") {
+            let ip = ip.trim();
+            if !ip.is_empty() {
+                return Outcome::Success(ClientIp(ip.to_string()));
+            }
+        }
+
+        // nginx X-Real-IP
+        if let Some(ip) = headers.get_one("X-Real-IP") {
+            let ip = ip.trim();
+            if !ip.is_empty() {
+                return Outcome::Success(ClientIp(ip.to_string()));
+            }
+        }
+
+        // X-Forwarded-For: client, proxy1, proxy2 — take the first (leftmost)
+        if let Some(forwarded) = headers.get_one("X-Forwarded-For") {
+            if let Some(ip) = forwarded.split(',').next() {
+                let ip = ip.trim();
+                if !ip.is_empty() {
+                    return Outcome::Success(ClientIp(ip.to_string()));
+                }
+            }
+        }
+
+        // Fallback to Rocket's socket peer address
+        let ip = request
+            .client_ip()
+            .map(|ip| ip.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        Outcome::Success(ClientIp(ip))
+    }
+}
+
 // ── Authenticated user guard (any active user with a valid session) ──
 
 /// Guard: any authenticated user with an active account.

@@ -52,10 +52,11 @@ pub fn login_submit(
     admin_slug: &State<AdminSlug>,
     limiter: &State<RateLimiter>,
     cookies: &CookieJar<'_>,
+    client_ip: auth::ClientIp,
 ) -> Result<Redirect, Template> {
     let theme = Setting::get_or(pool, "admin_theme", "dark");
-    let ip_hash = auth::hash_ip(&form.email);
-    let rate_key = format!("login:{}", ip_hash);
+    let ip = &client_ip.0;
+    let rate_key = format!("login:{}", ip);
     let max_attempts = Setting::get_i64(pool, "login_rate_limit").max(1) as u64;
     let window = std::time::Duration::from_secs(15 * 60);
 
@@ -91,10 +92,10 @@ pub fn login_submit(
             if Setting::get_or(pool, "firewall_enabled", "false") == "true"
                 && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
             {
-                FwEvent::log(pool, &ip_hash, "failed_login", Some(&format!("Unknown user: {}", form.email)), None, None, Some("login"));
+                FwEvent::log(pool, ip, "failed_login", Some(&format!("Unknown user: {}", form.email)), None, None, Some("login"));
                 if Setting::get_or(pool, "fw_ban_unknown_users", "false") == "true" {
                     let dur = Setting::get_or(pool, "fw_unknown_user_ban_duration", "24h");
-                    let _ = FwBan::create_with_duration(pool, &ip_hash, "unknown_user", Some(&format!("Login attempt with unknown user: {}", form.email)), &dur, None, None);
+                    let _ = FwBan::create_with_duration(pool, ip, "unknown_user", Some(&format!("Login attempt with unknown user: {}", form.email)), &dur, None, None);
                 }
             }
             return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));
@@ -117,13 +118,13 @@ pub fn login_submit(
         if Setting::get_or(pool, "firewall_enabled", "false") == "true"
             && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
         {
-            FwEvent::log(pool, &ip_hash, "failed_login", Some("Wrong password"), None, None, Some("login"));
+            FwEvent::log(pool, ip, "failed_login", Some("Wrong password"), None, None, Some("login"));
             let threshold: i64 = Setting::get_or(pool, "fw_failed_login_ban_threshold", "5")
                 .parse().unwrap_or(5);
-            let count = FwEvent::count_for_ip_since(pool, &ip_hash, "failed_login", 15);
+            let count = FwEvent::count_for_ip_since(pool, ip, "failed_login", 15);
             if count >= threshold {
                 let dur = Setting::get_or(pool, "fw_failed_login_ban_duration", "1h");
-                let _ = FwBan::create_with_duration(pool, &ip_hash, "failed_login", Some("Too many failed login attempts"), &dur, None, None);
+                let _ = FwBan::create_with_duration(pool, ip, "failed_login", Some("Too many failed login attempts"), &dur, None, None);
             }
         }
         return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));

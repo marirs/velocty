@@ -45,15 +45,15 @@ pub fn forgot_password_submit(
     pool: &State<DbPool>,
     admin_slug: &State<AdminSlug>,
     limiter: &State<RateLimiter>,
+    client_ip: auth::ClientIp,
 ) -> Template {
     let theme = Setting::get_or(pool, "admin_theme", "dark");
     let mut ctx: HashMap<String, String> = HashMap::new();
     ctx.insert("admin_theme".to_string(), theme);
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
 
-    // Rate limit: 3 requests per 15 minutes per email
-    let ip_hash = auth::hash_ip(&form.email);
-    let rate_key = format!("pw_reset:{}", ip_hash);
+    // Rate limit: 3 requests per 15 minutes per IP
+    let rate_key = format!("pw_reset:{}", client_ip.0);
     if !limiter.check_and_record(&rate_key, 3, std::time::Duration::from_secs(15 * 60)) {
         ctx.insert("error".to_string(), "Too many requests. Please try again in 15 minutes.".to_string());
         return Template::render("admin/forgot_password", &ctx);

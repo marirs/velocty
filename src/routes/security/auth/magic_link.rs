@@ -45,6 +45,7 @@ pub fn magic_link_submit(
     pool: &State<DbPool>,
     admin_slug: &State<AdminSlug>,
     limiter: &State<RateLimiter>,
+    client_ip: auth::ClientIp,
 ) -> Result<Template, Template> {
     let theme = Setting::get_or(pool, "admin_theme", "dark");
 
@@ -73,8 +74,7 @@ pub fn magic_link_submit(
     }
 
     // Rate limit magic link requests
-    let ip_hash = auth::hash_ip(&form.email);
-    let rate_key = format!("magic_link:{}", ip_hash);
+    let rate_key = format!("magic_link:{}", client_ip.0);
     if !limiter.check_and_record(&rate_key, 3, std::time::Duration::from_secs(15 * 60)) {
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Too many requests. Please try again in 15 minutes.".to_string());

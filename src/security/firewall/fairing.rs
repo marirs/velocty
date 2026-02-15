@@ -86,10 +86,22 @@ impl Fairing for FirewallFairing {
             return;
         }
 
-        let ip = request
-            .client_ip()
-            .map(|ip| ip.to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+        let headers = request.headers();
+        let ip = headers.get_one("CF-Connecting-IP")
+            .or_else(|| headers.get_one("True-Client-IP"))
+            .or_else(|| headers.get_one("X-Real-IP"))
+            .map(|h| h.trim().to_string())
+            .or_else(|| {
+                headers.get_one("X-Forwarded-For")
+                    .and_then(|h| h.split(',').next())
+                    .map(|h| h.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            })
+            .unwrap_or_else(|| {
+                request.client_ip()
+                    .map(|ip| ip.to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            });
 
         let ua = request.headers().get_one("User-Agent").unwrap_or("").to_string();
 
