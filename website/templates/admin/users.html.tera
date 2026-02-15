@@ -89,6 +89,21 @@
     </div>
     <div class="modal-body">
         <input type="hidden" id="um-id" value="">
+        <div id="um-avatar-group" class="form-group" style="display:none;text-align:center">
+            <div style="position:relative;display:inline-block">
+                <img id="um-avatar-preview" src="" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border-subtle);display:none">
+                <div id="um-avatar-placeholder" style="width:64px;height:64px;border-radius:50%;background:var(--bg-input);border:2px dashed var(--border-subtle);display:flex;align-items:center;justify-content:center;margin:0 auto">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+            </div>
+            <div style="margin-top:8px">
+                <label class="btn btn-sm" style="cursor:pointer;font-size:12px;display:inline-block">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Change Avatar
+                    <input type="file" id="um-avatar-file" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+                </label>
+                <button type="button" class="btn btn-sm" id="um-avatar-remove" style="font-size:12px;display:none" onclick="removeAvatar()">Remove</button>
+            </div>
+        </div>
         <div class="form-group">
             <label>Display Name</label>
             <input type="text" id="um-name" class="form-control" placeholder="John Doe">
@@ -99,12 +114,13 @@
         </div>
         <div class="form-group" id="um-role-group">
             <label>Role</label>
-            <select id="um-role" class="form-control">
+            <select id="um-role" class="form-control" onchange="updateRoleHint()">
                 <option value="admin">Admin</option>
                 <option value="editor">Editor</option>
                 <option value="author" selected>Author</option>
                 <option value="subscriber">Subscriber</option>
             </select>
+            <small id="um-role-hint" class="text-muted" style="display:block;margin-top:4px;font-size:11px"></small>
         </div>
         <div class="form-group" id="um-pw-group">
             <label id="um-pw-label">Password</label>
@@ -240,6 +256,69 @@ document.addEventListener('keydown', function(e) {
     }
 }, true);
 
+var roleHints = {
+    admin: 'Full access — settings, users, designs, firewall, and all content.',
+    editor: 'Manage all content — posts, portfolio, categories, tags, comments.',
+    author: 'Create and edit own posts and portfolio items.',
+    subscriber: 'No admin panel access. For newsletters and gated content.'
+};
+function updateRoleHint() {
+    var role = document.getElementById('um-role').value;
+    document.getElementById('um-role-hint').textContent = roleHints[role] || '';
+}
+
+function setAvatarPreview(url) {
+    var img = document.getElementById('um-avatar-preview');
+    var ph = document.getElementById('um-avatar-placeholder');
+    var rmBtn = document.getElementById('um-avatar-remove');
+    if (url) {
+        img.src = url;
+        img.style.display = '';
+        ph.style.display = 'none';
+        rmBtn.style.display = '';
+    } else {
+        img.src = '';
+        img.style.display = 'none';
+        ph.style.display = 'flex';
+        rmBtn.style.display = 'none';
+    }
+}
+
+function uploadAvatar(input) {
+    if (!input.files || !input.files[0]) return;
+    var userId = document.getElementById('um-id').value;
+    if (!userId) return;
+    var fd = new FormData();
+    fd.append('user_id', userId);
+    fd.append('file', input.files[0]);
+    fetch('/' + adminSlug + '/api/users/avatar', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            setAvatarPreview(data.avatar);
+        } else {
+            showAlert('Error', data.error || 'Avatar upload failed');
+        }
+    });
+    input.value = '';
+}
+
+function removeAvatar() {
+    var userId = document.getElementById('um-id').value;
+    if (!userId) return;
+    fetch('/' + adminSlug + '/api/users/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: parseInt(userId), avatar: '' })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            setAvatarPreview(null);
+        }
+    });
+}
+
 function showCreateModal() {
     isEditMode = false;
     document.getElementById('user-modal-title').textContent = 'New User';
@@ -255,6 +334,8 @@ function showCreateModal() {
     document.getElementById('um-role-group').style.display = '';
     document.getElementById('um-pw-group').style.display = '';
     document.getElementById('um-self-link').style.display = 'none';
+    document.getElementById('um-avatar-group').style.display = 'none';
+    updateRoleHint();
     document.getElementById('user-modal-overlay').style.display = '';
     document.getElementById('user-modal').style.display = '';
 }
@@ -278,6 +359,10 @@ function showEditModal(user, isSelf) {
     if (isSelf) {
         document.getElementById('um-change-pw-link').href = '/' + adminSlug + '/settings/security#tab-sec-auth';
     }
+    // Avatar
+    document.getElementById('um-avatar-group').style.display = '';
+    setAvatarPreview(user.avatar && user.avatar !== '' ? user.avatar : null);
+    updateRoleHint();
     document.getElementById('user-modal-overlay').style.display = '';
     document.getElementById('user-modal').style.display = '';
 }

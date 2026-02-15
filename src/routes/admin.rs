@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::security::auth::{AdminUser, EditorUser};
+use crate::security::auth::{AdminUser, AuthorUser, EditorUser};
 use crate::db::DbPool;
 use crate::AdminSlug;
 
@@ -29,7 +29,7 @@ use crate::models::tag::Tag;
 // ── Dashboard ──────────────────────────────────────────
 
 #[get("/")]
-pub fn dashboard(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn dashboard(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let posts_count = Post::count(pool, None);
     let posts_draft = Post::count(pool, Some("draft"));
     let portfolio_count = PortfolioItem::count(pool, None);
@@ -52,7 +52,7 @@ pub fn dashboard(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlu
 
 #[get("/posts?<status>&<page>")]
 pub fn posts_list(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     status: Option<String>,
@@ -85,7 +85,7 @@ pub fn posts_list(
 }
 
 #[get("/posts/new")]
-pub fn posts_new(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn posts_new(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
 
@@ -105,7 +105,7 @@ pub fn posts_new(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlu
 }
 
 #[get("/posts/<id>/edit")]
-pub fn posts_edit(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
+pub fn posts_edit(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
     let post = Post::find_by_id(pool, id)?;
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
@@ -140,7 +140,7 @@ pub fn posts_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<Admin
 
 #[get("/portfolio?<status>&<page>")]
 pub fn portfolio_list(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     status: Option<String>,
@@ -172,7 +172,7 @@ pub fn portfolio_list(
 }
 
 #[get("/portfolio/new")]
-pub fn portfolio_new(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn portfolio_new(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
 
@@ -192,7 +192,7 @@ pub fn portfolio_new(_admin: EditorUser, pool: &State<DbPool>, slug: &State<Admi
 }
 
 #[get("/portfolio/<id>/edit")]
-pub fn portfolio_edit(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
+pub fn portfolio_edit(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
     let item = PortfolioItem::find_by_id(pool, id)?;
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
@@ -218,7 +218,7 @@ pub fn portfolio_edit(_admin: EditorUser, pool: &State<DbPool>, slug: &State<Adm
 }
 
 #[post("/portfolio/<id>/delete")]
-pub fn portfolio_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn portfolio_delete(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = PortfolioItem::delete(pool, id);
     Redirect::to(format!("{}/portfolio", admin_base(slug)))
 }
@@ -469,7 +469,7 @@ pub struct ImageUploadForm<'f> {
 
 #[post("/upload/image", data = "<form>")]
 pub async fn upload_image(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     mut form: Form<ImageUploadForm<'_>>,
 ) -> Json<Value> {
     match save_upload(&mut form.file, "editor").await {
@@ -488,7 +488,7 @@ pub struct FontUploadForm<'f> {
 
 #[post("/upload/font", data = "<form>")]
 pub async fn upload_font(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     mut form: Form<FontUploadForm<'_>>,
 ) -> Json<Value> {
@@ -523,7 +523,7 @@ pub async fn upload_font(
 
 #[post("/posts/new", data = "<form>")]
 pub async fn posts_create(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
@@ -565,7 +565,7 @@ pub async fn posts_create(
 
 #[post("/posts/<id>/edit", data = "<form>")]
 pub async fn posts_update(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     id: i64,
@@ -623,7 +623,7 @@ pub struct PortfolioFormData<'f> {
 
 #[post("/portfolio/new", data = "<form>")]
 pub async fn portfolio_create(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
@@ -670,7 +670,7 @@ pub async fn portfolio_create(
 
 #[post("/portfolio/<id>/edit", data = "<form>")]
 pub async fn portfolio_update(
-    _admin: EditorUser,
+    _admin: AuthorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     id: i64,
@@ -1654,6 +1654,7 @@ pub struct UserUpdateForm {
     pub display_name: Option<String>,
     pub role: Option<String>,
     pub password: Option<String>,
+    pub avatar: Option<String>,
 }
 
 #[post("/api/users/update", format = "json", data = "<form>")]
@@ -1685,10 +1686,19 @@ pub fn user_update(
         }
     }
 
+    // Update avatar if explicitly provided (empty string = remove)
+    let avatar = match form.avatar {
+        Some(ref a) => a.trim().to_string(),
+        None => user.avatar.clone(),
+    };
+    if avatar != user.avatar {
+        let _ = User::update_avatar(pool, form.id, &avatar);
+    }
+
     // Update profile fields if provided
     let email = form.email.as_deref().unwrap_or(&user.email).trim().to_string();
     let display_name = form.display_name.as_deref().unwrap_or(&user.display_name).trim().to_string();
-    if let Err(e) = User::update_profile(pool, form.id, &display_name, &email, &user.avatar) {
+    if let Err(e) = User::update_profile(pool, form.id, &display_name, &email, &avatar) {
         return Json(json!({"success": false, "error": e}));
     }
 
@@ -1696,6 +1706,9 @@ pub fn user_update(
     if form.id == _admin.user.id {
         let _ = Setting::set(pool, "admin_email", &email);
         let _ = Setting::set(pool, "admin_display_name", &display_name);
+        if avatar != user.avatar {
+            let _ = Setting::set(pool, "admin_avatar", &avatar);
+        }
     }
 
     // Update password if provided
@@ -1715,6 +1728,41 @@ pub fn user_update(
     }
 
     Json(json!({"success": true}))
+}
+
+#[derive(FromForm)]
+pub struct AvatarUploadForm<'f> {
+    pub user_id: i64,
+    pub file: TempFile<'f>,
+}
+
+#[post("/api/users/avatar", data = "<form>")]
+pub async fn user_avatar_upload(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    mut form: Form<AvatarUploadForm<'_>>,
+) -> Json<Value> {
+    use crate::models::user::User;
+
+    let user = match User::get_by_id(pool, form.user_id) {
+        Some(u) => u,
+        None => return Json(json!({"success": false, "error": "User not found"})),
+    };
+
+    match save_upload(&mut form.file, "avatar").await {
+        Some(filename) => {
+            let avatar_url = format!("/uploads/{}", filename);
+            if let Err(e) = User::update_avatar(pool, user.id, &avatar_url) {
+                return Json(json!({"success": false, "error": e}));
+            }
+            // Sync to settings if this is the current user
+            if user.id == _admin.user.id {
+                let _ = Setting::set(pool, "admin_avatar", &avatar_url);
+            }
+            Json(json!({"success": true, "avatar": avatar_url}))
+        }
+        None => Json(json!({"success": false, "error": "Upload failed. Ensure the file is a valid image."})),
+    }
 }
 
 #[derive(Deserialize)]
@@ -1874,6 +1922,7 @@ pub fn routes() -> Vec<rocket::Route> {
         users_list,
         user_create,
         user_update,
+        user_avatar_upload,
         user_lock,
         user_unlock,
         user_reset_password,
