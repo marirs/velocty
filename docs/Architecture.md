@@ -13,9 +13,9 @@ This document expands on `README-CMS.md` with detailed architecture decisions, s
 | **Backend** | Rust + Rocket |
 | **Database** | SQLite (via rusqlite) or MongoDB (user choice at setup) |
 | **Templates (admin)** | Tera (Rocket's built-in template engine) |
-| **Page layout builder** | GrapesJS (admin only, ~200KB) |
-| **Content editor** | Editor.js (admin only, ~30KB) |
-| **AI** | Ollama (local) / OpenAI / Anthropic (pluggable) |
+| **Page layout builder** | GrapesJS (admin only, ~200KB) — Phase 3 |
+| **Content editor** | TinyMCE 7 (self-hosted, admin only, ~3.8MB) |
+| **AI** | Ollama (local) / OpenAI / Gemini / Cloudflare (pluggable) — Phase 4 |
 | **Frontend (visitors)** | Pure HTML/CSS + minimal vanilla JS |
 | **Auth** | Session-based + optional MFA (TOTP) |
 
@@ -591,18 +591,52 @@ Allowed values for `media_organization`:
 | `social_links` | Social media links (JSON) | "[]" |
 | `social_brand_colors` | Use brand colors for icons | "true" |
 
-### PayPal / Commerce (Phase 2)
+### Commerce
+
+#### Global Commerce Settings
 
 | Key | Description | Default |
 |---|---|---|
-| `paypal_mode` | sandbox / live | "sandbox" |
-| `paypal_client_id` | PayPal REST API Client ID | "" |
-| `paypal_email` | Seller PayPal email | "" |
-| `paypal_currency` | Currency code | "USD" |
-| `paypal_button_color` | gold / blue / silver / white / black | "gold" |
+| `commerce_currency` | Currency code | "USD" |
 | `downloads_max_per_purchase` | Max downloads per token | "3" |
 | `downloads_expiry_hours` | Link expiry in hours | "48" |
 | `downloads_license_template` | License text template | (default license text) |
+
+#### Provider Enable Toggles
+
+| Key | Provider | Required Fields |
+|---|---|---|
+| `commerce_paypal_enabled` | PayPal | `paypal_client_id`, `paypal_secret` |
+| `commerce_stripe_enabled` | Stripe | `stripe_publishable_key`, `stripe_secret_key` |
+| `commerce_razorpay_enabled` | Razorpay | `razorpay_key_id`, `razorpay_key_secret` |
+| `commerce_mollie_enabled` | Mollie | `mollie_api_key` |
+| `commerce_square_enabled` | Square | `square_application_id`, `square_access_token`, `square_location_id` |
+| `commerce_2checkout_enabled` | 2Checkout | `twocheckout_merchant_code`, `twocheckout_secret_key` |
+| `commerce_payoneer_enabled` | Payoneer | `payoneer_program_id`, `payoneer_client_id`, `payoneer_client_secret` |
+
+#### Provider-Specific Keys
+
+| Provider | Keys |
+|---|---|
+| **PayPal** | `paypal_client_id`, `paypal_secret`, `paypal_mode` (sandbox/live) |
+| **Stripe** | `stripe_publishable_key`, `stripe_secret_key`, `stripe_webhook_secret` |
+| **Razorpay** | `razorpay_key_id`, `razorpay_key_secret` |
+| **Mollie** | `mollie_api_key` |
+| **Square** | `square_application_id`, `square_access_token`, `square_location_id`, `square_webhook_signature_key` |
+| **2Checkout** | `twocheckout_merchant_code`, `twocheckout_secret_key`, `twocheckout_secret_word` |
+| **Payoneer** | `payoneer_program_id`, `payoneer_client_id`, `payoneer_client_secret` |
+
+#### Webhook Security
+
+| Provider | Method |
+|---|---|
+| Stripe | HMAC-SHA256 of payload with `stripe_webhook_secret` |
+| Square | HMAC-SHA256 of URL+body with `square_webhook_signature_key` |
+| 2Checkout | MD5 hash of sale_id + vendor_id + invoice_id + `twocheckout_secret_word` |
+| Razorpay | HMAC-SHA256 client-side verification |
+| Mollie | API fetch-back (server fetches payment status from Mollie API) |
+| PayPal | Client-side JS SDK capture (no webhook needed) |
+| Payoneer | Webhook with provider verification |
 
 ### AI (Phase 4)
 
@@ -711,6 +745,43 @@ trait LlmProvider {
 See `README-CMS.md` for full schema. Additional tables for this architecture:
 
 ```sql
+-- Orders (provider-agnostic)
+CREATE TABLE orders (
+    id INTEGER PRIMARY KEY,
+    portfolio_id INTEGER NOT NULL,
+    buyer_email TEXT DEFAULT '',
+    buyer_name TEXT DEFAULT '',
+    amount REAL NOT NULL,
+    currency TEXT DEFAULT 'USD',
+    provider TEXT NOT NULL,          -- paypal, stripe, razorpay, mollie, square, 2checkout, payoneer
+    provider_order_id TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',   -- pending, completed, refunded
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (portfolio_id) REFERENCES portfolio(id)
+);
+
+-- Download tokens (per order)
+CREATE TABLE download_tokens (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    downloads_used INTEGER DEFAULT 0,
+    max_downloads INTEGER DEFAULT 3,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
+-- License keys (per order)
+CREATE TABLE licenses (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    license_key TEXT UNIQUE NOT NULL, -- XXXX-XXXX-XXXX-XXXX
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
 -- Import history
 CREATE TABLE imports (
     id INTEGER PRIMARY KEY,
@@ -801,10 +872,22 @@ velocty/
 │   ├── render.rs                    # Design + content merge, placeholder replacement
 │   ├── seo.rs                       # Meta tags, JSON-LD, OG, sitemap generation
 │   ├── rss.rs                       # RSS feed generation
+│   ├── email.rs                     # Purchase email delivery (Gmail SMTP, custom SMTP)
 │   ├── images.rs                    # Upload handling, thumbnail generation, WebP
 │   └── import/
 │       ├── mod.rs
 │       └── wordpress.rs             # WP XML parser (Phase 1)
+│   └── routes/
+│       ├── commerce/                # Payment provider routes
+│       │   ├── mod.rs               # Shared helpers, order pipeline, download routes
+│       │   ├── paypal.rs            # PayPal JS SDK create/capture
+│       │   ├── stripe.rs            # Stripe Checkout + HMAC-SHA256 webhook
+│       │   ├── razorpay.rs          # Razorpay order create + HMAC verify
+│       │   ├── mollie.rs            # Mollie payment create + API webhook
+│       │   ├── square.rs            # Square payment link + HMAC-SHA256 webhook
+│       │   ├── twocheckout.rs       # 2Checkout hosted checkout + MD5 IPN
+│       │   └── payoneer.rs          # Payoneer checkout link + webhook
+│       └── ...
 ├── website/
 │   ├── site/                        # Site-specific data
 │   │   ├── db/velocty.db            # SQLite database (created at runtime)
@@ -825,6 +908,7 @@ velocty/
 │           ├── portfolio/
 │           ├── comments/
 │           ├── settings/
+│           ├── sales/               # Sales dashboard + orders
 │           └── import/
 ```
 
@@ -850,14 +934,22 @@ velocty/
 - Login captcha (reCAPTCHA, Turnstile, hCaptcha) + anti-spam (Akismet, CleanTalk, OOPSpam)
 - Multi-site support (optional feature flag)
 
-### Phase 2 — Commerce & Auth
-- MFA flow: enable TOTP, register via QR code, download recovery codes, disable MFA
-- PayPal JS SDK checkout on portfolio items
-- Token-based secure downloads with expiry and count limits
-- License file generation per purchase
-- Buyer email notifications (SMTP config in settings)
-- Sales dashboard in admin
-- PayPal / Commerce settings
+### Phase 2 — Commerce & Auth ✅
+- MFA flow: enable TOTP via QR code, verify codes, download recovery codes, disable MFA, login challenge page
+- DB schema: orders, download_tokens, licenses tables + portfolio purchase_note, payment_provider, download_file_path columns
+- Order/DownloadToken/License models with full CRUD and query helpers
+- 7 payment providers: PayPal (JS SDK), Stripe (Checkout + HMAC-SHA256 webhook), Razorpay (JS modal + HMAC verify), Mollie (redirect + API webhook), Square (redirect + HMAC-SHA256 webhook), 2Checkout (redirect + MD5 IPN), Payoneer (redirect + webhook)
+- Per-item payment provider selection (dropdown if >1 enabled, auto-assign if 1)
+- Portfolio editor: sell_enabled toggle, price input (auto-format), purchase_note, payment provider dropdown, download file URL input
+- Commerce settings UI: all 7 providers with validation + downloads + license config
+- Sales sidebar menu (conditionally visible) with Dashboard + Orders tabs
+- Sales Dashboard: total/30d/7d revenue, order counts by status, recent orders table
+- Orders page: filterable by status, paginated
+- Public portfolio: single buy button per item, email capture, purchase lookup
+- Download page: token-based with license key display, download count tracking, expiry enforcement
+- Optional download file path per item (falls back to featured image)
+- Buyer email notifications via Gmail SMTP or custom SMTP
+- Zero `.unwrap()` calls in all commerce routes — safe error handling throughout
 
 ### Phase 3 — Editors & Design Builder
 - Editor.js integration for blog/portfolio content

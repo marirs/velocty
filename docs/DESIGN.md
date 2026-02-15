@@ -229,9 +229,14 @@ Collapsed (60px):          Expanded (200px on hover):
 | `/admin/settings/seo` | SEO settings |
 | `/admin/settings/security` | Security settings (MFA, sessions) |
 | `/admin/settings/design` | Design settings (active design, social, back-to-top) |
-| `/admin/settings/paypal` | PayPal settings (Phase 2) |
+| `/admin/settings/commerce` | Commerce settings (7 providers, downloads, license) |
+| `/admin/settings/email` | Email provider settings (11 providers) |
 | `/admin/settings/ai` | AI settings (Phase 4) |
+| `/admin/sales` | Sales dashboard (revenue stats, order counts) |
+| `/admin/sales/orders` | Orders list (filterable, paginated) |
+| `/admin/health` | Health dashboard (disk, DB, filesystem, tools) |
 | `/admin/login` | Login page |
+| `/admin/mfa` | MFA challenge page (TOTP code entry) |
 
 ---
 
@@ -482,13 +487,23 @@ Same as post editor, plus:
 │  │  └─────────────────┘                              │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
-│  ┌─ Sell (Phase 2) ──────────────────────────────────┐  │
-│  │  ☐ Enable selling for this item                   │  │
-│  │  Price: [$___________]                            │  │
-│  │  Download file: [Upload]                          │  │
-│  │  Purchase details:                                │  │
-│  │  [________________________________________]       │  │
-│  └───────────────────────────────────────────────────┘  │
+│  ┌─ Sell ──────────────────────────────────────────────┐  │
+│  │  [●] Enable selling                                │  │
+│  │                                                     │  │
+│  │  (visible when enabled:)                            │  │
+│  │  Price (USD):  [25.00___________]  ← auto-formats  │  │
+│  │                                                     │  │
+│  │  Payment Processor:  [Stripe ▼]   ← dropdown if    │  │
+│  │    (hidden if 0-1 providers enabled)  >1 enabled    │  │
+│  │                                                     │  │
+│  │  Download File URL:                                 │  │
+│  │  Optional. If provided, this file will be served    │  │
+│  │  to buyers. If empty, the featured image is used.   │  │
+│  │  [/uploads/my-file.zip________________]             │  │
+│  │                                                     │  │
+│  │  Purchase Note:                                     │  │
+│  │  [High-res PNG + PSD source____________]            │  │
+│  └─────────────────────────────────────────────────────┘  │
 ```
 
 #### Comments (`/admin/comments`)

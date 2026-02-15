@@ -47,6 +47,26 @@ Velocty guides you through a 4-step setup wizard on first run:
 |---|---|
 | ![Admin Account](docs/wizzard-3.png) | ![Terms & Privacy](docs/wizzard-4.png) |
 
+### Journal
+
+| Journal List | New Post |
+|---|---|
+| ![Journal List](docs/journal-list.png) | ![New Post](docs/new-post.png) |
+
+### Settings
+
+| Site | Typography | Portfolio |
+|---|---|---|
+| ![Site Settings](docs/site-settings.png) | ![Typography Settings](docs/typography-settings.png) | ![Portfolio Settings](docs/portfolio-settings.png) |
+
+| SEO | Security | Frontend |
+|---|---|---|
+| ![SEO Settings](docs/seo-settings.png) | ![Security Settings](docs/security-settings.png) | ![Frontend Settings](docs/frontend-settings.png) |
+
+| Commerce | Email | AI |
+|---|---|---|
+| ![Commerce Settings](docs/commerce-settings.png) | ![Email Settings](docs/email%20settings.png) | ![AI Settings](docs/ai-settings.png) |
+
 ---
 
 ## Tech Stack
@@ -104,11 +124,19 @@ Velocty guides you through a 4-step setup wizard on first run:
 
 ### Commerce (Digital Downloads)
 
-- **7 payment providers** — PayPal, Stripe, Payoneer, 2Checkout, Square, Razorpay, Mollie
-- **Sandbox/Live modes** per provider
+- **7 payment providers** — PayPal (JS SDK), Stripe (Checkout), Razorpay (JS modal), Mollie, Square, 2Checkout, Payoneer (redirect-based)
+- **Per-item provider selection** — seller chooses which payment processor to use for each portfolio item
+- **Sandbox/Live modes** per provider (Stripe, Square, 2Checkout, Payoneer)
+- **Webhook security** — Stripe (HMAC-SHA256), Square (HMAC-SHA256), 2Checkout (MD5), Razorpay (HMAC client verify), Mollie (API fetch-back)
+- **Order pipeline** — `create_pending_order` → provider checkout → `finalize_order` (idempotent)
 - **Secure token-based downloads** with configurable expiry and download limits
-- **Digital Download License** — customizable license agreement included with every purchase
-- **License.txt generation** — per-purchase file with item name, buyer info, transaction ID, date
+- **Optional download file** — seller can specify a separate download file per item; falls back to featured image
+- **License key generation** — auto-generated `XXXX-XXXX-XXXX-XXXX` format per purchase
+- **Purchase email** — async delivery via Gmail SMTP or custom SMTP with download link + license key
+- **Purchase lookup** — returning buyers can check purchase status by email
+- **Sales dashboard** — total/30d/7d revenue, order counts, recent orders
+- **Orders page** — filterable by status (all/completed/pending/refunded), paginated
+- **Price auto-format** — `25` → `25.00` in the portfolio editor
 
 ### SEO (Built-in, No Plugins)
 
@@ -280,12 +308,14 @@ velocty/
 │   ├── render.rs                # Design + content merge
 │   ├── seo.rs                   # Meta tags, JSON-LD, sitemap
 │   ├── rss.rs                   # RSS/Atom feed generation
+│   ├── email.rs                 # Purchase email delivery (Gmail SMTP, custom SMTP)
 │   ├── images.rs                # Upload, thumbnails, WebP conversion
 │   ├── license.rs               # Purchase license.txt generation
 │   ├── rate_limit.rs            # In-memory rate limiter (login, comments)
 │   ├── site.rs                  # Multi-site: SiteContext, SitePoolManager, SiteResolver (feature-gated)
-│   ├── models/                  # Data models (Post, Portfolio, Category, etc.)
-│   └── routes/                  # Route handlers (admin, auth, public, API, super_admin)
+│   ├── models/                  # Data models (Post, Portfolio, Category, Order, DownloadToken, License, etc.)
+│   └── routes/                  # Route handlers (admin, auth, public, API, commerce, super_admin)
+│       └── commerce/            # Payment provider routes (paypal, stripe, razorpay, mollie, square, 2checkout, payoneer)
 ├── website/
 │   ├── site/                    # Site-specific data (single-site mode)
 │   │   ├── db/velocty.db        # SQLite database
@@ -332,13 +362,18 @@ velocty/
   - `SiteResolver` fairing for Host-based routing
   - `DashMap`-cached per-site connection pools
 
-### Phase 2 — Commerce
+### Phase 2 — Commerce ✅
 
-- Payment processing (PayPal, Stripe, etc.)
-- Token-based secure downloads with expiry
-- License file generation per purchase
-- Buyer email notifications
-- Sales dashboard in admin
+- 7 payment providers: PayPal (JS SDK), Stripe (Checkout + webhook), Razorpay (JS modal + HMAC verify), Mollie (redirect + API webhook), Square (redirect + HMAC webhook), 2Checkout (redirect + MD5 IPN), Payoneer (redirect + webhook)
+- Per-item payment provider selection (dropdown if >1 enabled, auto-assign if 1)
+- Order pipeline: create pending → provider checkout → finalize (download token + license key + email)
+- Token-based secure downloads with configurable expiry and max download count
+- Optional download file path per portfolio item (falls back to featured image)
+- License key generation per purchase (XXXX-XXXX-XXXX-XXXX)
+- Buyer email notifications via Gmail SMTP or custom SMTP
+- Sales dashboard (revenue stats, order counts) + Orders page (filterable, paginated)
+- Price auto-format in editor (25 → 25.00)
+- Zero `.unwrap()` calls in all commerce routes — safe error handling throughout
 
 ### Phase 3 — Editors & Design Builder
 

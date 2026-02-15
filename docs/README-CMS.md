@@ -44,13 +44,18 @@ WordPress loads ~50+ PHP files per request, a full MySQL abstraction layer, a pl
 - Sell toggle: price, PayPal client-side checkout, token-based secure downloads
 - License file generation per purchase
 
-### 3. Commerce (PayPal)
+### 3. Commerce (7 Payment Providers)
 
-- PayPal JS SDK checkout on portfolio items
-- Sandbox / Live mode toggle
-- Secure token-based download links with expiry and download count limits
-- Buyer email notifications
-- Sales dashboard in admin
+- **PayPal** (JS SDK client-side), **Stripe** (Checkout redirect + HMAC-SHA256 webhook), **Razorpay** (JS modal + HMAC verify), **Mollie** (redirect + API fetch-back webhook), **Square** (redirect + HMAC-SHA256 webhook), **2Checkout** (redirect + MD5 IPN), **Payoneer** (redirect + webhook)
+- Per-item payment provider selection — seller picks which processor per portfolio item
+- Sandbox / Live mode toggle per provider
+- Shared order pipeline: `create_pending_order` → provider checkout → `finalize_order`
+- Secure token-based download links with configurable expiry and download count limits
+- Optional download file per item (falls back to featured image if not set)
+- License key auto-generation per purchase (XXXX-XXXX-XXXX-XXXX)
+- Buyer email notifications via Gmail SMTP or custom SMTP
+- Sales dashboard + Orders page in admin
+- Price auto-format in editor (25 → 25.00)
 
 ### 4. Built-in SEO (No Plugins)
 
@@ -279,6 +284,9 @@ CREATE TABLE portfolio (
     meta_description TEXT,
     sell_enabled INTEGER DEFAULT 0,
     price REAL,
+    purchase_note TEXT DEFAULT '',   -- what buyer receives (shown before/after purchase)
+    payment_provider TEXT DEFAULT '',-- selected provider for this item
+    download_file_path TEXT DEFAULT '',-- optional file URL; falls back to featured image
     likes INTEGER DEFAULT 0,
     status TEXT DEFAULT 'draft',
     published_at DATETIME,
@@ -329,18 +337,41 @@ CREATE TABLE comments (
     FOREIGN KEY (post_id) REFERENCES posts(id)
 );
 
--- Downloads / sales
-CREATE TABLE downloads (
+-- Orders (provider-agnostic)
+CREATE TABLE orders (
     id INTEGER PRIMARY KEY,
-    token TEXT UNIQUE NOT NULL,
     portfolio_id INTEGER NOT NULL,
-    buyer_email TEXT NOT NULL,
-    transaction_id TEXT NOT NULL,
-    download_count INTEGER DEFAULT 0,
-    max_downloads INTEGER DEFAULT 3,
-    created_at DATETIME NOT NULL,
-    expires_at DATETIME NOT NULL,
+    buyer_email TEXT DEFAULT '',
+    buyer_name TEXT DEFAULT '',
+    amount REAL NOT NULL,
+    currency TEXT DEFAULT 'USD',
+    provider TEXT NOT NULL,          -- paypal, stripe, razorpay, mollie, square, 2checkout, payoneer
+    provider_order_id TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',   -- pending, completed, refunded
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (portfolio_id) REFERENCES portfolio(id)
+);
+
+-- Download tokens (per order)
+CREATE TABLE download_tokens (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    downloads_used INTEGER DEFAULT 0,
+    max_downloads INTEGER DEFAULT 3,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
+-- License keys (per order)
+CREATE TABLE licenses (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    license_key TEXT UNIQUE NOT NULL, -- XXXX-XXXX-XXXX-XXXX
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
 );
 
 -- Designs
@@ -383,17 +414,20 @@ CREATE TABLE settings (
 
 ### Phase 2 — Commerce & Auth ✅
 - MFA flow: enable TOTP via QR code, verify codes, download recovery codes, disable MFA, login challenge page
-- DB schema: orders, download_tokens, licenses tables + portfolio purchase_note column
+- DB schema: orders, download_tokens, licenses tables + portfolio purchase_note, payment_provider, download_file_path columns
 - Order/DownloadToken/License models with full CRUD and query helpers
-- Portfolio editor: sell_enabled toggle, price input, purchase_note textarea with dynamic visibility
+- Portfolio editor: sell_enabled toggle, price input (auto-format 25→25.00), purchase_note textarea, payment provider dropdown (conditional), download file URL input
 - Commerce settings UI: all 7 providers (PayPal, Stripe, Payoneer, 2Checkout, Square, Razorpay, Mollie) + downloads + license config
-- Checkout routes: PayPal create/capture, Stripe session create, generic provider capture, purchase status check
+- Checkout routes for all 7 providers: PayPal (JS SDK create/capture), Stripe (Checkout session + HMAC-SHA256 webhook), Razorpay (order create + HMAC verify), Mollie (payment create + API webhook), Square (payment link + HMAC-SHA256 webhook), 2Checkout (hosted checkout + MD5 IPN), Payoneer (checkout link + webhook)
+- Per-item payment provider selection: dropdown if >1 enabled, auto-assign if 1, warning if 0
 - Sales sidebar menu (conditionally visible when any provider enabled) with Dashboard + Orders tabs
 - Sales Dashboard: total/30d/7d revenue, order counts by status, recent orders table
 - Orders page: filterable by status (all/completed/pending/refunded), paginated list
-- Public portfolio Buy button: PayPal JS SDK integration, email capture, purchase lookup for returning buyers
+- Public portfolio: single buy button per item based on selected provider, email capture, purchase lookup for returning buyers
 - Download page: token-based with license key display, download count tracking, expiry enforcement
+- Optional download file path per item (falls back to featured image)
 - Buyer email notifications: purchase receipt with download link + license key via SMTP (Gmail + custom SMTP via lettre)
+- Zero `.unwrap()` calls in all commerce routes — safe error handling throughout
 
 ### Phase 3 — Editors
 - Editor.js integration for blog/portfolio content (block-based WYSIWYG)
