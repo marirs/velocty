@@ -851,23 +851,34 @@ pub fn settings_save(
         }
     }
 
-    // Blog/Portfolio slug: both cannot be empty at the same time
+    // Blog/Portfolio slug validation:
+    // - Only validate slug emptiness for *enabled* modules
+    // - Both enabled modules cannot have empty slugs simultaneously
+    // - Both enabled modules cannot share the same slug
     if section == "blog" {
+        let journal_enabled = data.get("journal_enabled").map(|v| v.as_str()) == Some("true");
         let blog_slug = data.get("blog_slug").map(|v| v.trim()).unwrap_or("");
-        if blog_slug.is_empty() {
-            let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "portfolio");
-            if portfolio_slug.is_empty() {
-                errors.push("Journal Slug cannot be empty while Portfolio Slug is also empty — at least one must have a slug".to_string());
-            }
+        let portfolio_enabled = Setting::get_or(pool, "portfolio_enabled", "false") == "true";
+        let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "portfolio");
+
+        if journal_enabled && blog_slug.is_empty() && portfolio_enabled && portfolio_slug.is_empty() {
+            errors.push("Journal Slug cannot be empty while Portfolio Slug is also empty — at least one must have a slug".to_string());
+        }
+        if journal_enabled && !blog_slug.is_empty() && portfolio_enabled && blog_slug == portfolio_slug {
+            errors.push("Journal Slug and Portfolio Slug cannot be the same".to_string());
         }
     }
     if section == "portfolio" {
+        let portfolio_enabled = data.get("portfolio_enabled").map(|v| v.as_str()) == Some("true");
         let portfolio_slug = data.get("portfolio_slug").map(|v| v.trim()).unwrap_or("");
-        if portfolio_slug.is_empty() {
-            let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
-            if blog_slug.is_empty() {
-                errors.push("Portfolio Slug cannot be empty while Journal Slug is also empty — at least one must have a slug".to_string());
-            }
+        let journal_enabled = Setting::get_or(pool, "journal_enabled", "true") == "true";
+        let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
+
+        if portfolio_enabled && portfolio_slug.is_empty() && journal_enabled && blog_slug.is_empty() {
+            errors.push("Portfolio Slug cannot be empty while Journal Slug is also empty — at least one must have a slug".to_string());
+        }
+        if portfolio_enabled && !portfolio_slug.is_empty() && journal_enabled && portfolio_slug == blog_slug {
+            errors.push("Portfolio Slug and Journal Slug cannot be the same".to_string());
         }
     }
 
@@ -950,6 +961,33 @@ pub fn settings_save(
     }
 
     let _ = Setting::set_many(pool, &data);
+
+    // Proactive slug defaults: when re-enabling a module whose slug is empty,
+    // auto-fill the default slug to prevent future conflicts
+    if section == "blog" {
+        let journal_enabled = Setting::get_or(pool, "journal_enabled", "true") == "true";
+        let blog_slug = Setting::get_or(pool, "blog_slug", "");
+        if journal_enabled && blog_slug.is_empty() {
+            let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "");
+            if portfolio_slug.is_empty() || portfolio_slug != "journal" {
+                let _ = Setting::set(pool, "blog_slug", "journal");
+            } else {
+                let _ = Setting::set(pool, "blog_slug", "blog");
+            }
+        }
+    }
+    if section == "portfolio" {
+        let portfolio_enabled = Setting::get_or(pool, "portfolio_enabled", "false") == "true";
+        let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "");
+        if portfolio_enabled && portfolio_slug.is_empty() {
+            let blog_slug = Setting::get_or(pool, "blog_slug", "");
+            if blog_slug.is_empty() || blog_slug != "portfolio" {
+                let _ = Setting::set(pool, "portfolio_slug", "portfolio");
+            } else {
+                let _ = Setting::set(pool, "portfolio_slug", "gallery");
+            }
+        }
+    }
 
     // If email settings changed and no providers remain enabled, revert magic link to password
     if section == "email" {

@@ -169,6 +169,25 @@ Last updated: 2026-02-15
 - **Refactored:** Portfolio grid links now use dynamic `portfolio_slug` setting instead of hardcoded "/portfolio/"
 - **Refactored:** Cleaned up redundant `settings` clones in `render_portfolio_single`
 
+### Journal Settings Audit ✅
+- **Bug fix:** `blog_display_type` now wired — supports "grid" (CSS grid), "masonry" (column-count), "list" (default compact or editorial)
+- **Bug fix:** `blog_grid_columns` now wired via CSS var `--blog-grid-columns` (separate from portfolio's `--grid-columns`)
+- **Bug fix:** `blog_list_style` now wired — "editorial" mode uses larger images, bigger headings, more spacing
+- **Bug fix:** `blog_excerpt_words` now wired — `truncate_words()` helper truncates excerpts to configured word count
+- **Bug fix:** `blog_pagination_type` now wired — supports "classic", "load_more", "infinite" (reuses same JS from portfolio)
+- **Bug fix:** `blog_show_author` now wired — conditionally shows author name in list + single views
+- **Bug fix:** `blog_show_date` now wired — conditionally shows date in list + single views
+- **Bug fix:** `blog_show_reading_time` now wired — shows "X min read" based on word_count / 200 wpm
+- **Bug fix:** Blog list links now use dynamic `blog_slug` setting instead of hardcoded "/blog/"
+- **Refactored:** Blog meta (author · date · reading time) extracted into reusable `.blog-meta` div
+- **Added:** `truncate_words()` helper function for excerpt truncation
+
+### Slug Validation Fixes ✅
+- **Bug fix:** Slug validation now checks if module is *enabled* before validating — disabled module's empty slug no longer triggers "both empty" error
+- **Bug fix:** Added duplicate slug check — both enabled modules cannot share the same slug
+- **Proactive:** When re-enabling a module with empty slug, auto-fills default slug ("journal"/"blog" for Journal, "portfolio"/"gallery" for Portfolio) to prevent future conflicts
+- **Proactive:** Fallback slug avoids collision with the other module's current slug
+
 ### Potential Enhancements
 - Wire captcha into comment form via design templates (currently only in default `render.rs`)
 - Magic link token cleanup cron/scheduled task

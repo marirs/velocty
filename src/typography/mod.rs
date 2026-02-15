@@ -59,6 +59,7 @@ pub fn build_css_variables(settings: &Value) -> String {
     --sidebar-width: 250px;
     --grid-gap: 8px;
     --grid-columns: {grid_cols};
+    --blog-grid-columns: {blog_grid_cols};
     --lightbox-border-color: {lb_border};
     --lightbox-title-color: {lb_title_color};
     --lightbox-tag-color: {lb_tag_color};
@@ -83,6 +84,7 @@ pub fn build_css_variables(settings: &Value) -> String {
         size_h6 = get("font_size_h6", "1rem"),
         text_transform = text_transform,
         grid_cols = get("portfolio_grid_columns", "3"),
+        blog_grid_cols = get("blog_grid_columns", "3"),
         lb_border = get("portfolio_lightbox_border_color", "#D4A017"),
         lb_title_color = get("portfolio_lightbox_title_color", "#FFFFFF"),
         lb_tag_color = get("portfolio_lightbox_tag_color", "#AAAAAA"),

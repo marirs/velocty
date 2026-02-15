@@ -570,6 +570,17 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
 }
 
 
+fn truncate_words(text: &str, max_words: usize) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() <= max_words {
+        text.to_string()
+    } else {
+        let mut result = words[..max_words].join(" ");
+        result.push_str("…");
+        result
+    }
+}
+
 fn build_pagination(current: i64, total: i64) -> String {
     let mut html = String::from(r#"<nav class="pagination">"#);
     if current > 1 {
@@ -737,6 +748,7 @@ fn render_portfolio_single(context: &Value) -> String {
     };
     let show_likes = sg("portfolio_enable_likes", "true") == "true";
     let show_cats = sg("portfolio_show_categories", "true") == "true";
+    let show_tags = sg("portfolio_show_tags", "true") == "true";
     let portfolio_slug = sg("portfolio_slug", "portfolio");
 
     let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
@@ -788,6 +800,27 @@ fn render_portfolio_single(context: &Value) -> String {
                         html_escape(name)
                     ));
                 }
+                html.push_str("</div>");
+            }
+        }
+    }
+
+    if show_tags {
+        if let Some(tag_list) = tags {
+            if !tag_list.is_empty() {
+                html.push_str(r#"<div class="item-tags" style="margin-bottom:12px">"#);
+                let tag_strs: Vec<String> = tag_list
+                    .iter()
+                    .filter_map(|t| {
+                        let name = t.get("name").and_then(|v| v.as_str())?;
+                        let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                        Some(format!(
+                            "<a href=\"/{}/tag/{}\">{}</a>",
+                            portfolio_slug, tslug, html_escape(name)
+                        ))
+                    })
+                    .collect();
+                html.push_str(&tag_strs.join(" · "));
                 html.push_str("</div>");
             }
         }
@@ -850,12 +883,31 @@ fn render_blog_list(context: &Value) -> String {
         _ => return "<p>No posts yet.</p>".to_string(),
     };
 
-    let mut html = String::from(r#"<div class="blog-list">"#);
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+    };
+    let display_type = sg("blog_display_type", "grid");
+    let list_style = sg("blog_list_style", "compact");
+    let blog_slug = sg("blog_slug", "journal");
+    let show_author = sg("blog_show_author", "true") == "true";
+    let show_date = sg("blog_show_date", "true") == "true";
+    let show_reading_time = sg("blog_show_reading_time", "true") == "true";
+    let excerpt_words: usize = sg("blog_excerpt_words", "40").parse().unwrap_or(40);
+
+    // Container class based on display type
+    let container_class = match display_type.as_str() {
+        "masonry" => "blog-list blog-masonry",
+        "grid" => "blog-list blog-grid",
+        _ => if list_style == "editorial" { "blog-list blog-editorial" } else { "blog-list" },
+    };
+
+    let mut html = format!("<div class=\"{}\">", container_class);
 
     for post in posts {
         let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        let excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
+        let raw_excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
         let date = post
             .get("published_at")
             .and_then(|v| v.as_str())
@@ -864,55 +916,88 @@ fn render_blog_list(context: &Value) -> String {
             .get("featured_image")
             .and_then(|v| v.as_str())
             .unwrap_or("");
+        let author = post.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
+        let word_count = post.get("word_count").and_then(|v| v.as_i64()).unwrap_or(0);
+
+        // Truncate excerpt to configured word count
+        let excerpt = truncate_words(raw_excerpt, excerpt_words);
+
+        // Reading time estimate (~200 wpm)
+        let reading_time = ((word_count as f64) / 200.0).ceil().max(1.0) as i64;
+
+        let thumb_html = if !thumb.is_empty() {
+            format!(
+                "<div class=\"blog-thumb\"><img src=\"/uploads/{}\" alt=\"{}\"></div>",
+                thumb,
+                html_escape(title)
+            )
+        } else {
+            String::new()
+        };
+
+        // Build meta line (author, date, reading time)
+        let mut meta_parts: Vec<String> = Vec::new();
+        if show_author && !author.is_empty() {
+            meta_parts.push(format!("<span class=\"blog-author\">{}</span>", html_escape(author)));
+        }
+        if show_date && !date.is_empty() {
+            meta_parts.push(format!("<time>{}</time>", date));
+        }
+        if show_reading_time && word_count > 0 {
+            meta_parts.push(format!("<span class=\"reading-time\">{} min read</span>", reading_time));
+        }
+        let meta_html = if !meta_parts.is_empty() {
+            format!("<div class=\"blog-meta\">{}</div>", meta_parts.join(" · "))
+        } else {
+            String::new()
+        };
 
         html.push_str(&format!(
-            r#"<article class="blog-item">
-    {thumb_html}
-    <div class="blog-item-content">
-        <h2><a href="/blog/{slug}">{title}</a></h2>
-        <time>{date}</time>
-        <p>{excerpt}</p>
-    </div>
-</article>"#,
+            "<article class=\"blog-item\">\
+             {thumb_html}\
+             <div class=\"blog-item-content\">\
+             <h2><a href=\"/{blog_slug}/{slug}\">{title}</a></h2>\
+             {meta_html}\
+             <p>{excerpt}</p>\
+             </div>\
+             </article>",
+            thumb_html = thumb_html,
+            blog_slug = blog_slug,
             slug = slug,
             title = html_escape(title),
-            date = date,
-            excerpt = html_escape(excerpt),
-            thumb_html = if !thumb.is_empty() {
-                format!(
-                    r#"<div class="blog-thumb"><img src="/uploads/{}" alt="{}"></div>"#,
-                    thumb,
-                    html_escape(title)
-                )
-            } else {
-                String::new()
-            },
+            meta_html = meta_html,
+            excerpt = html_escape(&excerpt),
         ));
     }
 
     html.push_str("</div>");
 
     // Pagination
-    if let (Some(current), Some(total)) = (
-        context.get("current_page").and_then(|v| v.as_i64()),
-        context.get("total_pages").and_then(|v| v.as_i64()),
-    ) {
-        if total > 1 {
-            html.push_str(r#"<nav class="pagination">"#);
-            if current > 1 {
-                html.push_str(&format!(r#"<a href="/blog?page={}">&laquo; Prev</a>"#, current - 1));
+    let current_page = context.get("current_page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let total_pages = context.get("total_pages").and_then(|v| v.as_i64()).unwrap_or(1);
+    let pagination_type = sg("blog_pagination_type", "classic");
+
+    if total_pages > 1 {
+        match pagination_type.as_str() {
+            "load_more" => {
+                html.push_str(&format!(
+                    "<div class=\"pagination\" style=\"justify-content:center\">\
+                     <button id=\"load-more-btn\" data-page=\"{}\" data-total=\"{}\" \
+                     style=\"padding:10px 28px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;font-size:14px\">\
+                     Load More</button></div>",
+                    current_page + 1, total_pages
+                ));
             }
-            for p in 1..=total {
-                if p == current {
-                    html.push_str(&format!(r#"<span class="current">{}</span>"#, p));
-                } else {
-                    html.push_str(&format!(r#"<a href="/blog?page={}">{}</a>"#, p, p));
-                }
+            "infinite" => {
+                html.push_str(&format!(
+                    "<div id=\"infinite-sentinel\" data-page=\"{}\" data-total=\"{}\" \
+                     style=\"height:1px\"></div>",
+                    current_page + 1, total_pages
+                ));
             }
-            if current < total {
-                html.push_str(&format!(r#"<a href="/blog?page={}">Next &raquo;</a>"#, current + 1));
+            _ => {
+                html.push_str(&build_pagination(current_page, total_pages));
             }
-            html.push_str("</nav>");
         }
     }
 
@@ -925,6 +1010,12 @@ fn render_blog_single(context: &Value) -> String {
         None => return render_404(context),
     };
     let settings = context.get("settings").cloned().unwrap_or_default();
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+    };
+    let show_author = sg("blog_show_author", "true") == "true";
+    let show_date = sg("blog_show_date", "true") == "true";
+    let show_reading_time = sg("blog_show_reading_time", "true") == "true";
 
     let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
     let content = post
@@ -939,14 +1030,29 @@ fn render_blog_single(context: &Value) -> String {
         .get("featured_image")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let author = post.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
+    let word_count = post.get("word_count").and_then(|v| v.as_i64()).unwrap_or(0);
+    let reading_time = ((word_count as f64) / 200.0).ceil().max(1.0) as i64;
 
     let mut html = format!(
-        r#"<article class="blog-single">
-    <h1>{title}</h1>
-    <time>{date}</time>"#,
-        title = html_escape(title),
-        date = date,
+        "<article class=\"blog-single\">\n    <h1>{}</h1>",
+        html_escape(title),
     );
+
+    // Build meta line
+    let mut meta_parts: Vec<String> = Vec::new();
+    if show_author && !author.is_empty() {
+        meta_parts.push(format!("<span class=\"blog-author\">{}</span>", html_escape(author)));
+    }
+    if show_date && !date.is_empty() {
+        meta_parts.push(format!("<time>{}</time>", date));
+    }
+    if show_reading_time && word_count > 0 {
+        meta_parts.push(format!("<span class=\"reading-time\">{} min read</span>", reading_time));
+    }
+    if !meta_parts.is_empty() {
+        html.push_str(&format!("\n    <div class=\"blog-meta\">{}</div>", meta_parts.join(" · ")));
+    }
 
     if !featured.is_empty() {
         html.push_str(&format!(
@@ -1424,7 +1530,7 @@ h6 { font-size: var(--font-size-h6); }
 .lb-prev { left: 10px; }
 .lb-next { right: 10px; }
 
-/* Blog */
+/* Blog List — default (compact list) */
 .blog-list { max-width: 900px; padding: 30px; }
 
 .blog-item {
@@ -1440,13 +1546,57 @@ h6 { font-size: var(--font-size-h6); }
 .blog-item h2 { font-size: 18px; margin-bottom: 4px; }
 .blog-item h2 a { color: var(--color-text); text-decoration: none; }
 .blog-item h2 a:hover { text-decoration: underline; }
-.blog-item time { font-size: 12px; color: var(--color-text-secondary); }
+.blog-meta { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.blog-meta time { font-size: 12px; color: var(--color-text-secondary); }
+.reading-time { font-style: italic; }
 .blog-item p { font-size: 14px; color: var(--color-text-secondary); margin-top: 8px; }
+
+/* Blog Grid mode */
+.blog-list.blog-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--blog-grid-columns, 3), 1fr);
+    gap: 24px;
+    max-width: none;
+}
+.blog-grid .blog-item {
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.blog-grid .blog-thumb img { width: 100%; height: 200px; }
+
+/* Blog Masonry mode */
+.blog-list.blog-masonry {
+    column-count: var(--blog-grid-columns, 3);
+    column-gap: 24px;
+    max-width: none;
+}
+.blog-masonry .blog-item {
+    break-inside: avoid;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.blog-masonry .blog-thumb img { width: 100%; height: auto; }
+
+/* Blog Editorial list style */
+.blog-list.blog-editorial .blog-item {
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 32px;
+    margin-bottom: 32px;
+}
+.blog-editorial .blog-thumb img { width: 100%; height: 300px; }
+.blog-editorial .blog-item h2 { font-size: 24px; }
+.blog-editorial .blog-item p { font-size: 16px; }
 
 /* Blog Single */
 .blog-single { max-width: 800px; padding: 30px; }
 .blog-single h1 { font-size: var(--font-size-h1); margin-bottom: 8px; }
-.blog-single time { font-size: 13px; color: var(--color-text-secondary); display: block; margin-bottom: 20px; }
+.blog-single .blog-meta { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 20px; }
+.blog-single time { font-size: 13px; color: var(--color-text-secondary); }
 .featured-image img { width: 100%; margin-bottom: 24px; }
 .post-content { line-height: 1.8; }
 
