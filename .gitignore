@@ -13,6 +13,8 @@ Thumbs.db
 
 website/db/
 website/uploads/
+website/models/
+website/site/models/
 website/site/db/velocty.db
 GeoLite2-City.mmdb
 
