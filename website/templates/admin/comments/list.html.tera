@@ -47,4 +47,19 @@
     <div class="empty-state">No comments yet.</div>
     {% endif %}
 </div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if current_page > 1 %}
+    <a href="/{{ admin_slug }}/comments?page={{ current_page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo; Prev</a>
+    {% endif %}
+    {% for p in range(end=total_pages) %}
+    {% set page_num = p + 1 %}
+    <a href="/{{ admin_slug }}/comments?page={{ page_num }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    {% endfor %}
+    {% if current_page < total_pages %}
+    <a href="/{{ admin_slug }}/comments?page={{ current_page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock content %}

@@ -78,6 +78,42 @@ impl Category {
             .unwrap_or_default()
     }
 
+    pub fn list_paginated(pool: &DbPool, type_filter: Option<&str>, limit: i64, offset: i64) -> Vec<Self> {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
+        let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match type_filter {
+            Some(t) => (
+                "SELECT * FROM categories WHERE type = ?1 ORDER BY name LIMIT ?2 OFFSET ?3".to_string(),
+                vec![Box::new(t.to_string()), Box::new(limit), Box::new(offset)],
+            ),
+            None => (
+                "SELECT * FROM categories ORDER BY name LIMIT ?1 OFFSET ?2".to_string(),
+                vec![Box::new(limit), Box::new(offset)],
+            ),
+        };
+        let mut stmt = match conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return vec![],
+        };
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        stmt.query_map(params_refs.as_slice(), Self::from_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn count(pool: &DbPool, type_filter: Option<&str>) -> i64 {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        match type_filter {
+            Some(t) => conn.query_row("SELECT COUNT(*) FROM categories WHERE type = ?1", params![t], |row| row.get(0)).unwrap_or(0),
+            None => conn.query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0)).unwrap_or(0),
+        }
+    }
+
     pub fn for_content(pool: &DbPool, content_id: i64, content_type: &str) -> Vec<Self> {
         let conn = match pool.get() {
             Ok(c) => c,

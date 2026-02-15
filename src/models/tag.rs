@@ -55,6 +55,28 @@ impl Tag {
             .unwrap_or_default()
     }
 
+    pub fn list_paginated(pool: &DbPool, limit: i64, offset: i64) -> Vec<Self> {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
+        let mut stmt = match conn.prepare("SELECT * FROM tags ORDER BY name LIMIT ?1 OFFSET ?2") {
+            Ok(s) => s,
+            Err(_) => return vec![],
+        };
+        stmt.query_map(params![limit, offset], Self::from_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn count(pool: &DbPool) -> i64 {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        conn.query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0)).unwrap_or(0)
+    }
+
     pub fn for_content(pool: &DbPool, content_id: i64, content_type: &str) -> Vec<Self> {
         let conn = match pool.get() {
             Ok(c) => c,

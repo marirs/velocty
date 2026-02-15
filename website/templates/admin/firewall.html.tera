@@ -80,6 +80,21 @@
         {% else %}
         <p class="text-muted">No events recorded yet.</p>
         {% endif %}
+
+        {% if ev_total_pages > 1 %}
+        <div class="pagination" style="margin-top:16px">
+            {% if ev_current_page > 1 %}
+            <a href="/{{ admin_slug }}/firewall?ev_page={{ ev_current_page - 1 }}{% if ban_current_page > 1 %}&ban_page={{ ban_current_page }}{% endif %}#tab-fw-events">&laquo; Prev</a>
+            {% endif %}
+            {% for p in range(end=ev_total_pages) %}
+            {% set page_num = p + 1 %}
+            <a href="/{{ admin_slug }}/firewall?ev_page={{ page_num }}{% if ban_current_page > 1 %}&ban_page={{ ban_current_page }}{% endif %}#tab-fw-events" class="{% if page_num == ev_current_page %}active{% endif %}">{{ page_num }}</a>
+            {% endfor %}
+            {% if ev_current_page < ev_total_pages %}
+            <a href="/{{ admin_slug }}/firewall?ev_page={{ ev_current_page + 1 }}{% if ban_current_page > 1 %}&ban_page={{ ban_current_page }}{% endif %}#tab-fw-events">Next &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -136,6 +151,21 @@
         </div>
         {% else %}
         <p class="text-muted">No active bans.</p>
+        {% endif %}
+
+        {% if ban_total_pages > 1 %}
+        <div class="pagination" style="margin-top:16px">
+            {% if ban_current_page > 1 %}
+            <a href="/{{ admin_slug }}/firewall?ban_page={{ ban_current_page - 1 }}{% if ev_current_page > 1 %}&ev_page={{ ev_current_page }}{% endif %}#tab-fw-bans">&laquo; Prev</a>
+            {% endif %}
+            {% for p in range(end=ban_total_pages) %}
+            {% set page_num = p + 1 %}
+            <a href="/{{ admin_slug }}/firewall?ban_page={{ page_num }}{% if ev_current_page > 1 %}&ev_page={{ ev_current_page }}{% endif %}#tab-fw-bans" class="{% if page_num == ban_current_page %}active{% endif %}">{{ page_num }}</a>
+            {% endfor %}
+            {% if ban_current_page < ban_total_pages %}
+            <a href="/{{ admin_slug }}/firewall?ban_page={{ ban_current_page + 1 }}{% if ev_current_page > 1 %}&ev_page={{ ev_current_page }}{% endif %}#tab-fw-bans">Next &raquo;</a>
+            {% endif %}
+        </div>
         {% endif %}
     </div>
 </div>

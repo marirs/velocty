@@ -253,6 +253,22 @@ impl FwEvent {
         }
     }
 
+    /// Total event count (with optional type filter)
+    pub fn count_all(pool: &DbPool, event_type: Option<&str>) -> i64 {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        match event_type {
+            Some(et) => conn.query_row(
+                "SELECT COUNT(*) FROM fw_events WHERE event_type = ?1",
+                params![et],
+                |row| row.get(0),
+            ).unwrap_or(0),
+            None => conn.query_row("SELECT COUNT(*) FROM fw_events", [], |row| row.get(0)).unwrap_or(0),
+        }
+    }
+
     /// Count events in the last N hours
     pub fn count_since_hours(pool: &DbPool, hours: i64) -> i64 {
         let conn = match pool.get() {

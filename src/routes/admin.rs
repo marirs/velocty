@@ -239,11 +239,13 @@ pub fn comments_list(
 
     let comments = Comment::list(pool, status.as_deref(), per_page, offset);
     let total = Comment::count(pool, status.as_deref());
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as i64;
 
     let context = json!({
         "page_title": "Comments",
         "comments": comments,
         "current_page": current_page,
+        "total_pages": total_pages,
         "total": total,
         "status_filter": status,
         "count_all": Comment::count(pool, None),
@@ -277,14 +279,21 @@ pub fn comment_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<Adm
 
 // ── Categories ─────────────────────────────────────────
 
-#[get("/categories?<type_filter>")]
+#[get("/categories?<type_filter>&<page>")]
 pub fn categories_list(
     _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     type_filter: Option<String>,
+    page: Option<i64>,
 ) -> Template {
-    let categories = Category::list(pool, type_filter.as_deref());
+    let per_page = 20i64;
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+
+    let categories = Category::list_paginated(pool, type_filter.as_deref(), per_page, offset);
+    let total = Category::count(pool, type_filter.as_deref());
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as i64;
 
     let categories_with_count: Vec<serde_json::Value> = categories
         .iter()
@@ -302,6 +311,9 @@ pub fn categories_list(
     let context = json!({
         "page_title": "Categories",
         "categories": categories_with_count,
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "total": total,
         "type_filter": type_filter,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
@@ -312,9 +324,15 @@ pub fn categories_list(
 
 // ── Tags ───────────────────────────────────────────────
 
-#[get("/tags")]
-pub fn tags_list(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
-    let tags = Tag::list(pool);
+#[get("/tags?<page>")]
+pub fn tags_list(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, page: Option<i64>) -> Template {
+    let per_page = 20i64;
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+
+    let tags = Tag::list_paginated(pool, per_page, offset);
+    let total = Tag::count(pool);
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as i64;
 
     let tags_with_count: Vec<serde_json::Value> = tags
         .iter()
@@ -331,6 +349,9 @@ pub fn tags_list(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlu
     let context = json!({
         "page_title": "Tags",
         "tags": tags_with_count,
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "total": total,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
@@ -1502,34 +1523,55 @@ pub fn sales_orders(
 
 // ── Firewall Dashboard ─────────────────────────────────
 
-#[get("/firewall")]
+#[get("/firewall?<ev_page>&<ban_page>")]
 pub fn firewall_dashboard(
     _admin: AdminUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
+    ev_page: Option<i64>,
+    ban_page: Option<i64>,
 ) -> Template {
     use crate::models::firewall::{FwBan, FwEvent};
 
+    let per_page: i64 = 25;
+
+    // Events pagination
+    let ev_current = ev_page.unwrap_or(1).max(1);
+    let ev_offset = (ev_current - 1) * per_page;
+    let ev_total = FwEvent::count_all(pool, None);
+    let ev_total_pages = ((ev_total as f64) / (per_page as f64)).ceil() as i64;
+
+    // Bans pagination
+    let ban_current = ban_page.unwrap_or(1).max(1);
+    let ban_offset = (ban_current - 1) * per_page;
+    let ban_total = FwBan::active_count(pool);
+    let ban_total_pages = ((ban_total as f64) / (per_page as f64)).ceil() as i64;
+
     let settings = Setting::all(pool);
-    let active_bans = FwBan::active_count(pool);
     let events_24h = FwEvent::count_since_hours(pool, 24);
     let events_1h = FwEvent::count_since_hours(pool, 1);
     let top_ips = FwEvent::top_ips(pool, 10);
     let event_counts = FwEvent::counts_by_type(pool);
-    let events = FwEvent::recent(pool, None, 100, 0);
-    let bans = FwBan::active_bans(pool, 100, 0);
+    let events = FwEvent::recent(pool, None, per_page, ev_offset);
+    let bans = FwBan::active_bans(pool, per_page, ban_offset);
 
     let context = json!({
         "page_title": "Firewall",
         "admin_slug": slug.0,
         "settings": settings,
-        "active_bans": active_bans,
+        "active_bans": ban_total,
         "events_24h": events_24h,
         "events_1h": events_1h,
         "top_ips": top_ips,
         "event_counts": event_counts,
         "events": events,
         "bans": bans,
+        "ev_current_page": ev_current,
+        "ev_total_pages": ev_total_pages,
+        "ev_total": ev_total,
+        "ban_current_page": ban_current,
+        "ban_total_pages": ban_total_pages,
+        "ban_total": ban_total,
     });
     Template::render("admin/firewall", &context)
 }

@@ -56,14 +56,14 @@
 {% if total_pages > 1 %}
 <div class="pagination">
     {% if current_page > 1 %}
-    <a href="/{{ admin_slug }}/portfolio?page={{ current_page - 1 }}">&laquo; Prev</a>
+    <a href="/{{ admin_slug }}/portfolio?page={{ current_page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo; Prev</a>
     {% endif %}
     {% for p in range(end=total_pages) %}
     {% set page_num = p + 1 %}
-    <a href="/{{ admin_slug }}/portfolio?page={{ page_num }}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    <a href="/{{ admin_slug }}/portfolio?page={{ page_num }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
     {% endfor %}
     {% if current_page < total_pages %}
-    <a href="/{{ admin_slug }}/portfolio?page={{ current_page + 1 }}">Next &raquo;</a>
+    <a href="/{{ admin_slug }}/portfolio?page={{ current_page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next &raquo;</a>
     {% endif %}
 </div>
 {% endif %}
