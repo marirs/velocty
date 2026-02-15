@@ -387,12 +387,17 @@ velocty/
 - Design management: create, edit, duplicate, delete, activate, preview
 - Custom components for content placeholders
 
-### Phase 4 — AI
+### Phase 4 — AI ✅
 
-- Pluggable LLM connector with failover chain (Local → Ollama → OpenAI → Gemini → Cloudflare)
-- SEO suggestions: meta title, description, tags, categories, alt text, slug
-- Blog post generation from description
-- Inline assist: expand, rewrite, summarise, continue
+- Pluggable LLM connector with failover chain (Ollama → OpenAI → Gemini → Cloudflare Workers AI)
+- Provider-agnostic `ai::complete()` — automatic failover to next enabled provider on failure
+- SEO suggestions: ✨ buttons on Slug, Tags, Meta Title, Meta Description fields
+- Blog post generation from description (title, HTML content, excerpt, tags — all in one shot)
+- TinyMCE inline assist: select text → ✨ AI menu → Expand, Rewrite, Summarise, Continue, More Formal, More Casual
+- AI features conditionally shown only when at least one provider is enabled
+- All AI responses parsed with robust JSON extraction (handles markdown fences, leading text)
+- Settings UI: per-provider configuration, draggable failover chain ordering, model download for local LLM
+- Zero hardcoded API keys — all credentials stored in settings DB
 
 ---
 
