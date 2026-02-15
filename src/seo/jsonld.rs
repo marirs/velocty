@@ -2,21 +2,33 @@ use crate::db::DbPool;
 use crate::models::portfolio::PortfolioItem;
 use crate::models::post::Post;
 use crate::models::settings::Setting;
+use chrono::{DateTime, Utc};
 
 use super::json_escape;
+
+/// Format a NaiveDateTime as ISO 8601 with timezone offset for schema.org
+fn format_iso8601(ndt: chrono::NaiveDateTime, tz_name: &str) -> String {
+    let utc: DateTime<Utc> = DateTime::from_naive_utc_and_offset(ndt, Utc);
+    if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
+        utc.with_timezone(&tz).format("%Y-%m-%dT%H:%M:%S%:z").to_string()
+    } else {
+        utc.format("%Y-%m-%dT%H:%M:%S+00:00").to_string()
+    }
+}
 
 /// Build JSON-LD structured data for a blog post
 pub fn build_post_jsonld(pool: &DbPool, post: &Post) -> String {
     let site_name = Setting::get_or(pool, "site_name", "Velocty");
     let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
     let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
+    let tz_name = Setting::get_or(pool, "timezone", "UTC");
 
     let published = post
         .published_at
-        .map(|d| d.format("%Y-%m-%dT%H:%M:%S").to_string())
+        .map(|d| format_iso8601(d, &tz_name))
         .unwrap_or_default();
 
-    let modified = post.updated_at.format("%Y-%m-%dT%H:%M:%S").to_string();
+    let modified = format_iso8601(post.updated_at, &tz_name);
 
     let mut ld = format!(
         r#"<script type="application/ld+json">

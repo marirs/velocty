@@ -20,6 +20,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         "portfolio_single" => render_portfolio_single(context),
         "blog_list" => render_blog_list(context),
         "blog_single" => render_blog_single(context),
+        "archives" => render_archives(context),
         "404" => render_404(context),
         _ => render_404(context),
     };
@@ -663,6 +664,28 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
 }
 
 
+fn format_date_iso8601(raw: &str, settings: &Value) -> String {
+    let tz_name = settings
+        .get("timezone")
+        .and_then(|v| v.as_str())
+        .unwrap_or("UTC");
+
+    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S"));
+
+    match naive {
+        Ok(ndt) => {
+            let utc_dt = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc);
+            if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
+                utc_dt.with_timezone(&tz).format("%Y-%m-%dT%H:%M:%S%:z").to_string()
+            } else {
+                utc_dt.format("%Y-%m-%dT%H:%M:%S+00:00").to_string()
+            }
+        }
+        Err(_) => raw.to_string(),
+    }
+}
+
 fn format_date(raw: &str, settings: &Value) -> String {
     let fmt = settings
         .get("date_format")
@@ -1204,8 +1227,10 @@ fn render_blog_single(context: &Value) -> String {
         let slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
         let headline = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let desc = post.get("meta_description").and_then(|v| v.as_str()).unwrap_or("");
-        let published = post.get("published_at").and_then(|v| v.as_str()).unwrap_or("");
-        let modified = post.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+        let raw_pub = post.get("published_at").and_then(|v| v.as_str()).unwrap_or("");
+        let raw_mod = post.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+        let published = format_date_iso8601(raw_pub, &settings);
+        let modified = format_date_iso8601(raw_mod, &settings);
         let image = post.get("featured_image").and_then(|v| v.as_str()).unwrap_or("");
         let mut ld = format!(
             r#"<script type="application/ld+json">
@@ -1230,6 +1255,59 @@ fn render_blog_single(context: &Value) -> String {
         html.push_str(&ld);
     }
 
+    html
+}
+
+fn render_archives(context: &Value) -> String {
+    let archives = match context.get("archives") {
+        Some(Value::Array(a)) => a,
+        _ => return "<div class=\"blog-list\" style=\"padding:30px\"><h1>Archives</h1><p>No posts yet.</p></div>".to_string(),
+    };
+
+    if archives.is_empty() {
+        return "<div class=\"blog-list\" style=\"padding:30px\"><h1>Archives</h1><p>No posts yet.</p></div>".to_string();
+    }
+
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let blog_slug = settings.get("blog_slug").and_then(|v| v.as_str()).unwrap_or("journal");
+
+    let mut html = String::from("<div class=\"blog-list\" style=\"padding:30px\"><h1>Archives</h1>");
+
+    // Group by year
+    let mut current_year = String::new();
+    for entry in archives {
+        let year = entry.get("year").and_then(|v| v.as_str()).unwrap_or("");
+        let month = entry.get("month").and_then(|v| v.as_str()).unwrap_or("");
+        let count = entry.get("count").and_then(|v| v.as_i64()).unwrap_or(0);
+
+        if year != current_year {
+            if !current_year.is_empty() {
+                html.push_str("</ul>");
+            }
+            current_year = year.to_string();
+            html.push_str(&format!("<h2 style=\"margin-top:24px;margin-bottom:8px\">{}</h2><ul style=\"list-style:none;padding:0\">", year));
+        }
+
+        // Convert month number to name
+        let month_name = match month {
+            "01" => "January", "02" => "February", "03" => "March",
+            "04" => "April", "05" => "May", "06" => "June",
+            "07" => "July", "08" => "August", "09" => "September",
+            "10" => "October", "11" => "November", "12" => "December",
+            _ => month,
+        };
+
+        html.push_str(&format!(
+            "<li style=\"padding:4px 0\"><a href=\"/archives/{}/{}\" style=\"color:var(--color-text);text-decoration:none\">{}</a> <span style=\"color:var(--color-text-secondary);font-size:13px\">({})</span></li>",
+            year, month, month_name, count
+        ));
+    }
+
+    if !current_year.is_empty() {
+        html.push_str("</ul>");
+    }
+
+    html.push_str("</div>");
     html
 }
 
