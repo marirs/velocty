@@ -615,18 +615,15 @@ pub fn rss_feed(pool: &State<DbPool>) -> RawXml<String> {
 // ── Sitemap ────────────────────────────────────────────
 
 #[get("/sitemap.xml")]
-pub fn sitemap(pool: &State<DbPool>) -> RawXml<String> {
-    RawXml(seo::generate_sitemap(pool))
+pub fn sitemap(pool: &State<DbPool>) -> Option<RawXml<String>> {
+    seo::sitemap::generate_sitemap(pool).map(RawXml)
 }
 
 // ── Robots.txt ─────────────────────────────────────────
 
 #[get("/robots.txt")]
 pub fn robots(pool: &State<DbPool>) -> String {
-    let mut content = Setting::get_or(pool, "seo_robots_txt", "User-agent: *\nAllow: /");
-    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
-    content.push_str(&format!("\nSitemap: {}/sitemap.xml", site_url));
-    content
+    seo::sitemap::generate_robots(pool)
 }
 
 // ── Privacy Policy ─────────────────────────────────────

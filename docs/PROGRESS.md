@@ -98,6 +98,19 @@ Last updated: 2026-02-15
 - Fix crash when `--features multi-site` binary runs without setup (duplicated managed state)
 - Wizard-based first-run for multi-site migration/setup
 
+### SEO Module Refactor ✅
+- Refactored monolithic `src/seo.rs` into `src/seo/` module directory:
+  - `seo/mod.rs` — re-exports, shared `html_escape`/`json_escape`
+  - `seo/meta.rs` — `build_meta()` (title, description, canonical, OG, Twitter Cards)
+  - `seo/jsonld.rs` — `build_post_jsonld()`, `build_portfolio_jsonld()` (uses dynamic blog/portfolio slugs)
+  - `seo/sitemap.rs` — `generate_sitemap()` + `generate_robots()` (uses dynamic slugs)
+  - `seo/analytics.rs` — `build_analytics_scripts()` (moved from render.rs) — 7 providers: GA4, Plausible, Fathom, Matomo, Cloudflare, Clicky, Umami
+  - `seo/webmaster.rs` — `build_webmaster_meta()` (moved from render.rs) — Google, Bing, Yandex, Pinterest, Baidu
+- **Bug fix:** JSON-LD structured data now actually injected into blog single + portfolio single pages (was defined but never called)
+- **Bug fix:** `/sitemap.xml` now returns 404 when `seo_sitemap_enabled` is `false` (was served unconditionally)
+- **Bug fix:** Sitemap URLs now use dynamic `blog_slug` and `portfolio_slug` settings instead of hardcoded `/blog/` and `/portfolio/`
+- **Bug fix:** `robots.txt` only includes Sitemap line when sitemap is enabled
+
 ### Potential Enhancements
 - Wire captcha into comment form via design templates (currently only in default `render.rs`)
 - Magic link token cleanup cron/scheduled task

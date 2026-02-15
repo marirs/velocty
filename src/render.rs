@@ -2,6 +2,7 @@ use serde_json::Value;
 
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::seo;
 
 /// Renders a full page by merging the active design template with content data.
 /// In Phase 1, this uses hardcoded default templates.
@@ -97,7 +98,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
 </body>
 </html>"#,
         seo_meta = seo_meta,
-        webmaster_meta = build_webmaster_meta(&settings),
+        webmaster_meta = seo::build_webmaster_meta(&settings),
         font = font_primary,
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
@@ -117,7 +118,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         } else {
             ""
         },
-        analytics_scripts = build_analytics_scripts(&settings),
+        analytics_scripts = seo::build_analytics_scripts(&settings),
         cookie_consent = build_cookie_consent_banner(&settings),
     )
 }
@@ -142,7 +143,7 @@ pub fn render_legal_page(
     let ctx = serde_json::json!({ "categories": cats_json });
     let categories_html = build_categories_sidebar(&ctx);
 
-    let analytics_scripts = build_analytics_scripts(&settings_json);
+    let analytics_scripts = seo::build_analytics_scripts(&settings_json);
 
     format!(
         r#"<!DOCTYPE html>
@@ -289,36 +290,6 @@ fn build_social_links(settings: &Value) -> String {
     String::from(r#"<div class="social-links"></div>"#)
 }
 
-fn build_webmaster_meta(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings
-            .get(key)
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-    };
-
-    let mut meta = String::new();
-    let verifications = [
-        ("seo_google_verification", "google-site-verification"),
-        ("seo_bing_verification", "msvalidate.01"),
-        ("seo_yandex_verification", "yandex-verification"),
-        ("seo_pinterest_verification", "p:domain_verify"),
-        ("seo_baidu_verification", "baidu-site-verification"),
-    ];
-
-    for (key, name) in &verifications {
-        let val = get(key);
-        if !val.is_empty() {
-            meta.push_str(&format!(
-                r#"    <meta name="{}" content="{}">"#,
-                name,
-                html_escape(val)
-            ));
-            meta.push('\n');
-        }
-    }
-    meta
-}
 
 fn build_cookie_consent_banner(settings: &Value) -> String {
     let get = |key: &str| -> &str {
@@ -412,128 +383,6 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
     )
 }
 
-fn build_analytics_scripts(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings
-            .get(key)
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-    };
-    let enabled = |key: &str| -> bool { get(key) == "true" };
-
-    // When cookie consent is enabled, gate analytics behind consent
-    let consent = enabled("cookie_consent_enabled");
-    let (stag, stag_async) = if consent {
-        (r#"<script type="text/plain" data-consent="analytics""#, r#"<script type="text/plain" data-consent="analytics""#)
-    } else {
-        ("<script", "<script async")
-    };
-
-    let mut scripts = String::new();
-
-    // Google Analytics (GA4)
-    if enabled("seo_ga_enabled") {
-        let id = get("seo_ga_measurement_id");
-        if !id.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag_async} src="https://www.googletagmanager.com/gtag/js?id={id}"></script>
-{stag}>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{id}');</script>
-"#,
-                stag_async = stag_async,
-                stag = stag,
-                id = html_escape(id)
-            ));
-        }
-    }
-
-    // Plausible
-    if enabled("seo_plausible_enabled") {
-        let domain = get("seo_plausible_domain");
-        let host = get("seo_plausible_host");
-        let host = if host.is_empty() { "https://plausible.io" } else { host };
-        if !domain.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag} defer data-domain="{domain}" src="{host}/js/script.js"></script>
-"#,
-                stag = stag,
-                domain = html_escape(domain),
-                host = html_escape(host),
-            ));
-        }
-    }
-
-    // Fathom
-    if enabled("seo_fathom_enabled") {
-        let site_id = get("seo_fathom_site_id");
-        if !site_id.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag} src="https://cdn.usefathom.com/script.js" data-site="{id}" defer></script>
-"#,
-                stag = stag,
-                id = html_escape(site_id)
-            ));
-        }
-    }
-
-    // Matomo
-    if enabled("seo_matomo_enabled") {
-        let url = get("seo_matomo_url");
-        let site_id = get("seo_matomo_site_id");
-        if !url.is_empty() && !site_id.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag}>var _paq=window._paq=window._paq||[];_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);(function(){{var u='{url}/';_paq.push(['setTrackerUrl',u+'matomo.php']);_paq.push(['setSiteId','{site_id}']);var d=document,g=d.createElement('script'),s=d.getElementsByTagName('script')[0];g.async=true;g.src=u+'matomo.js';s.parentNode.insertBefore(g,s);}})();</script>
-"#,
-                stag = stag,
-                url = html_escape(url),
-                site_id = html_escape(site_id),
-            ));
-        }
-    }
-
-    // Cloudflare Web Analytics
-    if enabled("seo_cloudflare_analytics_enabled") {
-        let token = get("seo_cloudflare_analytics_token");
-        if !token.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag} defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token":"{token}"}}'></script>
-"#,
-                stag = stag,
-                token = html_escape(token)
-            ));
-        }
-    }
-
-    // Clicky
-    if enabled("seo_clicky_enabled") {
-        let site_id = get("seo_clicky_site_id");
-        if !site_id.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag_async} data-id="{id}" src="//static.getclicky.com/js"></script>
-"#,
-                stag_async = stag_async,
-                id = html_escape(site_id)
-            ));
-        }
-    }
-
-    // Umami
-    if enabled("seo_umami_enabled") {
-        let website_id = get("seo_umami_website_id");
-        let host = get("seo_umami_host");
-        let host = if host.is_empty() { "https://analytics.umami.is" } else { host };
-        if !website_id.is_empty() {
-            scripts.push_str(&format!(
-                r#"{stag} defer src="{host}/script.js" data-website-id="{id}"></script>
-"#,
-                stag = stag,
-                host = html_escape(host),
-                id = html_escape(website_id),
-            ));
-        }
-    }
-
-    scripts
-}
 
 fn render_portfolio_grid(context: &Value) -> String {
     let items = match context.get("items") {
@@ -673,6 +522,34 @@ fn render_portfolio_single(context: &Value) -> String {
     }
 
     html.push_str("</article>");
+
+    // JSON-LD structured data
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    if settings.get("seo_structured_data").and_then(|v| v.as_str()) == Some("true") {
+        let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
+        let site_url = settings.get("site_url").and_then(|v| v.as_str()).unwrap_or("http://localhost:8000");
+        let portfolio_slug = settings.get("portfolio_slug").and_then(|v| v.as_str()).unwrap_or("portfolio");
+        let slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        let meta_desc = item.get("meta_description").and_then(|v| v.as_str()).unwrap_or("");
+        html.push_str(&format!(
+            r#"<script type="application/ld+json">
+{{
+    "@context": "https://schema.org",
+    "@type": "ImageObject",
+    "name": "{}",
+    "description": "{}",
+    "contentUrl": "{}/uploads/{}",
+    "url": "{}/{}/{}",
+    "publisher": {{ "@type": "Organization", "name": "{}" }}
+}}
+</script>"#,
+            html_escape(title), html_escape(meta_desc),
+            site_url, image,
+            site_url, portfolio_slug, slug,
+            html_escape(site_name),
+        ));
+    }
+
     html
 }
 
@@ -926,6 +803,41 @@ f.addEventListener('submit',function(e){{
     }
 
     html.push_str("</article>");
+
+    // JSON-LD structured data
+    if settings.get("seo_structured_data").and_then(|v| v.as_str()) == Some("true") {
+        let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
+        let site_url = settings.get("site_url").and_then(|v| v.as_str()).unwrap_or("http://localhost:8000");
+        let blog_slug = settings.get("blog_slug").and_then(|v| v.as_str()).unwrap_or("journal");
+        let slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        let headline = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let desc = post.get("meta_description").and_then(|v| v.as_str()).unwrap_or("");
+        let published = post.get("published_at").and_then(|v| v.as_str()).unwrap_or("");
+        let modified = post.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+        let image = post.get("featured_image").and_then(|v| v.as_str()).unwrap_or("");
+        let mut ld = format!(
+            r#"<script type="application/ld+json">
+{{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "{}",
+    "description": "{}",
+    "url": "{}/{}/{}",
+    "datePublished": "{}",
+    "dateModified": "{}",
+    "publisher": {{ "@type": "Organization", "name": "{}" }}"#,
+            html_escape(headline), html_escape(desc),
+            site_url, blog_slug, slug,
+            published, modified,
+            html_escape(site_name),
+        );
+        if !image.is_empty() {
+            ld.push_str(&format!(r#", "image": "{}/uploads/{}""#, site_url, html_escape(image)));
+        }
+        ld.push_str("\n}\n</script>");
+        html.push_str(&ld);
+    }
+
     html
 }
 
