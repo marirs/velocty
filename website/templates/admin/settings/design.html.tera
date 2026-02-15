@@ -32,6 +32,7 @@
     <div id="panel-general" class="sub-panel">
         <div class="form-card">
             <h3>UI Features</h3>
+            <label class="checkbox-item"><input type="checkbox" name="design_site_search" value="true" {% if settings.design_site_search == "true" %}checked{% endif %}> Site Search <span class="status-dot {% if settings.design_site_search == 'true' %}dot-on{% else %}dot-off{% endif %}"></span></label>
             <label class="checkbox-item"><input type="checkbox" name="design_back_to_top" value="true" {% if settings.design_back_to_top == "true" %}checked{% endif %}> Show back-to-top button</label>
         </div>
 

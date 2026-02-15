@@ -405,6 +405,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("security_hcaptcha_site_key", ""),
         ("security_hcaptcha_secret_key", ""),
         // Visitors (Design)
+        ("design_site_search", "true"),
         ("design_back_to_top", "false"),
         ("cookie_consent_enabled", "false"),
         ("cookie_consent_style", "minimal"),

@@ -989,7 +989,7 @@ pub fn settings_save(
         ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &[
-            "design_back_to_top",
+            "design_site_search", "design_back_to_top",
             "cookie_consent_enabled", "cookie_consent_show_reject",
             "privacy_policy_enabled", "terms_of_use_enabled",
         ],
