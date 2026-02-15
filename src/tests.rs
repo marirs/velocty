@@ -15,7 +15,11 @@ use crate::models::user::User;
 use crate::models::order::{Order, DownloadToken, License};
 use crate::models::audit::AuditEntry;
 use crate::models::firewall::{FwBan, FwEvent};
+use crate::models::design::{Design, DesignTemplate};
+use crate::models::analytics::PageView;
+use crate::models::import::Import;
 use crate::security::auth;
+use crate::security::mfa;
 
 /// Atomic counter for unique shared-cache DB names so parallel tests don't collide.
 static TEST_DB_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -1140,6 +1144,490 @@ fn slug_cross_validation() {
     // Empty blog slug is allowed (mounts at /)
     let blog3 = "";
     assert!(!is_reserved(blog3));
+}
+
+// ═══════════════════════════════════════════════════════════
+// Settings: additional coverage
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn settings_get_f64() {
+    let pool = test_pool();
+    Setting::set(&pool, "price", "19.99").unwrap();
+    assert!((Setting::get_f64(&pool, "price") - 19.99).abs() < 0.001);
+    assert_eq!(Setting::get_f64(&pool, "missing"), 0.0);
+}
+
+#[test]
+fn settings_get_group() {
+    let pool = test_pool();
+    Setting::set(&pool, "smtp_host", "mail.example.com").unwrap();
+    Setting::set(&pool, "smtp_port", "587").unwrap();
+    Setting::set(&pool, "smtp_user", "user@example.com").unwrap();
+    Setting::set(&pool, "unrelated_key", "nope").unwrap();
+
+    let group = Setting::get_group(&pool, "smtp_");
+    assert_eq!(group.len(), 3);
+    assert_eq!(group.get("smtp_host").unwrap(), "mail.example.com");
+    assert_eq!(group.get("smtp_port").unwrap(), "587");
+    assert!(group.get("unrelated_key").is_none());
+}
+
+// ═══════════════════════════════════════════════════════════
+// Users: additional coverage
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn user_update_password() {
+    let pool = test_pool();
+    let hash1 = fast_hash("old_pass");
+    let id = User::create(&pool, "pw@test.com", &hash1, "PW", "admin").unwrap();
+
+    let hash2 = fast_hash("new_pass");
+    User::update_password(&pool, id, &hash2).unwrap();
+
+    let user = User::get_by_id(&pool, id).unwrap();
+    assert!(auth::verify_password("new_pass", &user.password_hash));
+    assert!(!auth::verify_password("old_pass", &user.password_hash));
+}
+
+#[test]
+fn user_update_avatar() {
+    let pool = test_pool();
+    let hash = fast_hash("p");
+    let id = User::create(&pool, "av@test.com", &hash, "Av", "admin").unwrap();
+
+    User::update_avatar(&pool, id, "/uploads/avatar.png").unwrap();
+    let user = User::get_by_id(&pool, id).unwrap();
+    assert_eq!(user.avatar, "/uploads/avatar.png");
+}
+
+#[test]
+fn user_touch_last_login() {
+    let pool = test_pool();
+    let hash = fast_hash("p");
+    let id = User::create(&pool, "login@test.com", &hash, "L", "admin").unwrap();
+
+    let before = User::get_by_id(&pool, id).unwrap();
+    assert!(before.last_login_at.is_none());
+
+    User::touch_last_login(&pool, id).unwrap();
+    let after = User::get_by_id(&pool, id).unwrap();
+    assert!(after.last_login_at.is_some());
+}
+
+#[test]
+fn user_list_paginated() {
+    let pool = test_pool();
+    let hash = fast_hash("p");
+    for i in 0..5 {
+        User::create(&pool, &format!("u{}@t.com", i), &hash, &format!("U{}", i), "editor").unwrap();
+    }
+    User::create(&pool, "admin@t.com", &hash, "Admin", "admin").unwrap();
+
+    // All users
+    assert_eq!(User::count_filtered(&pool, None), 6);
+    assert_eq!(User::list_paginated(&pool, None, 3, 0).len(), 3);
+    assert_eq!(User::list_paginated(&pool, None, 10, 4).len(), 2);
+
+    // Filter by role
+    assert_eq!(User::count_filtered(&pool, Some("editor")), 5);
+    assert_eq!(User::list_paginated(&pool, Some("editor"), 10, 0).len(), 5);
+    assert_eq!(User::count_filtered(&pool, Some("admin")), 1);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Designs + DesignTemplates
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn design_crud() {
+    let pool = test_pool();
+
+    // seed_defaults creates a "Default" design, so count starts at 1
+    let baseline = Design::list(&pool).len();
+
+    let id = Design::create(&pool, "Custom Theme").unwrap();
+    assert!(id > 0);
+
+    let design = Design::find_by_id(&pool, id).unwrap();
+    assert_eq!(design.name, "Custom Theme");
+    assert!(!design.is_active);
+
+    // List
+    assert_eq!(Design::list(&pool).len(), baseline + 1);
+
+    // Delete
+    Design::delete(&pool, id).unwrap();
+    assert!(Design::find_by_id(&pool, id).is_none());
+    assert_eq!(Design::list(&pool).len(), baseline);
+}
+
+#[test]
+fn design_activate() {
+    let pool = test_pool();
+    let d1 = Design::create(&pool, "Theme A").unwrap();
+    let d2 = Design::create(&pool, "Theme B").unwrap();
+
+    // Activate d1
+    Design::activate(&pool, d1).unwrap();
+    assert!(Design::find_by_id(&pool, d1).unwrap().is_active);
+    assert!(!Design::find_by_id(&pool, d2).unwrap().is_active);
+    assert_eq!(Design::active(&pool).unwrap().id, d1);
+
+    // Activate d2 — d1 should deactivate
+    Design::activate(&pool, d2).unwrap();
+    assert!(!Design::find_by_id(&pool, d1).unwrap().is_active);
+    assert!(Design::find_by_id(&pool, d2).unwrap().is_active);
+    assert_eq!(Design::active(&pool).unwrap().id, d2);
+}
+
+#[test]
+fn design_duplicate() {
+    let pool = test_pool();
+    let orig = Design::create(&pool, "Original").unwrap();
+
+    // Add templates to original
+    DesignTemplate::upsert(&pool, orig, "homepage", "<h1>Home</h1>", "h1{color:red}").unwrap();
+    DesignTemplate::upsert(&pool, orig, "post", "<article/>", "article{}").unwrap();
+
+    // Duplicate
+    let dup = Design::duplicate(&pool, orig, "Copy of Original").unwrap();
+    assert_ne!(orig, dup);
+
+    let dup_design = Design::find_by_id(&pool, dup).unwrap();
+    assert_eq!(dup_design.name, "Copy of Original");
+
+    // Templates should be duplicated
+    let templates = DesignTemplate::for_design(&pool, dup);
+    assert_eq!(templates.len(), 2);
+}
+
+#[test]
+fn design_template_upsert_and_get() {
+    let pool = test_pool();
+    let did = Design::create(&pool, "Test Design").unwrap();
+
+    // Create template
+    DesignTemplate::upsert(&pool, did, "homepage", "<div>v1</div>", ".v1{}").unwrap();
+    let t = DesignTemplate::get(&pool, did, "homepage").unwrap();
+    assert_eq!(t.layout_html, "<div>v1</div>");
+    assert_eq!(t.style_css, ".v1{}");
+
+    // Update (upsert same type)
+    DesignTemplate::upsert(&pool, did, "homepage", "<div>v2</div>", ".v2{}").unwrap();
+    let t2 = DesignTemplate::get(&pool, did, "homepage").unwrap();
+    assert_eq!(t2.layout_html, "<div>v2</div>");
+
+    // Different template type
+    DesignTemplate::upsert(&pool, did, "post", "<article/>", "").unwrap();
+    assert_eq!(DesignTemplate::for_design(&pool, did).len(), 2);
+
+    // Delete design cascades templates
+    Design::delete(&pool, did).unwrap();
+    assert_eq!(DesignTemplate::for_design(&pool, did).len(), 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Analytics (PageView)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn pageview_record_and_overview() {
+    let pool = test_pool();
+
+    PageView::record(&pool, "/", "hash1", Some("US"), None, Some("https://google.com"), Some("Mozilla/5.0"), Some("desktop"), Some("Chrome")).unwrap();
+    PageView::record(&pool, "/blog/hello", "hash2", Some("UK"), None, None, None, Some("mobile"), Some("Safari")).unwrap();
+    PageView::record(&pool, "/portfolio/sunset", "hash1", Some("US"), None, None, None, Some("desktop"), Some("Chrome")).unwrap();
+
+    let from = "2020-01-01";
+    let to = "2030-12-31";
+
+    let stats = PageView::overview(&pool, from, to);
+    assert_eq!(stats.total_views, 3);
+    assert_eq!(stats.unique_visitors, 2);
+}
+
+#[test]
+fn pageview_calendar_data() {
+    let pool = test_pool();
+    PageView::record(&pool, "/", "h1", None, None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/about", "h2", None, None, None, None, None, None).unwrap();
+
+    let data = PageView::calendar_data(&pool, "2020-01-01", "2030-12-31");
+    assert!(!data.is_empty());
+    let total: i64 = data.iter().map(|d| d.count).sum();
+    assert_eq!(total, 2);
+}
+
+#[test]
+fn pageview_geo_data() {
+    let pool = test_pool();
+    PageView::record(&pool, "/", "h1", Some("US"), None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/", "h2", Some("US"), None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/", "h3", Some("UK"), None, None, None, None, None).unwrap();
+
+    let geo = PageView::geo_data(&pool, "2020-01-01", "2030-12-31");
+    assert_eq!(geo.len(), 2);
+    assert_eq!(geo[0].label, "US");
+    assert_eq!(geo[0].count, 2);
+}
+
+#[test]
+fn pageview_top_referrers() {
+    let pool = test_pool();
+    PageView::record(&pool, "/", "h1", None, None, Some("https://google.com"), None, None, None).unwrap();
+    PageView::record(&pool, "/", "h2", None, None, Some("https://google.com"), None, None, None).unwrap();
+    PageView::record(&pool, "/", "h3", None, None, None, None, None, None).unwrap();
+
+    let refs = PageView::top_referrers(&pool, "2020-01-01", "2030-12-31", 10);
+    assert_eq!(refs.len(), 2);
+    // Top referrer should be google (2 hits)
+    assert_eq!(refs[0].count, 2);
+}
+
+#[test]
+fn pageview_stream_data() {
+    let pool = test_pool();
+    PageView::record(&pool, "/blog/a", "h1", None, None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/portfolio/b", "h2", None, None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/about", "h3", None, None, None, None, None, None).unwrap();
+
+    let stream = PageView::stream_data(&pool, "2020-01-01", "2030-12-31");
+    assert!(!stream.is_empty());
+    let total: i64 = stream.iter().map(|s| s.count).sum();
+    assert_eq!(total, 3);
+}
+
+#[test]
+fn pageview_top_portfolio() {
+    let pool = test_pool();
+    PageView::record(&pool, "/portfolio/sunset", "h1", None, None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/portfolio/sunset", "h2", None, None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/portfolio/dawn", "h3", None, None, None, None, None, None).unwrap();
+    PageView::record(&pool, "/blog/unrelated", "h4", None, None, None, None, None, None).unwrap();
+
+    let top = PageView::top_portfolio(&pool, "2020-01-01", "2030-12-31", 10);
+    assert_eq!(top.len(), 2);
+    assert_eq!(top[0].label, "/portfolio/sunset");
+    assert_eq!(top[0].count, 2);
+}
+
+#[test]
+fn pageview_tag_relations() {
+    let pool = test_pool();
+    let t1 = Tag::create(&pool, &TagForm { name: "Rust".to_string(), slug: "rust".to_string() }).unwrap();
+    let t2 = Tag::create(&pool, &TagForm { name: "Web".to_string(), slug: "web".to_string() }).unwrap();
+    let t3 = Tag::create(&pool, &TagForm { name: "API".to_string(), slug: "api-tag".to_string() }).unwrap();
+
+    let p1 = Post::create(&pool, &make_post_form("P1", "p1", "published")).unwrap();
+    let p2 = Post::create(&pool, &make_post_form("P2", "p2", "published")).unwrap();
+
+    // p1 has Rust + Web, p2 has Rust + API
+    Tag::set_for_content(&pool, p1, "post", &[t1, t2]).unwrap();
+    Tag::set_for_content(&pool, p2, "post", &[t1, t3]).unwrap();
+
+    let relations = PageView::tag_relations(&pool);
+    assert!(!relations.is_empty());
+    // Rust-Web and Rust-API should appear
+    assert!(relations.iter().any(|r| r.source == "API" || r.target == "API"));
+}
+
+// ═══════════════════════════════════════════════════════════
+// Imports
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn import_create_and_list() {
+    let pool = test_pool();
+
+    let id = Import::create(&pool, "wordpress", Some("export.xml"), 10, 5, 3, 2, Some("All good")).unwrap();
+    assert!(id > 0);
+
+    let id2 = Import::create(&pool, "velocty", Some("backup.json"), 20, 0, 0, 0, None).unwrap();
+    assert!(id2 > id);
+
+    let list = Import::list(&pool);
+    assert_eq!(list.len(), 2);
+
+    // Find the wordpress import by source (order may vary when timestamps are identical)
+    let wp = list.iter().find(|i| i.source == "wordpress").unwrap();
+    assert_eq!(wp.posts_count, 10);
+    assert_eq!(wp.portfolio_count, 5);
+    assert_eq!(wp.comments_count, 3);
+    assert_eq!(wp.skipped_count, 2);
+    assert_eq!(wp.log.as_deref(), Some("All good"));
+
+    let vel = list.iter().find(|i| i.source == "velocty").unwrap();
+    assert_eq!(vel.posts_count, 20);
+    assert!(vel.log.is_none());
+}
+
+// ═══════════════════════════════════════════════════════════
+// MFA (TOTP)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn mfa_generate_secret() {
+    let secret = mfa::generate_secret();
+    assert!(!secret.is_empty());
+    // Base32-encoded secrets are alphanumeric
+    assert!(secret.chars().all(|c| c.is_alphanumeric() || c == '='));
+}
+
+#[test]
+fn mfa_generate_recovery_codes() {
+    let codes = mfa::generate_recovery_codes();
+    assert_eq!(codes.len(), 10);
+    for code in &codes {
+        // Format: XXXX-XXXX (9 chars with dash)
+        assert_eq!(code.len(), 9);
+        assert_eq!(&code[4..5], "-");
+    }
+    // All codes should be unique
+    let mut unique = codes.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), 10);
+}
+
+#[test]
+fn mfa_verify_code_rejects_bad_input() {
+    let secret = mfa::generate_secret();
+    // Random wrong code should fail
+    assert!(!mfa::verify_code(&secret, "000000"));
+    assert!(!mfa::verify_code(&secret, ""));
+    assert!(!mfa::verify_code(&secret, "not-a-code"));
+    // Invalid secret should fail gracefully
+    assert!(!mfa::verify_code("not-a-valid-base32!!!", "123456"));
+}
+
+#[test]
+fn mfa_qr_data_uri() {
+    let secret = mfa::generate_secret();
+    let result = mfa::qr_data_uri(&secret, "Velocty", "admin@test.com");
+    assert!(result.is_ok());
+    let uri = result.unwrap();
+    assert!(uri.starts_with("data:image/png;base64,"));
+    assert!(uri.len() > 100); // should be a substantial base64 string
+}
+
+// ═══════════════════════════════════════════════════════════
+// Firewall: additional coverage
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn fw_ban_expire_stale() {
+    let pool = test_pool();
+
+    // Create a ban that already expired (active=1 but expires_at in the past)
+    {
+        let conn = pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO fw_bans (ip, reason, active, expires_at) VALUES ('10.0.0.99', 'test', 1, datetime('now', '-1 hour'))",
+            [],
+        ).unwrap();
+    }
+
+    // is_banned already filters by expires_at, so it returns false
+    // but the row is still active=1 in the DB
+    let active_before: i64 = {
+        let conn = pool.get().unwrap();
+        conn.query_row(
+            "SELECT COUNT(*) FROM fw_bans WHERE ip = '10.0.0.99' AND active = 1",
+            [],
+            |row| row.get(0),
+        ).unwrap()
+    };
+    assert_eq!(active_before, 1);
+
+    // expire_stale marks it inactive
+    FwBan::expire_stale(&pool);
+
+    let active_after: i64 = {
+        let conn = pool.get().unwrap();
+        conn.query_row(
+            "SELECT COUNT(*) FROM fw_bans WHERE ip = '10.0.0.99' AND active = 1",
+            [],
+            |row| row.get(0),
+        ).unwrap()
+    };
+    assert_eq!(active_after, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Orders: additional coverage
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn order_revenue_by_period() {
+    let pool = test_pool();
+    let pid = setup_portfolio(&pool);
+
+    Order::create(&pool, pid, "a@t.com", "A", 50.0, "USD", "stripe", "S1", "completed").unwrap();
+    Order::create(&pool, pid, "b@t.com", "B", 30.0, "USD", "stripe", "S2", "completed").unwrap();
+    Order::create(&pool, pid, "c@t.com", "C", 20.0, "USD", "stripe", "S3", "pending").unwrap();
+
+    // Revenue for last 30 days (all orders are fresh)
+    let rev = Order::revenue_by_period(&pool, 30);
+    assert!((rev - 80.0).abs() < 0.01); // only completed orders
+
+    // Total revenue
+    assert!((Order::total_revenue(&pool) - 80.0).abs() < 0.01);
+}
+
+#[test]
+fn download_token_max_downloads_exhausted() {
+    let pool = test_pool();
+    let pid = setup_portfolio(&pool);
+    let oid = Order::create(&pool, pid, "b@t.com", "B", 10.0, "USD", "stripe", "", "completed").unwrap();
+
+    let future = chrono::Utc::now().naive_utc() + chrono::Duration::hours(48);
+    let tid = DownloadToken::create(&pool, oid, "tok-exhaust", 2, future).unwrap();
+
+    // Use up all downloads
+    DownloadToken::increment_download(&pool, tid).unwrap();
+    DownloadToken::increment_download(&pool, tid).unwrap();
+
+    let token = DownloadToken::find_by_token(&pool, "tok-exhaust").unwrap();
+    assert_eq!(token.downloads_used, 2);
+    assert!(!token.is_valid()); // max_downloads reached
+}
+
+// ═══════════════════════════════════════════════════════════
+// Security: rate limiting
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn login_rate_limit() {
+    let pool = test_pool();
+    Setting::set(&pool, "login_rate_limit", "3").unwrap();
+
+    let hash = fast_hash("p");
+    let uid = User::create(&pool, "rl@test.com", &hash, "RL", "admin").unwrap();
+
+    // check_login_rate_limit hashes the IP, then queries sessions by ip_address.
+    // create_session stores the raw IP. So we store the hashed IP directly
+    // to simulate what a real login flow does (the route hashes before storing).
+    let ip = "192.168.1.1";
+    let ip_hash = auth::hash_ip(ip);
+
+    // Insert sessions with the hashed IP to match what rate limiter queries
+    for _ in 0..3 {
+        let conn = pool.get().unwrap();
+        let now = chrono::Utc::now().naive_utc();
+        let expires = now + chrono::Duration::hours(24);
+        conn.execute(
+            "INSERT INTO sessions (id, user_id, created_at, expires_at, ip_address) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![uuid::Uuid::new_v4().to_string(), uid, now, expires, ip_hash],
+        ).unwrap();
+    }
+
+    // 4th attempt should be rate limited
+    assert!(!auth::check_login_rate_limit(&pool, ip));
+
+    // Different IP should still be allowed
+    assert!(auth::check_login_rate_limit(&pool, "10.0.0.1"));
 }
 
 // ═══════════════════════════════════════════════════════════
