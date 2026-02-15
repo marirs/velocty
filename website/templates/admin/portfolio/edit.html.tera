@@ -47,7 +47,7 @@
         <div class="editor-sidebar">
             <div class="form-card collapsible">
                 <h4>Categories</h4>
-                <div class="checkbox-list">
+                <div class="checkbox-list" id="category-list">
                     {% for cat in categories %}
                     <label class="checkbox-item">
                         <input type="checkbox" name="category_ids" value="{{ cat.id }}"
@@ -55,6 +55,18 @@
                         {{ cat.name }}
                     </label>
                     {% endfor %}
+                </div>
+                <div style="margin-top:8px;display:flex;gap:6px" id="add-cat-row">
+                    <input type="text" id="new-cat-name" placeholder="New category…" style="flex:1;font-size:12px;padding:5px 8px">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addCategory()" style="white-space:nowrap;font-size:11px;padding:4px 10px">+ Add</button>
+                </div>
+            </div>
+
+            <div class="form-card collapsible">
+                <h4>Publish Date</h4>
+                <div class="form-group" style="margin-bottom:0">
+                    <input type="datetime-local" name="published_at" id="published_at" value="{% if item and item.published_at %}{{ item.published_at | date(format='%Y-%m-%dT%H:%M') }}{% endif %}" style="font-size:12px">
+                    <p class="text-muted" style="font-size:11px;margin-top:4px">Leave empty to use current time on publish</p>
                 </div>
             </div>
 
@@ -223,6 +235,37 @@
             });
             {% endif %}
         }
+    });
+
+    // Inline category creation
+    function addCategory() {
+        var input = document.getElementById('new-cat-name');
+        var name = input.value.trim();
+        if (!name) return;
+        input.disabled = true;
+        fetch('/{{ admin_slug }}/api/categories/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, type: 'portfolio'})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                var list = document.getElementById('category-list');
+                var label = document.createElement('label');
+                label.className = 'checkbox-item';
+                label.innerHTML = '<input type="checkbox" name="category_ids" value="' + data.id + '" checked> ' + data.name;
+                list.appendChild(label);
+                input.value = '';
+            } else {
+                alert(data.error || 'Failed to create category');
+            }
+        })
+        .catch(function() { alert('Failed to create category'); })
+        .finally(function() { input.disabled = false; input.focus(); });
+    }
+    document.getElementById('new-cat-name').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); addCategory(); }
     });
 
     document.getElementById('title').addEventListener('input', function() {

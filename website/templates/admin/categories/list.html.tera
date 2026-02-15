@@ -41,14 +41,30 @@
         </thead>
         <tbody>
             {% for cat in categories %}
-            <tr>
+            <tr id="cat-row-{{ cat.id }}">
                 <td>{{ cat.name }}</td>
                 <td class="text-muted">{{ cat.slug }}</td>
                 <td><span class="badge">{{ cat.type }}</span></td>
                 <td class="text-muted">{{ cat.count }}</td>
-                <td class="actions">
+                <td class="actions" style="white-space:nowrap">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="editCategory({{ cat.id }}, '{{ cat.name }}', '{{ cat.slug }}', '{{ cat.type }}')">Edit</button>
                     <form method="post" action="/{{ admin_slug }}/categories/{{ cat.id }}/delete" class="inline" onsubmit="return confirm('Delete this category?')">
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            <tr id="cat-edit-{{ cat.id }}" style="display:none">
+                <td colspan="5">
+                    <form method="post" action="/{{ admin_slug }}/categories/{{ cat.id }}/edit" class="form-row" style="gap:8px;align-items:center">
+                        <input type="text" name="name" value="{{ cat.name }}" placeholder="Name" required style="flex:2;font-size:13px;padding:5px 8px">
+                        <input type="text" name="slug" value="{{ cat.slug }}" placeholder="Slug" style="flex:2;font-size:13px;padding:5px 8px">
+                        <select name="type" style="flex:1;font-size:13px;padding:5px 8px">
+                            <option value="portfolio" {% if cat.type == "portfolio" %}selected{% endif %}>Portfolio</option>
+                            <option value="post" {% if cat.type == "post" %}selected{% endif %}>Journal</option>
+                            <option value="both" {% if cat.type == "both" %}selected{% endif %}>Both</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="cancelEdit({{ cat.id }})">Cancel</button>
                     </form>
                 </td>
             </tr>
@@ -74,4 +90,15 @@
     {% endif %}
 </div>
 {% endif %}
+
+<script>
+function editCategory(id) {
+    document.getElementById('cat-row-' + id).style.display = 'none';
+    document.getElementById('cat-edit-' + id).style.display = '';
+}
+function cancelEdit(id) {
+    document.getElementById('cat-edit-' + id).style.display = 'none';
+    document.getElementById('cat-row-' + id).style.display = '';
+}
+</script>
 {% endblock content %}

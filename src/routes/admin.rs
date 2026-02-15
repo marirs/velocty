@@ -462,6 +462,7 @@ pub struct PostFormData<'f> {
     pub meta_title: Option<String>,
     pub meta_description: Option<String>,
     pub status: String,
+    pub published_at: Option<String>,
     pub category_ids: Option<Vec<i64>>,
     pub featured_image: Option<TempFile<'f>>,
 }
@@ -565,7 +566,7 @@ pub async fn posts_create(
         meta_description: form.meta_description.clone(),
         status: form.status.clone(),
         published_at: if form.status == "published" {
-            Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string())
+            form.published_at.clone().filter(|s| !s.is_empty()).or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string()))
         } else {
             None
         },
@@ -608,7 +609,10 @@ pub async fn posts_update(
         meta_description: form.meta_description.clone(),
         status: form.status.clone(),
         published_at: if form.status == "published" {
-            Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string())
+            form.published_at.clone().filter(|s| !s.is_empty()).or_else(|| {
+                Post::find_by_id(pool, id).and_then(|p| p.published_at).map(|d| d.format("%Y-%m-%dT%H:%M").to_string())
+                    .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string()))
+            })
         } else {
             None
         },
@@ -638,6 +642,7 @@ pub struct PortfolioFormData<'f> {
     pub payment_provider: Option<String>,
     pub download_file_path: Option<String>,
     pub status: String,
+    pub published_at: Option<String>,
     pub category_ids: Option<Vec<i64>>,
     pub image: Option<TempFile<'f>>,
 }
@@ -670,7 +675,7 @@ pub async fn portfolio_create(
         download_file_path: form.download_file_path.clone(),
         status: form.status.clone(),
         published_at: if form.status == "published" {
-            Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string())
+            form.published_at.clone().filter(|s| !s.is_empty()).or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string()))
         } else {
             None
         },
@@ -720,7 +725,10 @@ pub async fn portfolio_update(
         download_file_path: form.download_file_path.clone(),
         status: form.status.clone(),
         published_at: if form.status == "published" {
-            Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string())
+            form.published_at.clone().filter(|s| !s.is_empty()).or_else(|| {
+                PortfolioItem::find_by_id(pool, id).and_then(|p| p.published_at).map(|d| d.format("%Y-%m-%dT%H:%M").to_string())
+                    .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string()))
+            })
         } else {
             None
         },
@@ -765,6 +773,49 @@ pub fn category_create(
         },
     );
     Redirect::to(format!("{}/categories", admin_base(admin_slug)))
+}
+
+#[post("/api/categories/create", format = "json", data = "<data>")]
+pub fn api_category_create(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    data: Json<Value>,
+) -> Json<Value> {
+    let name = data.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let cat_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("post").to_string();
+    if name.is_empty() {
+        return Json(json!({"ok": false, "error": "Name is required"}));
+    }
+    let cat_slug = slug::slugify(&name);
+    match Category::create(pool, &CategoryForm { name: name.clone(), slug: cat_slug, r#type: cat_type }) {
+        Ok(id) => Json(json!({"ok": true, "id": id, "name": name})),
+        Err(e) => Json(json!({"ok": false, "error": e})),
+    }
+}
+
+#[post("/categories/<id>/edit", data = "<form>")]
+pub fn category_update(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    id: i64,
+    form: Form<CategoryFormData>,
+) -> Redirect {
+    let cat_slug = if form.slug.is_empty() {
+        slug::slugify(&form.name)
+    } else {
+        form.slug.clone()
+    };
+    let _ = Category::update(
+        pool,
+        id,
+        &CategoryForm {
+            name: form.name.clone(),
+            slug: cat_slug,
+            r#type: form.r#type.clone(),
+        },
+    );
+    Redirect::to(format!("{}/categories", admin_base(slug)))
 }
 
 #[post("/categories/<id>/delete")]
@@ -1948,6 +1999,8 @@ pub fn routes() -> Vec<rocket::Route> {
         comment_delete,
         categories_list,
         category_create,
+        api_category_create,
+        category_update,
         category_delete,
         tags_list,
         tag_delete,

@@ -56,7 +56,7 @@ impl Category {
 
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match type_filter {
             Some(t) => (
-                "SELECT * FROM categories WHERE type = ?1 ORDER BY name".to_string(),
+                "SELECT * FROM categories WHERE type = ?1 OR type = 'both' ORDER BY name".to_string(),
                 vec![Box::new(t.to_string())],
             ),
             None => (
@@ -85,7 +85,7 @@ impl Category {
         };
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match type_filter {
             Some(t) => (
-                "SELECT * FROM categories WHERE type = ?1 ORDER BY name LIMIT ?2 OFFSET ?3".to_string(),
+                "SELECT * FROM categories WHERE type = ?1 OR type = 'both' ORDER BY name LIMIT ?2 OFFSET ?3".to_string(),
                 vec![Box::new(t.to_string()), Box::new(limit), Box::new(offset)],
             ),
             None => (
@@ -109,7 +109,7 @@ impl Category {
             Err(_) => return 0,
         };
         match type_filter {
-            Some(t) => conn.query_row("SELECT COUNT(*) FROM categories WHERE type = ?1", params![t], |row| row.get(0)).unwrap_or(0),
+            Some(t) => conn.query_row("SELECT COUNT(*) FROM categories WHERE type = ?1 OR type = 'both'", params![t], |row| row.get(0)).unwrap_or(0),
             None => conn.query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0)).unwrap_or(0),
         }
     }
