@@ -1484,6 +1484,87 @@ pub fn sales_orders(
     Template::render("admin/sales/orders", &context)
 }
 
+// ── Firewall Dashboard ─────────────────────────────────
+
+#[get("/firewall")]
+pub fn firewall_dashboard(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+) -> Template {
+    use crate::models::firewall::{FwBan, FwEvent};
+
+    let settings = Setting::all(pool);
+    let active_bans = FwBan::active_count(pool);
+    let events_24h = FwEvent::count_since_hours(pool, 24);
+    let events_1h = FwEvent::count_since_hours(pool, 1);
+    let top_ips = FwEvent::top_ips(pool, 10);
+    let event_counts = FwEvent::counts_by_type(pool);
+    let events = FwEvent::recent(pool, None, 100, 0);
+    let bans = FwBan::active_bans(pool, 100, 0);
+
+    let context = json!({
+        "page_title": "Firewall",
+        "admin_slug": slug.0,
+        "settings": settings,
+        "active_bans": active_bans,
+        "events_24h": events_24h,
+        "events_1h": events_1h,
+        "top_ips": top_ips,
+        "event_counts": event_counts,
+        "events": events,
+        "bans": bans,
+    });
+    Template::render("admin/firewall", &context)
+}
+
+#[derive(Deserialize)]
+pub struct BanForm {
+    pub ip: String,
+    pub reason: Option<String>,
+    pub duration: Option<String>,
+}
+
+#[post("/api/firewall/ban", format = "json", data = "<form>")]
+pub fn firewall_ban(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<BanForm>,
+) -> Json<Value> {
+    use crate::models::firewall::FwBan;
+
+    let ip = form.ip.trim();
+    if ip.is_empty() {
+        return Json(json!({"success": false, "error": "IP is required"}));
+    }
+    let reason = form.reason.as_deref().unwrap_or("manual");
+    let duration = form.duration.as_deref().unwrap_or("7d");
+
+    match FwBan::create_with_duration(pool, ip, reason, Some("Manual ban from admin"), duration, None, None) {
+        Ok(id) => Json(json!({"success": true, "id": id})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UnbanForm {
+    pub id: i64,
+}
+
+#[post("/api/firewall/unban", format = "json", data = "<form>")]
+pub fn firewall_unban(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UnbanForm>,
+) -> Json<Value> {
+    use crate::models::firewall::FwBan;
+
+    match FwBan::unban_by_id(pool, form.id) {
+        Ok(_) => Json(json!({"success": true})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         dashboard,
@@ -1535,5 +1616,8 @@ pub fn routes() -> Vec<rocket::Route> {
         mfa_recovery_codes,
         sales_dashboard,
         sales_orders,
+        firewall_dashboard,
+        firewall_ban,
+        firewall_unban,
     ]
 }

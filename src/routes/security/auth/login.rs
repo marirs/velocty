@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use crate::security::{self, auth, mfa};
 use crate::db::DbPool;
+use crate::models::firewall::{FwBan, FwEvent};
 use crate::models::settings::Setting;
 use crate::rate_limit::RateLimiter;
 use crate::AdminSlug;
@@ -85,6 +86,18 @@ pub fn login_submit(
     let admin_email = Setting::get_or(pool, "admin_email", "");
 
     if !admin_email.is_empty() && form.email != admin_email {
+        // Firewall: log failed login with unknown user
+        if Setting::get_or(pool, "firewall_enabled", "false") == "true"
+            && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
+        {
+            FwEvent::log(pool, &ip_hash, "failed_login", Some(&format!("Unknown user: {}", form.email)), None, None, Some("login"));
+
+            // Ban unknown users immediately if configured
+            if Setting::get_or(pool, "fw_ban_unknown_users", "false") == "true" {
+                let dur = Setting::get_or(pool, "fw_unknown_user_ban_duration", "24h");
+                let _ = FwBan::create_with_duration(pool, &ip_hash, "unknown_user", Some(&format!("Login attempt with unknown user: {}", form.email)), &dur, None, None);
+            }
+        }
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Invalid credentials".to_string());
         ctx.insert("admin_theme".to_string(), theme);
@@ -94,6 +107,20 @@ pub fn login_submit(
     }
 
     if !auth::verify_password(&form.password, &stored_hash) {
+        // Firewall: log failed login and check ban threshold
+        if Setting::get_or(pool, "firewall_enabled", "false") == "true"
+            && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
+        {
+            FwEvent::log(pool, &ip_hash, "failed_login", Some("Wrong password"), None, None, Some("login"));
+
+            let threshold: i64 = Setting::get_or(pool, "fw_failed_login_ban_threshold", "5")
+                .parse().unwrap_or(5);
+            let count = FwEvent::count_for_ip_since(pool, &ip_hash, "failed_login", 15);
+            if count >= threshold {
+                let dur = Setting::get_or(pool, "fw_failed_login_ban_duration", "1h");
+                let _ = FwBan::create_with_duration(pool, &ip_hash, "failed_login", Some("Too many failed login attempts"), &dur, None, None);
+            }
+        }
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), "Invalid credentials".to_string());
         ctx.insert("admin_theme".to_string(), theme.clone());

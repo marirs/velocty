@@ -247,6 +247,36 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             UNIQUE(portfolio_id, ip_hash),
             FOREIGN KEY (portfolio_id) REFERENCES portfolio(id)
         );
+
+        -- Firewall: ban list
+        CREATE TABLE IF NOT EXISTS fw_bans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            detail TEXT,
+            banned_at DATETIME NOT NULL DEFAULT (datetime('now')),
+            expires_at DATETIME,
+            country TEXT,
+            user_agent TEXT,
+            active INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX IF NOT EXISTS idx_fw_bans_ip ON fw_bans(ip);
+        CREATE INDEX IF NOT EXISTS idx_fw_bans_active ON fw_bans(active);
+
+        -- Firewall: event log
+        CREATE TABLE IF NOT EXISTS fw_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            detail TEXT,
+            country TEXT,
+            user_agent TEXT,
+            request_path TEXT,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_fw_events_ip ON fw_events(ip);
+        CREATE INDEX IF NOT EXISTS idx_fw_events_type ON fw_events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_fw_events_created ON fw_events(created_at);
         ",
     )?;
 
@@ -601,6 +631,35 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("email_smtp_username", ""),
         ("email_smtp_password", ""),
         ("email_smtp_encryption", "tls"),
+        // Firewall
+        ("firewall_enabled", "false"),
+        ("fw_monitor_bots", "true"),
+        ("fw_bot_auto_ban", "false"),
+        ("fw_bot_ban_threshold", "10"),
+        ("fw_bot_ban_duration", "24h"),
+        ("fw_failed_login_tracking", "true"),
+        ("fw_failed_login_ban_threshold", "5"),
+        ("fw_failed_login_ban_duration", "1h"),
+        ("fw_ban_unknown_users", "false"),
+        ("fw_unknown_user_ban_duration", "24h"),
+        ("fw_xss_protection", "true"),
+        ("fw_sqli_protection", "true"),
+        ("fw_path_traversal_protection", "true"),
+        ("fw_csrf_strict", "true"),
+        ("fw_injection_ban_duration", "7d"),
+        ("fw_rate_limit_enabled", "true"),
+        ("fw_rate_limit_requests", "100"),
+        ("fw_rate_limit_window", "60"),
+        ("fw_rate_limit_ban_duration", "1h"),
+        ("fw_payment_abuse_detection", "true"),
+        ("fw_payment_ban_threshold", "3"),
+        ("fw_payment_ban_duration", "30d"),
+        ("fw_geo_blocking_enabled", "false"),
+        ("fw_geo_block_visitors", "true"),
+        ("fw_geo_block_admin", "true"),
+        ("fw_geo_blocked_countries", ""),
+        ("fw_geo_allowed_countries", ""),
+        ("fw_security_headers", "true"),
     ];
 
     for (key, value) in defaults {

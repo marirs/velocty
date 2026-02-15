@@ -22,6 +22,7 @@
 
 <div class="sub-tabs">
     <button type="button" class="tab active" data-sec-tab="tab-sec-general">General</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-firewall">Firewall{% if settings.firewall_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-sec-tab="tab-sec-akismet">Akismet{% if settings.security_akismet_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-sec-tab="tab-sec-cleantalk">CleanTalk{% if settings.security_cleantalk_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-sec-tab="tab-sec-oopspam">OOPSpam{% if settings.security_oopspam_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
@@ -193,6 +194,259 @@
         </div>
     </div>
 
+    <!-- Firewall -->
+    <div id="tab-sec-firewall" style="display:none">
+        <div class="form-card">
+            <h3>Firewall</h3>
+            <p class="text-muted" style="margin-bottom:12px">Built-in application firewall. When enabled, a Firewall dashboard appears in the admin left menu for monitoring and managing threats.</p>
+            <label class="checkbox-item"><input type="checkbox" name="firewall_enabled" value="true" id="fw_master_toggle" {% if settings.firewall_enabled == "true" %}checked{% endif %}> Enable Firewall<span class="status-dot"></span></label>
+        </div>
+
+        <fieldset id="fw-settings-fields" {% if settings.firewall_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+
+        <div class="sub-tabs" style="margin-top:4px">
+            <button type="button" class="tab active" data-fwsub-tab="fwsub-login">Login</button>
+            <button type="button" class="tab" data-fwsub-tab="fwsub-injection">Injection</button>
+            <button type="button" class="tab" data-fwsub-tab="fwsub-rate">Rate Limit</button>
+            <button type="button" class="tab" data-fwsub-tab="fwsub-bots">Bots</button>
+            <button type="button" class="tab" data-fwsub-tab="fwsub-payment">Payment</button>
+            <button type="button" class="tab" data-fwsub-tab="fwsub-geo">Country</button>
+            <button type="button" class="tab" data-fwsub-tab="fwsub-headers">Headers</button>
+        </div>
+
+        <!-- Login Protection -->
+        <div id="fwsub-login">
+            <div class="form-card">
+                <h3>Login Activity Tracking</h3>
+                <p class="text-muted" style="margin-bottom:12px">Monitor and respond to login activity. All login attempts (successful and failed) are logged to the firewall event log when enabled.</p>
+                <label class="checkbox-item"><input type="checkbox" name="fw_failed_login_tracking" value="true" id="fw_login_tracking" {% if settings.fw_failed_login_tracking != "false" %}checked{% endif %}> Track Login Activity</label>
+            </div>
+
+            <div id="fw-login-details" {% if settings.fw_failed_login_tracking == "false" %}style="display:none"{% endif %}>
+                <div class="form-card">
+                    <h3>Unknown Users</h3>
+                    <p class="text-muted" style="margin-bottom:12px">When someone tries to log in with a username or email that does not exist in your user directory.</p>
+                    <div class="form-group">
+                        <label>Action to take</label>
+                        <div style="display:flex;gap:16px;margin-top:4px">
+                            <label class="checkbox-item" style="margin:0"><input type="radio" name="fw_unknown_user_action" value="ignore" {% if settings.fw_ban_unknown_users != "true" %}checked{% endif %}> Ignore (log only)</label>
+                            <label class="checkbox-item" style="margin:0"><input type="radio" name="fw_unknown_user_action" value="block" id="fw_unknown_block_radio" {% if settings.fw_ban_unknown_users == "true" %}checked{% endif %}> Block IP immediately</label>
+                        </div>
+                    </div>
+                    <div id="fw-unknown-block-opts" {% if settings.fw_ban_unknown_users != "true" %}style="display:none"{% endif %}>
+                        <div class="form-group" style="margin-top:12px">
+                            <label for="fw_unknown_user_ban_duration">Block duration</label>
+                            <select id="fw_unknown_user_ban_duration" name="fw_unknown_user_ban_duration">
+                                <option value="1h" {% if settings.fw_unknown_user_ban_duration == "1h" %}selected{% endif %}>1 hour</option>
+                                <option value="6h" {% if settings.fw_unknown_user_ban_duration == "6h" %}selected{% endif %}>6 hours</option>
+                                <option value="24h" {% if settings.fw_unknown_user_ban_duration == "24h" or settings.fw_unknown_user_ban_duration == "" %}selected{% endif %}>24 hours</option>
+                                <option value="7d" {% if settings.fw_unknown_user_ban_duration == "7d" %}selected{% endif %}>7 days</option>
+                                <option value="30d" {% if settings.fw_unknown_user_ban_duration == "30d" %}selected{% endif %}>30 days</option>
+                                <option value="permanent" {% if settings.fw_unknown_user_ban_duration == "permanent" %}selected{% endif %}>Permanent</option>
+                            </select>
+                            <span class="form-help">How long to ban the IP after a single login attempt with an unknown username.</span>
+                        </div>
+                    </div>
+                    <input type="hidden" name="fw_ban_unknown_users" id="fw_ban_unknown_users_hidden" value="{% if settings.fw_ban_unknown_users == 'true' %}true{% else %}false{% endif %}">
+                </div>
+
+                <div class="form-card">
+                    <h3>Known Users — Failed Passwords</h3>
+                    <p class="text-muted" style="margin-bottom:12px">When someone enters a correct username but the wrong password repeatedly.</p>
+                    <div class="form-group">
+                        <label>Action to take</label>
+                        <div style="display:flex;gap:16px;margin-top:4px">
+                            <label class="checkbox-item" style="margin:0"><input type="radio" name="fw_known_user_action" value="ignore" {% if settings.fw_failed_login_ban_threshold == "0" %}checked{% endif %}> Log only (no block)</label>
+                            <label class="checkbox-item" style="margin:0"><input type="radio" name="fw_known_user_action" value="block" id="fw_known_block_radio" {% if settings.fw_failed_login_ban_threshold != "0" %}checked{% endif %}> Block after threshold</label>
+                        </div>
+                    </div>
+                    <div id="fw-known-block-opts" {% if settings.fw_failed_login_ban_threshold == "0" %}style="display:none"{% endif %}>
+                        <div class="form-group" style="margin-top:12px">
+                            <label for="fw_failed_login_ban_threshold">Block after how many failed attempts</label>
+                            <input type="number" id="fw_failed_login_ban_threshold" name="fw_failed_login_ban_threshold" value="{{ settings.fw_failed_login_ban_threshold | default(value='5') }}" min="1" max="50" style="width:100px">
+                            <span class="form-help">Number of failed password attempts within a 15-minute window before the IP is blocked.</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="fw_failed_login_ban_duration">Block duration</label>
+                            <select id="fw_failed_login_ban_duration" name="fw_failed_login_ban_duration">
+                                <option value="1h" {% if settings.fw_failed_login_ban_duration == "1h" or settings.fw_failed_login_ban_duration == "" %}selected{% endif %}>1 hour</option>
+                                <option value="6h" {% if settings.fw_failed_login_ban_duration == "6h" %}selected{% endif %}>6 hours</option>
+                                <option value="24h" {% if settings.fw_failed_login_ban_duration == "24h" %}selected{% endif %}>24 hours</option>
+                                <option value="7d" {% if settings.fw_failed_login_ban_duration == "7d" %}selected{% endif %}>7 days</option>
+                                <option value="30d" {% if settings.fw_failed_login_ban_duration == "30d" %}selected{% endif %}>30 days</option>
+                                <option value="permanent" {% if settings.fw_failed_login_ban_duration == "permanent" %}selected{% endif %}>Permanent</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Injection Protection -->
+        <div id="fwsub-injection" style="display:none">
+            <div class="form-card">
+                <h3>Injection Protection (OWASP)</h3>
+                <p class="text-muted" style="margin-bottom:12px">Detect and block common web attack patterns in URLs and query strings. Any injection attempt results in an immediate ban.</p>
+                <label class="checkbox-item" style="margin-bottom:8px"><input type="checkbox" name="fw_xss_protection" value="true" {% if settings.fw_xss_protection != "false" %}checked{% endif %}> XSS Protection</label>
+                <span class="form-help" style="margin-bottom:12px">Block script tags, event handlers, and data URIs in inputs.</span>
+                <label class="checkbox-item" style="margin-bottom:8px"><input type="checkbox" name="fw_sqli_protection" value="true" {% if settings.fw_sqli_protection != "false" %}checked{% endif %}> SQL Injection Protection</label>
+                <span class="form-help" style="margin-bottom:12px">Block UNION, OR 1=1, comment sequences, and other SQL patterns.</span>
+                <label class="checkbox-item" style="margin-bottom:8px"><input type="checkbox" name="fw_path_traversal_protection" value="true" {% if settings.fw_path_traversal_protection != "false" %}checked{% endif %}> Path Traversal Protection</label>
+                <span class="form-help" style="margin-bottom:12px">Block ../, %2e%2e, null bytes, and directory traversal attempts.</span>
+                <label class="checkbox-item" style="margin-bottom:8px"><input type="checkbox" name="fw_csrf_strict" value="true" {% if settings.fw_csrf_strict != "false" %}checked{% endif %}> Strict CSRF Enforcement</label>
+                <span class="form-help" style="margin-bottom:12px">Enforce origin/referer checks on state-changing requests.</span>
+            </div>
+            <div class="form-card">
+                <h3>Ban Duration</h3>
+                <div class="form-group">
+                    <label for="fw_injection_ban_duration">How long to ban IPs caught attempting injection attacks</label>
+                    <select id="fw_injection_ban_duration" name="fw_injection_ban_duration">
+                        <option value="1h" {% if settings.fw_injection_ban_duration == "1h" %}selected{% endif %}>1 hour</option>
+                        <option value="24h" {% if settings.fw_injection_ban_duration == "24h" %}selected{% endif %}>24 hours</option>
+                        <option value="7d" {% if settings.fw_injection_ban_duration == "7d" or settings.fw_injection_ban_duration == "" %}selected{% endif %}>7 days</option>
+                        <option value="30d" {% if settings.fw_injection_ban_duration == "30d" %}selected{% endif %}>30 days</option>
+                        <option value="permanent" {% if settings.fw_injection_ban_duration == "permanent" %}selected{% endif %}>Permanent</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limiting -->
+        <div id="fwsub-rate" style="display:none">
+            <div class="form-card">
+                <h3>Global Rate Limiting</h3>
+                <p class="text-muted" style="margin-bottom:12px">Limit the number of requests any single IP can make within a time window. Exceeding the limit results in an automatic ban.</p>
+                <label class="checkbox-item"><input type="checkbox" name="fw_rate_limit_enabled" value="true" {% if settings.fw_rate_limit_enabled != "false" %}checked{% endif %}> Enable Rate Limiting</label>
+            </div>
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="fw_rate_limit_requests">Max requests per window</label>
+                    <input type="number" id="fw_rate_limit_requests" name="fw_rate_limit_requests" value="{{ settings.fw_rate_limit_requests | default(value='100') }}" min="10" max="10000" style="width:120px">
+                </div>
+                <div class="form-group">
+                    <label for="fw_rate_limit_window">Time window</label>
+                    <select id="fw_rate_limit_window" name="fw_rate_limit_window">
+                        <option value="10" {% if settings.fw_rate_limit_window == "10" %}selected{% endif %}>10 seconds</option>
+                        <option value="30" {% if settings.fw_rate_limit_window == "30" %}selected{% endif %}>30 seconds</option>
+                        <option value="60" {% if settings.fw_rate_limit_window == "60" or settings.fw_rate_limit_window == "" %}selected{% endif %}>60 seconds</option>
+                        <option value="300" {% if settings.fw_rate_limit_window == "300" %}selected{% endif %}>5 minutes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fw_rate_limit_ban_duration">Ban duration when exceeded</label>
+                    <select id="fw_rate_limit_ban_duration" name="fw_rate_limit_ban_duration">
+                        <option value="1h" {% if settings.fw_rate_limit_ban_duration == "1h" or settings.fw_rate_limit_ban_duration == "" %}selected{% endif %}>1 hour</option>
+                        <option value="6h" {% if settings.fw_rate_limit_ban_duration == "6h" %}selected{% endif %}>6 hours</option>
+                        <option value="24h" {% if settings.fw_rate_limit_ban_duration == "24h" %}selected{% endif %}>24 hours</option>
+                        <option value="7d" {% if settings.fw_rate_limit_ban_duration == "7d" %}selected{% endif %}>7 days</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bot Detection -->
+        <div id="fwsub-bots" style="display:none">
+            <div class="form-card">
+                <h3>Bot Detection</h3>
+                <p class="text-muted" style="margin-bottom:12px">Monitor requests from known scanner tools, empty user-agents, and other suspicious bot fingerprints.</p>
+                <label class="checkbox-item"><input type="checkbox" name="fw_monitor_bots" value="true" {% if settings.fw_monitor_bots != "false" %}checked{% endif %}> Monitor Bot Activity</label>
+                <span class="form-help">Log suspicious bot fingerprints (user-agent patterns, request rates).</span>
+            </div>
+            <div class="form-card">
+                <h3>Auto-Ban</h3>
+                <label class="checkbox-item"><input type="checkbox" name="fw_bot_auto_ban" value="true" id="fw_bot_auto_ban" {% if settings.fw_bot_auto_ban == "true" %}checked{% endif %}> Automatically ban after threshold</label>
+                <div id="fw-bot-ban-fields" {% if settings.fw_bot_auto_ban != "true" %}style="display:none"{% endif %}>
+                    <div class="form-group" style="margin-top:12px">
+                        <label for="fw_bot_ban_threshold">Ban after how many suspicious requests (within 1 hour)</label>
+                        <input type="number" id="fw_bot_ban_threshold" name="fw_bot_ban_threshold" value="{{ settings.fw_bot_ban_threshold | default(value='10') }}" min="1" max="100" style="width:100px">
+                    </div>
+                    <div class="form-group">
+                        <label for="fw_bot_ban_duration">Ban duration</label>
+                        <select id="fw_bot_ban_duration" name="fw_bot_ban_duration">
+                            <option value="1h" {% if settings.fw_bot_ban_duration == "1h" %}selected{% endif %}>1 hour</option>
+                            <option value="6h" {% if settings.fw_bot_ban_duration == "6h" %}selected{% endif %}>6 hours</option>
+                            <option value="24h" {% if settings.fw_bot_ban_duration == "24h" or settings.fw_bot_ban_duration == "" %}selected{% endif %}>24 hours</option>
+                            <option value="7d" {% if settings.fw_bot_ban_duration == "7d" %}selected{% endif %}>7 days</option>
+                            <option value="30d" {% if settings.fw_bot_ban_duration == "30d" %}selected{% endif %}>30 days</option>
+                            <option value="permanent" {% if settings.fw_bot_ban_duration == "permanent" %}selected{% endif %}>Permanent</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Protection -->
+        <div id="fwsub-payment" style="display:none">
+            <div class="form-card">
+                <h3>Payment Endpoint Protection</h3>
+                <p class="text-muted" style="margin-bottom:12px">Detect and ban IPs making suspicious or repeated failed payment attempts against your commerce endpoints.</p>
+                <label class="checkbox-item"><input type="checkbox" name="fw_payment_abuse_detection" value="true" {% if settings.fw_payment_abuse_detection != "false" %}checked{% endif %}> Monitor Payment Endpoints</label>
+            </div>
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="fw_payment_ban_threshold">Ban after failed/suspicious attempts</label>
+                    <input type="number" id="fw_payment_ban_threshold" name="fw_payment_ban_threshold" value="{{ settings.fw_payment_ban_threshold | default(value='3') }}" min="1" max="20" style="width:100px">
+                </div>
+                <div class="form-group">
+                    <label for="fw_payment_ban_duration">Ban duration</label>
+                    <select id="fw_payment_ban_duration" name="fw_payment_ban_duration">
+                        <option value="7d" {% if settings.fw_payment_ban_duration == "7d" %}selected{% endif %}>7 days</option>
+                        <option value="30d" {% if settings.fw_payment_ban_duration == "30d" or settings.fw_payment_ban_duration == "" %}selected{% endif %}>30 days</option>
+                        <option value="permanent" {% if settings.fw_payment_ban_duration == "permanent" %}selected{% endif %}>Permanent</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Country Blocking -->
+        <div id="fwsub-geo" style="display:none">
+            <div class="form-card">
+                <h3>Country Blocking</h3>
+                <p class="text-muted" style="margin-bottom:12px">Block or allow traffic based on geographic location. Requires a MaxMind GeoLite2 Country database file.</p>
+                <label class="checkbox-item"><input type="checkbox" name="fw_geo_blocking_enabled" value="true" id="fw_geo_toggle" {% if settings.fw_geo_blocking_enabled == "true" %}checked{% endif %}> Enable Country Blocking</label>
+                <span class="form-help"><code>GeoLite2-Country.mmdb</code> must be in your data directory. <a href="https://dev.maxmind.com/geoip/geolite2-free-geolocation-data" target="_blank" style="color:var(--accent)">Get it free from MaxMind</a></span>
+            </div>
+            <div id="fw-geo-fields" {% if settings.fw_geo_blocking_enabled != "true" %}style="display:none"{% endif %}>
+                <div class="form-card">
+                    <h3>Scope</h3>
+                    <label class="checkbox-item" style="margin-bottom:8px"><input type="checkbox" name="fw_geo_block_visitors" value="true" {% if settings.fw_geo_block_visitors != "false" %}checked{% endif %}> Block from public pages</label>
+                    <label class="checkbox-item"><input type="checkbox" name="fw_geo_block_admin" value="true" {% if settings.fw_geo_block_admin != "false" %}checked{% endif %}> Block from admin panel</label>
+                </div>
+                <div class="form-card">
+                    <h3>Country Lists</h3>
+                    <div class="form-group">
+                        <label for="fw_geo_blocked_countries">Blocked Countries</label>
+                        <input type="text" id="fw_geo_blocked_countries" name="fw_geo_blocked_countries" value="{{ settings.fw_geo_blocked_countries | default(value='') }}" placeholder="CN,RU,KP">
+                        <span class="form-help">Comma-separated ISO 3166-1 alpha-2 country codes. These countries will be blocked.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="fw_geo_allowed_countries">Allowed Countries (whitelist mode)</label>
+                        <input type="text" id="fw_geo_allowed_countries" name="fw_geo_allowed_countries" value="{{ settings.fw_geo_allowed_countries | default(value='') }}" placeholder="US,GB,DE,FR">
+                        <span class="form-help">If set, <strong>only</strong> these countries are allowed. Overrides the block list.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Headers -->
+        <div id="fwsub-headers" style="display:none">
+            <div class="form-card">
+                <h3>Security Headers</h3>
+                <p class="text-muted" style="margin-bottom:12px">Automatically add recommended security headers to all HTTP responses.</p>
+                <label class="checkbox-item"><input type="checkbox" name="fw_security_headers" value="true" {% if settings.fw_security_headers != "false" %}checked{% endif %}> Add Security Headers</label>
+                <div style="margin-top:16px;padding:12px;background:var(--bg-input);border-radius:6px;font-size:13px;line-height:1.8">
+                    <code>X-Frame-Options: SAMEORIGIN</code><br>
+                    <code>X-Content-Type-Options: nosniff</code><br>
+                    <code>Referrer-Policy: strict-origin-when-cross-origin</code><br>
+                    <code>Permissions-Policy: camera=(), microphone=(), geolocation=()</code><br>
+                    <code>X-XSS-Protection: 1; mode=block</code>
+                </div>
+            </div>
+        </div>
+
+        </fieldset>
+    </div>
+
     <!-- Akismet -->
     <div id="tab-sec-akismet" style="display:none">
         <div class="form-card">
@@ -318,7 +572,7 @@
 (function() {
     // Sub-tab switching
     var tabs = document.querySelectorAll('[data-sec-tab]');
-    var panels = ['tab-sec-general','tab-sec-akismet','tab-sec-cleantalk','tab-sec-oopspam','tab-sec-recaptcha','tab-sec-turnstile','tab-sec-hcaptcha'];
+    var panels = ['tab-sec-general','tab-sec-firewall','tab-sec-akismet','tab-sec-cleantalk','tab-sec-oopspam','tab-sec-recaptcha','tab-sec-turnstile','tab-sec-hcaptcha'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
@@ -365,6 +619,70 @@
             }
         });
     });
+
+    // Firewall master toggle
+    var fwMaster = document.getElementById('fw_master_toggle');
+    if (fwMaster) {
+        fwMaster.addEventListener('change', function() {
+            document.getElementById('fw-settings-fields').disabled = !this.checked;
+        });
+    }
+
+    // Firewall sub-sub-tabs
+    var fwSubTabs = document.querySelectorAll('[data-fwsub-tab]');
+    var fwSubPanels = ['fwsub-login','fwsub-injection','fwsub-rate','fwsub-bots','fwsub-payment','fwsub-geo','fwsub-headers'];
+    fwSubTabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            fwSubTabs.forEach(function(t) { t.classList.remove('active'); });
+            fwSubPanels.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+            tab.classList.add('active');
+            var el = document.getElementById(tab.dataset.fwsubTab);
+            if (el) el.style.display = '';
+        });
+    });
+
+    // Login tracking toggle
+    var fwLoginTracking = document.getElementById('fw_login_tracking');
+    if (fwLoginTracking) {
+        fwLoginTracking.addEventListener('change', function() {
+            document.getElementById('fw-login-details').style.display = this.checked ? '' : 'none';
+        });
+    }
+
+    // Unknown user action radios
+    document.querySelectorAll('input[name="fw_unknown_user_action"]').forEach(function(r) {
+        r.addEventListener('change', function() {
+            var isBlock = this.value === 'block';
+            document.getElementById('fw-unknown-block-opts').style.display = isBlock ? '' : 'none';
+            document.getElementById('fw_ban_unknown_users_hidden').value = isBlock ? 'true' : 'false';
+        });
+    });
+
+    // Known user action radios
+    document.querySelectorAll('input[name="fw_known_user_action"]').forEach(function(r) {
+        r.addEventListener('change', function() {
+            var isBlock = this.value === 'block';
+            document.getElementById('fw-known-block-opts').style.display = isBlock ? '' : 'none';
+            if (!isBlock) document.getElementById('fw_failed_login_ban_threshold').value = '0';
+            else if (document.getElementById('fw_failed_login_ban_threshold').value === '0') document.getElementById('fw_failed_login_ban_threshold').value = '5';
+        });
+    });
+
+    // Bot auto-ban toggle
+    var fwBotBan = document.getElementById('fw_bot_auto_ban');
+    if (fwBotBan) {
+        fwBotBan.addEventListener('change', function() {
+            document.getElementById('fw-bot-ban-fields').style.display = this.checked ? '' : 'none';
+        });
+    }
+
+    // Geo blocking toggle
+    var fwGeo = document.getElementById('fw_geo_toggle');
+    if (fwGeo) {
+        fwGeo.addEventListener('change', function() {
+            document.getElementById('fw-geo-fields').style.display = this.checked ? '' : 'none';
+        });
+    }
 })();
 
 // ── MFA Modal ──────────────────────────────────────────

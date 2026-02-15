@@ -2,6 +2,7 @@ pub mod analytics;
 pub mod category;
 pub mod comment;
 pub mod design;
+pub mod firewall;
 pub mod import;
 pub mod order;
 pub mod portfolio;

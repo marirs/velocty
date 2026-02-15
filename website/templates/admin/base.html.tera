@@ -60,6 +60,12 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     <span class="nav-label">Health</span>
                 </a>
+                {% if settings.firewall_enabled == "true" %}
+                <a href="/{{ admin_slug }}/firewall" class="nav-item {% if page_title == 'Firewall' %}active{% endif %}" title="Firewall">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span class="nav-label">Firewall</span>
+                </a>
+                {% endif %}
                 {% if settings.commerce_paypal_enabled == "true" or settings.commerce_stripe_enabled == "true" or settings.commerce_payoneer_enabled == "true" or settings.commerce_2checkout_enabled == "true" or settings.commerce_square_enabled == "true" or settings.commerce_razorpay_enabled == "true" or settings.commerce_mollie_enabled == "true" %}
                 <a href="/{{ admin_slug }}/sales" class="nav-item {% if page_title == 'Sales' or page_title == 'Sales Dashboard' or page_title == 'Orders' %}active{% endif %}" title="Sales">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>

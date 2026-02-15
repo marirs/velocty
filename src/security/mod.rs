@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod firewall;
 pub mod mfa;
 pub mod magic_link;
 pub mod recaptcha;

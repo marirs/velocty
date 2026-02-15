@@ -1,0 +1,203 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Firewall</h2></div>
+
+<div class="sub-tabs">
+    <button type="button" class="tab active" data-fw-tab="tab-fw-overview">Overview</button>
+    <button type="button" class="tab" data-fw-tab="tab-fw-events">Event Log</button>
+    <button type="button" class="tab" data-fw-tab="tab-fw-bans">Ban List</button>
+</div>
+
+<!-- Overview -->
+<div id="tab-fw-overview">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+        <div class="form-card" style="text-align:center;padding:20px">
+            <div style="font-size:32px;font-weight:700;color:var(--accent)">{{ active_bans }}</div>
+            <div class="text-muted" style="font-size:13px;margin-top:4px">Active Bans</div>
+        </div>
+        <div class="form-card" style="text-align:center;padding:20px">
+            <div style="font-size:32px;font-weight:700;color:var(--warning, #f59e0b)">{{ events_24h }}</div>
+            <div class="text-muted" style="font-size:13px;margin-top:4px">Events (24h)</div>
+        </div>
+        <div class="form-card" style="text-align:center;padding:20px">
+            <div style="font-size:32px;font-weight:700;color:var(--danger, #ef4444)">{{ events_1h }}</div>
+            <div class="text-muted" style="font-size:13px;margin-top:4px">Events (1h)</div>
+        </div>
+    </div>
+
+    {% if top_ips | length > 0 %}
+    <div class="form-card">
+        <h3>Top Offending IPs (24h)</h3>
+        <table class="data-table" style="width:100%">
+            <thead><tr><th>IP Address</th><th style="text-align:right">Events</th></tr></thead>
+            <tbody>
+            {% for item in top_ips %}
+            <tr><td><code>{{ item.0 }}</code></td><td style="text-align:right">{{ item.1 }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if event_counts | length > 0 %}
+    <div class="form-card">
+        <h3>Events by Type (24h)</h3>
+        <table class="data-table" style="width:100%">
+            <thead><tr><th>Type</th><th style="text-align:right">Count</th></tr></thead>
+            <tbody>
+            {% for item in event_counts %}
+            <tr><td><span class="badge">{{ item.0 }}</span></td><td style="text-align:right">{{ item.1 }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Event Log -->
+<div id="tab-fw-events" style="display:none">
+    <div class="form-card">
+        <h3>Recent Events</h3>
+        {% if events | length > 0 %}
+        <div style="overflow-x:auto">
+        <table class="data-table" style="width:100%;font-size:13px">
+            <thead><tr><th>Time</th><th>Type</th><th>IP</th><th>Path</th><th>Detail</th><th>Country</th></tr></thead>
+            <tbody>
+            {% for ev in events %}
+            <tr>
+                <td style="white-space:nowrap">{{ ev.created_at }}</td>
+                <td><span class="badge">{{ ev.event_type }}</span></td>
+                <td><code>{{ ev.ip }}</code></td>
+                <td>{{ ev.request_path | default(value="-") }}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ ev.detail | default(value='') }}">{{ ev.detail | default(value="-") }}</td>
+                <td>{{ ev.country | default(value="-") }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No events recorded yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Ban List -->
+<div id="tab-fw-bans" style="display:none">
+    <div class="form-card">
+        <h3 style="display:flex;justify-content:space-between;align-items:center">
+            Active Bans
+            <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('manual-ban-form').style.display=document.getElementById('manual-ban-form').style.display==='none'?'':'none'">+ Manual Ban</button>
+        </h3>
+
+        <div id="manual-ban-form" style="display:none;margin-bottom:20px;padding:16px;border:1px solid var(--border-subtle);border-radius:8px;background:var(--bg-input)">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+                <div>
+                    <label style="font-size:12px;display:block;margin-bottom:4px">IP Address</label>
+                    <input type="text" id="ban-ip" placeholder="192.168.1.1" style="width:160px">
+                </div>
+                <div>
+                    <label style="font-size:12px;display:block;margin-bottom:4px">Reason</label>
+                    <input type="text" id="ban-reason" placeholder="Manual ban" style="width:160px">
+                </div>
+                <div>
+                    <label style="font-size:12px;display:block;margin-bottom:4px">Duration</label>
+                    <select id="ban-duration" style="width:120px">
+                        <option value="1h">1 hour</option>
+                        <option value="24h">24 hours</option>
+                        <option value="7d" selected>7 days</option>
+                        <option value="30d">30 days</option>
+                        <option value="permanent">Permanent</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger" onclick="manualBan()">Ban</button>
+            </div>
+            <p id="ban-msg" style="font-size:12px;margin-top:8px;display:none"></p>
+        </div>
+
+        {% if bans | length > 0 %}
+        <div style="overflow-x:auto">
+        <table class="data-table" style="width:100%;font-size:13px">
+            <thead><tr><th>IP</th><th>Reason</th><th>Banned At</th><th>Expires</th><th>Country</th><th></th></tr></thead>
+            <tbody>
+            {% for ban in bans %}
+            <tr id="ban-row-{{ ban.id }}">
+                <td><code>{{ ban.ip }}</code></td>
+                <td><span class="badge">{{ ban.reason }}</span></td>
+                <td style="white-space:nowrap">{{ ban.banned_at }}</td>
+                <td style="white-space:nowrap">{{ ban.expires_at | default(value="Permanent") }}</td>
+                <td>{{ ban.country | default(value="-") }}</td>
+                <td><button type="button" class="btn btn-sm" onclick="unban({{ ban.id }})">Unban</button></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No active bans.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    var tabs = document.querySelectorAll('[data-fw-tab]');
+    var panels = ['tab-fw-overview','tab-fw-events','tab-fw-bans'];
+    function activateTab(name) {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+        tabs.forEach(function(t) { if (t.dataset.fwTab === name) t.classList.add('active'); });
+        var el = document.getElementById(name);
+        if (el) el.style.display = '';
+    }
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            activateTab(tab.dataset.fwTab);
+            location.hash = tab.dataset.fwTab;
+        });
+    });
+    if (location.hash) { activateTab(location.hash.substring(1)); }
+})();
+
+var adminSlug = '{{ admin_slug }}';
+
+function manualBan() {
+    var ip = document.getElementById('ban-ip').value.trim();
+    var reason = document.getElementById('ban-reason').value.trim() || 'manual';
+    var duration = document.getElementById('ban-duration').value;
+    var msg = document.getElementById('ban-msg');
+    if (!ip) { msg.style.display=''; msg.style.color='var(--danger)'; msg.textContent='IP is required'; return; }
+    fetch('/' + adminSlug + '/api/firewall/ban', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: ip, reason: reason, duration: duration})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        msg.style.display = '';
+        if (d.success) { msg.style.color='var(--success)'; msg.textContent='Banned'; setTimeout(function(){ location.reload(); }, 800); }
+        else { msg.style.color='var(--danger)'; msg.textContent=d.error||'Failed'; }
+    })
+    .catch(function() { msg.style.display=''; msg.style.color='var(--danger)'; msg.textContent='Network error'; });
+}
+
+function unban(id) {
+    if (!confirm('Unban this IP?')) return;
+    fetch('/' + adminSlug + '/api/firewall/unban', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: id})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            var row = document.getElementById('ban-row-' + id);
+            if (row) row.remove();
+        }
+    });
+}
+</script>
+{% endblock scripts %}
