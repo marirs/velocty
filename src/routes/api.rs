@@ -119,6 +119,7 @@ pub struct CommentSubmit {
     pub honeypot: Option<String>,
     pub captcha_token: Option<String>,
     pub ip: Option<String>,
+    pub parent_id: Option<i64>,
 }
 
 #[post("/comment", format = "json", data = "<form>")]
@@ -127,6 +128,37 @@ pub fn comment_submit(
     limiter: &State<RateLimiter>,
     form: Json<CommentSubmit>,
 ) -> Json<Value> {
+    // Check if comments are globally enabled
+    if !Setting::get_bool(pool, "comments_enabled") {
+        return Json(json!({"success": false, "error": "Comments are disabled"}));
+    }
+
+    // Check per-content-type setting
+    let ct = form.content_type.as_deref().unwrap_or("post");
+    match ct {
+        "post" => {
+            if !Setting::get_bool(pool, "comments_on_blog") {
+                return Json(json!({"success": false, "error": "Comments are disabled for blog posts"}));
+            }
+        }
+        "portfolio" => {
+            if !Setting::get_bool(pool, "comments_on_portfolio") {
+                return Json(json!({"success": false, "error": "Comments are disabled for portfolio items"}));
+            }
+        }
+        _ => {}
+    }
+
+    // Validate required fields
+    if Setting::get_bool(pool, "comments_require_name") && form.author_name.trim().is_empty() {
+        return Json(json!({"success": false, "error": "Name is required"}));
+    }
+    if Setting::get_bool(pool, "comments_require_email") {
+        if form.author_email.as_deref().unwrap_or("").trim().is_empty() {
+            return Json(json!({"success": false, "error": "Email is required"}));
+        }
+    }
+
     // Rate limit by author email or name
     let rate_id = form.author_email.as_deref().unwrap_or(&form.author_name);
     let ip_hash = auth::hash_ip(rate_id);
@@ -168,6 +200,7 @@ pub fn comment_submit(
         author_email: form.author_email.clone(),
         body: form.body.clone(),
         honeypot: form.honeypot.clone(),
+        parent_id: form.parent_id,
     };
 
     match Comment::create(pool, &comment_form) {

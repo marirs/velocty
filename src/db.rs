@@ -637,6 +637,14 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Add parent_id to comments for threaded replies
+    let has_parent_id: bool = conn
+        .prepare("SELECT parent_id FROM comments LIMIT 0")
+        .is_ok();
+    if !has_parent_id {
+        conn.execute_batch("ALTER TABLE comments ADD COLUMN parent_id INTEGER DEFAULT NULL;")?;
+    }
+
     // Seed admin password if not set
     let admin_exists: i64 = conn.query_row(
         "SELECT COUNT(*) FROM settings WHERE key = 'admin_password_hash'",

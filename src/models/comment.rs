@@ -13,6 +13,7 @@ pub struct Comment {
     pub author_email: Option<String>,
     pub body: String,
     pub status: String,
+    pub parent_id: Option<i64>,
     pub created_at: NaiveDateTime,
 }
 
@@ -24,6 +25,7 @@ pub struct CommentForm {
     pub author_email: Option<String>,
     pub body: String,
     pub honeypot: Option<String>,
+    pub parent_id: Option<i64>,
 }
 
 impl Comment {
@@ -36,7 +38,8 @@ impl Comment {
             author_email: row.get("author_email")?,
             body: row.get("body")?,
             status: row.get("status")?,
-            created_at: row.get("created_at")?,
+            parent_id: row.get("parent_id").ok(),
+            created_at: row.get("created_at")?
         })
     }
 
@@ -128,9 +131,9 @@ impl Comment {
         let ct = form.content_type.as_deref().unwrap_or("post");
 
         conn.execute(
-            "INSERT INTO comments (post_id, content_type, author_name, author_email, body, status)
-             VALUES (?1, ?2, ?3, ?4, ?5, 'pending')",
-            params![form.post_id, ct, form.author_name, form.author_email, form.body],
+            "INSERT INTO comments (post_id, content_type, author_name, author_email, body, status, parent_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6)",
+            params![form.post_id, ct, form.author_name, form.author_email, form.body, form.parent_id],
         )
         .map_err(|e| e.to_string())?;
 
@@ -154,24 +157,4 @@ impl Comment {
         Ok(())
     }
 
-    pub fn rate_limit_check(pool: &DbPool, ip_hash: &str, max_per_hour: i64) -> bool {
-        let conn = match pool.get() {
-            Ok(c) => c,
-            Err(_) => return false,
-        };
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM comments
-                 WHERE created_at > datetime('now', '-1 hour')
-                 AND author_email IN (
-                     SELECT author_email FROM comments WHERE id IN (
-                         SELECT id FROM page_views WHERE ip_hash = ?1
-                     )
-                 )",
-                params![ip_hash],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-        count < max_per_hour
-    }
 }

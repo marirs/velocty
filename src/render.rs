@@ -214,6 +214,197 @@ pub fn render_legal_page(
     )
 }
 
+/// Reusable comment display + form for blog and portfolio pages.
+/// Renders approved comments (threaded) and the submission form with captcha.
+fn build_comments_section(context: &Value, settings: &Value, content_id: i64, content_type: &str) -> String {
+    let mut html = String::new();
+
+    // Render existing comments (threaded)
+    if let Some(Value::Array(comments)) = context.get("comments") {
+        // Separate top-level and replies
+        let top: Vec<&Value> = comments.iter().filter(|c| c.get("parent_id").and_then(|v| v.as_i64()).is_none()).collect();
+        let replies: Vec<&Value> = comments.iter().filter(|c| c.get("parent_id").and_then(|v| v.as_i64()).is_some()).collect();
+
+        if !comments.is_empty() {
+            html.push_str(&format!(
+                r#"<section class="comments"><h3>Comments ({})</h3>"#,
+                comments.len()
+            ));
+            for comment in &top {
+                render_comment(&mut html, comment, &replies, 0);
+            }
+            html.push_str("</section>");
+        }
+    }
+
+    // Comment form
+    let sg = |key: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+    };
+    let require_name = sg("comments_require_name") != "false";
+    let require_email = sg("comments_require_email") == "true";
+    let name_req = if require_name { " required" } else { "" };
+    let email_req = if require_email { " required" } else { "" };
+
+    let (captcha_provider, captcha_site_key): (String, String) = if sg("security_recaptcha_enabled") == "true" {
+        ("recaptcha".into(), sg("security_recaptcha_site_key"))
+    } else if sg("security_turnstile_enabled") == "true" {
+        ("turnstile".into(), sg("security_turnstile_site_key"))
+    } else if sg("security_hcaptcha_enabled") == "true" {
+        ("hcaptcha".into(), sg("security_hcaptcha_site_key"))
+    } else {
+        (String::new(), String::new())
+    };
+    let mut captcha_html = String::new();
+    let mut captcha_script = String::new();
+    let mut captcha_get_token_js = "null".to_string();
+
+    if !captcha_provider.is_empty() && !captcha_site_key.is_empty() {
+        match captcha_provider.as_str() {
+            "recaptcha" => {
+                let version = settings.get("security_recaptcha_version").and_then(|v| v.as_str()).unwrap_or("v3");
+                if version == "v3" {
+                    captcha_script = format!(r#"<script src="https://www.google.com/recaptcha/api.js?render={}"></script>"#, captcha_site_key);
+                    captcha_get_token_js = format!("function(){{return grecaptcha.execute('{}',{{action:'comment'}})}}", captcha_site_key);
+                } else {
+                    captcha_script = "https://www.google.com/recaptcha/api.js".to_string();
+                    captcha_html = format!(r#"<div class="g-recaptcha" data-sitekey="{}"></div>"#, captcha_site_key);
+                    captcha_get_token_js = "function(){return Promise.resolve(grecaptcha.getResponse())}".to_string();
+                }
+            }
+            "turnstile" => {
+                captcha_script = "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string();
+                captcha_html = format!(r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#, captcha_site_key);
+                captcha_get_token_js = "function(){return Promise.resolve(document.querySelector('[name=cf-turnstile-response]').value)}".to_string();
+            }
+            "hcaptcha" => {
+                captcha_script = "https://js.hcaptcha.com/1/api.js".to_string();
+                captcha_html = format!(r#"<div class="h-captcha" data-sitekey="{}"></div>"#, captcha_site_key);
+                captcha_get_token_js = "function(){return Promise.resolve(hcaptcha.getResponse())}".to_string();
+            }
+            _ => {}
+        }
+        if captcha_script.starts_with("https://") {
+            captcha_script = format!(r#"<script src="{}"></script>"#, captcha_script);
+        }
+    }
+
+    html.push_str(&format!(
+        "<section class=\"comment-form\">\
+\n    <h3>Leave a Comment</h3>\
+\n    {captcha_script}\
+\n    <form id=\"comment-form\" data-post-id=\"{content_id}\" data-content-type=\"{content_type}\">\
+\n        <input type=\"hidden\" name=\"parent_id\" value=\"\">\
+\n        <div id=\"reply-indicator\" style=\"display:none;margin-bottom:8px;font-size:13px;color:var(--color-text-secondary)\">\
+\n            Replying to <strong id=\"reply-to-name\"></strong> <a href=\"#\" id=\"cancel-reply\" style=\"margin-left:8px\">Cancel</a>\
+\n        </div>\
+\n        <input type=\"text\" name=\"author_name\" placeholder=\"Name\"{name_req}>\
+\n        <input type=\"email\" name=\"author_email\" placeholder=\"Email\"{email_req}>\
+\n        <textarea name=\"body\" placeholder=\"Your comment...\" required></textarea>\
+\n        <div style=\"display:none\"><input type=\"text\" name=\"honeypot\"></div>\
+\n        {captcha_html}\
+\n        <button type=\"submit\">Submit</button>\
+\n        <p id=\"comment-msg\" style=\"margin-top:8px;font-size:13px;display:none\"></p>\
+\n    </form>\
+\n</section>\
+\n<script>\
+\n(function(){{\
+\nvar f=document.getElementById('comment-form');\
+\nif(!f)return;\
+\nvar getToken={captcha_get_token_js};\
+\ndocument.querySelectorAll('.reply-btn').forEach(function(btn){{\
+\n    btn.addEventListener('click',function(e){{\
+\n        e.preventDefault();\
+\n        f.querySelector('[name=parent_id]').value=this.dataset.id;\
+\n        document.getElementById('reply-to-name').textContent=this.dataset.name;\
+\n        document.getElementById('reply-indicator').style.display='';\
+\n        f.querySelector('[name=body]').focus();\
+\n    }});\
+\n}});\
+\nvar cancelReply=document.getElementById('cancel-reply');\
+\nif(cancelReply)cancelReply.addEventListener('click',function(e){{\
+\n    e.preventDefault();\
+\n    f.querySelector('[name=parent_id]').value='';\
+\n    document.getElementById('reply-indicator').style.display='none';\
+\n}});\
+\nf.addEventListener('submit',function(e){{\
+\n    e.preventDefault();\
+\n    var btn=f.querySelector('button[type=submit]');\
+\n    btn.disabled=true;btn.textContent='Submitting...';\
+\n    var msg=document.getElementById('comment-msg');\
+\n    msg.style.display='none';\
+\n    var parentVal=f.querySelector('[name=parent_id]').value;\
+\n    var data={{\
+\n        post_id:parseInt(f.dataset.postId),\
+\n        content_type:f.dataset.contentType||'post',\
+\n        author_name:f.querySelector('[name=author_name]').value,\
+\n        author_email:f.querySelector('[name=author_email]').value||null,\
+\n        body:f.querySelector('[name=body]').value,\
+\n        honeypot:f.querySelector('[name=honeypot]').value||null,\
+\n        parent_id:parentVal?parseInt(parentVal):null\
+\n    }};\
+\n    var go=function(token){{\
+\n        if(token)data.captcha_token=token;\
+\n        fetch('/api/comment',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(data)}})\
+\n        .then(function(r){{return r.json()}})\
+\n        .then(function(j){{\
+\n            msg.style.display='';\
+\n            if(j.success){{msg.style.color='green';msg.textContent=j.message||'Comment submitted';f.reset();\
+\n                f.querySelector('[name=parent_id]').value='';\
+\n                document.getElementById('reply-indicator').style.display='none';\
+\n            }}\
+\n            else{{msg.style.color='red';msg.textContent=j.error||'Failed';}}\
+\n        }})\
+\n        .catch(function(){{msg.style.display='';msg.style.color='red';msg.textContent='Network error';}})\
+\n        .finally(function(){{btn.disabled=false;btn.textContent='Submit';}});\
+\n    }};\
+\n    if(typeof getToken==='function'){{\
+\n        Promise.resolve(getToken()).then(go).catch(function(){{go(null)}});\
+\n    }}else{{go(null);}}\
+\n}});\
+\n}})();\
+\n</script>",
+        captcha_script = captcha_script,
+        content_id = content_id,
+        content_type = content_type,
+        name_req = name_req,
+        email_req = email_req,
+        captcha_html = captcha_html,
+        captcha_get_token_js = captcha_get_token_js,
+    ));
+
+    html
+}
+
+/// Render a single comment and its nested replies recursively.
+fn render_comment(html: &mut String, comment: &Value, all_replies: &[&Value], depth: usize) {
+    let id = comment.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+    let name = comment.get("author_name").and_then(|v| v.as_str()).unwrap_or("Anonymous");
+    let body = comment.get("body").and_then(|v| v.as_str()).unwrap_or("");
+    let cdate = comment.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+    let indent = if depth > 0 {
+        format!(" style=\"margin-left:{}px;border-left:2px solid #e5e7eb;padding-left:12px\"", depth.min(3) * 24)
+    } else {
+        String::new()
+    };
+    let escaped_name = html_escape(name);
+    let escaped_body = html_escape(body);
+
+    html.push_str(&format!(
+        "<div class=\"comment\"{}><strong>{}</strong> <time>{}</time> \
+         <a href=\"#\" class=\"reply-btn\" data-id=\"{}\" data-name=\"{}\" \
+         style=\"font-size:12px;color:var(--color-accent);margin-left:8px\">Reply</a>\
+         <p>{}</p></div>",
+        indent, escaped_name, cdate, id, escaped_name, escaped_body,
+    ));
+
+    // Render child replies
+    let children: Vec<&&Value> = all_replies.iter().filter(|r| r.get("parent_id").and_then(|v| v.as_i64()) == Some(id)).collect();
+    for child in children {
+        render_comment(html, child, all_replies, depth + 1);
+    }
+}
+
 fn build_categories_sidebar(context: &Value) -> String {
     let categories = match context.get("categories") {
         Some(Value::Array(cats)) => cats,
@@ -485,6 +676,14 @@ fn render_portfolio_single(context: &Value) -> String {
         html.push_str(&build_commerce_html(price, purchase_note, item_id, &settings, payment_provider));
     }
 
+    // Comments on portfolio (gated on comments_enabled flag from route)
+    let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    if comments_on {
+        let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let settings = context.get("settings").cloned().unwrap_or_default();
+        html.push_str(&build_comments_section(context, &settings, item_id, "portfolio"));
+    }
+
     html.push_str("</article>");
 
     // JSON-LD structured data
@@ -631,139 +830,11 @@ fn render_blog_single(context: &Value) -> String {
 
     html.push_str(&format!(r#"<div class="post-content">{}</div>"#, content));
 
-    // Comments
-    if let Some(Value::Array(comments)) = context.get("comments") {
-        if !comments.is_empty() {
-            html.push_str(&format!(
-                r#"<section class="comments"><h3>Comments ({})</h3>"#,
-                comments.len()
-            ));
-            for comment in comments {
-                let name = comment
-                    .get("author_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Anonymous");
-                let body = comment.get("body").and_then(|v| v.as_str()).unwrap_or("");
-                let cdate = comment
-                    .get("created_at")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                html.push_str(&format!(
-                    r#"<div class="comment"><strong>{}</strong> <time>{}</time><p>{}</p></div>"#,
-                    html_escape(name),
-                    cdate,
-                    html_escape(body),
-                ));
-            }
-            html.push_str("</section>");
-        }
-
-        // Comment form
+    // Comments (gated on comments_enabled flag from route)
+    let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    if comments_on {
         let post_id = post.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-
-        // Captcha widget — derive provider and site key from security settings
-        let sg = |key: &str| -> String {
-            settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
-        };
-        let (captcha_provider, captcha_site_key): (String, String) = if sg("security_recaptcha_enabled") == "true" {
-            ("recaptcha".into(), sg("security_recaptcha_site_key"))
-        } else if sg("security_turnstile_enabled") == "true" {
-            ("turnstile".into(), sg("security_turnstile_site_key"))
-        } else if sg("security_hcaptcha_enabled") == "true" {
-            ("hcaptcha".into(), sg("security_hcaptcha_site_key"))
-        } else {
-            (String::new(), String::new())
-        };
-        let mut captcha_html = String::new();
-        let mut captcha_script = String::new();
-        let mut captcha_get_token_js = "null".to_string();
-
-        if !captcha_provider.is_empty() && !captcha_site_key.is_empty() {
-            match captcha_provider.as_str() {
-                "recaptcha" => {
-                    let version = settings.get("security_recaptcha_version").and_then(|v| v.as_str()).unwrap_or("v3");
-                    if version == "v3" {
-                        captcha_script = format!(r#"<script src="https://www.google.com/recaptcha/api.js?render={}"></script>"#, captcha_site_key);
-                        captcha_get_token_js = format!("function(){{return grecaptcha.execute('{}',{{action:'comment'}})}}", captcha_site_key);
-                    } else {
-                        captcha_script = "https://www.google.com/recaptcha/api.js".to_string();
-                        captcha_html = format!(r#"<div class="g-recaptcha" data-sitekey="{}"></div>"#, captcha_site_key);
-                        captcha_get_token_js = "function(){return Promise.resolve(grecaptcha.getResponse())}".to_string();
-                    }
-                }
-                "turnstile" => {
-                    captcha_script = "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string();
-                    captcha_html = format!(r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#, captcha_site_key);
-                    captcha_get_token_js = "function(){return Promise.resolve(document.querySelector('[name=cf-turnstile-response]').value)}".to_string();
-                }
-                "hcaptcha" => {
-                    captcha_script = "https://js.hcaptcha.com/1/api.js".to_string();
-                    captcha_html = format!(r#"<div class="h-captcha" data-sitekey="{}"></div>"#, captcha_site_key);
-                    captcha_get_token_js = "function(){return Promise.resolve(hcaptcha.getResponse())}".to_string();
-                }
-                _ => {}
-            }
-            if captcha_script.starts_with("https://") {
-                captcha_script = format!(r#"<script src="{}"></script>"#, captcha_script);
-            }
-        }
-
-        html.push_str(&format!(
-            r#"<section class="comment-form">
-    <h3>Leave a Comment</h3>
-    {captcha_script}
-    <form id="comment-form" data-post-id="{post_id}" data-content-type="post">
-        <input type="text" name="author_name" placeholder="Name" required>
-        <input type="email" name="author_email" placeholder="Email">
-        <textarea name="body" placeholder="Your comment..." required></textarea>
-        <div style="display:none"><input type="text" name="honeypot"></div>
-        {captcha_html}
-        <button type="submit">Submit</button>
-        <p id="comment-msg" style="margin-top:8px;font-size:13px;display:none"></p>
-    </form>
-</section>
-<script>
-(function(){{
-var f=document.getElementById('comment-form');
-if(!f)return;
-var getToken={captcha_get_token_js};
-f.addEventListener('submit',function(e){{
-    e.preventDefault();
-    var btn=f.querySelector('button[type=submit]');
-    btn.disabled=true;btn.textContent='Submitting...';
-    var msg=document.getElementById('comment-msg');
-    msg.style.display='none';
-    var data={{
-        post_id:parseInt(f.dataset.postId),
-        content_type:f.dataset.contentType||'post',
-        author_name:f.querySelector('[name=author_name]').value,
-        author_email:f.querySelector('[name=author_email]').value||null,
-        body:f.querySelector('[name=body]').value,
-        honeypot:f.querySelector('[name=honeypot]').value||null
-    }};
-    var go=function(token){{
-        if(token)data.captcha_token=token;
-        fetch('/api/comment',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(data)}})
-        .then(function(r){{return r.json()}})
-        .then(function(j){{
-            msg.style.display='';
-            if(j.success){{msg.style.color='green';msg.textContent=j.message||'Comment submitted';f.reset();}}
-            else{{msg.style.color='red';msg.textContent=j.error||'Failed';}}
-        }})
-        .catch(function(){{msg.style.display='';msg.style.color='red';msg.textContent='Network error';}})
-        .finally(function(){{btn.disabled=false;btn.textContent='Submit';}});
-    }};
-    if(typeof getToken==='function'){{
-        Promise.resolve(getToken()).then(go).catch(function(){{go(null)}});
-    }}else{{go(null);}}
-}});
-}})();
-</script>"#,
-            captcha_script = captcha_script,
-            post_id = post_id,
-            captcha_html = captcha_html,
-            captcha_get_token_js = captcha_get_token_js,
-        ));
+        html.push_str(&build_comments_section(context, &settings, post_id, "post"));
     }
 
     html.push_str("</article>");

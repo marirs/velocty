@@ -910,6 +910,7 @@ pub fn settings_save(
         ],
         "comments" => &[
             "comments_enabled", "comments_on_blog", "comments_on_portfolio",
+            "comments_honeypot", "comments_require_name", "comments_require_email",
         ],
         "security" => &[
             "mfa_enabled", "login_captcha_enabled",

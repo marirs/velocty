@@ -130,6 +130,22 @@ Last updated: 2026-02-15
 - **New API**: `POST /{admin_slug}/upload/font` — accepts font file (.woff2/.woff/.ttf/.otf) + font name, saves to `uploads/fonts/`, stores `font_custom_name` and `font_custom_filename` in settings
 - Wired "Add Font" button in typography template to use the upload API via `fetch`
 
+### Comments Fixes ✅
+- **Bug fix:** `comments_enabled` global setting now checked in both the API (`comment_submit`) and render — form only shown when enabled
+- **Bug fix:** `comments_on_blog` now checked in `blog_single` route — comments not loaded or rendered when disabled
+- **Bug fix:** `comments_on_portfolio` now checked with global `comments_enabled` in `portfolio_single` route
+- **Bug fix:** Portfolio single pages now render comments and comment form (was completely missing)
+- **Bug fix:** `comments_require_name` / `comments_require_email` now enforced server-side in the API and dynamically set `required` attribute in the HTML form
+- **Bug fix:** Missing checkbox keys (`comments_honeypot`, `comments_require_name`, `comments_require_email`) added to admin settings save handler
+- **Removed dead code:** `Comment::rate_limit_check` method (queried non-existent `page_views` table; actual rate limiting uses `RateLimiter`)
+- **New feature:** Threaded replies — `parent_id` column added to comments table via migration
+  - Comments display nested with indentation (up to 3 levels deep)
+  - "Reply" button on each comment sets `parent_id` in the form
+  - Reply indicator with cancel button
+  - `parent_id` sent in API payload and stored in DB
+- **Refactored:** Comment rendering extracted into reusable `build_comments_section()` + `render_comment()` functions shared by blog and portfolio
+- WordPress import updated with `parent_id: None` for compatibility
+
 ### Potential Enhancements
 - Wire captcha into comment form via design templates (currently only in default `render.rs`)
 - Magic link token cleanup cron/scheduled task

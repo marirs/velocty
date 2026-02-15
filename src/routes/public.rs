@@ -79,8 +79,14 @@ pub fn blog_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<String>> 
 
     let categories = Category::for_content(pool, post.id, "post");
     let tags = Tag::for_content(pool, post.id, "post");
-    let comments = Comment::for_post(pool, post.id, "post");
     let settings = Setting::all(pool);
+    let comments_enabled = settings.get("comments_enabled").map(|v| v.as_str()) == Some("true")
+        && settings.get("comments_on_blog").map(|v| v.as_str()) == Some("true");
+    let comments = if comments_enabled {
+        Comment::for_post(pool, post.id, "post")
+    } else {
+        vec![]
+    };
 
     let context = json!({
         "settings": settings,
@@ -88,6 +94,7 @@ pub fn blog_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<String>> 
         "categories": categories,
         "tags": tags,
         "comments": comments,
+        "comments_enabled": comments_enabled,
         "page_type": "blog_single",
         "seo": seo::build_meta(
             pool,
@@ -436,13 +443,14 @@ pub fn portfolio_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<Stri
 
     let categories = Category::for_content(pool, item.id, "portfolio");
     let tags = Tag::for_content(pool, item.id, "portfolio");
-    let comments_enabled = Setting::get_bool(pool, "comments_on_portfolio");
+    let settings = Setting::all(pool);
+    let comments_enabled = settings.get("comments_enabled").map(|v| v.as_str()) == Some("true")
+        && settings.get("comments_on_portfolio").map(|v| v.as_str()) == Some("true");
     let comments = if comments_enabled {
         Comment::for_post(pool, item.id, "portfolio")
     } else {
         vec![]
     };
-    let settings = Setting::all(pool);
 
     // Commerce: check if any provider is enabled
     let any_commerce = [

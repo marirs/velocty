@@ -303,6 +303,7 @@ fn import_post(
             },
             body: body.clone(),
             honeypot: None,
+            parent_id: None,
         };
         if let Ok(cid) = Comment::create(pool, &comment_form) {
             let _ = Comment::update_status(pool, cid, status);
