@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::ai::{self, prompts, AiRequest};
-use crate::security::auth::AdminUser;
+use crate::security::auth::EditorUser;
 use crate::db::DbPool;
 
 use super::parse_json_from_text;
@@ -32,7 +32,7 @@ pub struct DescribeImageRequest {
 
 #[post("/ai/generate-post", format = "json", data = "<body>")]
 pub fn generate_post(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<GeneratePostRequest>,
 ) -> Json<Value> {
@@ -68,7 +68,7 @@ pub fn generate_post(
 
 #[post("/ai/inline-assist", format = "json", data = "<body>")]
 pub fn inline_assist(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<InlineAssistRequest>,
 ) -> Json<Value> {
@@ -107,7 +107,7 @@ pub fn inline_assist(
 
 #[post("/ai/describe-image", format = "json", data = "<body>")]
 pub fn describe_image(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<DescribeImageRequest>,
 ) -> Json<Value> {

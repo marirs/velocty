@@ -72,6 +72,10 @@
                     <span class="nav-label">Sales</span>
                 </a>
                 {% endif %}
+                <a href="/{{ admin_slug }}/users" class="nav-item {% if page_title == 'Users' %}active{% endif %}" title="Users">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span class="nav-label">Users</span>
+                </a>
                 <a href="/{{ admin_slug }}/settings/general" class="nav-item {% if page_title is containing('Settings') %}active{% endif %}" title="Settings">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span class="nav-label">Settings</span>
@@ -79,10 +83,10 @@
             </nav>
             <div class="sidebar-bottom">
                 <div class="sidebar-user-row">
-                    <a href="/{{ admin_slug }}/settings/users" title="{{ settings.admin_display_name | default(value='Admin') }}" style="text-decoration:none">
+                    <a href="/{{ admin_slug }}/users" title="{{ settings.admin_display_name | default(value='Admin') }}" style="text-decoration:none">
                         <span class="user-avatar">{{ settings.admin_display_name | default(value='A') | truncate(length=1, end='') | upper }}</span>
                     </a>
-                    <a href="/{{ admin_slug }}/settings/users" class="nav-label" style="text-decoration:none;color:var(--text-tertiary)">{{ settings.admin_display_name | default(value='Admin') }}</a>
+                    <a href="/{{ admin_slug }}/users" class="nav-label" style="text-decoration:none;color:var(--text-tertiary)">{{ settings.admin_display_name | default(value='Admin') }}</a>
                     <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle theme">
                         {% if settings.admin_theme | default(value='dark') == "light" %}
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>

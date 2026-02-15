@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::security::{self, auth, magic_link, mfa};
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::models::user::User;
 use crate::rate_limit::RateLimiter;
 use crate::AdminSlug;
 
@@ -90,9 +91,9 @@ pub fn magic_link_submit(
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
     ctx.insert("success".to_string(), "If that email is registered, a magic link has been sent. Check your inbox.".to_string());
 
-    // Only actually send if the email matches the admin
+    // Only actually send if the email matches a known user
     if !admin_email.is_empty() && form.email.trim() == admin_email {
-        match magic_link::create_token(pool, &admin_email) {
+        match magic_link::create_token(pool, form.email.trim()) {
             Ok(token) => {
                 if let Err(e) = magic_link::send_magic_link_email(pool, &admin_email, &token) {
                     log::error!("Failed to send magic link email: {}", e);
@@ -119,18 +120,37 @@ pub fn magic_link_verify(
     let theme = Setting::get_or(pool, "admin_theme", "dark");
 
     match magic_link::verify_token(pool, token) {
-        Ok(_email) => {
-            // Check if MFA is required
-            let mfa_enabled = Setting::get_bool(pool, "mfa_enabled");
-            let mfa_secret = Setting::get_or(pool, "mfa_secret", "");
-            if mfa_enabled && !mfa_secret.is_empty() {
+        Ok(email) => {
+            // Look up the user by email
+            let user = match User::get_by_email(pool, &email) {
+                Some(u) => u,
+                None => {
+                    let mut ctx = HashMap::new();
+                    ctx.insert("error".to_string(), "User not found".to_string());
+                    ctx.insert("admin_theme".to_string(), theme);
+                    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+                    return Err(Template::render("admin/magic_link", &ctx));
+                }
+            };
+
+            if !user.is_active() {
+                let mut ctx = HashMap::new();
+                ctx.insert("error".to_string(), "This account is suspended or locked.".to_string());
+                ctx.insert("admin_theme".to_string(), theme);
+                ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+                return Err(Template::render("admin/magic_link", &ctx));
+            }
+
+            // Check if MFA is required (per-user)
+            if user.mfa_enabled && !user.mfa_secret.is_empty() {
                 let pending_token = uuid::Uuid::new_v4().to_string();
-                mfa::set_pending_cookie(cookies, &pending_token);
+                mfa::set_pending_cookie(cookies, &format!("{}:{}", user.id, pending_token));
                 return Ok(Redirect::to(format!("/{}/mfa", admin_slug.0)));
             }
 
             // Create session directly
-            match auth::create_session(pool, None, None) {
+            let _ = User::touch_last_login(pool, user.id);
+            match auth::create_session(pool, user.id, None, None) {
                 Ok(session_id) => {
                     auth::set_session_cookie(cookies, &session_id);
                     Ok(Redirect::to(format!("/{}", admin_slug.0)))

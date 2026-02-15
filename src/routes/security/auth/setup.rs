@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::security::auth;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::models::user::User;
 use crate::AdminSlug;
 
 use super::super::NoCacheTemplate;
@@ -170,6 +171,13 @@ pub fn setup_submit(
     let hash = auth::hash_password(&form.password)
         .map_err(|_| make_err("Failed to hash password.", &form))?;
 
+    // Create admin user in users table
+    match User::create(pool, form.admin_email.trim(), &hash, "Admin", "admin") {
+        Ok(_) => {}
+        Err(e) => return Err(make_err(&format!("Failed to create admin user: {}", e), &form)),
+    }
+
+    // Also keep admin_email in settings for backward compat and display
     let _ = Setting::set(pool, "site_name", form.site_name.trim());
     let _ = Setting::set(pool, "admin_email", form.admin_email.trim());
     let _ = Setting::set(pool, "admin_password_hash", &hash);

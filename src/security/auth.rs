@@ -7,36 +7,103 @@ use sha2::{Digest, Sha256};
 
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::models::user::User;
 
 const SESSION_COOKIE: &str = "velocty_session";
 
-/// Guard that ensures the request is from an authenticated admin
-pub struct AdminUser;
+// ── Authenticated user guard (any active user with a valid session) ──
+
+/// Guard: any authenticated user with an active account.
+/// All role-specific guards deref to this.
+pub struct AuthenticatedUser {
+    pub user: User,
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for AuthenticatedUser {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        match resolve_session_user(request).await {
+            Some(user) => Outcome::Success(AuthenticatedUser { user }),
+            None => Outcome::Forward(Status::Unauthorized),
+        }
+    }
+}
+
+// ── Role-specific guards ──
+
+/// Guard: requires role = admin
+pub struct AdminUser {
+    pub user: User,
+}
 
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for AdminUser {
     type Error = ();
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        let pool = match request.guard::<&State<DbPool>>().await {
-            Outcome::Success(p) => p,
-            _ => return Outcome::Forward(Status::Unauthorized),
-        };
-
-        let cookies = request.cookies();
-        let session_id = match cookies.get_private(SESSION_COOKIE) {
-            Some(c) => c.value().to_string(),
-            None => return Outcome::Forward(Status::Unauthorized),
-        };
-
-        if validate_session(pool, &session_id) {
-            Outcome::Success(AdminUser)
-        } else {
-            cookies.remove_private(Cookie::from(SESSION_COOKIE));
-            Outcome::Forward(Status::Unauthorized)
+        match resolve_session_user(request).await {
+            Some(user) if user.is_admin() => Outcome::Success(AdminUser { user }),
+            Some(_) => Outcome::Forward(Status::Forbidden),
+            None => Outcome::Forward(Status::Unauthorized),
         }
     }
 }
+
+/// Guard: requires role = admin or editor
+pub struct EditorUser {
+    pub user: User,
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for EditorUser {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        match resolve_session_user(request).await {
+            Some(user) if user.is_editor_or_above() => Outcome::Success(EditorUser { user }),
+            Some(_) => Outcome::Forward(Status::Forbidden),
+            None => Outcome::Forward(Status::Unauthorized),
+        }
+    }
+}
+
+/// Guard: requires role = admin, editor, or author
+pub struct AuthorUser {
+    pub user: User,
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for AuthorUser {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        match resolve_session_user(request).await {
+            Some(user) if user.is_author_or_above() => Outcome::Success(AuthorUser { user }),
+            Some(_) => Outcome::Forward(Status::Forbidden),
+            None => Outcome::Forward(Status::Unauthorized),
+        }
+    }
+}
+
+// ── Shared session resolution ──
+
+async fn resolve_session_user(request: &Request<'_>) -> Option<User> {
+    let pool = request.guard::<&State<DbPool>>().await.succeeded()?;
+    let cookies = request.cookies();
+    let session_id = cookies.get_private(SESSION_COOKIE)?.value().to_string();
+
+    match get_session_user(pool, &session_id) {
+        Some(user) if user.is_active() => Some(user),
+        _ => {
+            cookies.remove_private(Cookie::from(SESSION_COOKIE));
+            None
+        }
+    }
+}
+
+// ── Password utilities ──
 
 pub fn hash_password(password: &str) -> Result<String, String> {
     bcrypt::hash(password, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())
@@ -46,7 +113,9 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
     bcrypt::verify(password, hash).unwrap_or(false)
 }
 
-pub fn create_session(pool: &DbPool, ip: Option<&str>, ua: Option<&str>) -> Result<String, String> {
+// ── Session management ──
+
+pub fn create_session(pool: &DbPool, user_id: i64, ip: Option<&str>, ua: Option<&str>) -> Result<String, String> {
     let conn = pool.get().map_err(|e| e.to_string())?;
 
     let expiry_hours = Setting::get_i64(pool, "session_expiry_hours").max(1);
@@ -55,15 +124,32 @@ pub fn create_session(pool: &DbPool, ip: Option<&str>, ua: Option<&str>) -> Resu
     let expires = now + Duration::hours(expiry_hours);
 
     conn.execute(
-        "INSERT INTO sessions (id, created_at, expires_at, ip_address, user_agent)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![session_id, now, expires, ip, ua],
+        "INSERT INTO sessions (id, user_id, created_at, expires_at, ip_address, user_agent)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![session_id, user_id, now, expires, ip, ua],
     )
     .map_err(|e| e.to_string())?;
 
     Ok(session_id)
 }
 
+/// Validate a session and return the associated user
+pub fn get_session_user(pool: &DbPool, session_id: &str) -> Option<User> {
+    let conn = pool.get().ok()?;
+    let now = Utc::now().naive_utc();
+
+    let user_id: i64 = conn
+        .query_row(
+            "SELECT user_id FROM sessions WHERE id = ?1 AND expires_at > ?2 AND user_id IS NOT NULL",
+            params![session_id, now],
+            |row| row.get(0),
+        )
+        .ok()?;
+
+    User::get_by_id(pool, user_id)
+}
+
+/// Legacy: validate session exists (for backward compat during migration)
 pub fn validate_session(pool: &DbPool, session_id: &str) -> bool {
     let conn = match pool.get() {
         Ok(c) => c,
@@ -123,7 +209,6 @@ pub fn check_login_rate_limit(pool: &DbPool, ip: &str) -> bool {
     };
 
     let ip_hash = hash_ip(ip);
-    // Count recent failed sessions from this IP (sessions created in last 15 min)
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM sessions

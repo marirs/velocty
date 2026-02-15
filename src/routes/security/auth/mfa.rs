@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::security::{auth, mfa};
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::models::user::User;
 use crate::AdminSlug;
 
 use super::super::NoCacheTemplate;
@@ -18,10 +19,16 @@ pub struct MfaForm {
     pub code: String,
 }
 
+/// Extract user_id from pending cookie value "user_id:token"
+fn pending_user_id(cookies: &CookieJar<'_>) -> Option<i64> {
+    let val = mfa::get_pending_cookie(cookies)?;
+    val.split(':').next()?.parse().ok()
+}
+
 #[get("/mfa")]
 pub fn mfa_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, cookies: &CookieJar<'_>) -> Result<NoCacheTemplate, Redirect> {
-    // Only show MFA page if there's a pending token
-    if mfa::get_pending_cookie(cookies).is_none() {
+    // Only show MFA page if there's a pending token with a valid user_id
+    if pending_user_id(cookies).is_none() {
         return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
     let mut ctx: HashMap<String, String> = HashMap::new();
@@ -39,26 +46,30 @@ pub fn mfa_submit(
 ) -> Result<Redirect, Template> {
     let theme = Setting::get_or(pool, "admin_theme", "dark");
 
-    // Verify pending token exists
-    if mfa::get_pending_cookie(cookies).is_none() {
-        return Ok(Redirect::to(format!("/{}/login", admin_slug.0)));
-    }
+    // Extract user_id from pending cookie
+    let user_id = match pending_user_id(cookies) {
+        Some(id) => id,
+        None => return Ok(Redirect::to(format!("/{}/login", admin_slug.0))),
+    };
 
-    let mfa_secret = Setting::get_or(pool, "mfa_secret", "");
+    let user = match User::get_by_id(pool, user_id) {
+        Some(u) => u,
+        None => return Ok(Redirect::to(format!("/{}/login", admin_slug.0))),
+    };
+
     let code = form.code.trim();
 
-    // Try TOTP code first
-    let mut valid = mfa::verify_code(&mfa_secret, code);
+    // Try TOTP code first (against user's own secret)
+    let mut valid = mfa::verify_code(&user.mfa_secret, code);
 
     // If TOTP failed, try recovery code
     if !valid {
-        let codes_json = Setting::get_or(pool, "mfa_recovery_codes", "[]");
-        let mut codes: Vec<String> = serde_json::from_str(&codes_json).unwrap_or_default();
+        let mut codes: Vec<String> = serde_json::from_str(&user.mfa_recovery_codes).unwrap_or_default();
         let code_upper = code.to_uppercase();
         if let Some(pos) = codes.iter().position(|c| c == &code_upper) {
             codes.remove(pos);
             let updated = serde_json::to_string(&codes).unwrap_or_else(|_| "[]".to_string());
-            let _ = Setting::set(pool, "mfa_recovery_codes", &updated);
+            let _ = User::update_mfa(pool, user.id, true, &user.mfa_secret, &updated);
             valid = true;
         }
     }
@@ -74,8 +85,9 @@ pub fn mfa_submit(
     // Clear the pending cookie
     let _ = mfa::take_pending_cookie(cookies);
 
-    // Create session
-    match auth::create_session(pool, None, None) {
+    // Create session with user_id
+    let _ = User::touch_last_login(pool, user.id);
+    match auth::create_session(pool, user.id, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
             Ok(Redirect::to(format!("/{}", admin_slug.0)))

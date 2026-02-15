@@ -10,6 +10,7 @@ use crate::security::{self, auth, mfa};
 use crate::db::DbPool;
 use crate::models::firewall::{FwBan, FwEvent};
 use crate::models::settings::Setting;
+use crate::models::user::User;
 use crate::rate_limit::RateLimiter;
 use crate::AdminSlug;
 
@@ -20,11 +21,9 @@ pub struct LoginForm {
     pub captcha_token: Option<String>,
 }
 
-/// Returns true if this is a fresh install (no admin email set)
+/// Returns true if this is a fresh install (no users exist)
 pub fn needs_setup(pool: &DbPool) -> bool {
-    let email = Setting::get_or(pool, "admin_email", "");
-    let hash = Setting::get_or(pool, "admin_password_hash", "");
-    email.is_empty() || hash.is_empty()
+    User::count(pool) == 0
 }
 
 #[get("/login")]
@@ -57,62 +56,65 @@ pub fn login_submit(
     let max_attempts = Setting::get_i64(pool, "login_rate_limit").max(1) as u64;
     let window = std::time::Duration::from_secs(15 * 60);
 
+    let make_err = |msg: &str, theme: &str, pool: &DbPool, slug: &str| -> Template {
+        let mut ctx = HashMap::new();
+        ctx.insert("error".to_string(), msg.to_string());
+        ctx.insert("admin_theme".to_string(), theme.to_string());
+        ctx.insert("admin_slug".to_string(), slug.to_string());
+        inject_captcha_context(pool, &mut ctx);
+        Template::render("admin/login", &ctx)
+    };
+
     // Check rate limit before processing
     if !limiter.check_and_record(&rate_key, max_attempts, window) {
-        let mut ctx = HashMap::new();
-        ctx.insert("error".to_string(), "Too many login attempts. Please try again in 15 minutes.".to_string());
-        ctx.insert("admin_theme".to_string(), theme);
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-        inject_captcha_context(pool, &mut ctx);
-        return Err(Template::render("admin/login", &ctx));
+        return Err(make_err("Too many login attempts. Please try again in 15 minutes.", &theme, pool, &admin_slug.0));
     }
 
     // Verify login captcha
     let captcha_token = form.captcha_token.as_deref().unwrap_or("");
     match security::verify_login_captcha(pool, captcha_token, None) {
         Ok(false) => {
-            let mut ctx = HashMap::new();
-            ctx.insert("error".to_string(), "Captcha verification failed. Please try again.".to_string());
-            ctx.insert("admin_theme".to_string(), theme);
-            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-            inject_captcha_context(pool, &mut ctx);
-            return Err(Template::render("admin/login", &ctx));
+            return Err(make_err("Captcha verification failed. Please try again.", &theme, pool, &admin_slug.0));
         }
         Err(e) => log::warn!("Login captcha error (allowing): {}", e),
         _ => {}
     }
 
-    let stored_hash = Setting::get(pool, "admin_password_hash").unwrap_or_default();
-    let admin_email = Setting::get_or(pool, "admin_email", "");
-
-    if !admin_email.is_empty() && form.email != admin_email {
-        // Firewall: log failed login with unknown user
-        if Setting::get_or(pool, "firewall_enabled", "false") == "true"
-            && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
-        {
-            FwEvent::log(pool, &ip_hash, "failed_login", Some(&format!("Unknown user: {}", form.email)), None, None, Some("login"));
-
-            // Ban unknown users immediately if configured
-            if Setting::get_or(pool, "fw_ban_unknown_users", "false") == "true" {
-                let dur = Setting::get_or(pool, "fw_unknown_user_ban_duration", "24h");
-                let _ = FwBan::create_with_duration(pool, &ip_hash, "unknown_user", Some(&format!("Login attempt with unknown user: {}", form.email)), &dur, None, None);
+    // Look up user by email
+    let user = match User::get_by_email(pool, &form.email) {
+        Some(u) => u,
+        None => {
+            // Firewall: unknown user
+            if Setting::get_or(pool, "firewall_enabled", "false") == "true"
+                && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
+            {
+                FwEvent::log(pool, &ip_hash, "failed_login", Some(&format!("Unknown user: {}", form.email)), None, None, Some("login"));
+                if Setting::get_or(pool, "fw_ban_unknown_users", "false") == "true" {
+                    let dur = Setting::get_or(pool, "fw_unknown_user_ban_duration", "24h");
+                    let _ = FwBan::create_with_duration(pool, &ip_hash, "unknown_user", Some(&format!("Login attempt with unknown user: {}", form.email)), &dur, None, None);
+                }
             }
+            return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));
         }
-        let mut ctx = HashMap::new();
-        ctx.insert("error".to_string(), "Invalid credentials".to_string());
-        ctx.insert("admin_theme".to_string(), theme);
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-        inject_captcha_context(pool, &mut ctx);
-        return Err(Template::render("admin/login", &ctx));
+    };
+
+    // Check account status
+    if !user.is_active() {
+        return Err(make_err("This account is suspended or locked. Contact an administrator.", &theme, pool, &admin_slug.0));
     }
 
-    if !auth::verify_password(&form.password, &stored_hash) {
-        // Firewall: log failed login and check ban threshold
+    // Check role — subscribers cannot log into admin
+    if user.role == "subscriber" {
+        return Err(make_err("Your account does not have admin panel access.", &theme, pool, &admin_slug.0));
+    }
+
+    // Verify password
+    if !auth::verify_password(&form.password, &user.password_hash) {
+        // Firewall: failed password
         if Setting::get_or(pool, "firewall_enabled", "false") == "true"
             && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
         {
             FwEvent::log(pool, &ip_hash, "failed_login", Some("Wrong password"), None, None, Some("login"));
-
             let threshold: i64 = Setting::get_or(pool, "fw_failed_login_ban_threshold", "5")
                 .parse().unwrap_or(5);
             let count = FwEvent::count_for_ip_since(pool, &ip_hash, "failed_login", 15);
@@ -121,38 +123,25 @@ pub fn login_submit(
                 let _ = FwBan::create_with_duration(pool, &ip_hash, "failed_login", Some("Too many failed login attempts"), &dur, None, None);
             }
         }
-        let mut ctx = HashMap::new();
-        ctx.insert("error".to_string(), "Invalid credentials".to_string());
-        ctx.insert("admin_theme".to_string(), theme.clone());
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-        inject_captcha_context(pool, &mut ctx);
-        return Err(Template::render("admin/login", &ctx));
+        return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));
     }
 
-    // Check MFA
-    let mfa_enabled = Setting::get_bool(pool, "mfa_enabled");
-    let mfa_secret = Setting::get_or(pool, "mfa_secret", "");
-    if mfa_enabled && !mfa_secret.is_empty() {
-        // Store a pending token so the MFA page knows password was verified
+    // Check MFA (per-user)
+    if user.mfa_enabled && !user.mfa_secret.is_empty() {
         let pending_token = uuid::Uuid::new_v4().to_string();
-        mfa::set_pending_cookie(cookies, &pending_token);
+        // Store user_id in a pending cookie so MFA page can complete login
+        mfa::set_pending_cookie(cookies, &format!("{}:{}", user.id, pending_token));
         return Ok(Redirect::to(format!("/{}/mfa", admin_slug.0)));
     }
 
-    // Create session (no MFA)
-    match auth::create_session(pool, None, None) {
+    // Create session
+    let _ = User::touch_last_login(pool, user.id);
+    match auth::create_session(pool, user.id, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
             Ok(Redirect::to(format!("/{}", admin_slug.0)))
         }
-        Err(_) => {
-            let mut ctx = HashMap::new();
-            ctx.insert("error".to_string(), "Session creation failed".to_string());
-            ctx.insert("admin_theme".to_string(), theme.clone());
-            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-            inject_captcha_context(pool, &mut ctx);
-            Err(Template::render("admin/login", &ctx))
-        }
+        Err(_) => Err(make_err("Session creation failed", &theme, pool, &admin_slug.0)),
     }
 }
 

@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::security::auth::AdminUser;
+use crate::security::auth::{AdminUser, EditorUser};
 use crate::db::DbPool;
 use crate::AdminSlug;
 
@@ -29,7 +29,7 @@ use crate::models::tag::Tag;
 // ── Dashboard ──────────────────────────────────────────
 
 #[get("/")]
-pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn dashboard(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let posts_count = Post::count(pool, None);
     let posts_draft = Post::count(pool, Some("draft"));
     let portfolio_count = PortfolioItem::count(pool, None);
@@ -52,7 +52,7 @@ pub fn dashboard(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug
 
 #[get("/posts?<status>&<page>")]
 pub fn posts_list(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     status: Option<String>,
@@ -85,7 +85,7 @@ pub fn posts_list(
 }
 
 #[get("/posts/new")]
-pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn posts_new(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
 
@@ -105,7 +105,7 @@ pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug
 }
 
 #[get("/posts/<id>/edit")]
-pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
+pub fn posts_edit(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
     let post = Post::find_by_id(pool, id)?;
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
@@ -131,7 +131,7 @@ pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlu
 }
 
 #[post("/posts/<id>/delete")]
-pub fn posts_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn posts_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Post::delete(pool, id);
     Redirect::to(format!("{}/posts", admin_base(slug)))
 }
@@ -140,7 +140,7 @@ pub fn posts_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminS
 
 #[get("/portfolio?<status>&<page>")]
 pub fn portfolio_list(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     status: Option<String>,
@@ -172,7 +172,7 @@ pub fn portfolio_list(
 }
 
 #[get("/portfolio/new")]
-pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn portfolio_new(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
 
@@ -192,7 +192,7 @@ pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Admin
 }
 
 #[get("/portfolio/<id>/edit")]
-pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
+pub fn portfolio_edit(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
     let item = PortfolioItem::find_by_id(pool, id)?;
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
@@ -218,7 +218,7 @@ pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Admi
 }
 
 #[post("/portfolio/<id>/delete")]
-pub fn portfolio_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn portfolio_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = PortfolioItem::delete(pool, id);
     Redirect::to(format!("{}/portfolio", admin_base(slug)))
 }
@@ -227,7 +227,7 @@ pub fn portfolio_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Ad
 
 #[get("/comments?<status>&<page>")]
 pub fn comments_list(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     status: Option<String>,
@@ -258,19 +258,19 @@ pub fn comments_list(
 }
 
 #[post("/comments/<id>/approve")]
-pub fn comment_approve(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn comment_approve(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Comment::update_status(pool, id, "approved");
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/spam")]
-pub fn comment_spam(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn comment_spam(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Comment::update_status(pool, id, "spam");
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/delete")]
-pub fn comment_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn comment_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Comment::delete(pool, id);
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
@@ -279,7 +279,7 @@ pub fn comment_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Admi
 
 #[get("/categories?<type_filter>")]
 pub fn categories_list(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     type_filter: Option<String>,
@@ -313,7 +313,7 @@ pub fn categories_list(
 // ── Tags ───────────────────────────────────────────────
 
 #[get("/tags")]
-pub fn tags_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn tags_list(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
     let tags = Tag::list(pool);
 
     let tags_with_count: Vec<serde_json::Value> = tags
@@ -385,14 +385,19 @@ pub fn settings_page(
     slug: &State<AdminSlug>,
     section: &str,
     flash: Option<rocket::request::FlashMessage<'_>>,
-) -> Option<Template> {
+) -> Result<Template, Redirect> {
+    // Redirect Settings > Users to the standalone Users page
+    if section == "users" {
+        return Err(Redirect::to(format!("{}/users", admin_base(slug))));
+    }
+
     let valid_sections = [
         "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
-        "design", "social", "commerce", "paypal", "users", "ai", "email",
+        "design", "social", "commerce", "paypal", "ai", "email",
     ];
 
     if !valid_sections.contains(&section) {
-        return None;
+        return Err(Redirect::to(format!("{}/settings/general", admin_base(slug))));
     }
 
     let section_label = match section {
@@ -422,7 +427,7 @@ pub fn settings_page(
     }
 
     let template_name: String = format!("admin/settings/{}", section);
-    Some(Template::render(template_name, &context))
+    Ok(Template::render(template_name, &context))
 }
 
 // ── POST: Create Post ──────────────────────────────────
@@ -464,7 +469,7 @@ pub struct ImageUploadForm<'f> {
 
 #[post("/upload/image", data = "<form>")]
 pub async fn upload_image(
-    _admin: AdminUser,
+    _admin: EditorUser,
     mut form: Form<ImageUploadForm<'_>>,
 ) -> Json<Value> {
     match save_upload(&mut form.file, "editor").await {
@@ -483,7 +488,7 @@ pub struct FontUploadForm<'f> {
 
 #[post("/upload/font", data = "<form>")]
 pub async fn upload_font(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     mut form: Form<FontUploadForm<'_>>,
 ) -> Json<Value> {
@@ -518,7 +523,7 @@ pub async fn upload_font(
 
 #[post("/posts/new", data = "<form>")]
 pub async fn posts_create(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
@@ -560,7 +565,7 @@ pub async fn posts_create(
 
 #[post("/posts/<id>/edit", data = "<form>")]
 pub async fn posts_update(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     id: i64,
@@ -618,7 +623,7 @@ pub struct PortfolioFormData<'f> {
 
 #[post("/portfolio/new", data = "<form>")]
 pub async fn portfolio_create(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
@@ -665,7 +670,7 @@ pub async fn portfolio_create(
 
 #[post("/portfolio/<id>/edit", data = "<form>")]
 pub async fn portfolio_update(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     id: i64,
@@ -720,7 +725,7 @@ pub struct CategoryFormData {
 
 #[post("/categories/new", data = "<form>")]
 pub fn category_create(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     admin_slug: &State<AdminSlug>,
     form: Form<CategoryFormData>,
@@ -742,7 +747,7 @@ pub fn category_create(
 }
 
 #[post("/categories/<id>/delete")]
-pub fn category_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn category_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Category::delete(pool, id);
     Redirect::to(format!("{}/categories", admin_base(slug)))
 }
@@ -750,7 +755,7 @@ pub fn category_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Adm
 // ── POST: Tag Delete ───────────────────────────────────
 
 #[post("/tags/<id>/delete")]
-pub fn tag_delete(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn tag_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let _ = Tag::delete(pool, id);
     Redirect::to(format!("{}/tags", admin_base(slug)))
 }
@@ -1322,24 +1327,26 @@ pub async fn import_velocty(
     )
 }
 
-// ── MFA Setup / Disable ─────────────────────────────────
+// ── MFA Setup / Disable (per-user) ──────────────────────
 
 #[post("/mfa/setup", format = "json")]
 pub fn mfa_setup(
     _admin: AdminUser,
     pool: &State<DbPool>,
 ) -> Json<Value> {
+    use crate::models::user::User;
+
     let site_name = Setting::get_or(pool, "site_name", "Velocty");
-    let admin_email = Setting::get_or(pool, "admin_email", "admin");
 
     let secret = crate::security::mfa::generate_secret();
-    let qr = match crate::security::mfa::qr_data_uri(&secret, &site_name, &admin_email) {
+    let qr = match crate::security::mfa::qr_data_uri(&secret, &site_name, &_admin.user.email) {
         Ok(uri) => uri,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
 
-    // Store the pending secret temporarily (not yet confirmed)
-    let _ = Setting::set(pool, "mfa_pending_secret", &secret);
+    // Store the pending secret temporarily in settings keyed by user_id
+    let pending_key = format!("mfa_pending_secret_{}", _admin.user.id);
+    let _ = Setting::set(pool, &pending_key, &secret);
 
     Json(json!({ "ok": true, "qr": qr, "secret": secret }))
 }
@@ -1355,7 +1362,10 @@ pub fn mfa_verify(
     pool: &State<DbPool>,
     body: Json<MfaVerifyForm>,
 ) -> Json<Value> {
-    let pending = Setting::get_or(pool, "mfa_pending_secret", "");
+    use crate::models::user::User;
+
+    let pending_key = format!("mfa_pending_secret_{}", _admin.user.id);
+    let pending = Setting::get_or(pool, &pending_key, "");
     if pending.is_empty() {
         return Json(json!({ "ok": false, "error": "No pending MFA setup. Start setup first." }));
     }
@@ -1364,14 +1374,17 @@ pub fn mfa_verify(
         return Json(json!({ "ok": false, "error": "Invalid code. Please try again." }));
     }
 
-    // Code verified — activate MFA
+    // Code verified — activate MFA on user record
     let recovery_codes = crate::security::mfa::generate_recovery_codes();
     let codes_json = serde_json::to_string(&recovery_codes).unwrap_or_else(|_| "[]".to_string());
 
+    let _ = User::update_mfa(pool, _admin.user.id, true, &pending, &codes_json);
+    let _ = Setting::set(pool, &pending_key, "");
+
+    // Keep settings in sync for backward compat
     let _ = Setting::set(pool, "mfa_secret", &pending);
     let _ = Setting::set(pool, "mfa_enabled", "true");
     let _ = Setting::set(pool, "mfa_recovery_codes", &codes_json);
-    let _ = Setting::set(pool, "mfa_pending_secret", "");
 
     Json(json!({ "ok": true, "recovery_codes": recovery_codes }))
 }
@@ -1382,16 +1395,20 @@ pub fn mfa_disable(
     pool: &State<DbPool>,
     body: Json<MfaVerifyForm>,
 ) -> Json<Value> {
-    let secret = Setting::get_or(pool, "mfa_secret", "");
-    if secret.is_empty() {
+    use crate::models::user::User;
+
+    if !_admin.user.mfa_enabled || _admin.user.mfa_secret.is_empty() {
         return Json(json!({ "ok": false, "error": "MFA is not enabled." }));
     }
 
     // Verify current code before disabling
-    if !crate::security::mfa::verify_code(&secret, &body.code) {
+    if !crate::security::mfa::verify_code(&_admin.user.mfa_secret, &body.code) {
         return Json(json!({ "ok": false, "error": "Invalid code. MFA was not disabled." }));
     }
 
+    let _ = User::update_mfa(pool, _admin.user.id, false, "", "[]");
+
+    // Keep settings in sync for backward compat
     let _ = Setting::set(pool, "mfa_enabled", "false");
     let _ = Setting::set(pool, "mfa_secret", "");
     let _ = Setting::set(pool, "mfa_recovery_codes", "[]");
@@ -1404,8 +1421,7 @@ pub fn mfa_recovery_codes(
     _admin: AdminUser,
     pool: &State<DbPool>,
 ) -> Json<Value> {
-    let codes_json = Setting::get_or(pool, "mfa_recovery_codes", "[]");
-    let codes: Vec<String> = serde_json::from_str(&codes_json).unwrap_or_default();
+    let codes: Vec<String> = serde_json::from_str(&_admin.user.mfa_recovery_codes).unwrap_or_default();
     Json(json!({ "ok": true, "codes": codes }))
 }
 
@@ -1565,6 +1581,229 @@ pub fn firewall_unban(
     }
 }
 
+// ── Users Management ─────────────────────────────────────────
+
+#[get("/users")]
+pub fn users_list(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+) -> Template {
+    use crate::models::user::User;
+
+    let settings = Setting::all(pool);
+    let users = User::list_all(pool);
+    let users_json: Vec<serde_json::Value> = users.iter().map(|u| u.safe_json()).collect();
+
+    let context = json!({
+        "page_title": "Users",
+        "admin_slug": slug.0,
+        "settings": settings,
+        "users": users_json,
+        "current_user": _admin.user.safe_json(),
+    });
+    Template::render("admin/users", &context)
+}
+
+#[derive(Deserialize)]
+pub struct UserCreateForm {
+    pub email: String,
+    pub display_name: String,
+    pub password: String,
+    pub role: String,
+}
+
+#[post("/api/users/create", format = "json", data = "<form>")]
+pub fn user_create(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserCreateForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+    use crate::security::auth;
+
+    let email = form.email.trim();
+    let display_name = form.display_name.trim();
+    let role = form.role.trim();
+
+    if email.is_empty() || display_name.is_empty() {
+        return Json(json!({"success": false, "error": "Email and display name are required"}));
+    }
+    if form.password.len() < 8 {
+        return Json(json!({"success": false, "error": "Password must be at least 8 characters"}));
+    }
+    if !["admin", "editor", "author", "subscriber"].contains(&role) {
+        return Json(json!({"success": false, "error": "Invalid role"}));
+    }
+
+    let hash = match auth::hash_password(&form.password) {
+        Ok(h) => h,
+        Err(e) => return Json(json!({"success": false, "error": e})),
+    };
+
+    match User::create(pool, email, &hash, display_name, role) {
+        Ok(id) => Json(json!({"success": true, "id": id})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UserUpdateForm {
+    pub id: i64,
+    pub email: Option<String>,
+    pub display_name: Option<String>,
+    pub role: Option<String>,
+    pub password: Option<String>,
+}
+
+#[post("/api/users/update", format = "json", data = "<form>")]
+pub fn user_update(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserUpdateForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+    use crate::security::auth;
+
+    let user = match User::get_by_id(pool, form.id) {
+        Some(u) => u,
+        None => return Json(json!({"success": false, "error": "User not found"})),
+    };
+
+    // Update role if provided
+    if let Some(ref role) = form.role {
+        let role = role.trim();
+        if !["admin", "editor", "author", "subscriber"].contains(&role) {
+            return Json(json!({"success": false, "error": "Invalid role"}));
+        }
+        // Prevent demoting the last admin
+        if user.role == "admin" && role != "admin" && User::count_by_role(pool, "admin") <= 1 {
+            return Json(json!({"success": false, "error": "Cannot change role of the last admin"}));
+        }
+        if let Err(e) = User::update_role(pool, form.id, role) {
+            return Json(json!({"success": false, "error": e}));
+        }
+    }
+
+    // Update profile fields if provided
+    let email = form.email.as_deref().unwrap_or(&user.email).trim().to_string();
+    let display_name = form.display_name.as_deref().unwrap_or(&user.display_name).trim().to_string();
+    if let Err(e) = User::update_profile(pool, form.id, &display_name, &email, &user.avatar) {
+        return Json(json!({"success": false, "error": e}));
+    }
+
+    // Sync to settings if this is the current logged-in user
+    if form.id == _admin.user.id {
+        let _ = Setting::set(pool, "admin_email", &email);
+        let _ = Setting::set(pool, "admin_display_name", &display_name);
+    }
+
+    // Update password if provided
+    if let Some(ref pw) = form.password {
+        if !pw.is_empty() {
+            if pw.len() < 8 {
+                return Json(json!({"success": false, "error": "Password must be at least 8 characters"}));
+            }
+            let hash = match auth::hash_password(pw) {
+                Ok(h) => h,
+                Err(e) => return Json(json!({"success": false, "error": e})),
+            };
+            if let Err(e) = User::update_password(pool, form.id, &hash) {
+                return Json(json!({"success": false, "error": e}));
+            }
+        }
+    }
+
+    Json(json!({"success": true}))
+}
+
+#[derive(Deserialize)]
+pub struct UserActionForm {
+    pub id: i64,
+}
+
+#[post("/api/users/suspend", format = "json", data = "<form>")]
+pub fn user_suspend(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserActionForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+
+    // Prevent suspending yourself
+    if form.id == _admin.user.id {
+        return Json(json!({"success": false, "error": "Cannot suspend yourself"}));
+    }
+    // Prevent suspending the last admin
+    if let Some(u) = User::get_by_id(pool, form.id) {
+        if u.role == "admin" && User::count_by_role(pool, "admin") <= 1 {
+            return Json(json!({"success": false, "error": "Cannot suspend the last admin"}));
+        }
+    }
+    match User::suspend(pool, form.id) {
+        Ok(_) => Json(json!({"success": true})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
+#[post("/api/users/lock", format = "json", data = "<form>")]
+pub fn user_lock(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserActionForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+
+    if form.id == _admin.user.id {
+        return Json(json!({"success": false, "error": "Cannot lock yourself"}));
+    }
+    if let Some(u) = User::get_by_id(pool, form.id) {
+        if u.role == "admin" && User::count_by_role(pool, "admin") <= 1 {
+            return Json(json!({"success": false, "error": "Cannot lock the last admin"}));
+        }
+    }
+    match User::lock(pool, form.id) {
+        Ok(_) => Json(json!({"success": true})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
+#[post("/api/users/unlock", format = "json", data = "<form>")]
+pub fn user_unlock(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserActionForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+
+    match User::unlock(pool, form.id) {
+        Ok(_) => Json(json!({"success": true})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
+#[post("/api/users/delete", format = "json", data = "<form>")]
+pub fn user_delete(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserActionForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+
+    if form.id == _admin.user.id {
+        return Json(json!({"success": false, "error": "Cannot delete yourself"}));
+    }
+    if let Some(u) = User::get_by_id(pool, form.id) {
+        if u.role == "admin" && User::count_by_role(pool, "admin") <= 1 {
+            return Json(json!({"success": false, "error": "Cannot delete the last admin"}));
+        }
+    }
+    match User::delete(pool, form.id) {
+        Ok(_) => Json(json!({"success": true})),
+        Err(e) => Json(json!({"success": false, "error": e})),
+    }
+}
+
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         dashboard,
@@ -1619,5 +1858,12 @@ pub fn routes() -> Vec<rocket::Route> {
         firewall_dashboard,
         firewall_ban,
         firewall_unban,
+        users_list,
+        user_create,
+        user_update,
+        user_suspend,
+        user_lock,
+        user_unlock,
+        user_delete,
     ]
 }

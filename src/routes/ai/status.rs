@@ -3,13 +3,13 @@ use rocket::State;
 use serde_json::{json, Value};
 
 use crate::ai;
-use crate::security::auth::AdminUser;
+use crate::security::auth::EditorUser;
 use crate::db::DbPool;
 
 // ── Status Check ──────────────────────────────────────
 
 #[get("/ai/status")]
-pub fn ai_status(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+pub fn ai_status(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
     let enabled = ai::is_enabled(pool);
     let flags = ai::suggestion_flags(pool);
     Json(json!({

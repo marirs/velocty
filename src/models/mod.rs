@@ -9,3 +9,4 @@ pub mod portfolio;
 pub mod post;
 pub mod settings;
 pub mod tag;
+pub mod user;

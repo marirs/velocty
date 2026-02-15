@@ -2,7 +2,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde_json::Value;
 
-use crate::security::auth::AdminUser;
+use crate::security::auth::{AdminUser, EditorUser};
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
 use crate::models::portfolio::PortfolioItem;
@@ -12,7 +12,7 @@ use crate::models::tag::Tag;
 
 #[get("/stats/overview?<from>&<to>")]
 pub fn stats_overview(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -25,7 +25,7 @@ pub fn stats_overview(
 
 #[get("/stats/flow?<from>&<to>")]
 pub fn stats_flow(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -38,7 +38,7 @@ pub fn stats_flow(
 
 #[get("/stats/geo?<from>&<to>")]
 pub fn stats_geo(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -51,7 +51,7 @@ pub fn stats_geo(
 
 #[get("/stats/stream?<from>&<to>")]
 pub fn stats_stream(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -64,7 +64,7 @@ pub fn stats_stream(
 
 #[get("/stats/calendar?<from>&<to>")]
 pub fn stats_calendar(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -77,7 +77,7 @@ pub fn stats_calendar(
 
 #[get("/stats/top-portfolio?<from>&<to>&<limit>")]
 pub fn stats_top_portfolio(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -92,7 +92,7 @@ pub fn stats_top_portfolio(
 
 #[get("/stats/top-referrers?<from>&<to>&<limit>")]
 pub fn stats_top_referrers(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     from: Option<String>,
     to: Option<String>,
@@ -106,14 +106,14 @@ pub fn stats_top_referrers(
 }
 
 #[get("/stats/tags")]
-pub fn stats_tags(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+pub fn stats_tags(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
     let data = PageView::tag_relations(pool);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[post("/theme", data = "<body>")]
 pub fn set_theme(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<Value>,
 ) -> Json<Value> {
@@ -272,7 +272,7 @@ fn seo_check_item(
 
 #[get("/seo-check/post/<id>")]
 pub fn seo_check_post(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     id: i64,
 ) -> Json<Value> {
@@ -297,7 +297,7 @@ pub fn seo_check_post(
 
 #[get("/seo-check/portfolio/<id>")]
 pub fn seo_check_portfolio(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     id: i64,
 ) -> Json<Value> {

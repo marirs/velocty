@@ -248,6 +248,25 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             FOREIGN KEY (portfolio_id) REFERENCES portfolio(id)
         );
 
+        -- Users
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'subscriber',
+            status TEXT NOT NULL DEFAULT 'active',
+            avatar TEXT DEFAULT '',
+            mfa_enabled INTEGER NOT NULL DEFAULT 0,
+            mfa_secret TEXT DEFAULT '',
+            mfa_recovery_codes TEXT DEFAULT '[]',
+            last_login_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
         -- Firewall: ban list
         CREATE TABLE IF NOT EXISTS fw_bans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -311,6 +330,30 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         .is_ok();
     if has_old_downloads {
         conn.execute_batch("DROP TABLE IF EXISTS downloads;")?;
+    }
+
+    // Add user_id to sessions if missing
+    let has_session_user_id: bool = conn
+        .prepare("SELECT user_id FROM sessions LIMIT 0")
+        .is_ok();
+    if !has_session_user_id {
+        conn.execute_batch("ALTER TABLE sessions ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
+    }
+
+    // Add user_id to posts if missing
+    let has_post_user_id: bool = conn
+        .prepare("SELECT user_id FROM posts LIMIT 0")
+        .is_ok();
+    if !has_post_user_id {
+        conn.execute_batch("ALTER TABLE posts ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
+    }
+
+    // Add user_id to portfolio if missing
+    let has_portfolio_user_id: bool = conn
+        .prepare("SELECT user_id FROM portfolio LIMIT 0")
+        .is_ok();
+    if !has_portfolio_user_id {
+        conn.execute_batch("ALTER TABLE portfolio ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
     }
 
     Ok(())
@@ -735,6 +778,80 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             "INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_setup_complete', 'false')",
             params![],
         )?;
+    }
+
+    // ── Auto-migrate settings-based admin into users table ──
+    let user_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM users",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if user_count == 0 {
+        // Migrate existing admin from settings → users row #1
+        let admin_email: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'admin_email'", [], |row| row.get(0))
+            .unwrap_or_default();
+        let admin_hash: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'admin_password_hash'", [], |row| row.get(0))
+            .unwrap_or_default();
+        let admin_name: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'admin_display_name'", [], |row| row.get(0))
+            .unwrap_or_else(|_| "Admin".to_string());
+        let admin_avatar: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'admin_avatar'", [], |row| row.get(0))
+            .unwrap_or_default();
+        let mfa_enabled: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'mfa_enabled'", [], |row| row.get(0))
+            .unwrap_or_else(|_| "false".to_string());
+        let mfa_secret: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'mfa_secret'", [], |row| row.get(0))
+            .unwrap_or_default();
+        let mfa_codes: String = conn
+            .query_row("SELECT value FROM settings WHERE key = 'mfa_recovery_codes'", [], |row| row.get(0))
+            .unwrap_or_else(|_| "[]".to_string());
+
+        if !admin_email.is_empty() && !admin_hash.is_empty() {
+            let mfa_int: i32 = if mfa_enabled == "true" { 1 } else { 0 };
+            conn.execute(
+                "INSERT INTO users (email, password_hash, display_name, role, status, avatar, mfa_enabled, mfa_secret, mfa_recovery_codes)
+                 VALUES (?1, ?2, ?3, 'admin', 'active', ?4, ?5, ?6, ?7)",
+                params![admin_email, admin_hash, admin_name, admin_avatar, mfa_int, mfa_secret, mfa_codes],
+            )?;
+
+            // Assign user_id=1 to all existing posts, portfolio, and sessions
+            conn.execute_batch("UPDATE posts SET user_id = 1 WHERE user_id IS NULL;")?;
+            conn.execute_batch("UPDATE portfolio SET user_id = 1 WHERE user_id IS NULL;")?;
+            conn.execute_batch("UPDATE sessions SET user_id = 1 WHERE user_id IS NULL;")?;
+
+            log::info!("Migrated admin '{}' from settings to users table (id=1)", admin_email);
+        }
+    }
+
+    // Always backfill any orphaned sessions (e.g. created before migration ran)
+    let has_orphan_sessions: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sessions WHERE user_id IS NULL",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0) > 0;
+    if has_orphan_sessions {
+        // Assign to first admin user
+        let first_admin_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
+        if let Some(admin_id) = first_admin_id {
+            conn.execute(
+                "UPDATE sessions SET user_id = ?1 WHERE user_id IS NULL",
+                params![admin_id],
+            )?;
+            log::info!("Backfilled orphaned sessions with user_id={}", admin_id);
+        }
     }
 
     Ok(())

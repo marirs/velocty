@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::ai::{self, prompts, AiRequest};
-use crate::security::auth::AdminUser;
+use crate::security::auth::EditorUser;
 use crate::db::DbPool;
 use crate::models::category::Category;
 use crate::models::tag::Tag;
@@ -59,7 +59,7 @@ pub struct SuggestTitleRequest {
 
 #[post("/ai/suggest-meta", format = "json", data = "<body>")]
 pub fn suggest_meta(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<SuggestMetaRequest>,
 ) -> Json<Value> {
@@ -99,7 +99,7 @@ pub fn suggest_meta(
 
 #[post("/ai/suggest-tags", format = "json", data = "<body>")]
 pub fn suggest_tags(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<SuggestTagsRequest>,
 ) -> Json<Value> {
@@ -154,7 +154,7 @@ pub fn suggest_tags(
 
 #[post("/ai/suggest-categories", format = "json", data = "<body>")]
 pub fn suggest_categories(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<SuggestCategoriesRequest>,
 ) -> Json<Value> {
@@ -200,7 +200,7 @@ pub fn suggest_categories(
 
 #[post("/ai/suggest-slug", format = "json", data = "<body>")]
 pub fn suggest_slug(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<SuggestSlugRequest>,
 ) -> Json<Value> {
@@ -243,7 +243,7 @@ pub fn suggest_slug(
 
 #[post("/ai/suggest-alt-text", format = "json", data = "<body>")]
 pub fn suggest_alt_text(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<SuggestAltTextRequest>,
 ) -> Json<Value> {
@@ -279,7 +279,7 @@ pub fn suggest_alt_text(
 
 #[post("/ai/suggest-title", format = "json", data = "<body>")]
 pub fn suggest_title(
-    _admin: AdminUser,
+    _admin: EditorUser,
     pool: &State<DbPool>,
     body: Json<SuggestTitleRequest>,
 ) -> Json<Value> {
