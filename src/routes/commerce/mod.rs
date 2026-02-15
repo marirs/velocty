@@ -245,8 +245,13 @@ pub fn download_file(
     // Increment download count
     let _ = DownloadToken::increment_download(pool, dl_token.id);
 
-    // Redirect to the actual file
-    Ok(rocket::response::Redirect::to(format!("/uploads/{}", item.image_path)))
+    // Serve download_file_path if set, otherwise fall back to the featured image
+    let file_url = if !item.download_file_path.is_empty() {
+        item.download_file_path.clone()
+    } else {
+        format!("/uploads/{}", item.image_path)
+    };
+    Ok(rocket::response::Redirect::to(file_url))
 }
 
 // ── Check purchase status (for public page) ────────────

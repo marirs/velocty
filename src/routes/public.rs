@@ -554,6 +554,7 @@ pub fn portfolio_by_tag(
                     price: row.get("price")?,
                     purchase_note: row.get::<_, Option<String>>("purchase_note")?.unwrap_or_default(),
                     payment_provider: row.get::<_, Option<String>>("payment_provider")?.unwrap_or_default(),
+                    download_file_path: row.get::<_, Option<String>>("download_file_path")?.unwrap_or_default(),
                     likes: row.get("likes")?,
                     status: row.get("status")?,
                     published_at: row.get("published_at")?,

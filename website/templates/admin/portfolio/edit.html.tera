@@ -78,7 +78,7 @@
                 <h4>Sell</h4>
                 <div class="form-group">
                     <label class="checkbox-item">
-                        <input type="checkbox" name="sell_enabled" value="1" id="sell-toggle"
+                        <input type="checkbox" name="sell_enabled" value="1" id="sell-toggle" style="margin-right:6px"
                             {% if item and item.sell_enabled %}checked{% endif %}>
                         Enable selling
                     </label>
@@ -116,6 +116,11 @@
                         <span class="form-help" style="color:var(--warning)">No payment processors configured. Go to Settings &rarr; Commerce to enable one.</span>
                     </div>
                     {% endif %}
+                    <div class="form-group">
+                        <label for="download_file_path">Download File URL</label>
+                        <span class="form-help" style="display:block;margin-bottom:6px">Optional. If provided, this file will be served to buyers after purchase. If left empty, the portfolio featured image will be used as the downloadable file.</span>
+                        <input type="text" id="download_file_path" name="download_file_path" value="{% if item %}{{ item.download_file_path | default(value="") }}{% endif %}" placeholder="/uploads/my-file.zip">
+                    </div>
                     <div class="form-group">
                         <label for="purchase_note">Purchase Note</label>
                         <textarea id="purchase_note" name="purchase_note" rows="3" placeholder="What the buyer receives, e.g. High-res PNG + PSD source file">{% if item %}{{ item.purchase_note | default(value="") }}{% endif %}</textarea>

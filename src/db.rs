@@ -64,6 +64,7 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             price REAL,
             purchase_note TEXT DEFAULT '',
             payment_provider TEXT DEFAULT '',
+            download_file_path TEXT DEFAULT '',
             likes INTEGER DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'draft',
             published_at DATETIME,
@@ -254,6 +255,14 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         .is_ok();
     if !has_payment_provider {
         conn.execute_batch("ALTER TABLE portfolio ADD COLUMN payment_provider TEXT DEFAULT '';")?;
+    }
+
+    // Add download_file_path to portfolio if missing
+    let has_download_file_path: bool = conn
+        .prepare("SELECT download_file_path FROM portfolio LIMIT 0")
+        .is_ok();
+    if !has_download_file_path {
+        conn.execute_batch("ALTER TABLE portfolio ADD COLUMN download_file_path TEXT DEFAULT '';")?;
     }
 
     // Drop legacy downloads table and replace with orders + download_tokens + licenses
