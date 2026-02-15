@@ -16,6 +16,7 @@ mod render;
 mod security;
 mod rss;
 mod seo;
+mod typography;
 
 mod import;
 mod license;

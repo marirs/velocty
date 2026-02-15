@@ -111,6 +111,25 @@ Last updated: 2026-02-15
 - **Bug fix:** Sitemap URLs now use dynamic `blog_slug` and `portfolio_slug` settings instead of hardcoded `/blog/` and `/portfolio/`
 - **Bug fix:** `robots.txt` only includes Sitemap line when sitemap is enabled
 
+### Typography Fixes ✅
+- Rewrote `build_css_variables()` in `render.rs` to emit all typography CSS variables:
+  - `--font-body`, `--font-heading`, `--font-nav`, `--font-buttons`, `--font-captions` (per-element fonts)
+  - `--font-size-h1` through `--font-size-h6` (configurable heading sizes)
+  - `--text-transform` (none, uppercase, lowercase, capitalize)
+- New `build_font_links()` function for conditional font loading:
+  - **Google Fonts**: only loads when `font_google_enabled=true`, collects all unique families (primary, heading, per-element) into a single `<link>` tag
+  - **Adobe Fonts**: emits `<link rel="stylesheet" href="https://use.typekit.net/{project_id}.css">` when enabled
+  - **Custom fonts**: emits `@font-face` declaration pointing to `/uploads/fonts/{filename}`
+- Updated `DEFAULT_CSS` to use CSS variables for:
+  - `body` uses `var(--font-body)` + `var(--text-transform)`
+  - `h1-h6` use `var(--font-heading)` + `var(--font-size-h1)` through `var(--font-size-h6)`
+  - `.cat-link`, `.archives-link` use `var(--font-nav)`
+  - `.comment-form button`, `.pagination` use `var(--font-buttons)`
+  - `.footer-text`, `.item-tags` use `var(--font-captions)`
+- Added H4, H5, H6 size fields to typography settings template
+- **New API**: `POST /{admin_slug}/upload/font` — accepts font file (.woff2/.woff/.ttf/.otf) + font name, saves to `uploads/fonts/`, stores `font_custom_name` and `font_custom_filename` in settings
+- Wired "Add Font" button in typography template to use the upload API via `fetch`
+
 ### Potential Enhancements
 - Wire captcha into comment form via design templates (currently only in default `render.rs`)
 - Magic link token cleanup cron/scheduled task

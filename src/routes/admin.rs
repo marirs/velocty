@@ -459,6 +459,49 @@ pub async fn upload_image(
     }
 }
 
+// ── Font Upload API ─────────────────────────────────────
+
+#[derive(FromForm)]
+pub struct FontUploadForm<'f> {
+    pub file: TempFile<'f>,
+    pub font_name: String,
+}
+
+#[post("/upload/font", data = "<form>")]
+pub async fn upload_font(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    mut form: Form<FontUploadForm<'_>>,
+) -> Json<Value> {
+    let font_name = form.font_name.trim().to_string();
+    if font_name.is_empty() {
+        return Json(json!({ "error": "Font name is required" }));
+    }
+
+    let raw_name = form.file.raw_name()
+        .map(|n| n.dangerous_unsafe_unsanitized_raw().to_string())
+        .unwrap_or_default();
+    let ext = raw_name.rsplit('.').next().unwrap_or("woff2").to_lowercase();
+    let valid_exts = ["woff2", "woff", "ttf", "otf"];
+    if !valid_exts.contains(&ext.as_str()) {
+        return Json(json!({ "error": "Invalid font file type. Use .woff2, .woff, .ttf, or .otf" }));
+    }
+
+    let filename = format!("{}_{}.{}", font_name.to_lowercase().replace(' ', "-"), uuid::Uuid::new_v4(), ext);
+    let fonts_dir = std::path::Path::new("website/site/uploads/fonts");
+    let _ = std::fs::create_dir_all(fonts_dir);
+    let dest = fonts_dir.join(&filename);
+
+    match form.file.persist_to(&dest).await {
+        Ok(_) => {
+            let _ = Setting::set(pool, "font_custom_name", &font_name);
+            let _ = Setting::set(pool, "font_custom_filename", &filename);
+            Json(json!({ "success": true, "font_name": font_name, "filename": filename }))
+        }
+        Err(e) => Json(json!({ "error": format!("Upload failed: {}", e) })),
+    }
+}
+
 #[post("/posts/new", data = "<form>")]
 pub async fn posts_create(
     _admin: AdminUser,
@@ -1417,6 +1460,7 @@ pub fn routes() -> Vec<rocket::Route> {
         settings_page,
         settings_save,
         upload_image,
+        upload_font,
         health_page,
         health_vacuum,
         health_wal_checkpoint,

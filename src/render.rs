@@ -3,6 +3,7 @@ use serde_json::Value;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
 use crate::seo;
+use crate::typography;
 
 /// Renders a full page by merging the active design template with content data.
 /// In Phase 1, this uses hardcoded default templates.
@@ -11,7 +12,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     let settings = context.get("settings").cloned().unwrap_or_default();
 
     // Build CSS variables from settings
-    let css_vars = build_css_variables(&settings);
+    let css_vars = typography::build_css_variables(&settings);
 
     // Get the page-specific HTML
     let body_html = match template_type {
@@ -40,16 +41,14 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    let font_primary = settings
-        .get("font_primary")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Inter");
-
     // Build the sidebar categories
     let categories_html = build_categories_sidebar(context);
 
     // Build social links
     let social_html = build_social_links(&settings);
+
+    // Build font loading tags
+    let font_links = typography::build_font_links(&settings);
 
     // Full page shell — the default "Sidebar Portfolio" design
     format!(
@@ -60,9 +59,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {seo_meta}
     {webmaster_meta}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family={font}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+{font_links}    <style>
         {css_vars}
         {base_css}
     </style>
@@ -99,7 +96,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
 </html>"#,
         seo_meta = seo_meta,
         webmaster_meta = seo::build_webmaster_meta(&settings),
-        font = font_primary,
+        font_links = font_links,
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
         site_name = html_escape(site_name),
@@ -131,12 +128,11 @@ pub fn render_legal_page(
     html_body: &str,
 ) -> String {
     let settings_json = serde_json::to_value(settings).unwrap_or_default();
-    let css_vars = build_css_variables(&settings_json);
+    let css_vars = typography::build_css_variables(&settings_json);
     let social_html = build_social_links(&settings_json);
 
     let site_name = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
     let site_tagline = settings.get("site_tagline").map(|s| s.as_str()).unwrap_or("");
-    let font_primary = settings.get("font_primary").map(|s| s.as_str()).unwrap_or("Inter");
 
     let categories = crate::models::category::Category::list(pool, Some("portfolio"));
     let cats_json = serde_json::to_value(&categories).unwrap_or_default();
@@ -144,6 +140,7 @@ pub fn render_legal_page(
     let categories_html = build_categories_sidebar(&ctx);
 
     let analytics_scripts = seo::build_analytics_scripts(&settings_json);
+    let font_links = typography::build_font_links(&settings_json);
 
     format!(
         r#"<!DOCTYPE html>
@@ -152,9 +149,7 @@ pub fn render_legal_page(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} — {site_name}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family={font}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+{font_links}    <style>
         {css_vars}
         {base_css}
         .legal-content {{
@@ -207,7 +202,7 @@ pub fn render_legal_page(
         title = html_escape(title),
         site_name = html_escape(site_name),
         tagline = html_escape(site_tagline),
-        font = font_primary,
+        font_links = font_links,
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
         categories_html = categories_html,
@@ -216,37 +211,6 @@ pub fn render_legal_page(
         body = html_body,
         analytics_scripts = analytics_scripts,
         cookie_consent = build_cookie_consent_banner(&settings_json),
-    )
-}
-
-fn build_css_variables(settings: &Value) -> String {
-    let get = |key: &str, default: &str| -> String {
-        settings
-            .get(key)
-            .and_then(|v| v.as_str())
-            .unwrap_or(default)
-            .to_string()
-    };
-
-    format!(
-        r#":root {{
-    --font-primary: '{}', sans-serif;
-    --font-heading: '{}', sans-serif;
-    --font-size-body: {};
-    --sidebar-width: 250px;
-    --grid-gap: 8px;
-    --grid-columns: {};
-    --lightbox-border-color: {};
-    --color-text: #111827;
-    --color-text-secondary: #6b7280;
-    --color-bg: #ffffff;
-    --color-accent: #3b82f6;
-}}"#,
-        get("font_primary", "Inter"),
-        get("font_heading", "Inter"),
-        get("font_size_body", "16px"),
-        get("portfolio_grid_columns", "3"),
-        get("portfolio_lightbox_border_color", "#D4A017"),
     )
 }
 
@@ -958,12 +922,21 @@ const DEFAULT_CSS: &str = r#"
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: var(--font-primary);
+    font-family: var(--font-body);
     font-size: var(--font-size-body);
     color: var(--color-text);
     background: var(--color-bg);
     line-height: 1.6;
+    text-transform: var(--text-transform);
 }
+
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
+h1 { font-size: var(--font-size-h1); }
+h2 { font-size: var(--font-size-h2); }
+h3 { font-size: var(--font-size-h3); }
+h4 { font-size: var(--font-size-h4); }
+h5 { font-size: var(--font-size-h5); }
+h6 { font-size: var(--font-size-h6); }
 
 .site-wrapper {
     display: flex;
@@ -1006,6 +979,7 @@ body {
 }
 
 .cat-link {
+    font-family: var(--font-nav);
     font-size: 13px;
     color: var(--color-text);
     text-decoration: none;
@@ -1016,6 +990,7 @@ body {
 .cat-link.active { font-weight: 700; color: var(--color-accent); }
 
 .archives-link {
+    font-family: var(--font-nav);
     font-size: 13px;
     color: var(--color-text);
     text-decoration: none;
@@ -1027,6 +1002,7 @@ body {
 }
 
 .footer-text {
+    font-family: var(--font-captions);
     font-size: 11px;
     color: var(--color-text-secondary);
     margin-top: 16px;
@@ -1067,6 +1043,7 @@ body {
 }
 
 .item-tags {
+    font-family: var(--font-captions);
     font-size: 11px;
     color: var(--color-text-secondary);
     padding: 4px 0 8px;
@@ -1157,7 +1134,7 @@ body {
 
 /* Blog Single */
 .blog-single { max-width: 800px; padding: 30px; }
-.blog-single h1 { font-size: 32px; margin-bottom: 8px; }
+.blog-single h1 { font-size: var(--font-size-h1); margin-bottom: 8px; }
 .blog-single time { font-size: 13px; color: var(--color-text-secondary); display: block; margin-bottom: 20px; }
 .featured-image img { width: 100%; margin-bottom: 24px; }
 .post-content { line-height: 1.8; }
@@ -1166,7 +1143,7 @@ body {
 .portfolio-single { max-width: 1000px; padding: 30px; }
 .portfolio-image img { width: 100%; }
 .portfolio-meta { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; }
-.portfolio-meta h1 { font-size: 24px; }
+.portfolio-meta h1 { font-size: var(--font-size-h1); }
 .like-btn { cursor: pointer; font-size: 18px; }
 .portfolio-categories a { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
 
@@ -1187,6 +1164,7 @@ body {
 }
 .comment-form textarea { min-height: 100px; resize: vertical; }
 .comment-form button {
+    font-family: var(--font-buttons);
     padding: 8px 24px; background: var(--color-accent);
     color: #fff; border: none; border-radius: 4px;
     cursor: pointer; font-size: 14px;
@@ -1195,6 +1173,7 @@ body {
 /* Pagination */
 .pagination { display: flex; gap: 8px; padding: 20px 0; }
 .pagination a, .pagination .current {
+    font-family: var(--font-buttons);
     padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;
     text-decoration: none; color: var(--color-text); font-size: 13px;
 }

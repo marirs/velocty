@@ -245,6 +245,18 @@
                 <label for="font_size_h3">H3</label>
                 <input type="text" id="font_size_h3" name="font_size_h3" value="{{ settings.font_size_h3 | default(value='1.75rem') }}">
             </div>
+            <div class="form-group">
+                <label for="font_size_h4">H4</label>
+                <input type="text" id="font_size_h4" name="font_size_h4" value="{{ settings.font_size_h4 | default(value='1.5rem') }}">
+            </div>
+            <div class="form-group">
+                <label for="font_size_h5">H5</label>
+                <input type="text" id="font_size_h5" name="font_size_h5" value="{{ settings.font_size_h5 | default(value='1.25rem') }}">
+            </div>
+            <div class="form-group">
+                <label for="font_size_h6">H6</label>
+                <input type="text" id="font_size_h6" name="font_size_h6" value="{{ settings.font_size_h6 | default(value='1rem') }}">
+            </div>
             <span class="form-help">Accepts px, rem, or em values (e.g. 16px, 2rem)</span>
         </div>
 
@@ -367,7 +379,23 @@
         var nameInput = document.getElementById('font_custom_name');
         if (!nameInput.value.trim()) { alert('Please enter a font family name'); nameInput.focus(); return; }
         if (!fontInput.files || !fontInput.files[0]) { alert('Please select a font file'); return; }
-        document.querySelector('form').submit();
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+        var fd = new FormData();
+        fd.append('file', fontInput.files[0]);
+        fd.append('font_name', nameInput.value.trim());
+        fetch('/{{ admin_slug }}/upload/font', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(j) {
+                if (j.success) {
+                    location.reload();
+                } else {
+                    alert(j.error || 'Upload failed');
+                }
+            })
+            .catch(function() { alert('Network error'); })
+            .finally(function() { btn.disabled = false; btn.textContent = 'Add Font'; });
     });
 
     document.querySelectorAll('.font-remove').forEach(function(btn) {
