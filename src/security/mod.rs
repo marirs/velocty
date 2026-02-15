@@ -2,6 +2,7 @@ pub mod auth;
 pub mod firewall;
 pub mod mfa;
 pub mod magic_link;
+pub mod password_reset;
 pub mod recaptcha;
 pub mod turnstile;
 pub mod hcaptcha;

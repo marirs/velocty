@@ -26,8 +26,8 @@ pub fn needs_setup(pool: &DbPool) -> bool {
     User::count(pool) == 0
 }
 
-#[get("/login")]
-pub fn login_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result<Template, Redirect> {
+#[get("/login?<reset>")]
+pub fn login_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, reset: Option<&str>) -> Result<Template, Redirect> {
     if needs_setup(pool) {
         return Err(Redirect::to(format!("/{}/setup", admin_slug.0)));
     }
@@ -38,6 +38,9 @@ pub fn login_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result
     let mut context: HashMap<String, String> = HashMap::new();
     context.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
     context.insert("admin_slug".to_string(), admin_slug.0.clone());
+    if reset == Some("success") {
+        context.insert("reset_success".to_string(), "true".to_string());
+    }
     inject_captcha_context(pool, &mut context);
     Ok(Template::render("admin/login", &context))
 }

@@ -30,6 +30,9 @@
         {% if error %}
         <div class="alert alert-error">{{ error }}</div>
         {% endif %}
+        {% if reset_success %}
+        <div class="alert alert-success" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:var(--success, #22c55e);padding:12px;border-radius:8px;font-size:13px;margin-bottom:16px">Password reset successfully. Please log in with your new password.</div>
+        {% endif %}
         <form id="login-form" method="post" action="/{{ admin_slug }}/login">
             <div class="form-group">
                 <label for="email">Email</label>
@@ -55,6 +58,9 @@
             <input type="hidden" name="captcha_token" id="captcha_token" value="">
             <button type="submit" class="btn btn-primary btn-full">Log In</button>
         </form>
+        <div style="text-align:center;margin-top:12px">
+            <a href="/{{ admin_slug }}/forgot-password" style="color:var(--text-secondary);font-size:13px;text-decoration:none">Forgot Password?</a>
+        </div>
     </div>
     {% if captcha_provider is defined and captcha_provider != "" %}
     <script>

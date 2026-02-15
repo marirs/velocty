@@ -1758,6 +1758,43 @@ pub fn user_unlock(
     }
 }
 
+#[post("/api/users/reset-password", format = "json", data = "<form>")]
+pub fn user_reset_password(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    form: Json<UserActionForm>,
+) -> Json<Value> {
+    use crate::models::user::User;
+    use crate::security::{auth, password_reset};
+
+    let user = match User::get_by_id(pool, form.id) {
+        Some(u) => u,
+        None => return Json(json!({"success": false, "error": "User not found"})),
+    };
+
+    let temp_pw = password_reset::generate_temp_password();
+    let hash = match auth::hash_password(&temp_pw) {
+        Ok(h) => h,
+        Err(e) => return Json(json!({"success": false, "error": e})),
+    };
+
+    if let Err(e) = User::update_password(pool, user.id, &hash) {
+        return Json(json!({"success": false, "error": e}));
+    }
+
+    // Send the temp password via email in a background thread
+    let pool_clone = pool.inner().clone();
+    let email = user.email.clone();
+    let pw = temp_pw.clone();
+    std::thread::spawn(move || {
+        if let Err(e) = password_reset::send_admin_reset_email(&pool_clone, &email, &pw) {
+            log::error!("Failed to send admin password reset email to {}: {}", email, e);
+        }
+    });
+
+    Json(json!({"success": true, "message": "Password reset and emailed to user"}))
+}
+
 #[post("/api/users/delete", format = "json", data = "<form>")]
 pub fn user_delete(
     _admin: AdminUser,
@@ -1839,6 +1876,7 @@ pub fn routes() -> Vec<rocket::Route> {
         user_update,
         user_lock,
         user_unlock,
+        user_reset_password,
         user_delete,
     ]
 }
