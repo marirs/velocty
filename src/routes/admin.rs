@@ -1722,30 +1722,6 @@ pub struct UserActionForm {
     pub id: i64,
 }
 
-#[post("/api/users/suspend", format = "json", data = "<form>")]
-pub fn user_suspend(
-    _admin: AdminUser,
-    pool: &State<DbPool>,
-    form: Json<UserActionForm>,
-) -> Json<Value> {
-    use crate::models::user::User;
-
-    // Prevent suspending yourself
-    if form.id == _admin.user.id {
-        return Json(json!({"success": false, "error": "Cannot suspend yourself"}));
-    }
-    // Prevent suspending the last admin
-    if let Some(u) = User::get_by_id(pool, form.id) {
-        if u.role == "admin" && User::count_by_role(pool, "admin") <= 1 {
-            return Json(json!({"success": false, "error": "Cannot suspend the last admin"}));
-        }
-    }
-    match User::suspend(pool, form.id) {
-        Ok(_) => Json(json!({"success": true})),
-        Err(e) => Json(json!({"success": false, "error": e})),
-    }
-}
-
 #[post("/api/users/lock", format = "json", data = "<form>")]
 pub fn user_lock(
     _admin: AdminUser,
@@ -1861,7 +1837,6 @@ pub fn routes() -> Vec<rocket::Route> {
         users_list,
         user_create,
         user_update,
-        user_suspend,
         user_lock,
         user_unlock,
         user_delete,

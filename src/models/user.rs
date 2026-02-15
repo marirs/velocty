@@ -202,19 +202,6 @@ impl User {
 
     // ── Status management ──
 
-    pub fn suspend(pool: &DbPool, id: i64) -> Result<(), String> {
-        let conn = pool.get().map_err(|e| e.to_string())?;
-        conn.execute(
-            "UPDATE users SET status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-            params![id],
-        )
-        .map_err(|e| e.to_string())?;
-        // Invalidate all sessions for this user
-        conn.execute("DELETE FROM sessions WHERE user_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
     pub fn lock(pool: &DbPool, id: i64) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
         conn.execute(

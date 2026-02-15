@@ -854,5 +854,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Migrate any "suspended" status to "locked" (suspend concept removed)
+    conn.execute_batch("UPDATE users SET status = 'locked' WHERE status = 'suspended';")?;
+
     Ok(())
 }
