@@ -1,0 +1,189 @@
+<div id="settings-search" style="position:relative;margin-left:auto">
+    <div style="position:relative">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="settings-search-input" placeholder="Search settings…" autocomplete="off" style="width:220px;padding:6px 10px 6px 30px;font-size:12px;border-radius:6px;border:1px solid var(--border-input);background:var(--bg-input);color:var(--text-primary);outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="setTimeout(function(){document.getElementById('settings-search-results').style.display='none'},200);this.style.borderColor='var(--border-input)'">
+    </div>
+    <div id="settings-search-results" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;width:340px;max-height:360px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:100;padding:6px 0"></div>
+</div>
+
+<script>
+(function() {
+    var slug = '{{ admin_slug }}';
+    var idx = [
+        // Site
+        {t:'Site Name',s:'general',g:'Site',k:'site name title'},
+        {t:'Site Description',s:'general',g:'Site',k:'site description tagline'},
+        {t:'Site URL',s:'general',g:'Site',k:'site url domain'},
+        {t:'Admin Slug',s:'general',g:'Site',k:'admin slug url path'},
+        {t:'Blog Slug',s:'blog',g:'Journal',k:'blog slug journal url'},
+        {t:'Portfolio Slug',s:'portfolio',g:'Portfolio',k:'portfolio slug url'},
+        {t:'Timezone',s:'general',g:'Site',k:'timezone time zone'},
+        {t:'Date Format',s:'general',g:'Site',k:'date format'},
+        {t:'Favicon',s:'general',g:'Site',k:'favicon icon'},
+        // Visitors
+        {t:'Site Search',s:'design',g:'Visitors › UI Features',k:'site search enable disable',h:'#panel-general'},
+        {t:'Back to Top Button',s:'design',g:'Visitors › UI Features',k:'back to top button scroll',h:'#panel-general'},
+        {t:'Cookie Consent Banner',s:'design',g:'Visitors › Cookie Consent',k:'cookie consent banner gdpr',h:'#panel-general'},
+        {t:'Cookie Consent Style',s:'design',g:'Visitors › Cookie Consent',k:'cookie consent style minimal modal corner',h:'#panel-general'},
+        {t:'Cookie Consent Position',s:'design',g:'Visitors › Cookie Consent',k:'cookie consent position top bottom',h:'#panel-general'},
+        {t:'Privacy Policy',s:'design',g:'Visitors › Privacy',k:'privacy policy page enable',h:'#panel-privacy'},
+        {t:'Terms of Use',s:'design',g:'Visitors › Terms',k:'terms of use page enable',h:'#panel-terms'},
+        // Journal
+        {t:'Enable Journal',s:'blog',g:'Journal',k:'journal blog enable disable'},
+        {t:'Show Author',s:'blog',g:'Journal',k:'show author name blog'},
+        {t:'Show Date',s:'blog',g:'Journal',k:'show date blog post'},
+        {t:'Show Reading Time',s:'blog',g:'Journal',k:'show reading time blog'},
+        {t:'Featured Image Required',s:'blog',g:'Journal',k:'featured image required blog'},
+        // Portfolio
+        {t:'Enable Portfolio',s:'portfolio',g:'Portfolio',k:'portfolio enable disable'},
+        {t:'Enable Likes',s:'portfolio',g:'Portfolio',k:'portfolio likes enable'},
+        {t:'Image Protection',s:'portfolio',g:'Portfolio',k:'portfolio image protection right click'},
+        {t:'Fade Animation',s:'portfolio',g:'Portfolio',k:'portfolio fade animation'},
+        {t:'Show Categories',s:'portfolio',g:'Portfolio',k:'portfolio show categories'},
+        {t:'Show Tags',s:'portfolio',g:'Portfolio',k:'portfolio show tags'},
+        {t:'Lightbox',s:'portfolio',g:'Portfolio › Lightbox',k:'portfolio lightbox title tags navigation keyboard'},
+        {t:'Grid Layout',s:'portfolio',g:'Portfolio › Grid',k:'portfolio grid layout columns'},
+        // Comments
+        {t:'Enable Comments',s:'comments',g:'Comments',k:'comments enable disable'},
+        {t:'Comments on Blog',s:'comments',g:'Comments',k:'comments blog journal'},
+        {t:'Comments on Portfolio',s:'comments',g:'Comments',k:'comments portfolio'},
+        {t:'Honeypot',s:'comments',g:'Comments',k:'comments honeypot spam'},
+        {t:'Require Name',s:'comments',g:'Comments',k:'comments require name'},
+        {t:'Require Email',s:'comments',g:'Comments',k:'comments require email'},
+        // Typography
+        {t:'Google Fonts',s:'typography',g:'Typography',k:'google fonts enable'},
+        {t:'Adobe Fonts',s:'typography',g:'Typography',k:'adobe fonts typekit enable'},
+        {t:'Sitewide Font',s:'typography',g:'Typography',k:'sitewide font apply'},
+        {t:'Heading Font',s:'typography',g:'Typography',k:'heading font family'},
+        {t:'Body Font',s:'typography',g:'Typography',k:'body font family'},
+        // Media
+        {t:'WebP Conversion',s:'images',g:'Media',k:'webp convert images auto'},
+        {t:'Max Upload Size',s:'images',g:'Media',k:'max upload size limit images'},
+        {t:'Image Quality',s:'images',g:'Media',k:'image quality compression jpeg'},
+        {t:'Video Upload',s:'images',g:'Media',k:'video upload enable'},
+        {t:'Video Thumbnail',s:'images',g:'Media',k:'video thumbnail generate'},
+        // SEO
+        {t:'Sitemap',s:'seo',g:'SEO',k:'sitemap xml enable'},
+        {t:'Structured Data',s:'seo',g:'SEO',k:'structured data schema json-ld'},
+        {t:'Open Graph',s:'seo',g:'SEO',k:'open graph og meta facebook'},
+        {t:'Twitter Cards',s:'seo',g:'SEO',k:'twitter cards meta x'},
+        {t:'Google Analytics',s:'seo',g:'SEO › Analytics',k:'google analytics ga measurement id'},
+        {t:'Plausible',s:'seo',g:'SEO › Analytics',k:'plausible analytics'},
+        {t:'Fathom',s:'seo',g:'SEO › Analytics',k:'fathom analytics'},
+        {t:'Matomo',s:'seo',g:'SEO › Analytics',k:'matomo analytics'},
+        {t:'Cloudflare Analytics',s:'seo',g:'SEO › Analytics',k:'cloudflare analytics web'},
+        {t:'Clicky',s:'seo',g:'SEO › Analytics',k:'clicky analytics'},
+        {t:'Umami',s:'seo',g:'SEO › Analytics',k:'umami analytics'},
+        // Social
+        {t:'Share Buttons',s:'social',g:'Social › Share',k:'share buttons enable facebook x twitter linkedin'},
+        {t:'Share to Facebook',s:'social',g:'Social › Share',k:'share facebook button'},
+        {t:'Share to X',s:'social',g:'Social › Share',k:'share x twitter button'},
+        {t:'Share to LinkedIn',s:'social',g:'Social › Share',k:'share linkedin button'},
+        {t:'Social Brand Colors',s:'social',g:'Social',k:'social brand colors icons'},
+        {t:'Instagram',s:'social',g:'Social › Links',k:'instagram social link'},
+        {t:'X (Twitter)',s:'social',g:'Social › Links',k:'x twitter social link'},
+        {t:'Facebook',s:'social',g:'Social › Links',k:'facebook social link'},
+        {t:'YouTube',s:'social',g:'Social › Links',k:'youtube social link'},
+        {t:'TikTok',s:'social',g:'Social › Links',k:'tiktok social link'},
+        {t:'LinkedIn',s:'social',g:'Social › Links',k:'linkedin social link'},
+        {t:'Pinterest',s:'social',g:'Social › Links',k:'pinterest social link'},
+        {t:'Behance',s:'social',g:'Social › Links',k:'behance social link'},
+        {t:'Dribbble',s:'social',g:'Social › Links',k:'dribbble social link'},
+        {t:'GitHub',s:'social',g:'Social › Links',k:'github social link'},
+        {t:'Vimeo',s:'social',g:'Social › Links',k:'vimeo social link'},
+        {t:'500px',s:'social',g:'Social › Links',k:'500px social link'},
+        // Email
+        {t:'Email Failover',s:'email',g:'Email',k:'email failover chain'},
+        {t:'Gmail',s:'email',g:'Email',k:'gmail email provider app password'},
+        {t:'Resend',s:'email',g:'Email',k:'resend email provider api'},
+        {t:'Amazon SES',s:'email',g:'Email',k:'amazon ses email provider'},
+        {t:'Postmark',s:'email',g:'Email',k:'postmark email provider'},
+        {t:'Brevo',s:'email',g:'Email',k:'brevo sendinblue email provider'},
+        {t:'SendPulse',s:'email',g:'Email',k:'sendpulse email provider'},
+        {t:'Mailgun',s:'email',g:'Email',k:'mailgun email provider'},
+        {t:'Moosend',s:'email',g:'Email',k:'moosend email provider'},
+        {t:'Mandrill',s:'email',g:'Email',k:'mandrill mailchimp email provider'},
+        {t:'SparkPost',s:'email',g:'Email',k:'sparkpost email provider'},
+        {t:'Custom SMTP',s:'email',g:'Email',k:'smtp custom email provider host port'},
+        // Commerce
+        {t:'PayPal',s:'commerce',g:'Commerce',k:'paypal payment provider'},
+        {t:'Payoneer',s:'commerce',g:'Commerce',k:'payoneer payment provider'},
+        {t:'Stripe',s:'commerce',g:'Commerce',k:'stripe payment provider'},
+        {t:'2Checkout',s:'commerce',g:'Commerce',k:'2checkout payment provider'},
+        {t:'Square',s:'commerce',g:'Commerce',k:'square payment provider'},
+        {t:'Razorpay',s:'commerce',g:'Commerce',k:'razorpay payment provider'},
+        {t:'Mollie',s:'commerce',g:'Commerce',k:'mollie payment provider'},
+        {t:'Currency',s:'commerce',g:'Commerce',k:'currency usd eur commerce'},
+        {t:'Downloads per Purchase',s:'commerce',g:'Commerce',k:'downloads max per purchase limit'},
+        {t:'Download Expiry',s:'commerce',g:'Commerce',k:'download expiry hours'},
+        // AI
+        {t:'Ollama',s:'ai',g:'AI',k:'ollama local ai provider model'},
+        {t:'OpenAI',s:'ai',g:'AI',k:'openai gpt ai provider api key'},
+        {t:'Gemini',s:'ai',g:'AI',k:'gemini google ai provider api key'},
+        {t:'Groq',s:'ai',g:'AI',k:'groq ai provider api key llama'},
+        {t:'Cloudflare Workers AI',s:'ai',g:'AI',k:'cloudflare workers ai provider'},
+        {t:'AI Failover Chain',s:'ai',g:'AI',k:'ai failover chain order priority'},
+        {t:'AI Suggestions',s:'ai',g:'AI › Features',k:'ai suggest meta tags categories alt text slug'},
+        {t:'AI Theme Generation',s:'ai',g:'AI › Features',k:'ai theme generation design'},
+        {t:'AI Post Generation',s:'ai',g:'AI › Features',k:'ai post generation content'},
+        // Security
+        {t:'Login Method',s:'security',g:'Security › Auth',k:'login method password magic link',h:'#tab-sec-auth'},
+        {t:'Login Captcha',s:'security',g:'Security › Auth',k:'login captcha enable',h:'#tab-sec-auth'},
+        {t:'MFA / Two-Factor',s:'security',g:'Security › Auth',k:'mfa two factor authentication totp',h:'#tab-sec-auth'},
+        {t:'Akismet',s:'security',g:'Security › Spam',k:'akismet spam filter api key',h:'#tab-sec-spam'},
+        {t:'CleanTalk',s:'security',g:'Security › Spam',k:'cleantalk spam filter api key',h:'#tab-sec-spam'},
+        {t:'OOPSpam',s:'security',g:'Security › Spam',k:'oopspam spam filter api key',h:'#tab-sec-spam'},
+        {t:'reCaptcha',s:'security',g:'Security › Captcha',k:'recaptcha google captcha site key secret',h:'#tab-sec-captcha'},
+        {t:'Turnstile',s:'security',g:'Security › Captcha',k:'turnstile cloudflare captcha site key secret',h:'#tab-sec-captcha'},
+        {t:'hCaptcha',s:'security',g:'Security › Captcha',k:'hcaptcha captcha site key secret',h:'#tab-sec-captcha'},
+        {t:'Firewall',s:'security',g:'Security › Firewall',k:'firewall enable ban block ip',h:'#tab-sec-firewall'},
+        {t:'Geo Blocking',s:'security',g:'Security › Firewall',k:'geo blocking country block allow',h:'#tab-sec-firewall'},
+    ];
+
+    var input = document.getElementById('settings-search-input');
+    var results = document.getElementById('settings-search-results');
+
+    input.addEventListener('input', function() {
+        var q = this.value.trim().toLowerCase();
+        if (q.length < 2) { results.style.display = 'none'; return; }
+
+        var words = q.split(/\s+/);
+        var matches = idx.filter(function(item) {
+            var hay = (item.t + ' ' + item.g + ' ' + item.k).toLowerCase();
+            return words.every(function(w) { return hay.indexOf(w) !== -1; });
+        });
+
+        if (matches.length === 0) {
+            results.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--text-tertiary)">No settings found</div>';
+            results.style.display = '';
+            return;
+        }
+
+        // Group by g
+        var groups = {};
+        matches.forEach(function(m) {
+            if (!groups[m.g]) groups[m.g] = [];
+            groups[m.g].push(m);
+        });
+
+        var html = '';
+        for (var g in groups) {
+            html += '<div style="padding:4px 14px 2px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-tertiary)">' + g + '</div>';
+            groups[g].forEach(function(m) {
+                var url = '/' + slug + '/settings/' + m.s + (m.h || '');
+                html += '<a href="' + url + '" style="display:block;padding:7px 14px;font-size:13px;color:var(--text-primary);text-decoration:none;cursor:pointer" onmouseenter="this.style.background=\'var(--bg-card-hover)\'" onmouseleave="this.style.background=\'none\'">' + m.t + '</a>';
+            });
+        }
+        results.innerHTML = html;
+        results.style.display = '';
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { results.style.display = 'none'; this.blur(); }
+        if (e.key === 'Enter') {
+            var first = results.querySelector('a');
+            if (first) { first.click(); e.preventDefault(); }
+        }
+    });
+})();
+</script>
