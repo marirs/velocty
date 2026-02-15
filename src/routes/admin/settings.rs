@@ -176,18 +176,58 @@ pub fn settings_save(
         }
     }
 
+    // Reserved system routes that cannot be used as slugs
+    const RESERVED_SLUGS: &[&str] = &[
+        "static", "uploads", "api", "super", "download", "feed",
+        "sitemap.xml", "robots.txt", "privacy", "terms", "archives",
+        "login", "logout", "setup", "mfa", "magic-link",
+        "forgot-password", "reset-password",
+    ];
+
+    fn is_reserved(s: &str) -> bool {
+        RESERVED_SLUGS.contains(&s.to_lowercase().as_str())
+    }
+
+    // Admin slug validation (security section)
+    if section == "security" {
+        if let Some(new_admin) = data.get("admin_slug").map(|v| v.trim().to_string()) {
+            if !new_admin.is_empty() {
+                if is_reserved(&new_admin) {
+                    errors.push(format!("Admin Slug '{}' conflicts with a reserved system route", new_admin));
+                }
+                let cur_blog = Setting::get_or(pool, "blog_slug", "journal");
+                let cur_portfolio = Setting::get_or(pool, "portfolio_slug", "portfolio");
+                if new_admin == cur_blog {
+                    errors.push("Admin Slug cannot be the same as the Journal Slug".to_string());
+                }
+                if new_admin == cur_portfolio {
+                    errors.push("Admin Slug cannot be the same as the Portfolio Slug".to_string());
+                }
+            }
+        }
+    }
+
     // Blog/Portfolio slug validation
     if section == "blog" {
         let journal_enabled = data.get("journal_enabled").map(|v| v.as_str()) == Some("true");
         let blog_slug = data.get("blog_slug").map(|v| v.trim()).unwrap_or("");
         let portfolio_enabled = Setting::get_or(pool, "portfolio_enabled", "false") == "true";
         let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "portfolio");
+        let admin_slug_val = Setting::get_or(pool, "admin_slug", "admin");
 
         if journal_enabled && blog_slug.is_empty() && portfolio_enabled && portfolio_slug.is_empty() {
             errors.push("Journal Slug cannot be empty while Portfolio Slug is also empty — at least one must have a slug".to_string());
         }
-        if journal_enabled && !blog_slug.is_empty() && portfolio_enabled && blog_slug == portfolio_slug {
-            errors.push("Journal Slug and Portfolio Slug cannot be the same".to_string());
+        if journal_enabled && !blog_slug.is_empty() {
+            if is_reserved(blog_slug) {
+                errors.push(format!("Journal Slug '{}' conflicts with a reserved system route", blog_slug));
+            }
+            if portfolio_enabled && blog_slug == portfolio_slug {
+                errors.push("Journal Slug and Portfolio Slug cannot be the same".to_string());
+            }
+            if blog_slug == admin_slug_val {
+                errors.push("Journal Slug cannot be the same as the Admin Slug".to_string());
+            }
         }
     }
     if section == "portfolio" {
@@ -195,12 +235,21 @@ pub fn settings_save(
         let portfolio_slug = data.get("portfolio_slug").map(|v| v.trim()).unwrap_or("");
         let journal_enabled = Setting::get_or(pool, "journal_enabled", "true") == "true";
         let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
+        let admin_slug_val = Setting::get_or(pool, "admin_slug", "admin");
 
         if portfolio_enabled && portfolio_slug.is_empty() && journal_enabled && blog_slug.is_empty() {
             errors.push("Portfolio Slug cannot be empty while Journal Slug is also empty — at least one must have a slug".to_string());
         }
-        if portfolio_enabled && !portfolio_slug.is_empty() && journal_enabled && portfolio_slug == blog_slug {
-            errors.push("Portfolio Slug and Journal Slug cannot be the same".to_string());
+        if portfolio_enabled && !portfolio_slug.is_empty() {
+            if is_reserved(portfolio_slug) {
+                errors.push(format!("Portfolio Slug '{}' conflicts with a reserved system route", portfolio_slug));
+            }
+            if journal_enabled && portfolio_slug == blog_slug {
+                errors.push("Portfolio Slug and Journal Slug cannot be the same".to_string());
+            }
+            if portfolio_slug == admin_slug_val {
+                errors.push("Portfolio Slug cannot be the same as the Admin Slug".to_string());
+            }
         }
     }
 

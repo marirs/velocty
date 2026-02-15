@@ -192,8 +192,8 @@ Per-site admin tools (`/<admin_slug>/health`) work identically in both single-si
 ### Implementation
 
 - **Backend**: `src/health.rs` — `gather()` reads `velocty.toml` for backend, branches to `gather_db_sqlite()` or `gather_db_mongo()`
-- **Routes**: `src/routes/admin.rs` — `GET /health` + `POST /health/<tool>` endpoints (single-site)
-- **Routes**: `src/routes/super_admin.rs` — `POST /health/tool/<site_id>/<tool>` endpoints (multi-site)
+- **Routes**: `src/routes/admin/health.rs` — `GET /health` + `POST /health/<tool>` endpoints (single-site)
+- **Routes**: `src/routes/super_admin/health.rs` — `POST /health/tool/<site_id>/<tool>` endpoints (multi-site)
 - **Template**: `website/templates/admin/health.html.tera` — Tera conditionals on `report.database.backend`
 - **Template**: `website/templates/super/health.html.tera` — System health + site selector tools
 - **MongoDB ping**: Raw TCP + OP_MSG wire protocol (same approach as setup test-mongo)
@@ -839,17 +839,74 @@ CREATE INDEX idx_views_referrer ON page_views(referrer);
 
 ---
 
+## Slug Validation
+
+The admin panel validates all user-configurable slugs (`admin_slug`, `blog_slug`, `portfolio_slug`) to prevent conflicts with hardcoded system routes.
+
+### Reserved Slugs
+
+The following top-level paths are reserved and cannot be used as any slug:
+
+| Reserved | Reason |
+|---|---|
+| `static` | Static file server |
+| `uploads` | Upload file server |
+| `api` | Public JSON API (likes, comments, filtering) |
+| `super` | Super admin panel (multi-site) |
+| `download` | Commerce download pages |
+| `feed` | RSS feed |
+| `sitemap.xml` | XML sitemap |
+| `robots.txt` | Robots file |
+| `privacy` | Privacy policy page |
+| `terms` | Terms of use page |
+| `archives` | Blog archives |
+| `login` | Auth sub-route |
+| `logout` | Auth sub-route |
+| `setup` | First-run wizard |
+| `mfa` | MFA verification |
+| `magic-link` | Magic link auth |
+| `forgot-password` | Password reset |
+| `reset-password` | Password reset |
+
+### Cross-Slug Validation
+
+- All three slugs (`admin_slug`, `blog_slug`, `portfolio_slug`) must be unique from each other when non-empty
+- `blog_slug` and `portfolio_slug` may be empty (`""`) — this mounts the module at `/` as the homepage
+- `admin_slug` is always required (cannot be empty)
+- Both `blog_slug` and `portfolio_slug` cannot be empty at the same time
+
+### Implementation
+
+- **Validation**: `src/routes/admin/settings.rs` — `settings_save()` checks on save for `security`, `blog`, and `portfolio` sections
+- Reserved list: `RESERVED_SLUGS` constant + `is_reserved()` helper inside `settings_save()`
+
+---
+
 ## Project Structure (Phase 1)
 
 ```
 velocty/
 ├── Cargo.toml
 ├── README-CMS.md
-├── Architecture.md
+├── docs/
+│   ├── Architecture.md
+│   ├── DESIGN.md
+│   ├── MULTI-SITE.md
+│   ├── PROGRESS.md
+│   ├── README-CMS.md
+│   └── firewall-spec.md
 ├── src/
 │   ├── main.rs                      # Rocket launch, DB init, route mounting
 │   ├── db.rs                        # SQLite connection pool, migrations
-│   ├── auth.rs                      # Login, sessions, MFA (TOTP)
+│   ├── health.rs                    # Health dashboard data gathering + tools
+│   ├── render.rs                    # Design + content merge, placeholder replacement
+│   ├── rss.rs                       # RSS feed generation
+│   ├── analytics.rs                 # Page view logging middleware, GeoLite2 lookup
+│   ├── ai/                          # AI provider integrations
+│   ├── security/
+│   │   ├── auth.rs                  # Login, sessions, guards (AdminUser, EditorUser, AuthorUser)
+│   │   ├── mfa.rs                   # TOTP MFA helpers
+│   │   └── password_reset.rs        # Password reset tokens + email
 │   ├── models/
 │   │   ├── mod.rs
 │   │   ├── post.rs                  # Post struct, CRUD
@@ -860,34 +917,58 @@ velocty/
 │   │   ├── design.rs                # Design struct, CRUD
 │   │   ├── settings.rs              # Settings get/set helpers
 │   │   ├── import.rs                # Import history
-│   │   └── analytics.rs             # Page views, stats queries
+│   │   ├── analytics.rs             # Page views, stats queries
+│   │   ├── audit.rs                 # Audit log entries
+│   │   ├── firewall.rs              # Firewall events + bans
+│   │   ├── order.rs                 # Orders, download tokens, licenses
+│   │   └── user.rs                  # Multi-user model
 │   ├── routes/
 │   │   ├── mod.rs
 │   │   ├── public.rs                # Visitor-facing routes (blog, portfolio, RSS, sitemap)
-│   │   ├── admin.rs                 # Admin panel routes (dashboard, CRUD forms)
-│   │   ├── admin_api.rs             # Admin JSON API (dashboard stats for D3.js)
-│   │   ├── api.rs                   # Public JSON API endpoints (likes, comments, filtering)
-│   │   └── auth.rs                  # Login/logout/MFA routes
-│   ├── analytics.rs                 # Page view logging middleware, GeoLite2 lookup
-│   ├── render.rs                    # Design + content merge, placeholder replacement
-│   ├── seo.rs                       # Meta tags, JSON-LD, OG, sitemap generation
-│   ├── rss.rs                       # RSS feed generation
-│   ├── email.rs                     # Purchase email delivery (Gmail SMTP, custom SMTP)
-│   ├── images.rs                    # Upload handling, thumbnail generation, WebP
+│   │   ├── api.rs                   # Public JSON API (likes, comments, filtering)
+│   │   ├── ai.rs                    # AI suggestion endpoints
+│   │   ├── admin/                   # Admin panel routes
+│   │   │   ├── mod.rs               # Shared helpers (admin_base, save_upload), routes(), api_routes()
+│   │   │   ├── dashboard.rs         # Dashboard
+│   │   │   ├── posts.rs             # Posts CRUD
+│   │   │   ├── portfolio.rs         # Portfolio CRUD
+│   │   │   ├── comments.rs          # Comments moderation
+│   │   │   ├── categories.rs        # Categories + tags CRUD
+│   │   │   ├── media.rs             # Media library, image/font uploads
+│   │   │   ├── settings.rs          # Settings page + save (with slug validation)
+│   │   │   ├── designs.rs           # Design manager
+│   │   │   ├── import.rs            # WordPress + Velocty import
+│   │   │   ├── health.rs            # Health dashboard + tools
+│   │   │   ├── users.rs             # User management + MFA setup
+│   │   │   ├── firewall.rs          # Firewall dashboard + audit log + ban/unban
+│   │   │   ├── sales.rs             # Sales dashboard + orders
+│   │   │   └── api.rs               # Admin JSON API (stats, SEO check, theme)
+│   │   ├── security/                # Auth routes
+│   │   │   └── auth/
+│   │   │       ├── login.rs          # Login page + submit
+│   │   │       ├── logout.rs         # Logout + catch-all redirect
+│   │   │       ├── setup.rs          # First-run setup wizard
+│   │   │       ├── mfa.rs            # MFA challenge page
+│   │   │       ├── magic_link.rs     # Magic link auth
+│   │   │       └── password_reset.rs # Forgot/reset password
+│   │   ├── commerce/                # Payment provider routes
+│   │   │   ├── mod.rs               # Shared helpers, order pipeline, download routes
+│   │   │   ├── paypal.rs
+│   │   │   ├── stripe.rs
+│   │   │   ├── razorpay.rs
+│   │   │   ├── mollie.rs
+│   │   │   ├── square.rs
+│   │   │   ├── twocheckout.rs
+│   │   │   └── payoneer.rs
+│   │   └── super_admin/             # Super admin (multi-site, feature-gated)
+│   │       ├── mod.rs               # routes()
+│   │       ├── auth.rs              # Setup, login, logout + auth guard
+│   │       ├── dashboard.rs         # Dashboard + settings
+│   │       ├── sites.rs             # Site CRUD
+│   │       └── health.rs            # Per-site health tools
 │   └── import/
 │       ├── mod.rs
-│       └── wordpress.rs             # WP XML parser (Phase 1)
-│   └── routes/
-│       ├── commerce/                # Payment provider routes
-│       │   ├── mod.rs               # Shared helpers, order pipeline, download routes
-│       │   ├── paypal.rs            # PayPal JS SDK create/capture
-│       │   ├── stripe.rs            # Stripe Checkout + HMAC-SHA256 webhook
-│       │   ├── razorpay.rs          # Razorpay order create + HMAC verify
-│       │   ├── mollie.rs            # Mollie payment create + API webhook
-│       │   ├── square.rs            # Square payment link + HMAC-SHA256 webhook
-│       │   ├── twocheckout.rs       # 2Checkout hosted checkout + MD5 IPN
-│       │   └── payoneer.rs          # Payoneer checkout link + webhook
-│       └── ...
+│       └── wordpress.rs             # WP XML parser
 ├── website/
 │   ├── site/                        # Site-specific data
 │   │   ├── db/velocty.db            # SQLite database (created at runtime)
@@ -900,16 +981,17 @@ velocty/
 │   │       ├── admin.js
 │   │       └── tinymce/             # Self-hosted TinyMCE 7
 │   └── templates/                   # Tera templates (admin panel)
-│       └── admin/
-│           ├── base.html.tera
-│           ├── login.html.tera
-│           ├── dashboard.html.tera
-│           ├── posts/
-│           ├── portfolio/
-│           ├── comments/
-│           ├── settings/
-│           ├── sales/               # Sales dashboard + orders
-│           └── import/
+│       ├── admin/
+│       │   ├── base.html.tera
+│       │   ├── login.html.tera
+│       │   ├── dashboard.html.tera
+│       │   ├── posts/
+│       │   ├── portfolio/
+│       │   ├── comments/
+│       │   ├── settings/
+│       │   ├── sales/
+│       │   └── import/
+│       └── super/                   # Super admin templates (multi-site)
 ```
 
 ---
