@@ -47,6 +47,12 @@ Velocty guides you through a 4-step setup wizard on first run:
 |---|---|
 | ![Admin Account](docs/wizzard-3.png) | ![Terms & Privacy](docs/wizzard-4.png) |
 
+### Admin Dashboard
+
+| Analytics Dashboard | Sales Dashboard |
+|---|---|
+| ![Dashboard](docs/dashboard.png) | ![Sales Dashboard](docs/sales-dashboard.png) |
+
 ### Journal
 
 | Journal List | New Post |

@@ -157,7 +157,7 @@ impl PageView {
             "SELECT
                 COALESCE(referrer, 'Direct') as source,
                 CASE
-                    WHEN path LIKE '/blog%' THEN 'Blog'
+                    WHEN path LIKE '/blog%' OR path LIKE '/journal%' THEN 'Blog'
                     WHEN path LIKE '/portfolio%' THEN 'Portfolio'
                     ELSE 'Pages'
                 END as target,
@@ -187,7 +187,7 @@ impl PageView {
         let mut stmt2 = match conn.prepare(
             "SELECT
                 CASE
-                    WHEN path LIKE '/blog%' THEN 'Blog'
+                    WHEN path LIKE '/blog%' OR path LIKE '/journal%' THEN 'Blog'
                     WHEN path LIKE '/portfolio%' THEN 'Portfolio'
                     ELSE 'Pages'
                 END as source,
@@ -256,7 +256,7 @@ impl PageView {
             "SELECT
                 DATE(created_at) as date,
                 CASE
-                    WHEN path LIKE '/blog%' THEN 'blog'
+                    WHEN path LIKE '/blog%' OR path LIKE '/journal%' THEN 'blog'
                     WHEN path LIKE '/portfolio%' THEN 'portfolio'
                     ELSE 'pages'
                 END as content_type,
