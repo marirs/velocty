@@ -20,6 +20,10 @@ use crate::models::analytics::PageView;
 use crate::models::import::Import;
 use crate::security::auth;
 use crate::security::mfa;
+use crate::rate_limit::RateLimiter;
+use crate::rss;
+use crate::license;
+use crate::seo;
 
 /// Atomic counter for unique shared-cache DB names so parallel tests don't collide.
 static TEST_DB_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -1628,6 +1632,249 @@ fn login_rate_limit() {
 
     // Different IP should still be allowed
     assert!(auth::check_login_rate_limit(&pool, "10.0.0.1"));
+}
+
+// ═══════════════════════════════════════════════════════════
+// In-memory RateLimiter
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn rate_limiter_basic() {
+    let rl = RateLimiter::new();
+    let window = std::time::Duration::from_secs(60);
+
+    assert!(rl.check_and_record("login:1.2.3.4", 3, window));
+    assert!(rl.check_and_record("login:1.2.3.4", 3, window));
+    assert!(rl.check_and_record("login:1.2.3.4", 3, window));
+    // 4th should be blocked
+    assert!(!rl.check_and_record("login:1.2.3.4", 3, window));
+
+    // Different key is independent
+    assert!(rl.check_and_record("login:5.6.7.8", 3, window));
+}
+
+#[test]
+fn rate_limiter_remaining() {
+    let rl = RateLimiter::new();
+    let window = std::time::Duration::from_secs(60);
+
+    assert_eq!(rl.remaining("comment:1.2.3.4", 5, window), 5);
+    rl.check_and_record("comment:1.2.3.4", 5, window);
+    rl.check_and_record("comment:1.2.3.4", 5, window);
+    assert_eq!(rl.remaining("comment:1.2.3.4", 5, window), 3);
+}
+
+#[test]
+fn rate_limiter_cleanup() {
+    let rl = RateLimiter::new();
+    let window = std::time::Duration::from_secs(60);
+
+    rl.check_and_record("a", 10, window);
+    rl.check_and_record("b", 10, window);
+
+    // Cleanup with a very large max_age should keep everything
+    rl.cleanup(std::time::Duration::from_secs(3600));
+    assert_eq!(rl.remaining("a", 10, window), 9);
+
+    // Cleanup with zero max_age should remove everything
+    rl.cleanup(std::time::Duration::from_secs(0));
+    assert_eq!(rl.remaining("a", 10, window), 10);
+}
+
+// ═══════════════════════════════════════════════════════════
+// RSS Feed
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn rss_feed_generation() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_name", "Test Site").unwrap();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "blog_slug", "blog").unwrap();
+
+    // Create published posts
+    let mut form = make_post_form("Hello World", "hello-world", "published");
+    form.published_at = Some("2026-01-15T10:00".to_string());
+    Post::create(&pool, &form).unwrap();
+
+    let xml = rss::generate_feed(&pool);
+    assert!(xml.starts_with("<?xml"));
+    assert!(xml.contains("<rss version=\"2.0\""));
+    assert!(xml.contains("<title>Test Site</title>"));
+    assert!(xml.contains("<link>https://example.com</link>"));
+    assert!(xml.contains("hello-world"));
+    assert!(xml.contains("Hello World"));
+    assert!(xml.contains("</rss>"));
+}
+
+#[test]
+fn rss_feed_empty() {
+    let pool = test_pool();
+    let xml = rss::generate_feed(&pool);
+    assert!(xml.contains("<channel>"));
+    assert!(xml.contains("</channel>"));
+    // No <item> tags when no posts
+    assert!(!xml.contains("<item>"));
+}
+
+// ═══════════════════════════════════════════════════════════
+// License text generation
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn license_txt_generation() {
+    let pool = test_pool();
+    Setting::set(&pool, "admin_display_name", "John Doe").unwrap();
+    Setting::set(&pool, "downloads_license_template", "You may use this for personal and commercial projects.").unwrap();
+
+    let txt = license::generate_license_txt(&pool, "Sunset Photo", "TXN-12345", "2026-01-15");
+    assert!(txt.contains("License for: Sunset Photo"));
+    assert!(txt.contains("Purchased from: John Doe"));
+    assert!(txt.contains("Transaction: TXN-12345"));
+    assert!(txt.contains("Date: 2026-01-15"));
+    assert!(txt.contains("personal and commercial"));
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEO: Meta tags
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn seo_build_meta_basic() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_name", "My Site").unwrap();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+
+    let meta = seo::build_meta(&pool, Some("Hello"), Some("A description"), "/blog/hello");
+    assert!(meta.contains("<title>"));
+    assert!(meta.contains("Hello"));
+    assert!(meta.contains("My Site"));
+    assert!(meta.contains("A description"));
+    assert!(meta.contains("canonical"));
+    assert!(meta.contains("/blog/hello"));
+}
+
+#[test]
+fn seo_build_meta_og_twitter() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_name", "OG Site").unwrap();
+    Setting::set(&pool, "seo_open_graph", "true").unwrap();
+    Setting::set(&pool, "seo_twitter_cards", "true").unwrap();
+
+    let meta = seo::build_meta(&pool, Some("Post"), Some("Desc"), "/p");
+    assert!(meta.contains("og:title"));
+    assert!(meta.contains("og:description"));
+    assert!(meta.contains("og:site_name"));
+    assert!(meta.contains("twitter:card"));
+    assert!(meta.contains("twitter:title"));
+}
+
+#[test]
+fn seo_build_meta_no_og_twitter() {
+    let pool = test_pool();
+    // Explicitly disable OG and Twitter (seed_defaults enables them)
+    Setting::set(&pool, "seo_open_graph", "false").unwrap();
+    Setting::set(&pool, "seo_twitter_cards", "false").unwrap();
+    let meta = seo::build_meta(&pool, Some("Post"), None, "/p");
+    assert!(!meta.contains("og:title"));
+    assert!(!meta.contains("twitter:card"));
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEO: Sitemap + robots.txt
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn seo_sitemap_disabled() {
+    let pool = test_pool();
+    // seed_defaults enables sitemap, so explicitly disable
+    Setting::set(&pool, "seo_sitemap_enabled", "false").unwrap();
+    assert!(seo::generate_sitemap(&pool).is_none());
+}
+
+#[test]
+fn seo_sitemap_enabled() {
+    let pool = test_pool();
+    Setting::set(&pool, "seo_sitemap_enabled", "true").unwrap();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "blog_slug", "blog").unwrap();
+    Setting::set(&pool, "portfolio_slug", "portfolio").unwrap();
+
+    // Create content
+    let mut pf = make_post_form("My Post", "my-post", "published");
+    pf.published_at = Some("2026-01-01T12:00".to_string());
+    Post::create(&pool, &pf).unwrap();
+
+    let mut porf = make_portfolio_form("My Item", "my-item", "published");
+    porf.published_at = Some("2026-01-01T12:00".to_string());
+    PortfolioItem::create(&pool, &porf).unwrap();
+
+    let xml = seo::generate_sitemap(&pool).unwrap();
+    assert!(xml.contains("<?xml"));
+    assert!(xml.contains("<urlset"));
+    assert!(xml.contains("https://example.com"));
+    assert!(xml.contains("/blog/my-post"));
+    assert!(xml.contains("/portfolio/my-item"));
+}
+
+#[test]
+fn seo_robots_txt() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+
+    // Without sitemap
+    Setting::set(&pool, "seo_sitemap_enabled", "false").unwrap();
+    let robots = seo::sitemap::generate_robots(&pool);
+    assert!(robots.contains("User-agent"));
+    assert!(!robots.contains("Sitemap:"));
+
+    // With sitemap
+    Setting::set(&pool, "seo_sitemap_enabled", "true").unwrap();
+    let robots = seo::sitemap::generate_robots(&pool);
+    assert!(robots.contains("Sitemap: https://example.com/sitemap.xml"));
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEO: JSON-LD structured data
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn seo_jsonld_post() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_name", "LD Site").unwrap();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "blog_slug", "blog").unwrap();
+
+    let mut form = make_post_form("JSON-LD Post", "jsonld-post", "published");
+    form.published_at = Some("2026-01-15T10:00".to_string());
+    form.meta_description = Some("A test post".to_string());
+    let id = Post::create(&pool, &form).unwrap();
+    let post = Post::find_by_id(&pool, id).unwrap();
+
+    let ld = seo::build_post_jsonld(&pool, &post);
+    assert!(ld.contains("application/ld+json"));
+    assert!(ld.contains("BlogPosting"));
+    assert!(ld.contains("JSON-LD Post"));
+    assert!(ld.contains("A test post"));
+    assert!(ld.contains("https://example.com"));
+    assert!(ld.contains("LD Site"));
+}
+
+#[test]
+fn seo_jsonld_portfolio() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_name", "LD Site").unwrap();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "portfolio_slug", "gallery").unwrap();
+
+    let id = PortfolioItem::create(&pool, &make_portfolio_form("Sunset", "sunset", "published")).unwrap();
+    let item = PortfolioItem::find_by_id(&pool, id).unwrap();
+
+    let ld = seo::build_portfolio_jsonld(&pool, &item);
+    assert!(ld.contains("application/ld+json"));
+    assert!(ld.contains("ImageObject"));
+    assert!(ld.contains("Sunset"));
+    assert!(ld.contains("/gallery/sunset"));
 }
 
 // ═══════════════════════════════════════════════════════════
