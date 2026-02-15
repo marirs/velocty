@@ -1,7 +1,8 @@
 <div id="settings-search" style="position:relative;margin-left:auto">
     <div style="position:relative">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="settings-search-input" placeholder="Search settings…" autocomplete="off" style="width:280px;padding:6px 10px 6px 30px;font-size:12px;border-radius:6px;border:1px solid var(--border-input);background:var(--bg-input);color:var(--text-primary);outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-input)'">
+        <input type="text" id="settings-search-input" placeholder="Search settings…" autocomplete="off" style="width:280px;padding:6px 32px 6px 30px;font-size:12px;border-radius:6px;border:1px solid var(--border-input);background:var(--bg-input);color:var(--text-primary);outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-input)'">
+        <kbd style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;font-family:inherit;line-height:1;padding:2px 5px;border-radius:4px;border:1px solid var(--border-input);background:var(--bg-page);color:var(--text-tertiary);pointer-events:none">/</kbd>
     </div>
     <div id="settings-search-results" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;width:340px;max-height:360px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:100;padding:6px 0"></div>
 </div>
@@ -190,11 +191,38 @@
         e.preventDefault();
     });
 
+    // Handle click: for cross-page links, let browser navigate normally.
+    // For same-page hash links, force a reload so the page JS picks up the new hash.
+    results.addEventListener('click', function(e) {
+        var link = e.target.closest('a');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        var hashIdx = href.indexOf('#');
+        var targetPath = hashIdx >= 0 ? href.substring(0, hashIdx) : href;
+        if (targetPath === location.pathname) {
+            e.preventDefault();
+            window.location.hash = hashIdx >= 0 ? href.substring(hashIdx) : '';
+            window.location.reload();
+        }
+        // else: normal navigation happens
+    });
+
     input.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') { results.style.display = 'none'; input.blur(); }
         if (e.key === 'Enter') {
             var first = results.querySelector('a');
             if (first) first.click();
+        }
+    });
+
+    // Global "/" shortcut to focus search (like GitHub)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            var tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+            e.preventDefault();
+            input.focus();
+            input.select();
         }
     });
 })();
