@@ -11,6 +11,7 @@ mod db;
 mod health;
 mod images;
 mod rate_limit;
+mod email;
 mod render;
 mod rss;
 mod seo;
@@ -127,6 +128,10 @@ fn rocket() -> _ {
         .mount(
             "/api",
             routes::api::routes(),
+        )
+        .mount(
+            "/",
+            routes::commerce::routes(),
         )
         .mount(
             &admin_mount,

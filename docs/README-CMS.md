@@ -381,13 +381,19 @@ CREATE TABLE settings (
 - Login captcha + anti-spam services
 - Multi-site support (optional feature flag)
 
-### Phase 2 — Commerce & Auth
-- MFA flow: enable TOTP, register via QR code, download recovery codes, disable MFA
-- PayPal checkout on portfolio items
-- Token-based secure downloads with expiry and limits
-- License file generation
-- Buyer email notifications
-- Sales dashboard in admin
+### Phase 2 — Commerce & Auth ✅
+- MFA flow: enable TOTP via QR code, verify codes, download recovery codes, disable MFA, login challenge page
+- DB schema: orders, download_tokens, licenses tables + portfolio purchase_note column
+- Order/DownloadToken/License models with full CRUD and query helpers
+- Portfolio editor: sell_enabled toggle, price input, purchase_note textarea with dynamic visibility
+- Commerce settings UI: all 7 providers (PayPal, Stripe, Payoneer, 2Checkout, Square, Razorpay, Mollie) + downloads + license config
+- Checkout routes: PayPal create/capture, Stripe session create, generic provider capture, purchase status check
+- Sales sidebar menu (conditionally visible when any provider enabled) with Dashboard + Orders tabs
+- Sales Dashboard: total/30d/7d revenue, order counts by status, recent orders table
+- Orders page: filterable by status (all/completed/pending/refunded), paginated list
+- Public portfolio Buy button: PayPal JS SDK integration, email capture, purchase lookup for returning buyers
+- Download page: token-based with license key display, download count tracking, expiry enforcement
+- Buyer email notifications: purchase receipt with download link + license key via SMTP (Gmail + custom SMTP via lettre)
 
 ### Phase 3 — Editors
 - Editor.js integration for blog/portfolio content (block-based WYSIWYG)

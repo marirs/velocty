@@ -662,6 +662,24 @@ fn render_portfolio_single(context: &Value) -> String {
         html.push_str(&format!(r#"<div class="portfolio-description">{}</div>"#, desc));
     }
 
+    // Commerce: Buy / Download section
+    let commerce_enabled = context.get("commerce_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    if commerce_enabled {
+        let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let purchase_note = item.get("purchase_note").and_then(|v| v.as_str()).unwrap_or("");
+        let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let settings = context.get("settings").cloned().unwrap_or_default();
+        let currency = settings.get("commerce_currency").and_then(|v| v.as_str()).unwrap_or("USD");
+        let paypal_enabled = settings.get("commerce_paypal_enabled").and_then(|v| v.as_str()) == Some("true");
+        let paypal_client_id = settings.get("paypal_client_id").and_then(|v| v.as_str()).unwrap_or("");
+        let paypal_currency = settings.get("paypal_currency").and_then(|v| v.as_str()).unwrap_or(currency);
+
+        html.push_str(&build_commerce_html(
+            &html_escape(currency), price, purchase_note, item_id,
+            paypal_enabled, paypal_client_id, paypal_currency,
+        ));
+    }
+
     html.push_str("</article>");
     html
 }
@@ -1205,3 +1223,98 @@ body {
     .blog-thumb img { width: 100%; height: auto; }
 }
 "#;
+
+fn build_commerce_html(
+    currency: &str,
+    price: f64,
+    purchase_note: &str,
+    item_id: i64,
+    paypal_enabled: bool,
+    paypal_client_id: &str,
+    paypal_currency: &str,
+) -> String {
+    let mut s = String::new();
+    s.push_str(r#"<div class="commerce-section" style="margin-top:32px;padding:24px;border-radius:12px;border:1px solid #e0e0e0">"#);
+
+    // Price row
+    s.push_str(r#"<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><span style="font-size:28px;font-weight:700">"#);
+    s.push_str(currency);
+    s.push_str(&format!(" {:.2}", price));
+    s.push_str(r#"</span><span style="font-size:13px;color:#888">Digital Download</span></div>"#);
+
+    // Purchase note
+    if !purchase_note.is_empty() {
+        s.push_str(r#"<div style="font-size:13px;color:#888;padding:10px 14px;background:#f9f9f9;border-radius:8px;margin-bottom:4px"><strong>Includes:</strong> "#);
+        s.push_str(&html_escape(purchase_note));
+        s.push_str("</div>");
+    }
+
+    // Buy section
+    s.push_str(r#"<div id="commerce-buy" style="margin-top:16px">"#);
+    s.push_str(r#"<div id="commerce-email-step">"#);
+    s.push_str(r#"<input type="email" id="buyer-email" placeholder="Your email address" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:10px">"#);
+    s.push_str(r#"<div id="paypal-button-container" style="min-height:45px"></div>"#);
+    s.push_str("</div>");
+    s.push_str(r#"<div id="commerce-processing" style="display:none;text-align:center;padding:20px"><p style="color:#888">Processing your purchase...</p></div>"#);
+    s.push_str(r#"<div id="commerce-success" style="display:none;text-align:center;padding:20px">"#);
+    s.push_str(r#"<div style="font-size:32px;margin-bottom:8px">&#10004;</div>"#);
+    s.push_str(r#"<h3 style="margin-bottom:8px">Purchase Complete!</h3>"#);
+    s.push_str(r#"<p style="font-size:13px;color:#888;margin-bottom:16px">Check your email for the download link.</p>"#);
+    s.push_str("<a id=\"commerce-download-link\" href=\"#\" style=\"display:inline-block;padding:10px 24px;background:#E8913A;color:#fff;border-radius:8px;text-decoration:none;font-weight:600\">Download Now</a>");
+    s.push_str("<div id=\"commerce-license\" style=\"margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px;font-size:13px;display:none\"><strong>License Key:</strong> <code id=\"commerce-license-key\" style=\"user-select:all\"></code></div>");
+    s.push_str("</div></div>");
+
+    // Already purchased lookup
+    s.push_str(r#"<div style="margin-top:12px;border-top:1px solid #eee;padding-top:12px">"#);
+    s.push_str(r#"<details style="font-size:12px;color:#888"><summary style="cursor:pointer">Already purchased?</summary>"#);
+    s.push_str(r#"<div style="margin-top:8px">"#);
+    s.push_str(r#"<input type="email" id="lookup-email" placeholder="Enter your purchase email" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:8px">"#);
+    s.push_str(r#"<button type="button" onclick="lookupPurchase()" style="padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:13px">Look Up</button>"#);
+    s.push_str(r#"<p id="lookup-result" style="margin-top:8px;font-size:12px;display:none"></p>"#);
+    s.push_str("</div></details></div></div>");
+
+    // PayPal JS SDK
+    if paypal_enabled && !paypal_client_id.is_empty() {
+        s.push_str("<script src=\"https://www.paypal.com/sdk/js?client-id=");
+        s.push_str(paypal_client_id);
+        s.push_str("&currency=");
+        s.push_str(paypal_currency);
+        s.push_str("\"></script>\n<script>\n");
+        s.push_str("(function(){\n");
+        s.push_str(&format!("var itemId={};\n", item_id));
+        s.push_str("paypal.Buttons({\n");
+        s.push_str("style:{layout:'vertical',shape:'rect',label:'pay'},\n");
+        s.push_str("createOrder:function(){\n");
+        s.push_str("var email=document.getElementById('buyer-email').value.trim();\n");
+        s.push_str("if(!email||!email.includes('@')){alert('Please enter a valid email address');return;}\n");
+        s.push_str("return fetch('/api/checkout/paypal/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:itemId})}).then(function(r){return r.json()}).then(function(d){if(!d.ok){alert(d.error||'Failed');return;}window._vOid=d.order_id;return d.order_id.toString();});\n");
+        s.push_str("},\n");
+        s.push_str("onApprove:function(data){\n");
+        s.push_str("document.getElementById('commerce-email-step').style.display='none';\n");
+        s.push_str("document.getElementById('commerce-processing').style.display='';\n");
+        s.push_str("var email=document.getElementById('buyer-email').value.trim();\n");
+        s.push_str("return fetch('/api/checkout/paypal/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:window._vOid,paypal_order_id:data.orderID,buyer_email:email,buyer_name:''})}).then(function(r){return r.json()}).then(function(d){\n");
+        s.push_str("document.getElementById('commerce-processing').style.display='none';\n");
+        s.push_str("if(!d.ok){alert(d.error||'Payment failed');document.getElementById('commerce-email-step').style.display='';return;}\n");
+        s.push_str("document.getElementById('commerce-success').style.display='';\n");
+        s.push_str("document.getElementById('commerce-download-link').href='/download/'+d.download_token;\n");
+        s.push_str("if(d.license_key){document.getElementById('commerce-license').style.display='';document.getElementById('commerce-license-key').textContent=d.license_key;}\n");
+        s.push_str("});\n},\n");
+        s.push_str("onError:function(err){console.error('PayPal error:',err);alert('Payment error. Please try again.');}\n");
+        s.push_str("}).render('#paypal-button-container');\n})();\n");
+
+        // Lookup function
+        s.push_str("function lookupPurchase(){\n");
+        s.push_str("var email=document.getElementById('lookup-email').value.trim();\n");
+        s.push_str("var result=document.getElementById('lookup-result');\n");
+        s.push_str("if(!email)return;\nresult.style.display='';result.textContent='Looking up...';\n");
+        s.push_str(&format!("fetch('/api/checkout/check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{portfolio_id:{},email:email}})}}).then(function(r){{return r.json()}}).then(function(d){{\n", item_id));
+        s.push_str("if(d.purchased&&d.token_valid){result.innerHTML='<a href=\"/download/'+d.download_token+'\" style=\"color:#E8913A;font-weight:600\">Go to Download Page &rarr;</a>';}\n");
+        s.push_str("else if(d.purchased){result.textContent='Purchase found but download link has expired.';result.style.color='#f59e0b';}\n");
+        s.push_str("else{result.textContent='No purchase found for this email.';result.style.color='#ef4444';}\n");
+        s.push_str("}).catch(function(){result.textContent='Error looking up purchase.';});\n}\n");
+        s.push_str("</script>\n");
+    }
+
+    s
+}

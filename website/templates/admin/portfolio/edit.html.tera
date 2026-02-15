@@ -75,17 +75,24 @@
             </div>
 
             <div class="form-card collapsible">
-                <h4>Sell (Phase 2)</h4>
+                <h4>Sell</h4>
                 <div class="form-group">
                     <label class="checkbox-item">
-                        <input type="checkbox" name="sell_enabled" value="1"
-                            {% if item and item.sell_enabled %}checked{% endif %} disabled>
+                        <input type="checkbox" name="sell_enabled" value="1" id="sell-toggle"
+                            {% if item and item.sell_enabled %}checked{% endif %}>
                         Enable selling
                     </label>
                 </div>
-                <div class="form-group">
-                    <label for="price">Price ($)</label>
-                    <input type="number" id="price" name="price" step="0.01" value="{% if item %}{{ item.price | default(value="") }}{% endif %}" disabled>
+                <div id="sell-fields" style="{% if not item or not item.sell_enabled %}display:none{% endif %}">
+                    <div class="form-group">
+                        <label for="price">Price ({{ settings.commerce_currency | default(value="USD") }})</label>
+                        <input type="number" id="price" name="price" step="0.01" min="0" value="{% if item and item.price %}{{ item.price }}{% endif %}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase_note">Purchase Note</label>
+                        <textarea id="purchase_note" name="purchase_note" rows="3" placeholder="What the buyer receives, e.g. High-res PNG + PSD source file">{% if item %}{{ item.purchase_note | default(value="") }}{% endif %}</textarea>
+                        <span class="form-help">Shown to buyer before and after purchase.</span>
+                    </div>
                 </div>
             </div>
 
@@ -235,6 +242,11 @@
             zone.classList.remove('has-image');
         });
     })();
+
+    // Sell toggle
+    document.getElementById('sell-toggle').addEventListener('change', function() {
+        document.getElementById('sell-fields').style.display = this.checked ? '' : 'none';
+    });
 
     // SEO Check
     function runSeoCheck(type, id) {

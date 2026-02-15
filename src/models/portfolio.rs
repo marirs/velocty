@@ -17,6 +17,7 @@ pub struct PortfolioItem {
     pub meta_description: Option<String>,
     pub sell_enabled: bool,
     pub price: Option<f64>,
+    pub purchase_note: String,
     pub likes: i64,
     pub status: String,
     pub published_at: Option<NaiveDateTime>,
@@ -36,6 +37,7 @@ pub struct PortfolioForm {
     pub meta_description: Option<String>,
     pub sell_enabled: Option<bool>,
     pub price: Option<f64>,
+    pub purchase_note: Option<String>,
     pub status: String,
     pub published_at: Option<String>,
     pub category_ids: Option<Vec<i64>>,
@@ -57,6 +59,7 @@ impl PortfolioItem {
             meta_description: row.get("meta_description")?,
             sell_enabled: sell_raw != 0,
             price: row.get("price")?,
+            purchase_note: row.get::<_, Option<String>>("purchase_note")?.unwrap_or_default(),
             likes: row.get("likes")?,
             status: row.get("status")?,
             published_at: row.get("published_at")?,
@@ -174,8 +177,8 @@ impl PortfolioItem {
 
         conn.execute(
             "INSERT INTO portfolio (title, slug, description_json, description_html, image_path, thumbnail_path,
-             meta_title, meta_description, sell_enabled, price, status, published_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+             meta_title, meta_description, sell_enabled, price, purchase_note, status, published_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 form.title,
                 form.slug,
@@ -187,6 +190,7 @@ impl PortfolioItem {
                 form.meta_description,
                 form.sell_enabled.unwrap_or(false) as i64,
                 form.price,
+                form.purchase_note.as_deref().unwrap_or(""),
                 form.status,
                 published_at,
             ],
@@ -207,8 +211,8 @@ impl PortfolioItem {
         conn.execute(
             "UPDATE portfolio SET title=?1, slug=?2, description_json=?3, description_html=?4,
              image_path=?5, thumbnail_path=?6, meta_title=?7, meta_description=?8,
-             sell_enabled=?9, price=?10, status=?11, published_at=?12,
-             updated_at=CURRENT_TIMESTAMP WHERE id=?13",
+             sell_enabled=?9, price=?10, purchase_note=?11, status=?12, published_at=?13,
+             updated_at=CURRENT_TIMESTAMP WHERE id=?14",
             params![
                 form.title,
                 form.slug,
@@ -220,6 +224,7 @@ impl PortfolioItem {
                 form.meta_description,
                 form.sell_enabled.unwrap_or(false) as i64,
                 form.price,
+                form.purchase_note.as_deref().unwrap_or(""),
                 form.status,
                 published_at,
                 id,

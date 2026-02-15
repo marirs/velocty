@@ -71,6 +71,9 @@ url = "2"
 # System info (disk space, memory)
 libc = "0.2"
 
+# Email
+lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
+
 # Multi-site (optional)
 dashmap = { version = "5", optional = true }
 

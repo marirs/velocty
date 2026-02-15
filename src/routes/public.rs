@@ -444,6 +444,13 @@ pub fn portfolio_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<Stri
     };
     let settings = Setting::all(pool);
 
+    // Commerce: check if any provider is enabled
+    let any_commerce = [
+        "commerce_paypal_enabled", "commerce_stripe_enabled", "commerce_payoneer_enabled",
+        "commerce_2checkout_enabled", "commerce_square_enabled", "commerce_razorpay_enabled",
+        "commerce_mollie_enabled",
+    ].iter().any(|k| settings.get(*k).map(|v| v.as_str()) == Some("true"));
+
     let context = json!({
         "settings": settings,
         "item": item,
@@ -452,6 +459,7 @@ pub fn portfolio_single(pool: &State<DbPool>, slug: &str) -> Option<RawHtml<Stri
         "comments": comments,
         "comments_enabled": comments_enabled,
         "page_type": "portfolio_single",
+        "commerce_enabled": any_commerce && item.sell_enabled && item.price.unwrap_or(0.0) > 0.0,
         "seo": seo::build_meta(
             pool,
             item.meta_title.as_deref().or(Some(&item.title)),
@@ -544,6 +552,7 @@ pub fn portfolio_by_tag(
                     meta_description: row.get("meta_description")?,
                     sell_enabled: sell_raw != 0,
                     price: row.get("price")?,
+                    purchase_note: row.get::<_, Option<String>>("purchase_note")?.unwrap_or_default(),
                     likes: row.get("likes")?,
                     status: row.get("status")?,
                     published_at: row.get("published_at")?,

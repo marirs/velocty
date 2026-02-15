@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download — {{ settings.site_name | default(value="Velocty") }}</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f5;color:#2a2a2a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+        .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:480px;width:100%;padding:40px;text-align:center}
+        .card h1{font-size:20px;margin-bottom:6px}
+        .card .subtitle{color:#777;font-size:14px;margin-bottom:24px}
+        .card img{width:200px;height:200px;object-fit:cover;border-radius:12px;margin-bottom:20px;border:1px solid #eee}
+        .purchase-note{background:#f9f9f9;border:1px solid #eee;border-radius:10px;padding:14px 18px;font-size:13px;color:#555;margin-bottom:20px;text-align:left;line-height:1.6}
+        .license-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:20px;text-align:left}
+        .license-box label{font-size:11px;color:#16a34a;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+        .license-box code{display:block;font-size:15px;margin-top:4px;letter-spacing:1px;user-select:all;color:#15803d}
+        .dl-info{font-size:12px;color:#999;margin-bottom:20px}
+        .btn{display:inline-block;padding:12px 32px;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;border:none;transition:all .15s ease}
+        .btn-primary{background:#E8913A;color:#fff}
+        .btn-primary:hover{background:#D07A2F}
+        .btn-disabled{background:#e5e5e5;color:#999;cursor:not-allowed}
+        .error-icon{font-size:48px;margin-bottom:16px}
+        .error-msg{font-size:15px;color:#ef4444;margin-bottom:20px}
+        .back-link{display:inline-block;margin-top:16px;font-size:13px;color:#777;text-decoration:none}
+        .back-link:hover{color:#333}
+    </style>
+</head>
+<body>
+    <div class="card">
+        {% if error %}
+        <div class="error-icon">{% if expired %}⏰{% else %}⚠️{% endif %}</div>
+        <h1>{% if expired %}Download Expired{% else %}Download Unavailable{% endif %}</h1>
+        <p class="error-msg">{{ error }}</p>
+        <a href="/" class="back-link">← Back to site</a>
+        {% else %}
+        {% if image_path %}
+        <img src="/uploads/{{ image_path }}" alt="{{ item_title }}">
+        {% endif %}
+        <h1>{{ item_title }}</h1>
+        <p class="subtitle">Your purchase is ready for download</p>
+
+        {% if purchase_note %}
+        <div class="purchase-note">
+            <strong>What's included:</strong><br>
+            {{ purchase_note }}
+        </div>
+        {% endif %}
+
+        {% if license_key %}
+        <div class="license-box">
+            <label>License Key</label>
+            <code>{{ license_key }}</code>
+        </div>
+        {% endif %}
+
+        <p class="dl-info">{{ downloads_remaining }} download{% if downloads_remaining != 1 %}s{% endif %} remaining</p>
+
+        {% if downloads_remaining > 0 %}
+        <a href="/download/{{ token }}/file" class="btn btn-primary">Download File</a>
+        {% else %}
+        <span class="btn btn-disabled">Download Limit Reached</span>
+        {% endif %}
+
+        <br>
+        <a href="/" class="back-link">← Back to site</a>
+        {% endif %}
+    </div>
+</body>
+</html>

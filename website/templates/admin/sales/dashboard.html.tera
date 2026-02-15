@@ -1,0 +1,93 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Sales Dashboard</h2>
+</div>
+
+<div class="sub-tabs">
+    <a href="/{{ admin_slug }}/sales" class="tab active">Dashboard</a>
+    <a href="/{{ admin_slug }}/sales/orders" class="tab">Orders</a>
+</div>
+
+<!-- Stats Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+    <div class="form-card" style="text-align:center;padding:20px">
+        <div style="font-size:28px;font-weight:700;color:var(--success)">{{ currency }} {{ total_revenue }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Total Revenue</div>
+    </div>
+    <div class="form-card" style="text-align:center;padding:20px">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">{{ revenue_30d }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Last 30 Days</div>
+    </div>
+    <div class="form-card" style="text-align:center;padding:20px">
+        <div style="font-size:28px;font-weight:700">{{ revenue_7d }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Last 7 Days</div>
+    </div>
+    <div class="form-card" style="text-align:center;padding:20px">
+        <div style="font-size:28px;font-weight:700">{{ total_orders }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Total Orders</div>
+    </div>
+    <div class="form-card" style="text-align:center;padding:20px">
+        <div style="font-size:28px;font-weight:700;color:var(--success)">{{ completed_orders }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Completed</div>
+    </div>
+    <div class="form-card" style="text-align:center;padding:20px">
+        <div style="font-size:28px;font-weight:700;color:var(--warning)">{{ pending_orders }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Pending</div>
+    </div>
+</div>
+
+<!-- Recent Orders -->
+<div class="form-card">
+    <h3>Recent Orders</h3>
+    {% if recent_orders | length == 0 %}
+    <p class="text-muted" style="padding:20px 0;text-align:center">No orders yet. Orders will appear here once buyers make purchases.</p>
+    {% else %}
+    <div style="overflow-x:auto">
+        <table class="data-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Buyer</th>
+                    <th>Item</th>
+                    <th>Amount</th>
+                    <th>Provider</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recent_orders %}
+                <tr>
+                    <td style="color:var(--text-secondary)">#{{ order.id }}</td>
+                    <td>
+                        <div style="font-size:13px">{{ order.buyer_email }}</div>
+                        {% if order.buyer_name %}<div style="font-size:11px;color:var(--text-secondary)">{{ order.buyer_name }}</div>{% endif %}
+                    </td>
+                    <td style="color:var(--text-secondary)">{{ order.portfolio_id }}</td>
+                    <td style="font-weight:600">{{ currency }} {{ order.amount }}</td>
+                    <td><span style="text-transform:capitalize;font-size:12px;padding:2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-secondary)">{{ order.provider }}</span></td>
+                    <td>
+                        {% if order.status == "completed" %}
+                        <span style="color:var(--success);font-size:12px;font-weight:600">Completed</span>
+                        {% elif order.status == "pending" %}
+                        <span style="color:var(--warning);font-size:12px;font-weight:600">Pending</span>
+                        {% elif order.status == "refunded" %}
+                        <span style="color:var(--danger);font-size:12px;font-weight:600">Refunded</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary);font-size:12px">{{ order.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap">{{ order.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div style="text-align:center;margin-top:12px">
+        <a href="/{{ admin_slug }}/sales/orders" class="btn btn-sm">View All Orders →</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}

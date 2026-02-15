@@ -62,6 +62,7 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             meta_description TEXT,
             sell_enabled INTEGER DEFAULT 0,
             price REAL,
+            purchase_note TEXT DEFAULT '',
             likes INTEGER DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'draft',
             published_at DATETIME,
@@ -113,19 +114,46 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             FOREIGN KEY (post_id) REFERENCES posts(id)
         );
 
-        -- Downloads / sales (Phase 2, table created now)
-        CREATE TABLE IF NOT EXISTS downloads (
+        -- Orders
+        CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY,
-            token TEXT UNIQUE NOT NULL,
             portfolio_id INTEGER NOT NULL,
             buyer_email TEXT NOT NULL,
-            transaction_id TEXT NOT NULL,
-            download_count INTEGER DEFAULT 0,
-            max_downloads INTEGER DEFAULT 3,
-            created_at DATETIME NOT NULL,
-            expires_at DATETIME NOT NULL,
+            buyer_name TEXT DEFAULT '',
+            amount REAL NOT NULL,
+            currency TEXT NOT NULL DEFAULT 'USD',
+            provider TEXT NOT NULL,
+            provider_order_id TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (portfolio_id) REFERENCES portfolio(id)
         );
+
+        -- Download tokens (one per order)
+        CREATE TABLE IF NOT EXISTS download_tokens (
+            id INTEGER PRIMARY KEY,
+            order_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            downloads_used INTEGER DEFAULT 0,
+            max_downloads INTEGER DEFAULT 3,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        );
+
+        -- Licenses (one per order)
+        CREATE TABLE IF NOT EXISTS licenses (
+            id INTEGER PRIMARY KEY,
+            order_id INTEGER NOT NULL,
+            license_key TEXT UNIQUE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_orders_portfolio ON orders(portfolio_id);
+        CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(buyer_email);
+        CREATE INDEX IF NOT EXISTS idx_download_tokens_token ON download_tokens(token);
+        CREATE INDEX IF NOT EXISTS idx_download_tokens_order ON download_tokens(order_id);
 
         -- Designs
         CREATE TABLE IF NOT EXISTS designs (
@@ -209,6 +237,23 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         );
         ",
     )?;
+
+    // ── Schema migrations for existing databases ──────────────
+    // Add purchase_note to portfolio if missing
+    let has_purchase_note: bool = conn
+        .prepare("SELECT purchase_note FROM portfolio LIMIT 0")
+        .is_ok();
+    if !has_purchase_note {
+        conn.execute_batch("ALTER TABLE portfolio ADD COLUMN purchase_note TEXT DEFAULT '';")?;
+    }
+
+    // Drop legacy downloads table and replace with orders + download_tokens + licenses
+    let has_old_downloads: bool = conn
+        .prepare("SELECT transaction_id FROM downloads LIMIT 0")
+        .is_ok();
+    if has_old_downloads {
+        conn.execute_batch("DROP TABLE IF EXISTS downloads;")?;
+    }
 
     Ok(())
 }

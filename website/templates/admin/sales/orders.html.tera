@@ -1,0 +1,82 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Orders</h2>
+</div>
+
+<div class="sub-tabs">
+    <a href="/{{ admin_slug }}/sales" class="tab">Dashboard</a>
+    <a href="/{{ admin_slug }}/sales/orders" class="tab active">Orders</a>
+</div>
+
+<!-- Filters -->
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+    <a href="/{{ admin_slug }}/sales/orders" class="btn btn-sm {% if filter_status == '' %}btn-primary{% endif %}">All ({{ total }})</a>
+    <a href="/{{ admin_slug }}/sales/orders?status=completed" class="btn btn-sm {% if filter_status == 'completed' %}btn-primary{% endif %}">Completed</a>
+    <a href="/{{ admin_slug }}/sales/orders?status=pending" class="btn btn-sm {% if filter_status == 'pending' %}btn-primary{% endif %}">Pending</a>
+    <a href="/{{ admin_slug }}/sales/orders?status=refunded" class="btn btn-sm {% if filter_status == 'refunded' %}btn-primary{% endif %}">Refunded</a>
+</div>
+
+<div class="form-card">
+    {% if orders | length == 0 %}
+    <p class="text-muted" style="padding:30px 0;text-align:center">No orders found.</p>
+    {% else %}
+    <div style="overflow-x:auto">
+        <table class="data-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Buyer</th>
+                    <th>Item</th>
+                    <th>Amount</th>
+                    <th>Provider</th>
+                    <th>Provider ID</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td style="color:var(--text-secondary)">#{{ order.id }}</td>
+                    <td>
+                        <div style="font-size:13px">{{ order.buyer_email }}</div>
+                        {% if order.buyer_name %}<div style="font-size:11px;color:var(--text-secondary)">{{ order.buyer_name }}</div>{% endif %}
+                    </td>
+                    <td style="color:var(--text-secondary)">{{ order.portfolio_id }}</td>
+                    <td style="font-weight:600">{{ currency }} {{ order.amount }}</td>
+                    <td><span style="text-transform:capitalize;font-size:12px;padding:2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-secondary)">{{ order.provider }}</span></td>
+                    <td style="font-size:11px;color:var(--text-tertiary);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ order.provider_order_id }}">{{ order.provider_order_id }}</td>
+                    <td>
+                        {% if order.status == "completed" %}
+                        <span style="color:var(--success);font-size:12px;font-weight:600">Completed</span>
+                        {% elif order.status == "pending" %}
+                        <span style="color:var(--warning);font-size:12px;font-weight:600">Pending</span>
+                        {% elif order.status == "refunded" %}
+                        <span style="color:var(--danger);font-size:12px;font-weight:600">Refunded</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary);font-size:12px">{{ order.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap">{{ order.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:16px">
+        {% if current_page > 1 %}
+        <a href="/{{ admin_slug }}/sales/orders?page={{ current_page - 1 }}{% if filter_status %}&status={{ filter_status }}{% endif %}" class="btn btn-sm">← Prev</a>
+        {% endif %}
+        <span style="padding:6px 12px;font-size:13px;color:var(--text-secondary)">Page {{ current_page }} of {{ total_pages }}</span>
+        {% if current_page < total_pages %}
+        <a href="/{{ admin_slug }}/sales/orders?page={{ current_page + 1 }}{% if filter_status %}&status={{ filter_status }}{% endif %}" class="btn btn-sm">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock content %}
