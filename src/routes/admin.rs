@@ -1583,16 +1583,24 @@ pub fn firewall_unban(
 
 // ── Users Management ─────────────────────────────────────────
 
-#[get("/users")]
+#[get("/users?<role>&<page>")]
 pub fn users_list(
     _admin: AdminUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
+    role: Option<String>,
+    page: Option<i64>,
 ) -> Template {
     use crate::models::user::User;
 
+    let per_page = 20i64;
+    let current_page = page.unwrap_or(1).max(1);
+    let offset = (current_page - 1) * per_page;
+
     let settings = Setting::all(pool);
-    let users = User::list_all(pool);
+    let users = User::list_paginated(pool, role.as_deref(), per_page, offset);
+    let total = User::count_filtered(pool, role.as_deref());
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as i64;
     let users_json: Vec<serde_json::Value> = users.iter().map(|u| u.safe_json()).collect();
 
     let context = json!({
@@ -1601,6 +1609,15 @@ pub fn users_list(
         "settings": settings,
         "users": users_json,
         "current_user": _admin.user.safe_json(),
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "total": total,
+        "role_filter": role,
+        "count_all": User::count(pool),
+        "count_admin": User::count_by_role(pool, "admin"),
+        "count_editor": User::count_by_role(pool, "editor"),
+        "count_author": User::count_by_role(pool, "author"),
+        "count_subscriber": User::count_by_role(pool, "subscriber"),
     });
     Template::render("admin/users", &context)
 }

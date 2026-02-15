@@ -6,6 +6,14 @@
     <button type="button" class="btn btn-primary" onclick="showCreateModal()" style="font-size:13px;padding:6px 16px">+ New User</button>
 </div>
 
+<div class="status-tabs">
+    <a href="/{{ admin_slug }}/users" class="tab {% if not role_filter %}active{% endif %}">All ({{ count_all }})</a>
+    <a href="/{{ admin_slug }}/users?role=admin" class="tab {% if role_filter == 'admin' %}active{% endif %}">Admins ({{ count_admin }})</a>
+    <a href="/{{ admin_slug }}/users?role=editor" class="tab {% if role_filter == 'editor' %}active{% endif %}">Editors ({{ count_editor }})</a>
+    <a href="/{{ admin_slug }}/users?role=author" class="tab {% if role_filter == 'author' %}active{% endif %}">Authors ({{ count_author }})</a>
+    <a href="/{{ admin_slug }}/users?role=subscriber" class="tab {% if role_filter == 'subscriber' %}active{% endif %}">Subscribers ({{ count_subscriber }})</a>
+</div>
+
 <div class="form-card" style="overflow-x:auto">
     <table class="admin-table" style="width:100%;border-collapse:collapse">
         <thead>
@@ -79,6 +87,21 @@
         </tbody>
     </table>
 </div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if current_page > 1 %}
+    <a href="/{{ admin_slug }}/users?page={{ current_page - 1 }}{% if role_filter %}&role={{ role_filter }}{% endif %}">&laquo; Prev</a>
+    {% endif %}
+    {% for p in range(end=total_pages) %}
+    {% set page_num = p + 1 %}
+    <a href="/{{ admin_slug }}/users?page={{ page_num }}{% if role_filter %}&role={{ role_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    {% endfor %}
+    {% if current_page < total_pages %}
+    <a href="/{{ admin_slug }}/users?page={{ current_page + 1 }}{% if role_filter %}&role={{ role_filter }}{% endif %}">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
 
 <!-- Create / Edit Modal -->
 <div id="user-modal-overlay" class="modal-overlay" style="display:none" onclick="closeUserModal()"></div>

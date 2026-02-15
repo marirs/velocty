@@ -82,6 +82,46 @@ impl User {
             .unwrap_or_default()
     }
 
+    pub fn list_paginated(pool: &DbPool, role: Option<&str>, limit: i64, offset: i64) -> Vec<User> {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
+        let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match role {
+            Some(r) => (
+                format!("SELECT {} FROM users WHERE role = ?1 ORDER BY id ASC LIMIT ?2 OFFSET ?3", Self::SELECT_COLS),
+                vec![Box::new(r.to_string()), Box::new(limit), Box::new(offset)],
+            ),
+            None => (
+                format!("SELECT {} FROM users ORDER BY id ASC LIMIT ?1 OFFSET ?2", Self::SELECT_COLS),
+                vec![Box::new(limit), Box::new(offset)],
+            ),
+        };
+        let mut stmt = match conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return vec![],
+        };
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        stmt.query_map(params_refs.as_slice(), Self::from_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn count_filtered(pool: &DbPool, role: Option<&str>) -> i64 {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        match role {
+            Some(r) => conn.query_row(
+                "SELECT COUNT(*) FROM users WHERE role = ?1",
+                params![r],
+                |row| row.get(0),
+            ).unwrap_or(0),
+            None => conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0)).unwrap_or(0),
+        }
+    }
+
     pub fn count(pool: &DbPool) -> i64 {
         let conn = match pool.get() {
             Ok(c) => c,
