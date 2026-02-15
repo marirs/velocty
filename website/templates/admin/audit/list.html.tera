@@ -1,0 +1,114 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Audit Log</h2>
+    <span class="text-muted" style="font-size:13px">{{ total }} entr{% if total == 1 %}y{% else %}ies{% endif %}</span>
+</div>
+
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <select id="filter-action" onchange="applyFilters()" style="width:auto;font-size:12px;padding:6px 10px">
+        <option value="">All Actions</option>
+        {% for a in actions %}
+        <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+    </select>
+    <select id="filter-entity" onchange="applyFilters()" style="width:auto;font-size:12px;padding:6px 10px">
+        <option value="">All Entities</option>
+        {% for e in entity_types %}
+        <option value="{{ e }}" {% if entity_filter == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+    </select>
+    {% if action_filter or entity_filter or user_filter %}
+    <a href="/{{ admin_slug }}/audit-log" class="btn btn-sm btn-secondary" style="font-size:11px">Clear Filters</a>
+    {% endif %}
+</div>
+
+<div class="table-wrapper">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width:140px">Date</th>
+                <th style="width:120px">User</th>
+                <th style="width:110px">Action</th>
+                <th style="width:90px">Entity</th>
+                <th>Details</th>
+                <th style="width:110px">IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td class="text-muted" style="font-size:12px;white-space:nowrap">{{ entry.created_at }}</td>
+                <td>
+                    {% if entry.user_name %}
+                    <a href="/{{ admin_slug }}/audit-log?user_id={{ entry.user_id }}" style="font-size:12px">{{ entry.user_name }}</a>
+                    {% else %}
+                    <span class="text-muted" style="font-size:12px">System</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-{{ entry.action }}">{{ entry.action }}</span>
+                </td>
+                <td>
+                    {% if entry.entity_type %}
+                    <span style="font-size:12px;color:var(--text-secondary)">{{ entry.entity_type }}</span>
+                    {% endif %}
+                </td>
+                <td style="font-size:12px">
+                    {% if entry.entity_title %}<strong>{{ entry.entity_title }}</strong>{% endif %}
+                    {% if entry.details %}<span class="text-muted"> — {{ entry.details }}</span>{% endif %}
+                </td>
+                <td class="text-muted" style="font-size:11px;font-family:monospace">{{ entry.ip_address | default(value="") }}</td>
+            </tr>
+            {% endfor %}
+            {% if entries | length == 0 %}
+            <tr><td colspan="6" class="empty-state">No audit log entries{% if action_filter or entity_filter %} matching filters{% endif %}.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if current_page > 1 %}
+    <a href="/{{ admin_slug }}/audit-log?page={{ current_page - 1 }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_filter %}&entity={{ entity_filter }}{% endif %}{% if user_filter %}&user_id={{ user_filter }}{% endif %}">&laquo; Prev</a>
+    {% endif %}
+    {% for p in range(end=total_pages) %}
+    {% set page_num = p + 1 %}
+    <a href="/{{ admin_slug }}/audit-log?page={{ page_num }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_filter %}&entity={{ entity_filter }}{% endif %}{% if user_filter %}&user_id={{ user_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    {% endfor %}
+    {% if current_page < total_pages %}
+    <a href="/{{ admin_slug }}/audit-log?page={{ current_page + 1 }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_filter %}&entity={{ entity_filter }}{% endif %}{% if user_filter %}&user_id={{ user_filter }}{% endif %}">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<script>
+function applyFilters() {
+    var action = document.getElementById('filter-action').value;
+    var entity = document.getElementById('filter-entity').value;
+    var params = [];
+    if (action) params.push('action=' + encodeURIComponent(action));
+    if (entity) params.push('entity=' + encodeURIComponent(entity));
+    window.location.href = '/{{ admin_slug }}/audit-log' + (params.length ? '?' + params.join('&') : '');
+}
+</script>
+
+<style>
+.badge-create { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-update { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.badge-delete { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge-login { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+.badge-login_failed { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge-logout { background: rgba(107,114,128,0.15); color: var(--text-tertiary); }
+.badge-publish { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-schedule { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+.badge-settings_change { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-lock, .badge-unlock { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-ban, .badge-unban { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge-import { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.badge-activate { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-mfa_enable, .badge-mfa_disable { background: rgba(245,158,11,0.15); color: var(--warning); }
+</style>
+{% endblock content %}

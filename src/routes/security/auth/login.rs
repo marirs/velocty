@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use crate::security::{self, auth, mfa};
 use crate::db::DbPool;
+use crate::models::audit::AuditEntry;
 use crate::models::firewall::{FwBan, FwEvent};
 use crate::models::settings::Setting;
 use crate::models::user::User;
@@ -127,6 +128,7 @@ pub fn login_submit(
                 let _ = FwBan::create_with_duration(pool, ip, "failed_login", Some("Too many failed login attempts"), &dur, None, None);
             }
         }
+        AuditEntry::log(pool, Some(user.id), Some(&user.display_name), "login_failed", Some("user"), Some(user.id), Some(&user.email), Some("Wrong password"), Some(ip));
         return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));
     }
 
@@ -143,6 +145,7 @@ pub fn login_submit(
     match auth::create_session(pool, user.id, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
+            AuditEntry::log(pool, Some(user.id), Some(&user.display_name), "login", Some("user"), Some(user.id), Some(&user.email), None, Some(ip));
             Ok(Redirect::to(format!("/{}", admin_slug.0)))
         }
         Err(_) => Err(make_err("Session creation failed", &theme, pool, &admin_slug.0)),

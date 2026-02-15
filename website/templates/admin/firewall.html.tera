@@ -7,6 +7,7 @@
     <button type="button" class="tab active" data-fw-tab="tab-fw-overview">Overview</button>
     <button type="button" class="tab" data-fw-tab="tab-fw-events">Event Log</button>
     <button type="button" class="tab" data-fw-tab="tab-fw-bans">Ban List</button>
+    <button type="button" class="tab" data-fw-tab="tab-fw-audit">Audit Log</button>
 </div>
 
 <!-- Overview -->
@@ -169,13 +170,79 @@
         {% endif %}
     </div>
 </div>
+<!-- Audit Log -->
+<div id="tab-fw-audit" style="display:none">
+    <div class="form-card" style="margin-bottom:16px">
+        <form method="get" action="/{{ admin_slug }}/firewall" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <div>
+                <label style="font-size:12px;display:block;margin-bottom:4px">Action</label>
+                <select name="audit_action" style="width:150px">
+                    <option value="">All</option>
+                    {% for a in audit_actions %}<option value="{{ a }}" {% if audit_action_filter == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;display:block;margin-bottom:4px">Entity</label>
+                <select name="audit_entity" style="width:150px">
+                    <option value="">All</option>
+                    {% for e in audit_entity_types %}<option value="{{ e }}" {% if audit_entity_filter == e %}selected{% endif %}>{{ e }}</option>{% endfor %}
+                </select>
+            </div>
+            <input type="hidden" name="audit_page" value="1">
+            <button type="submit" class="btn btn-sm btn-primary" onclick="this.form.action+='#tab-fw-audit'">Filter</button>
+            <a href="/{{ admin_slug }}/firewall#tab-fw-audit" class="btn btn-sm">Clear</a>
+        </form>
+    </div>
+
+    <div class="form-card">
+        {% if audit_entries | length > 0 %}
+        <div style="overflow-x:auto">
+        <table class="data-table" style="width:100%;font-size:13px">
+            <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Target</th><th>Details</th><th>IP</th></tr></thead>
+            <tbody>
+            {% for e in audit_entries %}
+            <tr>
+                <td style="white-space:nowrap">{{ e.created_at }}</td>
+                <td>{{ e.user_name | default(value="System") }}</td>
+                <td><span class="badge {% if e.action == 'delete' %}badge-danger{% elif e.action == 'create' %}badge-success{% elif e.action == 'login' %}badge-info{% elif e.action == 'login_failed' %}badge-danger{% elif e.action == 'settings_change' %}badge-warning{% endif %}">{{ e.action }}</span></td>
+                <td>{{ e.entity_type | default(value="-") }}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ e.entity_title | default(value='') }}">{{ e.entity_title | default(value="-") }}</td>
+                <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ e.details | default(value='') }}">{{ e.details | default(value="-") }}</td>
+                <td><code>{{ e.ip_address | default(value="-") }}</code></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No audit log entries yet.</p>
+        {% endif %}
+
+        {% if audit_total_pages > 1 %}
+        <div class="pagination" style="margin-top:16px">
+            {% if audit_current_page > 1 %}
+            <a href="/{{ admin_slug }}/firewall?audit_page={{ audit_current_page - 1 }}{% if audit_action_filter %}&audit_action={{ audit_action_filter }}{% endif %}{% if audit_entity_filter %}&audit_entity={{ audit_entity_filter }}{% endif %}{% if audit_user_filter %}&audit_user={{ audit_user_filter }}{% endif %}#tab-fw-audit">&laquo; Prev</a>
+            {% endif %}
+            {% for p in range(end=audit_total_pages) %}
+            {% set page_num = p + 1 %}
+            {% if page_num >= audit_current_page - 2 and page_num <= audit_current_page + 2 %}
+            <a href="/{{ admin_slug }}/firewall?audit_page={{ page_num }}{% if audit_action_filter %}&audit_action={{ audit_action_filter }}{% endif %}{% if audit_entity_filter %}&audit_entity={{ audit_entity_filter }}{% endif %}{% if audit_user_filter %}&audit_user={{ audit_user_filter }}{% endif %}#tab-fw-audit" class="{% if page_num == audit_current_page %}active{% endif %}">{{ page_num }}</a>
+            {% endif %}
+            {% endfor %}
+            {% if audit_current_page < audit_total_pages %}
+            <a href="/{{ admin_slug }}/firewall?audit_page={{ audit_current_page + 1 }}{% if audit_action_filter %}&audit_action={{ audit_action_filter }}{% endif %}{% if audit_entity_filter %}&audit_entity={{ audit_entity_filter }}{% endif %}{% if audit_user_filter %}&audit_user={{ audit_user_filter }}{% endif %}#tab-fw-audit">Next &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock content %}
 
 {% block scripts %}
 <script>
 (function() {
     var tabs = document.querySelectorAll('[data-fw-tab]');
-    var panels = ['tab-fw-overview','tab-fw-events','tab-fw-bans'];
+    var panels = ['tab-fw-overview','tab-fw-events','tab-fw-bans','tab-fw-audit'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });

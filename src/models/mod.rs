@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod audit;
 pub mod category;
 pub mod comment;
 pub mod design;

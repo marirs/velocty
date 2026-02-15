@@ -296,6 +296,24 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         CREATE INDEX IF NOT EXISTS idx_fw_events_ip ON fw_events(ip);
         CREATE INDEX IF NOT EXISTS idx_fw_events_type ON fw_events(event_type);
         CREATE INDEX IF NOT EXISTS idx_fw_events_created ON fw_events(created_at);
+
+        -- Audit log
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            user_name TEXT,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id INTEGER,
+            entity_title TEXT,
+            details TEXT,
+            ip_address TEXT,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+        CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type);
+        CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
         ",
     )?;
 
@@ -713,6 +731,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("task_session_max_age_days", "30"),
         ("task_magic_link_cleanup_interval", "60"),
         ("task_scheduled_publish_interval", "1"),
+        ("task_audit_log_cleanup_interval", "1440"),
+        ("task_audit_log_max_age_days", "90"),
         ("task_analytics_cleanup_interval", "1440"),
         ("task_analytics_max_age_days", "365"),
     ];

@@ -17,6 +17,7 @@ use crate::AdminSlug;
 fn admin_base(slug: &AdminSlug) -> String {
     format!("/{}", slug.0)
 }
+use crate::models::audit::AuditEntry;
 use crate::models::category::{Category, CategoryForm};
 use crate::models::comment::Comment;
 use crate::models::design::Design;
@@ -133,7 +134,9 @@ pub fn posts_edit(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSl
 
 #[post("/posts/<id>/delete")]
 pub fn posts_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+    let title = Post::find_by_id(pool, id).map(|p| p.title).unwrap_or_default();
     let _ = Post::delete(pool, id);
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("post"), Some(id), Some(&title), None, None);
     Redirect::to(format!("{}/posts", admin_base(slug)))
 }
 
@@ -221,7 +224,9 @@ pub fn portfolio_edit(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<Adm
 
 #[post("/portfolio/<id>/delete")]
 pub fn portfolio_delete(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+    let title = PortfolioItem::find_by_id(pool, id).map(|p| p.title).unwrap_or_default();
     let _ = PortfolioItem::delete(pool, id);
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("portfolio"), Some(id), Some(&title), None, None);
     Redirect::to(format!("{}/portfolio", admin_base(slug)))
 }
 
@@ -379,7 +384,9 @@ pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminS
 
 #[post("/designer/<id>/activate")]
 pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+    let name = Design::find_by_id(pool, id).map(|d| d.name).unwrap_or_default();
     let _ = Design::activate(pool, id);
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "activate", Some("design"), Some(id), Some(&name), None, None);
     Redirect::to(format!("{}/designer", admin_base(slug)))
 }
 
@@ -600,12 +607,14 @@ pub fn media_library(
 #[post("/media/<filename>/delete")]
 pub fn media_delete(
     _admin: EditorUser,
+    pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     filename: &str,
 ) -> Redirect {
     let path = std::path::Path::new("website/site/uploads").join(filename);
     if path.is_file() {
         let _ = std::fs::remove_file(&path);
+        AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("media"), None, Some(filename), None, None);
     }
     Redirect::to(format!("{}/media", admin_base(slug)))
 }
@@ -707,6 +716,7 @@ pub async fn posts_create(
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "post", cat_ids);
             }
+            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("post"), Some(id), Some(&form.title), Some(&form.status), None);
             Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id))
         }
         Err(_) => Redirect::to(format!("{}/posts", admin_base(slug))),
@@ -752,6 +762,7 @@ pub async fn posts_update(
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "post", cat_ids);
     }
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "update", Some("post"), Some(id), Some(&form.title), Some(&form.status), None);
     Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id))
 }
 
@@ -816,6 +827,7 @@ pub async fn portfolio_create(
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
             }
+            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("portfolio"), Some(id), Some(&form.title), Some(&form.status), None);
             Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id))
         }
         Err(_) => Redirect::to(format!("{}/portfolio", admin_base(slug))),
@@ -868,6 +880,7 @@ pub async fn portfolio_update(
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
     }
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "update", Some("portfolio"), Some(id), Some(&form.title), Some(&form.status), None);
     Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id))
 }
 
@@ -948,7 +961,9 @@ pub fn category_update(
 
 #[post("/categories/<id>/delete")]
 pub fn category_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+    let name = Category::find_by_id(pool, id).map(|c| c.name).unwrap_or_default();
     let _ = Category::delete(pool, id);
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("category"), Some(id), Some(&name), None, None);
     Redirect::to(format!("{}/categories", admin_base(slug)))
 }
 
@@ -1229,6 +1244,8 @@ pub fn settings_save(
         .filter(|t| !t.is_empty())
         .map(|t| format!("#{}", t))
         .unwrap_or_default();
+
+    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "settings_change", Some("settings"), None, Some(section), None, None);
 
     Ok(Flash::success(
         Redirect::to(format!("{}/settings/{}{}", admin_base(slug), section, tab_fragment)),
@@ -1705,13 +1722,17 @@ pub fn sales_orders(
 
 // ── Firewall Dashboard ─────────────────────────────────
 
-#[get("/firewall?<ev_page>&<ban_page>")]
+#[get("/firewall?<ev_page>&<ban_page>&<audit_page>&<audit_action>&<audit_entity>&<audit_user>")]
 pub fn firewall_dashboard(
     _admin: AdminUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     ev_page: Option<i64>,
     ban_page: Option<i64>,
+    audit_page: Option<i64>,
+    audit_action: Option<String>,
+    audit_entity: Option<String>,
+    audit_user: Option<i64>,
 ) -> Template {
     use crate::models::firewall::{FwBan, FwEvent};
 
@@ -1728,6 +1749,16 @@ pub fn firewall_dashboard(
     let ban_offset = (ban_current - 1) * per_page;
     let ban_total = FwBan::active_count(pool);
     let ban_total_pages = ((ban_total as f64) / (per_page as f64)).ceil() as i64;
+
+    // Audit log pagination
+    let audit_per_page: i64 = 50;
+    let audit_current = audit_page.unwrap_or(1).max(1);
+    let audit_offset = (audit_current - 1) * audit_per_page;
+    let audit_entries = AuditEntry::list(pool, audit_action.as_deref(), audit_entity.as_deref(), audit_user, audit_per_page, audit_offset);
+    let audit_total = AuditEntry::count(pool, audit_action.as_deref(), audit_entity.as_deref(), audit_user);
+    let audit_total_pages = (audit_total as f64 / audit_per_page as f64).ceil() as i64;
+    let audit_actions = AuditEntry::distinct_actions(pool);
+    let audit_entity_types = AuditEntry::distinct_entity_types(pool);
 
     let settings = Setting::all(pool);
     let events_24h = FwEvent::count_since_hours(pool, 24);
@@ -1754,6 +1785,15 @@ pub fn firewall_dashboard(
         "ban_current_page": ban_current,
         "ban_total_pages": ban_total_pages,
         "ban_total": ban_total,
+        "audit_entries": audit_entries,
+        "audit_total": audit_total,
+        "audit_current_page": audit_current,
+        "audit_total_pages": audit_total_pages,
+        "audit_action_filter": audit_action,
+        "audit_entity_filter": audit_entity,
+        "audit_user_filter": audit_user,
+        "audit_actions": audit_actions,
+        "audit_entity_types": audit_entity_types,
     });
     Template::render("admin/firewall", &context)
 }
@@ -1883,7 +1923,10 @@ pub fn user_create(
     };
 
     match User::create(pool, email, &hash, display_name, role) {
-        Ok(id) => Json(json!({"success": true, "id": id})),
+        Ok(id) => {
+            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("user"), Some(id), Some(display_name), Some(role), None);
+            Json(json!({"success": true, "id": id}))
+        }
         Err(e) => Json(json!({"success": false, "error": e})),
     }
 }
@@ -2027,8 +2070,12 @@ pub fn user_lock(
             return Json(json!({"success": false, "error": "Cannot lock the last admin"}));
         }
     }
+    let target_name = User::get_by_id(pool, form.id).map(|u| u.display_name).unwrap_or_default();
     match User::lock(pool, form.id) {
-        Ok(_) => Json(json!({"success": true})),
+        Ok(_) => {
+            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "lock", Some("user"), Some(form.id), Some(&target_name), None, None);
+            Json(json!({"success": true}))
+        }
         Err(e) => Json(json!({"success": false, "error": e})),
     }
 }
@@ -2041,8 +2088,12 @@ pub fn user_unlock(
 ) -> Json<Value> {
     use crate::models::user::User;
 
+    let target_name = User::get_by_id(pool, form.id).map(|u| u.display_name).unwrap_or_default();
     match User::unlock(pool, form.id) {
-        Ok(_) => Json(json!({"success": true})),
+        Ok(_) => {
+            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "unlock", Some("user"), Some(form.id), Some(&target_name), None, None);
+            Json(json!({"success": true}))
+        }
         Err(e) => Json(json!({"success": false, "error": e})),
     }
 }
@@ -2100,8 +2151,12 @@ pub fn user_delete(
             return Json(json!({"success": false, "error": "Cannot delete the last admin"}));
         }
     }
+    let target_name = User::get_by_id(pool, form.id).map(|u| u.display_name).unwrap_or_default();
     match User::delete(pool, form.id) {
-        Ok(_) => Json(json!({"success": true})),
+        Ok(_) => {
+            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("user"), Some(form.id), Some(&target_name), None, None);
+            Json(json!({"success": true}))
+        }
         Err(e) => Json(json!({"success": false, "error": e})),
     }
 }

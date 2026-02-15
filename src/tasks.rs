@@ -95,6 +95,24 @@ impl Fairing for BackgroundTasks {
             }
         });
 
+        // Audit log cleanup task
+        let p = Arc::clone(&pool);
+        tokio::spawn(async move {
+            loop {
+                let interval = get_interval(&p, "task_audit_log_cleanup_interval", 1440);
+                tokio::time::sleep(Duration::from_secs(interval * 60)).await;
+                let max_age = get_setting_i64(&p, "task_audit_log_max_age_days", 90);
+                match crate::models::audit::AuditEntry::cleanup(&p, max_age) {
+                    Ok(count) => {
+                        if count > 0 {
+                            log::info!("[task] Cleaned up {} old audit log entries", count);
+                        }
+                    }
+                    Err(e) => log::error!("[task] Audit log cleanup failed: {}", e),
+                }
+            }
+        });
+
         log::info!("[task] Background tasks started");
     }
 }

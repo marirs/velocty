@@ -78,6 +78,21 @@
         </div>
     </div>
 
+    <div class="form-card">
+        <h3>Audit Log Cleanup</h3>
+        <p class="text-muted" style="font-size:13px;margin-bottom:12px">Removes old audit log entries to keep the database lean.</p>
+        <div class="form-row" style="gap:12px;align-items:flex-end">
+            <div class="form-group" style="flex:1">
+                <label for="task_audit_log_cleanup_interval">Run every (minutes)</label>
+                <input type="number" id="task_audit_log_cleanup_interval" name="task_audit_log_cleanup_interval" value="{{ settings.task_audit_log_cleanup_interval | default(value='1440') }}" min="1" max="10080">
+            </div>
+            <div class="form-group" style="flex:1">
+                <label for="task_audit_log_max_age_days">Keep logs for (days)</label>
+                <input type="number" id="task_audit_log_max_age_days" name="task_audit_log_max_age_days" value="{{ settings.task_audit_log_max_age_days | default(value='90') }}" min="1" max="3650">
+            </div>
+        </div>
+    </div>
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>
