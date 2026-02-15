@@ -1,0 +1,167 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header">
+    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Media Library</h2>
+    <span class="text-muted" style="font-size:13px">{{ total }} file{% if total != 1 %}s{% endif %}</span>
+</div>
+
+<div class="status-tabs">
+    <a href="/{{ admin_slug }}/media" class="tab {% if not filter %}active{% endif %}">All ({{ count_all }})</a>
+    {% if count_images > 0 %}<a href="/{{ admin_slug }}/media?filter=image" class="tab {% if filter == 'image' %}active{% endif %}">Images ({{ count_images }})</a>{% endif %}
+    {% if count_videos > 0 %}<a href="/{{ admin_slug }}/media?filter=video" class="tab {% if filter == 'video' %}active{% endif %}">Videos ({{ count_videos }})</a>{% endif %}
+    {% if count_audio > 0 %}<a href="/{{ admin_slug }}/media?filter=audio" class="tab {% if filter == 'audio' %}active{% endif %}">Audio ({{ count_audio }})</a>{% endif %}
+    {% if count_documents > 0 %}<a href="/{{ admin_slug }}/media?filter=document" class="tab {% if filter == 'document' %}active{% endif %}">Documents ({{ count_documents }})</a>{% endif %}
+    {% if count_other > 0 %}<a href="/{{ admin_slug }}/media?filter=other" class="tab {% if filter == 'other' %}active{% endif %}">Other ({{ count_other }})</a>{% endif %}
+</div>
+
+{% if files | length == 0 %}
+<div class="form-card" style="text-align:center;padding:60px 20px">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5" style="margin-bottom:12px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    <p class="text-muted">{% if filter %}No {{ filter }} files found.{% else %}No uploaded files yet.{% endif %}</p>
+    {% if not filter %}<p class="text-muted" style="font-size:12px">Files uploaded through the post/portfolio editors will appear here.</p>{% endif %}
+</div>
+{% else %}
+<div class="media-grid">
+    {% for file in files %}
+    <div class="media-card" data-name="{{ file.name }}">
+        {% if file.is_image %}
+        <div class="media-thumb" style="background-image:url('/uploads/{{ file.path }}');" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}')"></div>
+        {% else %}
+        <div class="media-thumb media-file-icon" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}')">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="media-ext">.{{ file.ext }}</span>
+        </div>
+        {% endif %}
+        <div class="media-info">
+            <span class="media-name" title="{{ file.name }}">{{ file.name }}</span>
+            <span class="media-meta">{{ file.size_human }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if current_page > 1 %}
+    <a href="/{{ admin_slug }}/media?page={{ current_page - 1 }}{% if filter %}&filter={{ filter }}{% endif %}">&laquo; Prev</a>
+    {% endif %}
+    {% for p in range(end=total_pages) %}
+    {% set page_num = p + 1 %}
+    <a href="/{{ admin_slug }}/media?page={{ page_num }}{% if filter %}&filter={{ filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    {% endfor %}
+    {% if current_page < total_pages %}
+    <a href="/{{ admin_slug }}/media?page={{ current_page + 1 }}{% if filter %}&filter={{ filter }}{% endif %}">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<div id="media-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center" onclick="closePreview(event)">
+    <div id="media-preview-modal" style="background:var(--bg-card);border-radius:12px;max-width:720px;width:90%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+        <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-subtle)">
+            <strong id="preview-name" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></strong>
+            <button type="button" onclick="closePreview()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:20px;padding:0 4px">&times;</button>
+        </div>
+        <div id="preview-image-wrap" style="padding:16px;text-align:center">
+            <img id="preview-img" src="" alt="" style="max-width:100%;max-height:60vh;border-radius:6px">
+        </div>
+        <div style="padding:0 16px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+            <div style="font-size:12px;color:var(--text-secondary)">
+                <span id="preview-size"></span> &middot; <span id="preview-date"></span>
+            </div>
+            <div style="display:flex;gap:6px">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="copyUrl()">Copy URL</button>
+                <a id="preview-download" href="" download class="btn btn-sm btn-secondary">Download</a>
+                <form id="preview-delete-form" method="post" action="" class="inline" onsubmit="return confirm('Delete this file permanently?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var overlay = document.getElementById('media-preview-overlay');
+function openPreview(path, name, size, date) {
+    document.getElementById('preview-name').textContent = name;
+    document.getElementById('preview-img').src = '/uploads/' + path;
+    document.getElementById('preview-size').textContent = size;
+    document.getElementById('preview-date').textContent = date;
+    document.getElementById('preview-download').href = '/uploads/' + path;
+    document.getElementById('preview-delete-form').action = '/{{ admin_slug }}/media/' + encodeURIComponent(path) + '/delete';
+    overlay.style.display = 'flex';
+}
+function closePreview(e) {
+    if (!e || e.target === overlay) overlay.style.display = 'none';
+}
+function copyUrl() {
+    var url = window.location.origin + document.getElementById('preview-download').getAttribute('href');
+    navigator.clipboard.writeText(url).then(function() {
+        var btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy URL'; }, 1500);
+    });
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') overlay.style.display = 'none';
+});
+</script>
+
+<style>
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+.media-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+.media-card:hover {
+    border-color: var(--accent);
+}
+.media-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-input);
+    cursor: pointer;
+}
+.media-file-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.media-ext {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.media-info {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.media-name {
+    font-size: 11px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.media-meta {
+    font-size: 10px;
+    color: var(--text-tertiary);
+}
+</style>
+{% endblock content %}

@@ -712,6 +712,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("task_session_cleanup_interval", "30"),
         ("task_session_max_age_days", "30"),
         ("task_magic_link_cleanup_interval", "60"),
+        ("task_scheduled_publish_interval", "1"),
         ("task_analytics_cleanup_interval", "1440"),
         ("task_analytics_max_age_days", "365"),
     ];

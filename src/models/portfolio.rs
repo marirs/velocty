@@ -245,6 +245,16 @@ impl PortfolioItem {
         Ok(())
     }
 
+    pub fn update_status(pool: &DbPool, id: i64, status: &str) -> Result<(), String> {
+        let conn = pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE portfolio SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            params![status, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn delete(pool: &DbPool, id: i64) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM content_categories WHERE content_id = ?1 AND content_type = 'portfolio'", params![id])

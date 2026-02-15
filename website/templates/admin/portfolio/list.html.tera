@@ -10,6 +10,7 @@
     <a href="/{{ admin_slug }}/portfolio" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
     <a href="/{{ admin_slug }}/portfolio?status=published" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
     <a href="/{{ admin_slug }}/portfolio?status=draft" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
+    <a href="/{{ admin_slug }}/portfolio?status=scheduled" class="tab {% if status_filter == 'scheduled' %}active{% endif %}">Scheduled ({{ count_scheduled }})</a>
 </div>
 
 <div class="table-wrapper">

@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════ */
 
 :root {
+    color-scheme: dark;
     --bg-page: #262830;
     --bg-card: #2A2A31;
     --bg-card-hover: #2A282F;
@@ -27,8 +28,13 @@
     --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+[data-theme="dark"] {
+    color-scheme: dark;
+}
+
 /* ── Light Theme ───────────────────────────────────── */
 [data-theme="light"] {
+    color-scheme: light;
     --bg-page: #F3F3F3;
     --bg-card: #FFFFFF;
     --bg-card-hover: #F5F5F5;
@@ -675,6 +681,9 @@ input[type="password"],
 input[type="url"],
 input[type="number"],
 input[type="search"],
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"],
 textarea,
 select {
     width: 100%;
@@ -697,6 +706,19 @@ input:focus, textarea:focus, select:focus {
 
 input::placeholder, textarea::placeholder {
     color: var(--text-tertiary);
+}
+
+/* Datetime-local picker theming */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+}
+[data-theme="light"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: none;
 }
 
 /* Number input spinner arrows */
@@ -1049,6 +1071,7 @@ input[type="file"]::file-selector-button:hover {
 
 .badge-published, .badge-approved { background: rgba(34,197,94,0.15); color: var(--success); }
 .badge-draft { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-scheduled { background: rgba(139,92,246,0.15); color: #8b5cf6; }
 .badge-archived { background: rgba(107,114,128,0.15); color: var(--text-tertiary); }
 .badge-pending { background: rgba(59,130,246,0.15); color: var(--info); }
 .badge-spam { background: rgba(239,68,68,0.15); color: var(--danger); }

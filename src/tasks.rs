@@ -60,6 +60,23 @@ impl Fairing for BackgroundTasks {
             }
         });
 
+        // Scheduled publish task
+        let p = Arc::clone(&pool);
+        tokio::spawn(async move {
+            loop {
+                let interval = get_interval(&p, "task_scheduled_publish_interval", 1);
+                tokio::time::sleep(Duration::from_secs(interval * 60)).await;
+                match publish_scheduled(&p) {
+                    Ok(count) => {
+                        if count > 0 {
+                            log::info!("[task] Published {} scheduled items", count);
+                        }
+                    }
+                    Err(e) => log::error!("[task] Scheduled publish failed: {}", e),
+                }
+            }
+        });
+
         // Analytics cleanup task
         let p = Arc::clone(&pool);
         tokio::spawn(async move {
@@ -115,6 +132,23 @@ fn cleanup_magic_links(pool: &DbPool) -> Result<usize, String> {
         )
         .map_err(|e| e.to_string())?;
     Ok(deleted)
+}
+
+fn publish_scheduled(pool: &DbPool) -> Result<usize, String> {
+    let conn = pool.get().map_err(|e| e.to_string())?;
+    let posts = conn
+        .execute(
+            "UPDATE posts SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE status = 'scheduled' AND published_at <= datetime('now')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    let portfolio = conn
+        .execute(
+            "UPDATE portfolio SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE status = 'scheduled' AND published_at <= datetime('now')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(posts + portfolio)
 }
 
 fn cleanup_analytics(pool: &DbPool, max_age_days: i64) -> Result<usize, String> {

@@ -141,6 +141,7 @@
         {t:'Geo Blocking',s:'security',g:'Security › Firewall',k:'geo blocking country block allow',h:'#tab-sec-firewall'},
         // Tasks
         {t:'Session Cleanup',s:'tasks',g:'Tasks',k:'session cleanup background task interval'},
+        {t:'Scheduled Publish',s:'tasks',g:'Tasks',k:'scheduled publish auto post portfolio background task'},
         {t:'Magic Link Cleanup',s:'tasks',g:'Tasks',k:'magic link token cleanup background task interval'},
         {t:'Analytics Cleanup',s:'tasks',g:'Tasks',k:'analytics page views cleanup background task interval retention'},
     ];

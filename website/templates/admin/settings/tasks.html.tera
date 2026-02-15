@@ -27,10 +27,7 @@
     <p class="text-muted" style="font-size:13px;margin-bottom:20px">Background tasks run automatically at the configured intervals. Changes take effect on next server restart.</p>
 
     <div class="form-card">
-        <h3>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Session Cleanup
-        </h3>
+        <h3>Session Cleanup</h3>
         <p class="text-muted" style="font-size:13px;margin-bottom:12px">Removes expired and old login sessions from the database.</p>
         <div class="form-row" style="gap:12px;align-items:flex-end">
             <div class="form-group" style="flex:1">
@@ -45,10 +42,18 @@
     </div>
 
     <div class="form-card">
-        <h3>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Magic Link Cleanup
-        </h3>
+        <h3>Scheduled Publish</h3>
+        <p class="text-muted" style="font-size:13px;margin-bottom:12px">Automatically publishes posts and portfolio items when their scheduled date arrives.</p>
+        <div class="form-row" style="gap:12px;align-items:flex-end">
+            <div class="form-group" style="flex:1">
+                <label for="task_scheduled_publish_interval">Check every (minutes)</label>
+                <input type="number" id="task_scheduled_publish_interval" name="task_scheduled_publish_interval" value="{{ settings.task_scheduled_publish_interval | default(value='1') }}" min="1" max="60">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Magic Link Cleanup</h3>
         <p class="text-muted" style="font-size:13px;margin-bottom:12px">Removes expired and used magic link tokens from the database.</p>
         <div class="form-row" style="gap:12px;align-items:flex-end">
             <div class="form-group" style="flex:1">
@@ -59,10 +64,7 @@
     </div>
 
     <div class="form-card">
-        <h3>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
-            Analytics Cleanup
-        </h3>
+        <h3>Analytics Cleanup</h3>
         <p class="text-muted" style="font-size:13px;margin-bottom:12px">Removes old page view records to keep the database lean.</p>
         <div class="form-row" style="gap:12px;align-items:flex-end">
             <div class="form-group" style="flex:1">
