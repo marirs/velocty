@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::ai::{self, prompts, AiRequest};
-use crate::auth::AdminUser;
+use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::category::Category;
 use crate::models::tag::Tag;

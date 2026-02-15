@@ -292,7 +292,7 @@ pub fn super_admin_exists(pool: &RegistryPool) -> bool {
 }
 
 pub fn create_super_admin(pool: &RegistryPool, email: &str, password: &str) -> Result<(), String> {
-    let hash = crate::auth::hash_password(password)?;
+    let hash = crate::security::auth::hash_password(password)?;
     let conn = pool.get().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO super_admins (email, password_hash) VALUES (?1, ?2)",
@@ -315,7 +315,7 @@ pub fn verify_super_admin(pool: &RegistryPool, email: &str, password: &str) -> b
         Ok(h) => h,
         Err(_) => return false,
     };
-    crate::auth::verify_password(password, &hash)
+    crate::security::auth::verify_password(password, &hash)
 }
 
 pub fn create_super_session(pool: &RegistryPool, admin_email: &str) -> Result<String, String> {

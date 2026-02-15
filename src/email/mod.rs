@@ -64,7 +64,7 @@ pub fn send_purchase_email(
 
     let subject = format!("Your purchase: {} — {}", item_title, site_name);
 
-    if let Err(e) = send_via_configured_provider(&settings, &from, buyer_email, &subject, &body) {
+    if let Err(e) = send_via_provider(&settings, &from, buyer_email, &subject, &body) {
         eprintln!("[email] Failed to send purchase email to {}: {}", buyer_email, e);
     } else {
         eprintln!("[email] Purchase email sent to {}", buyer_email);
@@ -101,7 +101,7 @@ fn get_from_email(settings: &HashMap<String, String>) -> Option<String> {
 }
 
 /// Send email via the first configured provider in the failover chain.
-fn send_via_configured_provider(
+pub fn send_via_provider(
     settings: &HashMap<String, String>,
     from: &str,
     to: &str,

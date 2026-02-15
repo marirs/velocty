@@ -2,7 +2,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde_json::Value;
 
-use crate::auth::AdminUser;
+use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
 use crate::models::portfolio::PortfolioItem;

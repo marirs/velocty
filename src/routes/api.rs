@@ -3,7 +3,7 @@ use rocket::State;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::auth;
+use crate::security::auth;
 use crate::db::DbPool;
 use crate::models::comment::{Comment, CommentForm};
 use crate::models::portfolio::PortfolioItem;

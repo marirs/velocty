@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::auth::AdminUser;
+use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::AdminSlug;
 
@@ -1233,8 +1233,8 @@ pub fn mfa_setup(
     let site_name = Setting::get_or(pool, "site_name", "Velocty");
     let admin_email = Setting::get_or(pool, "admin_email", "admin");
 
-    let secret = crate::auth::mfa_generate_secret();
-    let qr = match crate::auth::mfa_qr_data_uri(&secret, &site_name, &admin_email) {
+    let secret = crate::security::mfa::generate_secret();
+    let qr = match crate::security::mfa::qr_data_uri(&secret, &site_name, &admin_email) {
         Ok(uri) => uri,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
@@ -1261,12 +1261,12 @@ pub fn mfa_verify(
         return Json(json!({ "ok": false, "error": "No pending MFA setup. Start setup first." }));
     }
 
-    if !crate::auth::mfa_verify_code(&pending, &body.code) {
+    if !crate::security::mfa::verify_code(&pending, &body.code) {
         return Json(json!({ "ok": false, "error": "Invalid code. Please try again." }));
     }
 
     // Code verified — activate MFA
-    let recovery_codes = crate::auth::mfa_generate_recovery_codes();
+    let recovery_codes = crate::security::mfa::generate_recovery_codes();
     let codes_json = serde_json::to_string(&recovery_codes).unwrap_or_else(|_| "[]".to_string());
 
     let _ = Setting::set(pool, "mfa_secret", &pending);
@@ -1289,7 +1289,7 @@ pub fn mfa_disable(
     }
 
     // Verify current code before disabling
-    if !crate::auth::mfa_verify_code(&secret, &body.code) {
+    if !crate::security::mfa::verify_code(&secret, &body.code) {
         return Json(json!({ "ok": false, "error": "Invalid code. MFA was not disabled." }));
     }
 

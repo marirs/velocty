@@ -1,0 +1,136 @@
+use rocket::form::Form;
+use rocket::http::CookieJar;
+use rocket::response::Redirect;
+use rocket::State;
+use rocket_dyn_templates::Template;
+use serde::Deserialize;
+use std::collections::HashMap;
+
+use crate::security::{auth, magic_link, mfa};
+use crate::db::DbPool;
+use crate::models::settings::Setting;
+use crate::rate_limit::RateLimiter;
+use crate::AdminSlug;
+
+use super::super::NoCacheTemplate;
+
+#[derive(Debug, FromForm, Deserialize)]
+pub struct MagicLinkForm {
+    pub email: String,
+}
+
+// ── Request Magic Link ────────────────────────────────
+
+#[get("/magic-link")]
+pub fn magic_link_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result<NoCacheTemplate, Redirect> {
+    // Only show if magic_link login method is enabled
+    let login_method = Setting::get_or(pool, "login_method", "password");
+    if login_method != "magic_link" {
+        return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
+    }
+    let mut ctx: HashMap<String, String> = HashMap::new();
+    ctx.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    Ok(NoCacheTemplate(Template::render("admin/magic_link", &ctx)))
+}
+
+#[post("/magic-link", data = "<form>")]
+pub fn magic_link_submit(
+    form: Form<MagicLinkForm>,
+    pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
+    limiter: &State<RateLimiter>,
+) -> Result<Template, Template> {
+    let theme = Setting::get_or(pool, "admin_theme", "dark");
+
+    let login_method = Setting::get_or(pool, "login_method", "password");
+    if login_method != "magic_link" {
+        let mut ctx = HashMap::new();
+        ctx.insert("error".to_string(), "Magic link login is not enabled".to_string());
+        ctx.insert("admin_theme".to_string(), theme);
+        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        return Err(Template::render("admin/magic_link", &ctx));
+    }
+
+    // Rate limit magic link requests
+    let ip_hash = auth::hash_ip(&form.email);
+    let rate_key = format!("magic_link:{}", ip_hash);
+    if !limiter.check_and_record(&rate_key, 3, std::time::Duration::from_secs(15 * 60)) {
+        let mut ctx = HashMap::new();
+        ctx.insert("error".to_string(), "Too many requests. Please try again in 15 minutes.".to_string());
+        ctx.insert("admin_theme".to_string(), theme);
+        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        return Err(Template::render("admin/magic_link", &ctx));
+    }
+
+    let admin_email = Setting::get_or(pool, "admin_email", "");
+
+    // Always show success message to prevent email enumeration
+    let mut ctx = HashMap::new();
+    ctx.insert("admin_theme".to_string(), theme.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("success".to_string(), "If that email is registered, a magic link has been sent. Check your inbox.".to_string());
+
+    // Only actually send if the email matches the admin
+    if !admin_email.is_empty() && form.email.trim() == admin_email {
+        match magic_link::create_token(pool, &admin_email) {
+            Ok(token) => {
+                if let Err(e) = magic_link::send_magic_link_email(pool, &admin_email, &token) {
+                    log::error!("Failed to send magic link email: {}", e);
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to create magic link token: {}", e);
+            }
+        }
+    }
+
+    Ok(Template::render("admin/magic_link", &ctx))
+}
+
+// ── Verify Magic Link ─────────────────────────────────
+
+#[get("/magic-link/verify?<token>")]
+pub fn magic_link_verify(
+    token: &str,
+    pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
+    cookies: &CookieJar<'_>,
+) -> Result<Redirect, Template> {
+    let theme = Setting::get_or(pool, "admin_theme", "dark");
+
+    match magic_link::verify_token(pool, token) {
+        Ok(_email) => {
+            // Check if MFA is required
+            let mfa_enabled = Setting::get_bool(pool, "mfa_enabled");
+            let mfa_secret = Setting::get_or(pool, "mfa_secret", "");
+            if mfa_enabled && !mfa_secret.is_empty() {
+                let pending_token = uuid::Uuid::new_v4().to_string();
+                mfa::set_pending_cookie(cookies, &pending_token);
+                return Ok(Redirect::to(format!("/{}/mfa", admin_slug.0)));
+            }
+
+            // Create session directly
+            match auth::create_session(pool, None, None) {
+                Ok(session_id) => {
+                    auth::set_session_cookie(cookies, &session_id);
+                    Ok(Redirect::to(format!("/{}", admin_slug.0)))
+                }
+                Err(_) => {
+                    let mut ctx = HashMap::new();
+                    ctx.insert("error".to_string(), "Session creation failed".to_string());
+                    ctx.insert("admin_theme".to_string(), theme);
+                    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+                    Err(Template::render("admin/magic_link", &ctx))
+                }
+            }
+        }
+        Err(e) => {
+            let mut ctx = HashMap::new();
+            ctx.insert("error".to_string(), e);
+            ctx.insert("admin_theme".to_string(), theme);
+            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+            Err(Template::render("admin/magic_link", &ctx))
+        }
+    }
+}

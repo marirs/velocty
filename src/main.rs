@@ -6,7 +6,6 @@ use rocket_dyn_templates::Template;
 
 mod ai;
 mod analytics;
-mod auth;
 mod boot;
 mod db;
 mod health;
@@ -14,6 +13,7 @@ mod images;
 mod rate_limit;
 mod email;
 mod render;
+mod security;
 mod rss;
 mod seo;
 
@@ -140,7 +140,7 @@ fn rocket() -> _ {
         )
         .mount(
             &admin_mount,
-            routes::auth::routes(),
+            routes::security::routes(),
         )
         .register("/", catchers![not_found, server_error]);
 

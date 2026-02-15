@@ -228,6 +228,16 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         CREATE INDEX IF NOT EXISTS idx_views_country ON page_views(country);
         CREATE INDEX IF NOT EXISTS idx_views_referrer ON page_views(referrer);
 
+        -- Magic link tokens
+        CREATE TABLE IF NOT EXISTS magic_links (
+            id INTEGER PRIMARY KEY,
+            token TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            expires_at DATETIME NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0
+        );
+
         -- Likes tracking (IP-based)
         CREATE TABLE IF NOT EXISTS likes (
             id INTEGER PRIMARY KEY,

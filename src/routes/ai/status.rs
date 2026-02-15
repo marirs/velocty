@@ -3,7 +3,7 @@ use rocket::State;
 use serde_json::{json, Value};
 
 use crate::ai;
-use crate::auth::AdminUser;
+use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 
 // ── Status Check ──────────────────────────────────────
