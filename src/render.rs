@@ -669,15 +669,9 @@ fn render_portfolio_single(context: &Value) -> String {
         let purchase_note = item.get("purchase_note").and_then(|v| v.as_str()).unwrap_or("");
         let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
         let settings = context.get("settings").cloned().unwrap_or_default();
-        let currency = settings.get("commerce_currency").and_then(|v| v.as_str()).unwrap_or("USD");
-        let paypal_enabled = settings.get("commerce_paypal_enabled").and_then(|v| v.as_str()) == Some("true");
-        let paypal_client_id = settings.get("paypal_client_id").and_then(|v| v.as_str()).unwrap_or("");
-        let paypal_currency = settings.get("paypal_currency").and_then(|v| v.as_str()).unwrap_or(currency);
+        let payment_provider = item.get("payment_provider").and_then(|v| v.as_str()).unwrap_or("");
 
-        html.push_str(&build_commerce_html(
-            &html_escape(currency), price, purchase_note, item_id,
-            paypal_enabled, paypal_client_id, paypal_currency,
-        ));
+        html.push_str(&build_commerce_html(price, purchase_note, item_id, &settings, payment_provider));
     }
 
     html.push_str("</article>");
@@ -1225,20 +1219,56 @@ body {
 "#;
 
 fn build_commerce_html(
-    currency: &str,
     price: f64,
     purchase_note: &str,
     item_id: i64,
-    paypal_enabled: bool,
-    paypal_client_id: &str,
-    paypal_currency: &str,
+    settings: &Value,
+    payment_provider: &str,
 ) -> String {
+    let gs = |key: &str| -> &str {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or("")
+    };
+    let enabled = |key: &str| -> bool {
+        gs(key) == "true"
+    };
+
+    let currency = {
+        let c = gs("commerce_currency");
+        if c.is_empty() { "USD" } else { c }
+    };
+
+    // Determine which single provider to use for this item
+    let provider = if !payment_provider.is_empty() {
+        payment_provider.to_string()
+    } else {
+        // Fallback for legacy items: use first enabled provider
+        let providers = [
+            ("paypal", "commerce_paypal_enabled", "paypal_client_id"),
+            ("stripe", "commerce_stripe_enabled", "stripe_publishable_key"),
+            ("razorpay", "commerce_razorpay_enabled", "razorpay_key_id"),
+            ("mollie", "commerce_mollie_enabled", "mollie_api_key"),
+            ("square", "commerce_square_enabled", "square_access_token"),
+            ("2checkout", "commerce_2checkout_enabled", "twocheckout_merchant_code"),
+            ("payoneer", "commerce_payoneer_enabled", "payoneer_client_id"),
+        ];
+        providers.iter()
+            .find(|(_, en, key)| enabled(en) && !gs(key).is_empty())
+            .map(|(name, _, _)| name.to_string())
+            .unwrap_or_default()
+    };
+
+    if provider.is_empty() {
+        return String::new();
+    }
+
+    let btn_style = "display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:center";
+
     let mut s = String::new();
     s.push_str(r#"<div class="commerce-section" style="margin-top:32px;padding:24px;border-radius:12px;border:1px solid #e0e0e0">"#);
 
     // Price row
     s.push_str(r#"<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><span style="font-size:28px;font-weight:700">"#);
-    s.push_str(currency);
+    s.push_str(&html_escape(currency));
     s.push_str(&format!(" {:.2}", price));
     s.push_str(r#"</span><span style="font-size:13px;color:#888">Digital Download</span></div>"#);
 
@@ -1253,16 +1283,64 @@ fn build_commerce_html(
     s.push_str(r#"<div id="commerce-buy" style="margin-top:16px">"#);
     s.push_str(r#"<div id="commerce-email-step">"#);
     s.push_str(r#"<input type="email" id="buyer-email" placeholder="Your email address" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:10px">"#);
-    s.push_str(r#"<div id="paypal-button-container" style="min-height:45px"></div>"#);
-    s.push_str("</div>");
+
+    // Render only the selected provider's button
+    match provider.as_str() {
+        "paypal" => {
+            s.push_str(r#"<div id="paypal-button-container" style="min-height:45px"></div>"#);
+        }
+        "stripe" => {
+            s.push_str(&format!(
+                r#"<button type="button" id="stripe-buy-btn" style="{};background:#635BFF;color:#fff" onclick="commerceRedirect('stripe')">Pay with Stripe</button>"#,
+                btn_style
+            ));
+        }
+        "razorpay" => {
+            s.push_str(&format!(
+                r#"<button type="button" id="razorpay-buy-btn" style="{};background:#072654;color:#fff" onclick="commerceRazorpay()">Pay with Razorpay</button>"#,
+                btn_style
+            ));
+        }
+        "mollie" => {
+            s.push_str(&format!(
+                r#"<button type="button" id="mollie-buy-btn" style="{};background:#0a0a0a;color:#fff" onclick="commerceRedirect('mollie')">Pay with Mollie</button>"#,
+                btn_style
+            ));
+        }
+        "square" => {
+            s.push_str(&format!(
+                r#"<button type="button" id="square-buy-btn" style="{};background:#006AFF;color:#fff" onclick="commerceRedirect('square')">Pay with Square</button>"#,
+                btn_style
+            ));
+        }
+        "2checkout" => {
+            s.push_str(&format!(
+                r#"<button type="button" id="2co-buy-btn" style="{};background:#F36F21;color:#fff" onclick="commerceRedirect('2checkout')">Pay with 2Checkout</button>"#,
+                btn_style
+            ));
+        }
+        "payoneer" => {
+            s.push_str(&format!(
+                r#"<button type="button" id="payoneer-buy-btn" style="{};background:#FF6C00;color:#fff" onclick="commerceRedirect('payoneer')">Pay with Payoneer</button>"#,
+                btn_style
+            ));
+        }
+        _ => {}
+    }
+
+    s.push_str("</div>"); // end commerce-email-step
+
+    // Processing state
     s.push_str(r#"<div id="commerce-processing" style="display:none;text-align:center;padding:20px"><p style="color:#888">Processing your purchase...</p></div>"#);
+
+    // Success state
     s.push_str(r#"<div id="commerce-success" style="display:none;text-align:center;padding:20px">"#);
     s.push_str(r#"<div style="font-size:32px;margin-bottom:8px">&#10004;</div>"#);
     s.push_str(r#"<h3 style="margin-bottom:8px">Purchase Complete!</h3>"#);
     s.push_str(r#"<p style="font-size:13px;color:#888;margin-bottom:16px">Check your email for the download link.</p>"#);
     s.push_str("<a id=\"commerce-download-link\" href=\"#\" style=\"display:inline-block;padding:10px 24px;background:#E8913A;color:#fff;border-radius:8px;text-decoration:none;font-weight:600\">Download Now</a>");
     s.push_str("<div id=\"commerce-license\" style=\"margin-top:16px;padding:12px;background:#f0fdf4;border-radius:8px;font-size:13px;display:none\"><strong>License Key:</strong> <code id=\"commerce-license-key\" style=\"user-select:all\"></code></div>");
-    s.push_str("</div></div>");
+    s.push_str("</div></div>"); // end commerce-success, commerce-buy
 
     // Already purchased lookup
     s.push_str(r#"<div style="margin-top:12px;border-top:1px solid #eee;padding-top:12px">"#);
@@ -1271,50 +1349,92 @@ fn build_commerce_html(
     s.push_str(r#"<input type="email" id="lookup-email" placeholder="Enter your purchase email" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:8px">"#);
     s.push_str(r#"<button type="button" onclick="lookupPurchase()" style="padding:6px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:13px">Look Up</button>"#);
     s.push_str(r#"<p id="lookup-result" style="margin-top:8px;font-size:12px;display:none"></p>"#);
-    s.push_str("</div></details></div></div>");
+    s.push_str("</div></details></div></div>"); // end lookup, commerce-section
+
+    // ── JavaScript ──────────────────────────────────────
+    s.push_str("<script>\n");
+    s.push_str(&format!("var _vItemId={};\n", item_id));
+
+    // Shared: validate email
+    s.push_str("function _vEmail(){var e=document.getElementById('buyer-email').value.trim();if(!e||!e.includes('@')){alert('Please enter a valid email address');return null;}return e;}\n");
+
+    // Shared: show success
+    s.push_str("function _vSuccess(d){document.getElementById('commerce-processing').style.display='none';");
+    s.push_str("if(!d.ok){alert(d.error||'Payment failed');document.getElementById('commerce-email-step').style.display='';return;}");
+    s.push_str("document.getElementById('commerce-success').style.display='';");
+    s.push_str("document.getElementById('commerce-download-link').href='/download/'+d.download_token;");
+    s.push_str("if(d.license_key){document.getElementById('commerce-license').style.display='';document.getElementById('commerce-license-key').textContent=d.license_key;}}\n");
+
+    // Shared: show processing
+    s.push_str("function _vProc(){document.getElementById('commerce-email-step').style.display='none';document.getElementById('commerce-processing').style.display='';}\n");
+
+    // Redirect-based providers (Stripe, Mollie, Square, 2Checkout, Payoneer)
+    if matches!(provider.as_str(), "stripe" | "mollie" | "square" | "2checkout" | "payoneer") {
+        s.push_str("function commerceRedirect(provider){\n");
+        s.push_str("var email=_vEmail();if(!email)return;\n_vProc();\n");
+        s.push_str("fetch('/api/checkout/'+provider+'/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:_vItemId,buyer_email:email})})");
+        s.push_str(".then(function(r){return r.json()}).then(function(d){\n");
+        s.push_str("if(!d.ok){alert(d.error||'Checkout failed');document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';return;}\n");
+        s.push_str("if(d.checkout_url){window.location.href=d.checkout_url;}");
+        s.push_str("else{_vSuccess(d);}");
+        s.push_str("\n}).catch(function(e){alert('Error: '+e.message);document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';});\n}\n");
+    }
+
+    // Razorpay JS SDK
+    if provider == "razorpay" {
+        let rp_key = gs("razorpay_key_id");
+        s.push_str("</script>\n<script src=\"https://checkout.razorpay.com/v1/checkout.js\"></script>\n<script>\n");
+        s.push_str("function commerceRazorpay(){\n");
+        s.push_str("var email=_vEmail();if(!email)return;\n_vProc();\n");
+        s.push_str("fetch('/api/checkout/razorpay/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:_vItemId,buyer_email:email})})");
+        s.push_str(".then(function(r){return r.json()}).then(function(d){\n");
+        s.push_str("if(!d.ok){alert(d.error||'Failed');document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';return;}\n");
+        s.push_str("var opts={\n");
+        s.push_str(&format!("key:'{}',\n", html_escape(rp_key)));
+        s.push_str("amount:d.amount,currency:d.currency,order_id:d.razorpay_order_id,\n");
+        s.push_str("prefill:{email:email},\n");
+        s.push_str("handler:function(resp){\n");
+        s.push_str("fetch('/api/checkout/razorpay/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({");
+        s.push_str("order_id:d.order_id,razorpay_order_id:resp.razorpay_order_id,razorpay_payment_id:resp.razorpay_payment_id,razorpay_signature:resp.razorpay_signature,buyer_email:email,buyer_name:''");
+        s.push_str("})}).then(function(r){return r.json()}).then(function(v){_vSuccess(v);});\n},\n");
+        s.push_str("modal:{ondismiss:function(){document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';}}\n");
+        s.push_str("};\nnew Razorpay(opts).open();\n");
+        s.push_str("}).catch(function(e){alert('Error: '+e.message);document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';});\n}\n");
+    }
 
     // PayPal JS SDK
-    if paypal_enabled && !paypal_client_id.is_empty() {
-        s.push_str("<script src=\"https://www.paypal.com/sdk/js?client-id=");
-        s.push_str(paypal_client_id);
-        s.push_str("&currency=");
-        s.push_str(paypal_currency);
-        s.push_str("\"></script>\n<script>\n");
-        s.push_str("(function(){\n");
-        s.push_str(&format!("var itemId={};\n", item_id));
+    if provider == "paypal" {
+        let pp_id = gs("paypal_client_id");
+        let pp_cur = {
+            let c = gs("paypal_currency");
+            if c.is_empty() { currency } else { c }
+        };
+        s.push_str("</script>\n");
+        s.push_str(&format!("<script src=\"https://www.paypal.com/sdk/js?client-id={}&currency={}\"></script>\n<script>\n", html_escape(pp_id), html_escape(pp_cur)));
         s.push_str("paypal.Buttons({\n");
         s.push_str("style:{layout:'vertical',shape:'rect',label:'pay'},\n");
         s.push_str("createOrder:function(){\n");
-        s.push_str("var email=document.getElementById('buyer-email').value.trim();\n");
-        s.push_str("if(!email||!email.includes('@')){alert('Please enter a valid email address');return;}\n");
-        s.push_str("return fetch('/api/checkout/paypal/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:itemId})}).then(function(r){return r.json()}).then(function(d){if(!d.ok){alert(d.error||'Failed');return;}window._vOid=d.order_id;return d.order_id.toString();});\n");
+        s.push_str("var email=_vEmail();if(!email)return;\n");
+        s.push_str("return fetch('/api/checkout/paypal/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:_vItemId})}).then(function(r){return r.json()}).then(function(d){if(!d.ok){alert(d.error||'Failed');return;}window._vOid=d.order_id;return d.order_id.toString();});\n");
         s.push_str("},\n");
-        s.push_str("onApprove:function(data){\n");
-        s.push_str("document.getElementById('commerce-email-step').style.display='none';\n");
-        s.push_str("document.getElementById('commerce-processing').style.display='';\n");
+        s.push_str("onApprove:function(data){\n_vProc();\n");
         s.push_str("var email=document.getElementById('buyer-email').value.trim();\n");
-        s.push_str("return fetch('/api/checkout/paypal/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:window._vOid,paypal_order_id:data.orderID,buyer_email:email,buyer_name:''})}).then(function(r){return r.json()}).then(function(d){\n");
-        s.push_str("document.getElementById('commerce-processing').style.display='none';\n");
-        s.push_str("if(!d.ok){alert(d.error||'Payment failed');document.getElementById('commerce-email-step').style.display='';return;}\n");
-        s.push_str("document.getElementById('commerce-success').style.display='';\n");
-        s.push_str("document.getElementById('commerce-download-link').href='/download/'+d.download_token;\n");
-        s.push_str("if(d.license_key){document.getElementById('commerce-license').style.display='';document.getElementById('commerce-license-key').textContent=d.license_key;}\n");
-        s.push_str("});\n},\n");
+        s.push_str("return fetch('/api/checkout/paypal/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:window._vOid,paypal_order_id:data.orderID,buyer_email:email,buyer_name:''})}).then(function(r){return r.json()}).then(function(d){_vSuccess(d);});\n},\n");
         s.push_str("onError:function(err){console.error('PayPal error:',err);alert('Payment error. Please try again.');}\n");
-        s.push_str("}).render('#paypal-button-container');\n})();\n");
-
-        // Lookup function
-        s.push_str("function lookupPurchase(){\n");
-        s.push_str("var email=document.getElementById('lookup-email').value.trim();\n");
-        s.push_str("var result=document.getElementById('lookup-result');\n");
-        s.push_str("if(!email)return;\nresult.style.display='';result.textContent='Looking up...';\n");
-        s.push_str(&format!("fetch('/api/checkout/check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{portfolio_id:{},email:email}})}}).then(function(r){{return r.json()}}).then(function(d){{\n", item_id));
-        s.push_str("if(d.purchased&&d.token_valid){result.innerHTML='<a href=\"/download/'+d.download_token+'\" style=\"color:#E8913A;font-weight:600\">Go to Download Page &rarr;</a>';}\n");
-        s.push_str("else if(d.purchased){result.textContent='Purchase found but download link has expired.';result.style.color='#f59e0b';}\n");
-        s.push_str("else{result.textContent='No purchase found for this email.';result.style.color='#ef4444';}\n");
-        s.push_str("}).catch(function(){result.textContent='Error looking up purchase.';});\n}\n");
-        s.push_str("</script>\n");
+        s.push_str("}).render('#paypal-button-container');\n");
     }
+
+    // Lookup function (always included)
+    s.push_str("function lookupPurchase(){\n");
+    s.push_str("var email=document.getElementById('lookup-email').value.trim();\n");
+    s.push_str("var result=document.getElementById('lookup-result');\n");
+    s.push_str("if(!email)return;\nresult.style.display='';result.textContent='Looking up...';\n");
+    s.push_str(&format!("fetch('/api/checkout/check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{portfolio_id:{},email:email}})}}).then(function(r){{return r.json()}}).then(function(d){{\n", item_id));
+    s.push_str("if(d.purchased&&d.token_valid){result.innerHTML='<a href=\"/download/'+d.download_token+'\" style=\"color:#E8913A;font-weight:600\">Go to Download Page &rarr;</a>';}\n");
+    s.push_str("else if(d.purchased){result.textContent='Purchase found but download link has expired.';result.style.color='#f59e0b';}\n");
+    s.push_str("else{result.textContent='No purchase found for this email.';result.style.color='#ef4444';}\n");
+    s.push_str("}).catch(function(){result.textContent='Error looking up purchase.';});\n}\n");
+    s.push_str("</script>\n");
 
     s
 }

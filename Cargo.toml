@@ -74,6 +74,8 @@ libc = "0.2"
 # HTTP client (payment provider APIs)
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 hmac = "0.12"
+md-5 = "0.10"
+base64 = "0.22"
 
 # Email
 lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }

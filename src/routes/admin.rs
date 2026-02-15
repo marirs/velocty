@@ -536,6 +536,7 @@ pub struct PortfolioFormData<'f> {
     pub sell_enabled: Option<String>,
     pub price: Option<f64>,
     pub purchase_note: Option<String>,
+    pub payment_provider: Option<String>,
     pub status: String,
     pub category_ids: Option<Vec<i64>>,
     pub image: Option<TempFile<'f>>,
@@ -565,6 +566,7 @@ pub async fn portfolio_create(
         sell_enabled: Some(form.sell_enabled.is_some()),
         price: form.price,
         purchase_note: form.purchase_note.clone(),
+        payment_provider: form.payment_provider.clone(),
         status: form.status.clone(),
         published_at: if form.status == "published" {
             Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string())
@@ -613,6 +615,7 @@ pub async fn portfolio_update(
         sell_enabled: Some(form.sell_enabled.is_some()),
         price: form.price,
         purchase_note: form.purchase_note.clone(),
+        payment_provider: form.payment_provider.clone(),
         status: form.status.clone(),
         published_at: if form.status == "published" {
             Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string())

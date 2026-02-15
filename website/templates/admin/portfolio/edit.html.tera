@@ -88,6 +88,34 @@
                         <label for="price">Price ({{ settings.commerce_currency | default(value="USD") }})</label>
                         <input type="number" id="price" name="price" step="0.01" min="0" value="{% if item and item.price %}{{ item.price }}{% endif %}" placeholder="0.00">
                     </div>
+                    {% set providers = [] %}
+                    {% if settings.commerce_paypal_enabled == "true" and settings.paypal_client_id is defined and settings.paypal_client_id != "" %}{% set_global providers = providers | concat(with=["paypal"]) %}{% endif %}
+                    {% if settings.commerce_stripe_enabled == "true" and settings.stripe_publishable_key is defined and settings.stripe_publishable_key != "" %}{% set_global providers = providers | concat(with=["stripe"]) %}{% endif %}
+                    {% if settings.commerce_razorpay_enabled == "true" and settings.razorpay_key_id is defined and settings.razorpay_key_id != "" %}{% set_global providers = providers | concat(with=["razorpay"]) %}{% endif %}
+                    {% if settings.commerce_mollie_enabled == "true" and settings.mollie_api_key is defined and settings.mollie_api_key != "" %}{% set_global providers = providers | concat(with=["mollie"]) %}{% endif %}
+                    {% if settings.commerce_square_enabled == "true" and settings.square_access_token is defined and settings.square_access_token != "" %}{% set_global providers = providers | concat(with=["square"]) %}{% endif %}
+                    {% if settings.commerce_2checkout_enabled == "true" and settings.twocheckout_merchant_code is defined and settings.twocheckout_merchant_code != "" %}{% set_global providers = providers | concat(with=["2checkout"]) %}{% endif %}
+                    {% if settings.commerce_payoneer_enabled == "true" and settings.payoneer_client_id is defined and settings.payoneer_client_id != "" %}{% set_global providers = providers | concat(with=["payoneer"]) %}{% endif %}
+                    {% if providers | length > 1 %}
+                    <div class="form-group">
+                        <label for="payment_provider">Payment Processor</label>
+                        <select id="payment_provider" name="payment_provider" required>
+                            <option value="" disabled {% if not item or item.payment_provider == "" %}selected{% endif %}>--- Select Payment Processor ---</option>
+                            {% for p in providers %}
+                            <option value="{{ p }}" {% if item and item.payment_provider == p %}selected{% endif %}>
+                                {% if p == "paypal" %}PayPal{% elif p == "stripe" %}Stripe{% elif p == "razorpay" %}Razorpay{% elif p == "mollie" %}Mollie{% elif p == "square" %}Square{% elif p == "2checkout" %}2Checkout{% elif p == "payoneer" %}Payoneer{% else %}{{ p }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% elif providers | length == 1 %}
+                    <input type="hidden" name="payment_provider" value="{{ providers | first }}">
+                    {% else %}
+                    <input type="hidden" name="payment_provider" value="">
+                    <div class="form-group">
+                        <span class="form-help" style="color:var(--warning)">No payment processors configured. Go to Settings &rarr; Commerce to enable one.</span>
+                    </div>
+                    {% endif %}
                     <div class="form-group">
                         <label for="purchase_note">Purchase Note</label>
                         <textarea id="purchase_note" name="purchase_note" rows="3" placeholder="What the buyer receives, e.g. High-res PNG + PSD source file">{% if item %}{{ item.purchase_note | default(value="") }}{% endif %}</textarea>
@@ -246,6 +274,12 @@
     // Sell toggle
     document.getElementById('sell-toggle').addEventListener('change', function() {
         document.getElementById('sell-fields').style.display = this.checked ? '' : 'none';
+    });
+
+    // Auto-format price: 25 → 25.00
+    document.getElementById('price').addEventListener('blur', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v > 0) { this.value = v.toFixed(2); }
     });
 
     // SEO Check

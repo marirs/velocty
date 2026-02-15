@@ -271,6 +271,10 @@
                 <label for="square_location_id">Location ID</label>
                 <input type="text" id="square_location_id" name="square_location_id" value="{{ settings.square_location_id | default(value='') }}" placeholder="Your location ID">
             </div>
+            <div class="form-group">
+                <label for="square_webhook_signature_key">Webhook Signature Key</label>
+                <input type="password" id="square_webhook_signature_key" name="square_webhook_signature_key" value="{{ settings.square_webhook_signature_key | default(value='') }}" placeholder="From Square Developer Dashboard → Webhooks">
+            </div>
         </div>
     </fieldset>
 </div>

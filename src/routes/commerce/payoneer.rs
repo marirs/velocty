@@ -41,7 +41,10 @@ pub fn payoneer_create(
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = PortfolioItem::find_by_id(pool, body.portfolio_id).unwrap();
+    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+        Some(i) => i,
+        None => return Json(json!({ "ok": false, "error": "Item not found" })),
+    };
     let base = site_url(&settings);
 
     // Get OAuth token

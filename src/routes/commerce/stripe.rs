@@ -1,4 +1,6 @@
 use rocket::serde::json::Json;
+use rocket::http::Status;
+use rocket::request::{FromRequest, Outcome, Request};
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -10,6 +12,37 @@ use crate::models::settings::Setting;
 use std::collections::HashMap;
 
 use super::{create_pending_order, finalize_order, site_url};
+
+/// Raw body guard for webhook signature verification
+pub struct RawBody(pub Vec<u8>);
+
+#[rocket::async_trait]
+impl<'r> rocket::data::FromData<'r> for RawBody {
+    type Error = std::io::Error;
+
+    async fn from_data(_req: &'r Request<'_>, data: rocket::data::Data<'r>) -> rocket::data::Outcome<'r, Self> {
+        use rocket::data::ToByteUnit;
+        match data.open(1.mebibytes()).into_bytes().await {
+            Ok(bytes) if bytes.is_complete() => rocket::data::Outcome::Success(RawBody(bytes.into_inner())),
+            Ok(_) => rocket::data::Outcome::Error((Status::PayloadTooLarge, std::io::Error::new(std::io::ErrorKind::Other, "Payload too large"))),
+            Err(e) => rocket::data::Outcome::Error((Status::InternalServerError, e)),
+        }
+    }
+}
+
+/// Extract Stripe-Signature header
+pub struct StripeSignature(pub String);
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for StripeSignature {
+    type Error = ();
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        match req.headers().get_one("Stripe-Signature") {
+            Some(sig) => Outcome::Success(StripeSignature(sig.to_string())),
+            None => Outcome::Error((Status::BadRequest, ())),
+        }
+    }
+}
 
 // ── Stripe: Create Checkout Session ────────────────────
 
@@ -37,7 +70,10 @@ pub fn stripe_create_session(
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = PortfolioItem::find_by_id(pool, body.portfolio_id).unwrap();
+    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+        Some(i) => i,
+        None => return Json(json!({ "ok": false, "error": "Item not found" })),
+    };
     let base = site_url(&settings);
 
     // Call Stripe API to create a Checkout Session
@@ -110,4 +146,87 @@ pub fn stripe_success(
         }
     }
     rocket::response::Redirect::to(base)
+}
+
+// ── Stripe: Webhook (primary payment confirmation) ──────
+
+/// Verify Stripe webhook signature: HMAC-SHA256 of "timestamp.payload" with webhook secret
+fn verify_stripe_signature(payload: &[u8], sig_header: &str, secret: &str) -> bool {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    type HmacSha256 = Hmac<Sha256>;
+
+    // Parse header: t=timestamp,v1=signature
+    let mut timestamp = "";
+    let mut signature = "";
+    for part in sig_header.split(',') {
+        if let Some(t) = part.strip_prefix("t=") {
+            timestamp = t;
+        } else if let Some(s) = part.strip_prefix("v1=") {
+            signature = s;
+        }
+    }
+    if timestamp.is_empty() || signature.is_empty() {
+        return false;
+    }
+
+    // Compute expected signature
+    let signed_payload = format!("{}.{}", timestamp, String::from_utf8_lossy(payload));
+    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(signed_payload.as_bytes());
+    let expected = hex::encode(mac.finalize().into_bytes());
+    expected == signature
+}
+
+#[post("/api/stripe/webhook", data = "<body>")]
+pub fn stripe_webhook(
+    pool: &State<DbPool>,
+    sig: StripeSignature,
+    body: RawBody,
+) -> Status {
+    let settings: HashMap<String, String> = Setting::all(pool);
+    let webhook_secret = settings.get("stripe_webhook_secret").cloned().unwrap_or_default();
+
+    if webhook_secret.is_empty() {
+        eprintln!("[stripe] Webhook secret not configured, rejecting");
+        return Status::BadRequest;
+    }
+
+    if !verify_stripe_signature(&body.0, &sig.0, &webhook_secret) {
+        eprintln!("[stripe] Invalid webhook signature");
+        return Status::BadRequest;
+    }
+
+    // Parse the event
+    let event: Value = match serde_json::from_slice(&body.0) {
+        Ok(v) => v,
+        Err(_) => return Status::BadRequest,
+    };
+
+    let event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+    if event_type == "checkout.session.completed" {
+        let session = match event.get("data").and_then(|d| d.get("object")) {
+            Some(s) => s,
+            None => return Status::BadRequest,
+        };
+
+        let payment_status = session.get("payment_status").and_then(|s| s.as_str()).unwrap_or("");
+        if payment_status != "paid" {
+            return Status::Ok;
+        }
+
+        let order_id_str = session.get("metadata").and_then(|m| m.get("order_id")).and_then(|o| o.as_str()).unwrap_or("");
+        let session_id = session.get("id").and_then(|i| i.as_str()).unwrap_or("");
+        let buyer_email = session.get("customer_details").and_then(|c| c.get("email")).and_then(|e| e.as_str()).unwrap_or("");
+
+        if let Ok(order_id) = order_id_str.parse::<i64>() {
+            let _ = finalize_order(pool, order_id, session_id, buyer_email, "");
+        }
+    }
+
+    Status::Ok
 }

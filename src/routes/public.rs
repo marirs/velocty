@@ -553,6 +553,7 @@ pub fn portfolio_by_tag(
                     sell_enabled: sell_raw != 0,
                     price: row.get("price")?,
                     purchase_note: row.get::<_, Option<String>>("purchase_note")?.unwrap_or_default(),
+                    payment_provider: row.get::<_, Option<String>>("payment_provider")?.unwrap_or_default(),
                     likes: row.get("likes")?,
                     status: row.get("status")?,
                     published_at: row.get("published_at")?,
