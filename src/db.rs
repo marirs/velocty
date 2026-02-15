@@ -571,6 +571,10 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("social_vimeo", ""),
         ("social_500px", ""),
         ("social_brand_colors", "true"),
+        ("share_enabled", "false"),
+        ("share_facebook", "true"),
+        ("share_x", "true"),
+        ("share_linkedin", "true"),
         // Commerce (Phase 2 — defaults ready)
         ("commerce_paypal_enabled", "false"),
         ("paypal_mode", "sandbox"),
