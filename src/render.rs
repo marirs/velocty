@@ -41,14 +41,34 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    // Build the sidebar categories
-    let categories_html = build_categories_sidebar(context);
+    // Settings helper
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+    };
+
+    // Build the sidebar categories (gated on portfolio_show_categories)
+    let categories_html = if sg("portfolio_show_categories", "true") == "true" {
+        build_categories_sidebar(context)
+    } else {
+        String::new()
+    };
 
     // Build social links
     let social_html = build_social_links(&settings);
 
     // Build font loading tags
     let font_links = typography::build_font_links(&settings);
+    let click_mode = sg("portfolio_click_mode", "lightbox");
+    let show_likes = sg("portfolio_enable_likes", "true");
+    let show_cats = sg("portfolio_show_categories", "true");
+    let show_tags = sg("portfolio_show_tags", "true");
+    let fade_anim = sg("portfolio_fade_animation", "true");
+    let display_type = sg("portfolio_display_type", "masonry");
+    let pagination_type = sg("portfolio_pagination_type", "classic");
+    let lb_show_title = sg("portfolio_lightbox_show_title", "true");
+    let lb_show_tags = sg("portfolio_lightbox_show_tags", "true");
+    let lb_nav = sg("portfolio_lightbox_nav", "true");
+    let lb_keyboard = sg("portfolio_lightbox_keyboard", "true");
 
     // Full page shell — the default "Sidebar Portfolio" design
     format!(
@@ -64,7 +84,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         {base_css}
     </style>
 </head>
-<body>
+<body data-click-mode="{click_mode}" data-show-likes="{show_likes}" data-show-categories="{show_cats}" data-show-tags="{show_tags}" data-fade-animation="{fade_anim}" data-display-type="{display_type}" data-pagination-type="{pagination_type}" data-lb-show-title="{lb_show_title}" data-lb-show-tags="{lb_show_tags}" data-lb-nav="{lb_nav}" data-lb-keyboard="{lb_keyboard}">
     <div class="site-wrapper">
         <aside class="sidebar">
             <div class="sidebar-top">
@@ -117,6 +137,17 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         },
         analytics_scripts = seo::build_analytics_scripts(&settings),
         cookie_consent = build_cookie_consent_banner(&settings),
+        click_mode = click_mode,
+        show_likes = show_likes,
+        show_cats = show_cats,
+        show_tags = show_tags,
+        fade_anim = fade_anim,
+        display_type = display_type,
+        pagination_type = pagination_type,
+        lb_show_title = lb_show_title,
+        lb_show_tags = lb_show_tags,
+        lb_nav = lb_nav,
+        lb_keyboard = lb_keyboard,
     )
 }
 
@@ -539,6 +570,25 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
 }
 
 
+fn build_pagination(current: i64, total: i64) -> String {
+    let mut html = String::from(r#"<nav class="pagination">"#);
+    if current > 1 {
+        html.push_str(&format!(r#"<a href="?page={}">&laquo; Prev</a>"#, current - 1));
+    }
+    for p in 1..=total {
+        if p == current {
+            html.push_str(&format!(r#"<span class="current">{}</span>"#, p));
+        } else {
+            html.push_str(&format!(r#"<a href="?page={}">{}</a>"#, p, p));
+        }
+    }
+    if current < total {
+        html.push_str(&format!(r#"<a href="?page={}">Next &raquo;</a>"#, current + 1));
+    }
+    html.push_str("</nav>");
+    html
+}
+
 fn render_portfolio_grid(context: &Value) -> String {
     let items = match context.get("items") {
         Some(Value::Array(items)) => items,
@@ -549,7 +599,21 @@ fn render_portfolio_grid(context: &Value) -> String {
         return "<p>No portfolio items yet.</p>".to_string();
     }
 
-    let mut html = String::from(r#"<div class="masonry-grid">"#);
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+    };
+    let display_type = sg("portfolio_display_type", "masonry");
+    let show_tags = sg("portfolio_show_tags", "true") == "true";
+    let _show_likes = sg("portfolio_enable_likes", "true") == "true";
+    let fade_anim = sg("portfolio_fade_animation", "true") == "true";
+
+    let grid_class = if display_type == "grid" { "css-grid" } else { "masonry-grid" };
+    let item_class = if fade_anim { "grid-item fade-in" } else { "grid-item" };
+
+    let mut html = format!(r#"<div class="{}">"#, grid_class);
+
+    let portfolio_slug = sg("portfolio_slug", "portfolio");
 
     for entry in items {
         let item = entry.get("item").unwrap_or(entry);
@@ -564,44 +628,62 @@ fn render_portfolio_grid(context: &Value) -> String {
             .unwrap_or("");
         let likes = item.get("likes").and_then(|v| v.as_i64()).unwrap_or(0);
 
+        let cats_data = entry
+            .get("categories")
+            .and_then(|c| c.as_array())
+            .map(|cats| cats
+                .iter()
+                .filter_map(|c| c.get("slug").and_then(|s| s.as_str()))
+                .collect::<Vec<_>>()
+                .join(" "))
+            .unwrap_or_default();
+
+        let tag_data = if show_tags {
+            tags.map(|tl| tl.iter()
+                .filter_map(|t| t.get("name").and_then(|v| v.as_str()))
+                .collect::<Vec<_>>()
+                .join(", "))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+
         html.push_str(&format!(
-            r#"<div class="grid-item" data-categories="{cats_data}">
-    <a href="/portfolio/{slug}" class="portfolio-link" data-title="{title}" data-likes="{likes}">
+            r#"<div class="{item_class}" data-categories="{cats_data}">
+    <a href="/{portfolio_slug}/{slug}" class="portfolio-link" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
         <img src="/uploads/{image}" alt="{title}" loading="lazy">
     </a>"#,
+            item_class = item_class,
+            cats_data = cats_data,
+            portfolio_slug = portfolio_slug,
             slug = slug,
             title = html_escape(title),
             image = image,
             likes = likes,
-            cats_data = entry
-                .get("categories")
-                .and_then(|c| c.as_array())
-                .map(|cats| cats
-                    .iter()
-                    .filter_map(|c| c.get("slug").and_then(|s| s.as_str()))
-                    .collect::<Vec<_>>()
-                    .join(" "))
-                .unwrap_or_default(),
+            tag_data = html_escape(&tag_data),
         ));
 
         // Tags below image
-        if let Some(tag_list) = tags {
-            if !tag_list.is_empty() {
-                html.push_str(r#"<div class="item-tags">"#);
-                let tag_strs: Vec<String> = tag_list
-                    .iter()
-                    .filter_map(|t| {
-                        let name = t.get("name").and_then(|v| v.as_str())?;
-                        let slug = t.get("slug").and_then(|v| v.as_str())?;
-                        Some(format!(
-                            r#"<a href="/portfolio/tag/{}">{}</a>"#,
-                            slug,
-                            html_escape(name)
-                        ))
-                    })
-                    .collect();
-                html.push_str(&tag_strs.join(" · "));
-                html.push_str("</div>");
+        if show_tags {
+            if let Some(tag_list) = tags {
+                if !tag_list.is_empty() {
+                    html.push_str(r#"<div class="item-tags">"#);
+                    let tag_strs: Vec<String> = tag_list
+                        .iter()
+                        .filter_map(|t| {
+                            let name = t.get("name").and_then(|v| v.as_str())?;
+                            let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                            Some(format!(
+                                "<a href=\"/{}/tag/{}\">{}</a>",
+                                portfolio_slug,
+                                tslug,
+                                html_escape(name)
+                            ))
+                        })
+                        .collect();
+                    html.push_str(&tag_strs.join(" · "));
+                    html.push_str("</div>");
+                }
             }
         }
 
@@ -609,6 +691,37 @@ fn render_portfolio_grid(context: &Value) -> String {
     }
 
     html.push_str("</div>");
+
+    // Pagination
+    let current_page = context.get("current_page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let total_pages = context.get("total_pages").and_then(|v| v.as_i64()).unwrap_or(1);
+    let pagination_type = sg("portfolio_pagination_type", "classic");
+
+    if total_pages > 1 {
+        match pagination_type.as_str() {
+            "load_more" => {
+                html.push_str(&format!(
+                    "<div class=\"pagination\" style=\"justify-content:center\">\
+                     <button id=\"load-more-btn\" data-page=\"{}\" data-total=\"{}\" \
+                     style=\"padding:10px 28px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;font-size:14px\">\
+                     Load More</button></div>",
+                    current_page + 1, total_pages
+                ));
+            }
+            "infinite" => {
+                html.push_str(&format!(
+                    "<div id=\"infinite-sentinel\" data-page=\"{}\" data-total=\"{}\" \
+                     style=\"height:1px\"></div>",
+                    current_page + 1, total_pages
+                ));
+            }
+            _ => {
+                // Classic pagination
+                html.push_str(&build_pagination(current_page, total_pages));
+            }
+        }
+    }
+
     html
 }
 
@@ -618,6 +731,14 @@ fn render_portfolio_single(context: &Value) -> String {
         None => return render_404(context),
     };
 
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+    };
+    let show_likes = sg("portfolio_enable_likes", "true") == "true";
+    let show_cats = sg("portfolio_show_categories", "true") == "true";
+    let portfolio_slug = sg("portfolio_slug", "portfolio");
+
     let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
     let image = item.get("image_path").and_then(|v| v.as_str()).unwrap_or("");
     let desc = item
@@ -625,9 +746,19 @@ fn render_portfolio_single(context: &Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let likes = item.get("likes").and_then(|v| v.as_i64()).unwrap_or(0);
+    let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
 
     let tags = context.get("tags").and_then(|t| t.as_array());
     let categories = context.get("categories").and_then(|c| c.as_array());
+
+    let like_html = if show_likes {
+        format!(
+            r#"<span class="like-btn" data-id="{}">♥ <span class="like-count">{}</span></span>"#,
+            item_id, format_likes(likes)
+        )
+    } else {
+        String::new()
+    };
 
     let mut html = format!(
         r#"<article class="portfolio-single">
@@ -636,27 +767,29 @@ fn render_portfolio_single(context: &Value) -> String {
     </div>
     <div class="portfolio-meta">
         <h1>{title}</h1>
-        <span class="like-btn" data-id="{id}">♥ <span class="like-count">{likes}</span></span>
+        {like_html}
     </div>"#,
         image = image,
         title = html_escape(title),
-        id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0),
-        likes = format_likes(likes),
+        like_html = like_html,
     );
 
-    if let Some(cats) = categories {
-        if !cats.is_empty() {
-            html.push_str(r#"<div class="portfolio-categories">"#);
-            for cat in cats {
-                let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-                html.push_str(&format!(
-                    r#"<a href="/portfolio/category/{}">{}</a>"#,
-                    slug,
-                    html_escape(name)
-                ));
+    if show_cats {
+        if let Some(cats) = categories {
+            if !cats.is_empty() {
+                html.push_str(r#"<div class="portfolio-categories">"#);
+                for cat in cats {
+                    let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+                    html.push_str(&format!(
+                        "<a href=\"/{}/category/{}\">{}</a>",
+                        portfolio_slug,
+                        slug,
+                        html_escape(name)
+                    ));
+                }
+                html.push_str("</div>");
             }
-            html.push_str("</div>");
         }
     }
 
@@ -669,8 +802,6 @@ fn render_portfolio_single(context: &Value) -> String {
     if commerce_enabled {
         let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let purchase_note = item.get("purchase_note").and_then(|v| v.as_str()).unwrap_or("");
-        let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-        let settings = context.get("settings").cloned().unwrap_or_default();
         let payment_provider = item.get("payment_provider").and_then(|v| v.as_str()).unwrap_or("");
 
         html.push_str(&build_commerce_html(price, purchase_note, item_id, &settings, payment_provider));
@@ -679,15 +810,12 @@ fn render_portfolio_single(context: &Value) -> String {
     // Comments on portfolio (gated on comments_enabled flag from route)
     let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
     if comments_on {
-        let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-        let settings = context.get("settings").cloned().unwrap_or_default();
         html.push_str(&build_comments_section(context, &settings, item_id, "portfolio"));
     }
 
     html.push_str("</article>");
 
     // JSON-LD structured data
-    let settings = context.get("settings").cloned().unwrap_or_default();
     if settings.get("seo_structured_data").and_then(|v| v.as_str()) == Some("true") {
         let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
         let site_url = settings.get("site_url").and_then(|v| v.as_str()).unwrap_or("http://localhost:8000");
@@ -904,47 +1032,57 @@ fn format_likes(count: i64) -> String {
 
 const LIGHTBOX_JS: &str = r#"
 (function() {
-    const mode = document.body.dataset.clickMode || 'lightbox';
+    const b = document.body.dataset;
+    const mode = b.clickMode || 'lightbox';
     if (mode !== 'lightbox') return;
 
+    const showTitle = b.lbShowTitle !== 'false';
+    const showTags = b.lbShowTags !== 'false';
+    const showNav = b.lbNav !== 'false';
+    const useKeyboard = b.lbKeyboard !== 'false';
+    const showLikes = b.showLikes !== 'false';
+
     const links = document.querySelectorAll('.portfolio-link');
-    let overlay, img, titleEl, closeBtn, prevBtn, nextBtn;
+    let overlay, img, titleEl, tagsEl, likesEl, closeBtn, prevBtn, nextBtn;
     let currentIndex = 0;
     const items = Array.from(links);
 
     function createOverlay() {
         overlay = document.createElement('div');
         overlay.className = 'lightbox-overlay';
-        overlay.innerHTML = `
-            <button class="lb-close">&times;</button>
-            <button class="lb-prev">&lsaquo;</button>
-            <button class="lb-next">&rsaquo;</button>
-            <div class="lb-content">
-                <img class="lb-image" src="" alt="">
-                <div class="lb-title"></div>
-            </div>
-        `;
+        overlay.innerHTML =
+            '<button class="lb-close">&times;</button>' +
+            (showNav ? '<button class="lb-prev">&lsaquo;</button><button class="lb-next">&rsaquo;</button>' : '') +
+            '<div class="lb-content">' +
+                '<img class="lb-image" src="" alt="">' +
+                (showTitle ? '<div class="lb-title"></div>' : '') +
+                (showTags ? '<div class="lb-tags"></div>' : '') +
+                (showLikes ? '<div class="lb-likes" style="color:#fff;font-size:14px;margin-top:4px"></div>' : '') +
+            '</div>';
         document.body.appendChild(overlay);
         img = overlay.querySelector('.lb-image');
         titleEl = overlay.querySelector('.lb-title');
+        tagsEl = overlay.querySelector('.lb-tags');
+        likesEl = overlay.querySelector('.lb-likes');
         closeBtn = overlay.querySelector('.lb-close');
         prevBtn = overlay.querySelector('.lb-prev');
         nextBtn = overlay.querySelector('.lb-next');
 
         closeBtn.addEventListener('click', close);
-        prevBtn.addEventListener('click', () => navigate(-1));
-        nextBtn.addEventListener('click', () => navigate(1));
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        if (prevBtn) prevBtn.addEventListener('click', function() { navigate(-1); });
+        if (nextBtn) nextBtn.addEventListener('click', function() { navigate(1); });
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
     }
 
     function open(index) {
         if (!overlay) createOverlay();
         currentIndex = index;
-        const link = items[index];
-        const imgSrc = link.querySelector('img').src;
-        const title = link.dataset.title || '';
+        var link = items[index];
+        var imgSrc = link.querySelector('img').src;
         img.src = imgSrc;
-        titleEl.textContent = title;
+        if (titleEl) titleEl.textContent = link.dataset.title || '';
+        if (tagsEl) tagsEl.textContent = link.dataset.tags || '';
+        if (likesEl) { var lk = link.dataset.likes || '0'; likesEl.innerHTML = '&#9829; ' + lk; }
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
     }
@@ -959,19 +1097,91 @@ const LIGHTBOX_JS: &str = r#"
         open(currentIndex);
     }
 
-    items.forEach((link, i) => {
-        link.addEventListener('click', (e) => {
+    items.forEach(function(link, i) {
+        link.addEventListener('click', function(e) {
             e.preventDefault();
             open(i);
         });
     });
 
-    document.addEventListener('keydown', (e) => {
-        if (!overlay || !overlay.classList.contains('active')) return;
-        if (e.key === 'Escape') close();
-        if (e.key === 'ArrowLeft') navigate(-1);
-        if (e.key === 'ArrowRight') navigate(1);
-    });
+    if (useKeyboard) {
+        document.addEventListener('keydown', function(e) {
+            if (!overlay || !overlay.classList.contains('active')) return;
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft') navigate(-1);
+            if (e.key === 'ArrowRight') navigate(1);
+        });
+    }
+
+    // Fade-in animation via IntersectionObserver
+    if (b.fadeAnimation === 'true') {
+        var fadeItems = document.querySelectorAll('.grid-item.fade-in');
+        if (fadeItems.length && 'IntersectionObserver' in window) {
+            var obs = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            fadeItems.forEach(function(el) { obs.observe(el); });
+        } else {
+            fadeItems.forEach(function(el) { el.classList.add('visible'); });
+        }
+    }
+
+    // Load More button
+    var loadMoreBtn = document.getElementById('load-more-btn');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', function() {
+            var page = parseInt(this.dataset.page);
+            var total = parseInt(this.dataset.total);
+            if (page > total) return;
+            this.textContent = 'Loading...';
+            this.disabled = true;
+            var btn = this;
+            fetch(location.pathname + '?page=' + page, { headers: { 'Accept': 'text/html' } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    var newItems = tmp.querySelectorAll('.grid-item');
+                    var grid = document.querySelector('.masonry-grid, .css-grid');
+                    newItems.forEach(function(el) { grid.appendChild(el); });
+                    if (page + 1 > total) { btn.style.display = 'none'; }
+                    else { btn.dataset.page = page + 1; btn.textContent = 'Load More'; btn.disabled = false; }
+                })
+                .catch(function() { btn.textContent = 'Load More'; btn.disabled = false; });
+        });
+    }
+
+    // Infinite scroll
+    var sentinel = document.getElementById('infinite-sentinel');
+    if (sentinel && 'IntersectionObserver' in window) {
+        var loading = false;
+        var infObs = new IntersectionObserver(function(entries) {
+            if (!entries[0].isIntersecting || loading) return;
+            var page = parseInt(sentinel.dataset.page);
+            var total = parseInt(sentinel.dataset.total);
+            if (page > total) { infObs.disconnect(); return; }
+            loading = true;
+            fetch(location.pathname + '?page=' + page, { headers: { 'Accept': 'text/html' } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    var newItems = tmp.querySelectorAll('.grid-item');
+                    var grid = document.querySelector('.masonry-grid, .css-grid');
+                    newItems.forEach(function(el) { grid.appendChild(el); });
+                    sentinel.dataset.page = page + 1;
+                    loading = false;
+                    if (page + 1 > total) infObs.disconnect();
+                })
+                .catch(function() { loading = false; });
+        }, { threshold: 0 });
+        infObs.observe(sentinel);
+    }
 })();
 "#;
 
@@ -1086,16 +1296,28 @@ h6 { font-size: var(--font-size-h6); }
     padding: 0;
 }
 
-/* Masonry Grid */
+/* Masonry Grid (default) */
 .masonry-grid {
     column-count: var(--grid-columns);
     column-gap: var(--grid-gap);
     padding: var(--grid-gap);
 }
 
+/* CSS Grid mode (when data-display-type="grid") */
+.css-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-columns), 1fr);
+    gap: var(--grid-gap);
+    padding: var(--grid-gap);
+}
+
 .grid-item {
     break-inside: avoid;
     margin-bottom: var(--grid-gap);
+}
+
+.css-grid .grid-item {
+    margin-bottom: 0;
 }
 
 .grid-item img {
@@ -1111,6 +1333,17 @@ h6 { font-size: var(--font-size-h6); }
 .grid-item img:hover {
     opacity: 0.85;
     transition: opacity 0.2s;
+}
+
+/* Fade-in scroll animation */
+.grid-item.fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.grid-item.fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .item-tags {
@@ -1156,9 +1389,15 @@ h6 { font-size: var(--font-size-h6); }
 }
 
 .lb-title {
-    color: #fff;
+    color: var(--lightbox-title-color);
     font-size: 16px;
     margin-top: 12px;
+}
+
+.lb-tags {
+    color: var(--lightbox-tag-color);
+    font-size: 13px;
+    margin-top: 6px;
 }
 
 .lb-close {
@@ -1174,13 +1413,14 @@ h6 { font-size: var(--font-size-h6); }
     top: 50%;
     transform: translateY(-50%);
     background: none; border: none;
-    color: rgba(255,255,255,0.5);
+    color: var(--lightbox-nav-color);
+    opacity: 0.6;
     font-size: 40px;
     cursor: pointer;
     padding: 20px;
 }
 
-.lb-prev:hover, .lb-next:hover { color: #fff; }
+.lb-prev:hover, .lb-next:hover { opacity: 1; }
 .lb-prev { left: 10px; }
 .lb-next { right: 10px; }
 

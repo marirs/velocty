@@ -146,6 +146,29 @@ Last updated: 2026-02-15
 - **Refactored:** Comment rendering extracted into reusable `build_comments_section()` + `render_comment()` functions shared by blog and portfolio
 - WordPress import updated with `parent_id: None` for compatibility
 
+### Portfolio Settings Audit ✅
+- **Bug fix:** 5 missing checkbox keys in `settings_save` — `portfolio_show_categories`, `portfolio_show_tags`, `portfolio_lightbox_show_title`, `portfolio_lightbox_show_tags`, `portfolio_lightbox_nav`, `portfolio_lightbox_keyboard` now properly reset to false when unchecked
+- **Bug fix:** `portfolio_click_mode` now wired — sets `data-click-mode` on `<body>`, lightbox JS reads it and skips when mode is "single"
+- **Bug fix:** `portfolio_display_type` now wired — grid uses `css-grid` class for "grid" mode, `masonry-grid` for "masonry" (CSS column-count)
+- **Bug fix:** `portfolio_grid_columns` was already wired via CSS var `--grid-columns` ✓
+- **Bug fix:** `portfolio_pagination_type` now wired — supports "classic" (numbered), "load_more" (AJAX button), "infinite" (IntersectionObserver scroll)
+- **Bug fix:** `portfolio_lightbox_border_color` was already wired via CSS var ✓
+- **Bug fix:** `portfolio_lightbox_title_color` now wired via CSS var `--lightbox-title-color` (was hardcoded `#fff`)
+- **Bug fix:** `portfolio_lightbox_tag_color` now wired via CSS var `--lightbox-tag-color` + tags shown in lightbox
+- **Bug fix:** `portfolio_lightbox_nav_color` now wired via CSS var `--lightbox-nav-color` (was hardcoded `rgba(255,255,255,0.5)`)
+- **Bug fix:** `portfolio_lightbox_show_title` now wired — conditionally renders title element in lightbox overlay
+- **Bug fix:** `portfolio_lightbox_show_tags` now wired — conditionally renders tags element in lightbox overlay
+- **Bug fix:** `portfolio_lightbox_nav` now wired — conditionally renders prev/next buttons in lightbox
+- **Bug fix:** `portfolio_lightbox_keyboard` now wired — conditionally enables arrow key / Escape navigation
+- **Bug fix:** `portfolio_enable_likes` now wired — like button hidden on single page + lightbox when disabled
+- **Bug fix:** `portfolio_show_categories` now wired — hides sidebar category nav + single page categories when disabled
+- **Bug fix:** `portfolio_show_tags` now wired — hides tags below grid images when disabled
+- **Bug fix:** `portfolio_fade_animation` now wired — adds `fade-in` CSS class + IntersectionObserver JS for scroll reveal
+- **Bug fix:** `portfolio_image_protection` was already wired ✓
+- **Refactored:** Extracted `build_pagination()` helper for reuse
+- **Refactored:** Portfolio grid links now use dynamic `portfolio_slug` setting instead of hardcoded "/portfolio/"
+- **Refactored:** Cleaned up redundant `settings` clones in `render_portfolio_single`
+
 ### Potential Enhancements
 - Wire captcha into comment form via design templates (currently only in default `render.rs`)
 - Magic link token cleanup cron/scheduled task

@@ -60,6 +60,9 @@ pub fn build_css_variables(settings: &Value) -> String {
     --grid-gap: 8px;
     --grid-columns: {grid_cols};
     --lightbox-border-color: {lb_border};
+    --lightbox-title-color: {lb_title_color};
+    --lightbox-tag-color: {lb_tag_color};
+    --lightbox-nav-color: {lb_nav_color};
     --color-text: #111827;
     --color-text-secondary: #6b7280;
     --color-bg: #ffffff;
@@ -81,6 +84,9 @@ pub fn build_css_variables(settings: &Value) -> String {
         text_transform = text_transform,
         grid_cols = get("portfolio_grid_columns", "3"),
         lb_border = get("portfolio_lightbox_border_color", "#D4A017"),
+        lb_title_color = get("portfolio_lightbox_title_color", "#FFFFFF"),
+        lb_tag_color = get("portfolio_lightbox_tag_color", "#AAAAAA"),
+        lb_nav_color = get("portfolio_lightbox_nav_color", "#FFFFFF"),
     )
 }
 

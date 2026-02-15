@@ -907,6 +907,9 @@ pub fn settings_save(
         "portfolio" => &[
             "portfolio_enabled", "portfolio_enable_likes",
             "portfolio_image_protection", "portfolio_fade_animation",
+            "portfolio_show_categories", "portfolio_show_tags",
+            "portfolio_lightbox_show_title", "portfolio_lightbox_show_tags",
+            "portfolio_lightbox_nav", "portfolio_lightbox_keyboard",
         ],
         "comments" => &[
             "comments_enabled", "comments_on_blog", "comments_on_portfolio",
