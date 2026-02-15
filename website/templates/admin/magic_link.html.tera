@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — Velocty Admin</title>
+    <title>Magic Link — Velocty Admin</title>
     <link rel="stylesheet" href="/static/css/admin.css">
     <link rel="icon" type="image/png" href="/static/images/favicon.png">
     {% if captcha_provider is defined and captcha_provider == "recaptcha" %}
@@ -30,14 +30,14 @@
         {% if error %}
         <div class="alert alert-error">{{ error }}</div>
         {% endif %}
-        <form id="login-form" method="post" action="/{{ admin_slug }}/login">
+        {% if success %}
+        <div class="alert alert-success" style="background:var(--success,#22c55e);color:#fff;padding:12px 16px;border-radius:6px;margin-bottom:16px;font-size:14px">{{ success }}</div>
+        {% else %}
+        <p style="text-align:center;font-size:14px;color:var(--text-secondary,#888);margin-bottom:20px">Enter your email and we'll send you a one-time login link.</p>
+        <form id="magic-link-form" method="post" action="/{{ admin_slug }}/magic-link">
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required autofocus>
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
             </div>
             {% if captcha_provider is defined and captcha_provider == "recaptcha" and captcha_version is defined and captcha_version != "v3" %}
             <div class="form-group">
@@ -53,13 +53,17 @@
             </div>
             {% endif %}
             <input type="hidden" name="captcha_token" id="captcha_token" value="">
-            <button type="submit" class="btn btn-primary btn-full">Log In</button>
+            <button type="submit" class="btn btn-primary btn-full">Send Magic Link</button>
         </form>
+        {% endif %}
+        <div style="text-align:center;margin-top:16px">
+            <a href="/{{ admin_slug }}/login" style="font-size:13px;color:var(--text-secondary,#888)">← Back to password login</a>
+        </div>
     </div>
     {% if captcha_provider is defined and captcha_provider != "" %}
     <script>
     (function(){
-        var form = document.getElementById('login-form');
+        var form = document.getElementById('magic-link-form');
         if (!form) return;
         var provider = '{{ captcha_provider | default(value="") }}';
         var siteKey = '{{ captcha_site_key | default(value="") }}';
@@ -67,11 +71,11 @@
 
         form.addEventListener('submit', function(e) {
             var tokenField = document.getElementById('captcha_token');
-            if (tokenField.value) return; // already have token
+            if (tokenField.value) return;
 
             if (provider === 'recaptcha' && version === 'v3') {
                 e.preventDefault();
-                grecaptcha.execute(siteKey, {action: 'login'}).then(function(token) {
+                grecaptcha.execute(siteKey, {action: 'magic_link'}).then(function(token) {
                     tokenField.value = token;
                     form.submit();
                 });

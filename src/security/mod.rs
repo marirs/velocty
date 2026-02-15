@@ -15,7 +15,7 @@ use crate::models::settings::Setting;
 
 // ── Captcha Verification ──────────────────────────────
 
-/// Verify a captcha token using whichever captcha provider is enabled.
+/// Verify a captcha token using the specified provider (or auto-detect).
 /// Returns Ok(true) if verified, Ok(false) if failed, Err on config/network error.
 /// If no captcha provider is enabled, returns Ok(true) (pass-through).
 pub fn verify_captcha(
@@ -24,25 +24,79 @@ pub fn verify_captcha(
     remote_ip: Option<&str>,
 ) -> Result<bool, String> {
     let settings: HashMap<String, String> = Setting::all(pool);
+    verify_captcha_with_settings(&settings, token, remote_ip)
+}
 
-    // Check login_captcha_enabled first — if disabled, skip captcha entirely
+/// Verify a captcha token for login specifically.
+/// Checks login_captcha_enabled and login_captcha_provider settings.
+pub fn verify_login_captcha(
+    pool: &DbPool,
+    token: &str,
+    remote_ip: Option<&str>,
+) -> Result<bool, String> {
+    let settings: HashMap<String, String> = Setting::all(pool);
+
     if settings.get("login_captcha_enabled").map(|v| v.as_str()) != Some("true") {
         return Ok(true);
     }
 
-    // Try each captcha provider in priority order
-    if settings.get("security_recaptcha_enabled").map(|v| v.as_str()) == Some("true") {
-        return recaptcha::verify(&settings, token, remote_ip);
-    }
-    if settings.get("security_turnstile_enabled").map(|v| v.as_str()) == Some("true") {
-        return turnstile::verify(&settings, token, remote_ip);
-    }
-    if settings.get("security_hcaptcha_enabled").map(|v| v.as_str()) == Some("true") {
-        return hcaptcha::verify(&settings, token, remote_ip);
+    let provider = settings.get("login_captcha_provider").map(|v| v.as_str()).unwrap_or("");
+    if provider.is_empty() {
+        return Ok(true);
     }
 
-    // No captcha provider enabled — pass through
+    match provider {
+        "recaptcha" => recaptcha::verify(&settings, token, remote_ip),
+        "turnstile" => turnstile::verify(&settings, token, remote_ip),
+        "hcaptcha" => hcaptcha::verify(&settings, token, remote_ip),
+        _ => Ok(true),
+    }
+}
+
+/// Internal: verify using auto-detected provider from settings.
+fn verify_captcha_with_settings(
+    settings: &HashMap<String, String>,
+    token: &str,
+    remote_ip: Option<&str>,
+) -> Result<bool, String> {
+    if settings.get("security_recaptcha_enabled").map(|v| v.as_str()) == Some("true") {
+        return recaptcha::verify(settings, token, remote_ip);
+    }
+    if settings.get("security_turnstile_enabled").map(|v| v.as_str()) == Some("true") {
+        return turnstile::verify(settings, token, remote_ip);
+    }
+    if settings.get("security_hcaptcha_enabled").map(|v| v.as_str()) == Some("true") {
+        return hcaptcha::verify(settings, token, remote_ip);
+    }
     Ok(true)
+}
+
+/// Get login captcha info for rendering on the login page.
+/// Returns None if login captcha is disabled.
+pub fn login_captcha_info(pool: &DbPool) -> Option<CaptchaInfo> {
+    let settings: HashMap<String, String> = Setting::all(pool);
+    if settings.get("login_captcha_enabled").map(|v| v.as_str()) != Some("true") {
+        return None;
+    }
+    let provider = settings.get("login_captcha_provider").map(|v| v.as_str()).unwrap_or("");
+    match provider {
+        "recaptcha" => Some(CaptchaInfo {
+            provider: "recaptcha".into(),
+            site_key: settings.get("security_recaptcha_site_key").cloned().unwrap_or_default(),
+            version: settings.get("security_recaptcha_version").cloned().unwrap_or_else(|| "v3".to_string()),
+        }),
+        "turnstile" => Some(CaptchaInfo {
+            provider: "turnstile".into(),
+            site_key: settings.get("security_turnstile_site_key").cloned().unwrap_or_default(),
+            version: String::new(),
+        }),
+        "hcaptcha" => Some(CaptchaInfo {
+            provider: "hcaptcha".into(),
+            site_key: settings.get("security_hcaptcha_site_key").cloned().unwrap_or_default(),
+            version: String::new(),
+        }),
+        _ => None,
+    }
 }
 
 /// Get the active captcha provider name and site key for frontend rendering.

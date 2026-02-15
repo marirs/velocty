@@ -3,7 +3,7 @@ use rocket::State;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::security::auth;
+use crate::security::{self, auth};
 use crate::db::DbPool;
 use crate::models::comment::{Comment, CommentForm};
 use crate::models::portfolio::PortfolioItem;
@@ -117,6 +117,8 @@ pub struct CommentSubmit {
     pub author_email: Option<String>,
     pub body: String,
     pub honeypot: Option<String>,
+    pub captcha_token: Option<String>,
+    pub ip: Option<String>,
 }
 
 #[post("/comment", format = "json", data = "<form>")]
@@ -137,6 +139,26 @@ pub fn comment_submit(
             "success": false,
             "error": "Too many comments. Please wait before posting again."
         }));
+    }
+
+    // Captcha verification
+    if let Some(ref token) = form.captcha_token {
+        match security::verify_captcha(pool, token, form.ip.as_deref()) {
+            Ok(false) => return Json(json!({"success": false, "error": "Captcha verification failed"})),
+            Err(e) => log::warn!("Captcha error (allowing): {}", e),
+            _ => {}
+        }
+    } else if security::has_captcha_provider(pool) {
+        return Json(json!({"success": false, "error": "Captcha token required"}));
+    }
+
+    // Spam detection
+    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
+    let user_ip = form.ip.as_deref().unwrap_or("unknown");
+    match security::check_spam(pool, &site_url, user_ip, "", &form.body, Some(&form.author_name), form.author_email.as_deref()) {
+        Ok(true) => return Json(json!({"success": false, "error": "Your comment was flagged as spam"})),
+        Err(e) => log::warn!("Spam check error (allowing): {}", e),
+        _ => {}
     }
 
     let comment_form = CommentForm {

@@ -756,6 +756,7 @@ fn render_blog_single(context: &Value) -> String {
         Some(p) => p,
         None => return render_404(context),
     };
+    let settings = context.get("settings").cloned().unwrap_or_default();
 
     let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
     let content = post
@@ -817,18 +818,110 @@ fn render_blog_single(context: &Value) -> String {
         }
 
         // Comment form
+        let post_id = post.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+
+        // Captcha widget — derive provider and site key from security settings
+        let sg = |key: &str| -> String {
+            settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+        };
+        let (captcha_provider, captcha_site_key): (String, String) = if sg("security_recaptcha_enabled") == "true" {
+            ("recaptcha".into(), sg("security_recaptcha_site_key"))
+        } else if sg("security_turnstile_enabled") == "true" {
+            ("turnstile".into(), sg("security_turnstile_site_key"))
+        } else if sg("security_hcaptcha_enabled") == "true" {
+            ("hcaptcha".into(), sg("security_hcaptcha_site_key"))
+        } else {
+            (String::new(), String::new())
+        };
+        let mut captcha_html = String::new();
+        let mut captcha_script = String::new();
+        let mut captcha_get_token_js = "null".to_string();
+
+        if !captcha_provider.is_empty() && !captcha_site_key.is_empty() {
+            match captcha_provider.as_str() {
+                "recaptcha" => {
+                    let version = settings.get("security_recaptcha_version").and_then(|v| v.as_str()).unwrap_or("v3");
+                    if version == "v3" {
+                        captcha_script = format!(r#"<script src="https://www.google.com/recaptcha/api.js?render={}"></script>"#, captcha_site_key);
+                        captcha_get_token_js = format!("function(){{return grecaptcha.execute('{}',{{action:'comment'}})}}", captcha_site_key);
+                    } else {
+                        captcha_script = "https://www.google.com/recaptcha/api.js".to_string();
+                        captcha_html = format!(r#"<div class="g-recaptcha" data-sitekey="{}"></div>"#, captcha_site_key);
+                        captcha_get_token_js = "function(){return Promise.resolve(grecaptcha.getResponse())}".to_string();
+                    }
+                }
+                "turnstile" => {
+                    captcha_script = "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string();
+                    captcha_html = format!(r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#, captcha_site_key);
+                    captcha_get_token_js = "function(){return Promise.resolve(document.querySelector('[name=cf-turnstile-response]').value)}".to_string();
+                }
+                "hcaptcha" => {
+                    captcha_script = "https://js.hcaptcha.com/1/api.js".to_string();
+                    captcha_html = format!(r#"<div class="h-captcha" data-sitekey="{}"></div>"#, captcha_site_key);
+                    captcha_get_token_js = "function(){return Promise.resolve(hcaptcha.getResponse())}".to_string();
+                }
+                _ => {}
+            }
+            if captcha_script.starts_with("https://") {
+                captcha_script = format!(r#"<script src="{}"></script>"#, captcha_script);
+            }
+        }
+
         html.push_str(&format!(
             r#"<section class="comment-form">
     <h3>Leave a Comment</h3>
-    <form id="comment-form" data-post-id="{}" data-content-type="post">
+    {captcha_script}
+    <form id="comment-form" data-post-id="{post_id}" data-content-type="post">
         <input type="text" name="author_name" placeholder="Name" required>
         <input type="email" name="author_email" placeholder="Email">
         <textarea name="body" placeholder="Your comment..." required></textarea>
         <div style="display:none"><input type="text" name="honeypot"></div>
+        {captcha_html}
         <button type="submit">Submit</button>
+        <p id="comment-msg" style="margin-top:8px;font-size:13px;display:none"></p>
     </form>
-</section>"#,
-            post.get("id").and_then(|v| v.as_i64()).unwrap_or(0)
+</section>
+<script>
+(function(){{
+var f=document.getElementById('comment-form');
+if(!f)return;
+var getToken={captcha_get_token_js};
+f.addEventListener('submit',function(e){{
+    e.preventDefault();
+    var btn=f.querySelector('button[type=submit]');
+    btn.disabled=true;btn.textContent='Submitting...';
+    var msg=document.getElementById('comment-msg');
+    msg.style.display='none';
+    var data={{
+        post_id:parseInt(f.dataset.postId),
+        content_type:f.dataset.contentType||'post',
+        author_name:f.querySelector('[name=author_name]').value,
+        author_email:f.querySelector('[name=author_email]').value||null,
+        body:f.querySelector('[name=body]').value,
+        honeypot:f.querySelector('[name=honeypot]').value||null
+    }};
+    var go=function(token){{
+        if(token)data.captcha_token=token;
+        fetch('/api/comment',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(data)}})
+        .then(function(r){{return r.json()}})
+        .then(function(j){{
+            msg.style.display='';
+            if(j.success){{msg.style.color='green';msg.textContent=j.message||'Comment submitted';f.reset();}}
+            else{{msg.style.color='red';msg.textContent=j.error||'Failed';}}
+        }})
+        .catch(function(){{msg.style.display='';msg.style.color='red';msg.textContent='Network error';}})
+        .finally(function(){{btn.disabled=false;btn.textContent='Submit';}});
+    }};
+    if(typeof getToken==='function'){{
+        Promise.resolve(getToken()).then(go).catch(function(){{go(null)}});
+    }}else{{go(null);}}
+}});
+}})();
+</script>"#,
+            captcha_script = captcha_script,
+            post_id = post_id,
+            captcha_html = captcha_html,
+            captcha_get_token_js = captcha_get_token_js,
         ));
     }
 

@@ -6,17 +6,20 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::security::{auth, magic_link, mfa};
+use crate::security::{self, auth, magic_link, mfa};
 use crate::db::DbPool;
 use crate::models::settings::Setting;
 use crate::rate_limit::RateLimiter;
 use crate::AdminSlug;
+
+use super::login::inject_captcha_context;
 
 use super::super::NoCacheTemplate;
 
 #[derive(Debug, FromForm, Deserialize)]
 pub struct MagicLinkForm {
     pub email: String,
+    pub captcha_token: Option<String>,
 }
 
 // ── Request Magic Link ────────────────────────────────
@@ -31,6 +34,7 @@ pub fn magic_link_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> R
     let mut ctx: HashMap<String, String> = HashMap::new();
     ctx.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    inject_captcha_context(pool, &mut ctx);
     Ok(NoCacheTemplate(Template::render("admin/magic_link", &ctx)))
 }
 
@@ -50,6 +54,21 @@ pub fn magic_link_submit(
         ctx.insert("admin_theme".to_string(), theme);
         ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
         return Err(Template::render("admin/magic_link", &ctx));
+    }
+
+    // Verify login captcha
+    let captcha_token = form.captcha_token.as_deref().unwrap_or("");
+    match security::verify_login_captcha(pool, captcha_token, None) {
+        Ok(false) => {
+            let mut ctx = HashMap::new();
+            ctx.insert("error".to_string(), "Captcha verification failed. Please try again.".to_string());
+            ctx.insert("admin_theme".to_string(), theme.clone());
+            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+            inject_captcha_context(pool, &mut ctx);
+            return Err(Template::render("admin/magic_link", &ctx));
+        }
+        Err(e) => log::warn!("Login captcha error (allowing): {}", e),
+        _ => {}
     }
 
     // Rate limit magic link requests
