@@ -546,6 +546,110 @@ fieldset:disabled {
     border-color: var(--text-tertiary);
 }
 
+.btn-ai-suggest {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    cursor: pointer;
+    vertical-align: middle;
+    margin-left: 6px;
+    transition: all 150ms;
+    font-family: inherit;
+    line-height: 1.4;
+}
+.btn-ai-suggest:hover {
+    background: var(--accent);
+    color: #fff;
+}
+.btn-ai-suggest:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.ai-inline-bar {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    position: absolute;
+    z-index: 10000;
+    flex-wrap: wrap;
+}
+.ai-inline-bar button {
+    padding: 4px 10px;
+    font-size: 11px;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-input);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 150ms;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.ai-inline-bar button:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+.ai-inline-bar button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.ai-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: 380px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    animation: aiToastIn 0.25s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ai-toast-info {
+    background: var(--bg-card);
+    border: 1px solid var(--accent);
+    color: var(--text-primary);
+}
+.ai-toast-error {
+    background: var(--bg-card);
+    border: 1px solid var(--danger, #ef4444);
+    color: var(--danger, #ef4444);
+}
+@keyframes aiToastIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-generate-bar {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-top: 8px;
+}
+.ai-generate-bar input {
+    flex: 1;
+}
+.ai-generate-bar button {
+    white-space: nowrap;
+}
+
 .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
 .btn-lg { padding: 12px 24px; font-size: 15px; border-radius: 10px; }
 .btn-full { width: 100%; justify-content: center; }

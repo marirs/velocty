@@ -89,12 +89,16 @@ pub fn posts_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug
     let categories = Category::list(pool, Some("post"));
     let tags = Tag::list(pool);
 
+    let ai_enabled = crate::ai::is_enabled(pool);
+    let ai_has_vision = crate::ai::has_vision_provider(pool);
     let context = json!({
         "page_title": "New Post",
         "admin_slug": slug.0,
         "categories": categories,
         "tags": tags,
         "settings": Setting::all(pool),
+        "ai_enabled": ai_enabled,
+        "ai_has_vision": ai_has_vision,
     });
 
     Template::render("admin/posts/edit", &context)
@@ -108,6 +112,8 @@ pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlu
     let post_categories = Category::for_content(pool, id, "post");
     let post_tags = Tag::for_content(pool, id, "post");
 
+    let ai_enabled = crate::ai::is_enabled(pool);
+    let ai_has_vision = crate::ai::has_vision_provider(pool);
     let context = json!({
         "page_title": "Edit Post",
         "post": post,
@@ -117,6 +123,8 @@ pub fn posts_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlu
         "post_tags": post_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
+        "ai_enabled": ai_enabled,
+        "ai_has_vision": ai_has_vision,
     });
 
     Some(Template::render("admin/posts/edit", &context))
@@ -168,12 +176,16 @@ pub fn portfolio_new(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Admin
     let categories = Category::list(pool, Some("portfolio"));
     let tags = Tag::list(pool);
 
+    let ai_enabled = crate::ai::is_enabled(pool);
+    let ai_has_vision = crate::ai::has_vision_provider(pool);
     let context = json!({
         "page_title": "New Portfolio Item",
         "admin_slug": slug.0,
         "categories": categories,
         "tags": tags,
         "settings": Setting::all(pool),
+        "ai_enabled": ai_enabled,
+        "ai_has_vision": ai_has_vision,
     });
 
     Template::render("admin/portfolio/edit", &context)
@@ -187,6 +199,8 @@ pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Admi
     let item_categories = Category::for_content(pool, id, "portfolio");
     let item_tags = Tag::for_content(pool, id, "portfolio");
 
+    let ai_enabled = crate::ai::is_enabled(pool);
+    let ai_has_vision = crate::ai::has_vision_provider(pool);
     let context = json!({
         "page_title": "Edit Portfolio Item",
         "item": item,
@@ -196,6 +210,8 @@ pub fn portfolio_edit(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Admi
         "item_tags": item_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
+        "ai_enabled": ai_enabled,
+        "ai_has_vision": ai_has_vision,
     });
 
     Some(Template::render("admin/portfolio/edit", &context))
@@ -740,6 +756,7 @@ pub fn settings_save(
             ("ai_openai_enabled", "OpenAI", vec!["ai_openai_api_key"]),
             ("ai_gemini_enabled", "Gemini", vec!["ai_gemini_api_key"]),
             ("ai_cloudflare_enabled", "Cloudflare Workers AI", vec!["ai_cloudflare_account_id", "ai_cloudflare_api_token"]),
+            ("ai_groq_enabled", "Groq", vec!["ai_groq_api_key"]),
         ],
         _ => vec![],
     };
@@ -826,8 +843,8 @@ pub fn settings_save(
     // explicitly reset all known boolean keys for this section first.
     let checkbox_keys: &[&str] = match section {
         "ai" => &[
-            "ai_local_enabled", "ai_ollama_enabled", "ai_openai_enabled",
-            "ai_gemini_enabled", "ai_cloudflare_enabled",
+            "ai_ollama_enabled", "ai_openai_enabled",
+            "ai_gemini_enabled", "ai_cloudflare_enabled", "ai_groq_enabled",
             "ai_suggest_meta", "ai_suggest_tags", "ai_suggest_categories",
             "ai_suggest_alt_text", "ai_suggest_slug", "ai_theme_generation",
             "ai_post_generation",

@@ -22,10 +22,10 @@
 
 <div class="sub-tabs">
     <button type="button" class="tab active" data-ai-tab="tab-ai-failover">Failover Chain</button>
-    <button type="button" class="tab" data-ai-tab="tab-ai-local">Local LLM{% if settings.ai_local_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-ai-tab="tab-ai-ollama">Ollama{% if settings.ai_ollama_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-ai-tab="tab-ai-openai">OpenAI{% if settings.ai_openai_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-ai-tab="tab-ai-gemini">Gemini{% if settings.ai_gemini_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-ai-tab="tab-ai-groq">Groq{% if settings.ai_groq_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-ai-tab="tab-ai-cloudflare">Cloudflare{% if settings.ai_cloudflare_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
@@ -36,71 +36,31 @@
             <h3>AI Failover Chain</h3>
             <p class="text-muted" style="margin-bottom:16px">Drag to reorder. If the primary provider fails, the next enabled provider in the chain will be used automatically.</p>
             <div id="failover-chain" class="failover-list">
-                {% set chain = settings.ai_failover_chain | default(value='local,ollama,openai,gemini,cloudflare') %}
+                {% set chain = settings.ai_failover_chain | default(value='ollama,openai,gemini,groq,cloudflare') %}
                 {% for provider in chain | split(pat=',') %}
-                {% if provider == 'local' and settings.ai_local_enabled == 'true'
-                    or provider == 'ollama' and settings.ai_ollama_enabled == 'true'
+                {% if provider == 'ollama' and settings.ai_ollama_enabled == 'true'
                     or provider == 'openai' and settings.ai_openai_enabled == 'true'
                     or provider == 'gemini' and settings.ai_gemini_enabled == 'true'
+                    or provider == 'groq' and settings.ai_groq_enabled == 'true'
                     or provider == 'cloudflare' and settings.ai_cloudflare_enabled == 'true' %}
                 <div class="failover-item" data-provider="{{ provider }}" draggable="true">
                     <span class="failover-handle">⠿</span>
-                    <span class="failover-name">{% if provider == 'local' %}Local LLM (Embedded){% elif provider == 'ollama' %}Ollama (Server){% elif provider == 'openai' %}OpenAI{% elif provider == 'gemini' %}Gemini{% elif provider == 'cloudflare' %}Cloudflare Workers AI{% endif %}</span>
+                    <span class="failover-name">{% if provider == 'ollama' %}Ollama (Local){% elif provider == 'openai' %}OpenAI{% elif provider == 'gemini' %}Gemini{% elif provider == 'groq' %}Groq{% elif provider == 'cloudflare' %}Cloudflare Workers AI{% endif %}</span>
                     <span class="failover-badge"><span class="badge badge-published">Enabled</span></span>
                 </div>
                 {% endif %}
                 {% endfor %}
             </div>
             <p class="text-muted" style="font-size:13px;margin-top:8px">Only enabled providers appear here. Enable providers in their respective tabs.</p>
-            <input type="hidden" id="ai_failover_chain" name="ai_failover_chain" value="{{ settings.ai_failover_chain | default(value='local,ollama,openai,gemini,cloudflare') }}">
-        </div>
-    </div>
-
-    <div id="tab-ai-local" style="display:none">
-        <div class="form-card">
-            <h3>Local LLM (Embedded)</h3>
-            <p class="text-muted" style="margin-bottom:12px">Run a small language model directly inside Velocty — no external server needed. Ideal for auto-tagging, categorisation, meta descriptions, and slug suggestions.</p>
-            <label class="checkbox-item"><input type="checkbox" id="ai_local_enabled" name="ai_local_enabled" value="true" {% if settings.ai_local_enabled == "true" %}checked{% endif %}> Enable Local LLM</label>
-            <div class="form-group" style="margin-top:16px">
-                <label for="ai_local_model">Model</label>
-                <select id="ai_local_model" name="ai_local_model">
-                    <option value="smollm2-1.7b" {% if settings.ai_local_model == "smollm2-1.7b" %}selected{% endif %}>SmolLM2 1.7B (~1.0 GB) — fast, lightweight</option>
-                    <option value="smollm2-360m" {% if settings.ai_local_model == "smollm2-360m" %}selected{% endif %}>SmolLM2 360M (~250 MB) — ultra-light</option>
-                    <option value="tinyllama-1.1b" {% if settings.ai_local_model == "tinyllama-1.1b" %}selected{% endif %}>TinyLlama 1.1B (~700 MB) — general purpose</option>
-                    <option value="phi-2" {% if settings.ai_local_model == "phi-2" %}selected{% endif %}>Phi-2 2.7B (~1.8 GB) — higher quality</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Model Status</label>
-                <div id="local-model-status">
-                    {% if settings.ai_local_model_downloaded == "true" %}
-                    <span class="badge badge-published">Downloaded</span>
-                    <span class="text-muted" style="margin-left:8px;font-size:13px">Ready to use</span>
-                    {% else %}
-                    <span class="badge badge-draft">Not Downloaded</span>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="form-group">
-                <button type="button" id="download-local-model" class="btn btn-primary" onclick="downloadLocalModel()" {% if settings.ai_local_enabled != "true" %}disabled{% endif %}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Download Model
-                </button>
-                <div id="download-progress" style="display:none;margin-top:12px">
-                    <div style="background:var(--bg-input);border-radius:6px;height:8px;overflow:hidden">
-                        <div id="download-bar" style="background:var(--accent);height:100%;width:0%;transition:width 300ms"></div>
-                    </div>
-                    <span id="download-status" class="text-muted" style="font-size:12px;margin-top:4px;display:block">Preparing download...</span>
-                </div>
-                <span class="form-help">Downloads the selected model to <code>website/models/</code>. Only needs to be done once per model.</span>
-            </div>
+            <input type="hidden" id="ai_failover_chain" name="ai_failover_chain" value="{{ settings.ai_failover_chain | default(value='ollama,openai,gemini,groq,cloudflare') }}">
         </div>
     </div>
 
     <div id="tab-ai-ollama" style="display:none">
         <div class="form-card">
             <h3>Ollama (Local)</h3>
-            <label class="checkbox-item"><input type="checkbox" name="ai_ollama_enabled" value="true" {% if settings.ai_ollama_enabled == "true" %}checked{% endif %}> Enable Ollama</label>
+            <label class="checkbox-item"><input type="checkbox" name="ai_ollama_enabled" value="true" data-provider-toggle {% if settings.ai_ollama_enabled == "true" %}checked{% endif %}> Enable Ollama</label>
+            <fieldset {% if settings.ai_ollama_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
             <div class="form-group" style="margin-top:16px">
                 <label for="ai_ollama_url">Server URL</label>
                 <input type="text" id="ai_ollama_url" name="ai_ollama_url" value="{{ settings.ai_ollama_url | default(value='http://localhost:11434') }}" placeholder="http://localhost:11434">
@@ -109,13 +69,15 @@
                 <label for="ai_ollama_model">Model</label>
                 <input type="text" id="ai_ollama_model" name="ai_ollama_model" value="{{ settings.ai_ollama_model | default(value='') }}" placeholder="e.g. llama3, mistral, codellama">
             </div>
+            </fieldset>
         </div>
     </div>
 
     <div id="tab-ai-openai" style="display:none">
         <div class="form-card">
             <h3>OpenAI</h3>
-            <label class="checkbox-item"><input type="checkbox" name="ai_openai_enabled" value="true" {% if settings.ai_openai_enabled == "true" %}checked{% endif %}> Enable OpenAI</label>
+            <label class="checkbox-item"><input type="checkbox" name="ai_openai_enabled" value="true" data-provider-toggle {% if settings.ai_openai_enabled == "true" %}checked{% endif %}> Enable OpenAI</label>
+            <fieldset {% if settings.ai_openai_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
             <div class="form-group" style="margin-top:16px">
                 <label for="ai_openai_api_key">API Key</label>
                 <input type="password" id="ai_openai_api_key" name="ai_openai_api_key" value="{{ settings.ai_openai_api_key | default(value='') }}" placeholder="sk-...">
@@ -129,13 +91,15 @@
                 <input type="text" id="ai_openai_base_url" name="ai_openai_base_url" value="{{ settings.ai_openai_base_url | default(value='') }}" placeholder="https://api.openai.com/v1">
                 <span class="form-help">Override for OpenAI-compatible APIs (e.g. Azure, local proxies)</span>
             </div>
+            </fieldset>
         </div>
     </div>
 
     <div id="tab-ai-gemini" style="display:none">
         <div class="form-card">
             <h3>Gemini</h3>
-            <label class="checkbox-item"><input type="checkbox" name="ai_gemini_enabled" value="true" {% if settings.ai_gemini_enabled == "true" %}checked{% endif %}> Enable Gemini</label>
+            <label class="checkbox-item"><input type="checkbox" name="ai_gemini_enabled" value="true" data-provider-toggle {% if settings.ai_gemini_enabled == "true" %}checked{% endif %}> Enable Gemini</label>
+            <fieldset {% if settings.ai_gemini_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
             <div class="form-group" style="margin-top:16px">
                 <label for="ai_gemini_api_key">API Key</label>
                 <input type="password" id="ai_gemini_api_key" name="ai_gemini_api_key" value="{{ settings.ai_gemini_api_key | default(value='') }}" placeholder="AIza...">
@@ -144,13 +108,40 @@
                 <label for="ai_gemini_model">Model</label>
                 <input type="text" id="ai_gemini_model" name="ai_gemini_model" value="{{ settings.ai_gemini_model | default(value='gemini-pro') }}" placeholder="e.g. gemini-pro, gemini-1.5-pro">
             </div>
+            </fieldset>
+        </div>
+    </div>
+
+    <div id="tab-ai-groq" style="display:none">
+        <div class="form-card">
+            <h3>Groq</h3>
+            <p class="text-muted" style="margin-bottom:12px">Blazing fast inference (~500 tokens/sec). Free tier available. Supports text and vision models.</p>
+            <label class="checkbox-item"><input type="checkbox" name="ai_groq_enabled" value="true" data-provider-toggle {% if settings.ai_groq_enabled == "true" %}checked{% endif %}> Enable Groq</label>
+            <fieldset {% if settings.ai_groq_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="ai_groq_api_key">API Key</label>
+                <input type="password" id="ai_groq_api_key" name="ai_groq_api_key" value="{{ settings.ai_groq_api_key | default(value='') }}" placeholder="gsk_...">
+                <span class="form-help">Get a free API key at <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent)">console.groq.com/keys</a></span>
+            </div>
+            <div class="form-group">
+                <label for="ai_groq_model">Model</label>
+                <select id="ai_groq_model" name="ai_groq_model">
+                    <option value="llama-3.3-70b-versatile" {% if settings.ai_groq_model == "llama-3.3-70b-versatile" %}selected{% endif %}>Llama 3.3 70B Versatile — best quality</option>
+                    <option value="llama-3.1-8b-instant" {% if settings.ai_groq_model == "llama-3.1-8b-instant" %}selected{% endif %}>Llama 3.1 8B Instant — fastest</option>
+                    <option value="llama-3.2-11b-vision-preview" {% if settings.ai_groq_model == "llama-3.2-11b-vision-preview" %}selected{% endif %}>Llama 3.2 11B Vision — text + images</option>
+                    <option value="mixtral-8x7b-32768" {% if settings.ai_groq_model == "mixtral-8x7b-32768" %}selected{% endif %}>Mixtral 8x7B — 32K context</option>
+                    <option value="gemma2-9b-it" {% if settings.ai_groq_model == "gemma2-9b-it" %}selected{% endif %}>Gemma 2 9B — Google's model</option>
+                </select>
+            </div>
+            </fieldset>
         </div>
     </div>
 
     <div id="tab-ai-cloudflare" style="display:none">
         <div class="form-card">
             <h3>Cloudflare Workers AI</h3>
-            <label class="checkbox-item"><input type="checkbox" name="ai_cloudflare_enabled" value="true" {% if settings.ai_cloudflare_enabled == "true" %}checked{% endif %}> Enable Cloudflare Workers AI</label>
+            <label class="checkbox-item"><input type="checkbox" name="ai_cloudflare_enabled" value="true" data-provider-toggle {% if settings.ai_cloudflare_enabled == "true" %}checked{% endif %}> Enable Cloudflare Workers AI</label>
+            <fieldset {% if settings.ai_cloudflare_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
             <div class="form-group" style="margin-top:16px">
                 <label for="ai_cloudflare_account_id">Account ID</label>
                 <input type="text" id="ai_cloudflare_account_id" name="ai_cloudflare_account_id" value="{{ settings.ai_cloudflare_account_id | default(value='') }}" placeholder="Your Cloudflare account ID">
@@ -163,6 +154,7 @@
                 <label for="ai_cloudflare_model">Model</label>
                 <input type="text" id="ai_cloudflare_model" name="ai_cloudflare_model" value="{{ settings.ai_cloudflare_model | default(value='@cf/meta/llama-3-8b-instruct') }}" placeholder="e.g. @cf/meta/llama-3-8b-instruct">
             </div>
+            </fieldset>
         </div>
     </div>
 
@@ -175,7 +167,7 @@
 (function() {
     // Sub-tab switching
     var tabs = document.querySelectorAll('[data-ai-tab]');
-    var panels = ['tab-ai-failover','tab-ai-local','tab-ai-ollama','tab-ai-openai','tab-ai-gemini','tab-ai-cloudflare'];
+    var panels = ['tab-ai-failover','tab-ai-ollama','tab-ai-openai','tab-ai-gemini','tab-ai-groq','tab-ai-cloudflare'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
@@ -228,59 +220,13 @@
         items.forEach(function(item) { order.push(item.dataset.provider); });
         hiddenChain.value = order.join(',');
     }
-    // Toggle download button based on Enable Local LLM checkbox
-    var localToggle = document.getElementById('ai_local_enabled');
-    var dlBtn = document.getElementById('download-local-model');
-    if (localToggle && dlBtn) {
-        localToggle.addEventListener('change', function() {
-            dlBtn.disabled = !this.checked;
+    // Provider toggle: enable/disable fieldset when checkbox changes
+    document.querySelectorAll('[data-provider-toggle]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var fs = this.closest('.form-card').querySelector('fieldset');
+            if (fs) fs.disabled = !this.checked;
         });
-    }
+    });
 })();
-
-function downloadLocalModel() {
-    var model = document.getElementById('ai_local_model').value;
-    var btn = document.getElementById('download-local-model');
-    var progress = document.getElementById('download-progress');
-    var bar = document.getElementById('download-bar');
-    var status = document.getElementById('download-status');
-
-    btn.disabled = true;
-    btn.textContent = 'Downloading...';
-    progress.style.display = '';
-    bar.style.width = '0%';
-    status.textContent = 'Starting download of ' + model + '...';
-
-    var es = new EventSource('/{{ admin_slug }}/api/ai/download-model?model=' + encodeURIComponent(model));
-    es.onmessage = function(e) {
-        var data = JSON.parse(e.data);
-        if (data.progress !== undefined) {
-            bar.style.width = data.progress + '%';
-            status.textContent = data.status || ('Downloading... ' + data.progress + '%');
-        }
-        if (data.done) {
-            es.close();
-            bar.style.width = '100%';
-            status.textContent = 'Download complete!';
-            btn.textContent = 'Download Model';
-            btn.disabled = false;
-            document.getElementById('local-model-status').innerHTML =
-                '<span class="badge badge-published">Downloaded</span>' +
-                '<span class="text-muted" style="margin-left:8px;font-size:13px">Ready to use</span>';
-        }
-        if (data.error) {
-            es.close();
-            status.textContent = 'Error: ' + data.error;
-            btn.textContent = 'Retry Download';
-            btn.disabled = false;
-        }
-    };
-    es.onerror = function() {
-        es.close();
-        status.textContent = 'Connection lost. Please try again.';
-        btn.textContent = 'Retry Download';
-        btn.disabled = false;
-    };
-}
 </script>
 {% endblock scripts %}

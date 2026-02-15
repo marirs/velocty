@@ -12,13 +12,24 @@
 <form id="post-form" method="post" action="{% if post %}/{{ admin_slug }}/posts/{{ post.id }}/edit{% else %}/{{ admin_slug }}/posts/new{% endif %}" enctype="multipart/form-data">
     <div class="editor-layout">
         <div class="editor-main">
+            {% if ai_enabled and not post %}
+            <div class="form-card" id="ai-generate-section">
+                <h4>✨ Generate with AI</h4>
+                <p class="text-muted" style="font-size:13px;margin-bottom:8px">Describe what you want to write about and AI will generate a full post.</p>
+                <div class="ai-generate-bar">
+                    <input type="text" id="ai-generate-input" placeholder="e.g. A beginner's guide to landscape photography with tips on composition and lighting" style="flex:1">
+                    <button type="button" id="ai-generate-btn" class="btn btn-primary btn-sm" onclick="aiGeneratePost()">✨ Generate</button>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="form-card">
                 <div class="form-group">
-                    <label for="title">Title</label>
+                    <label for="title">Title {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestTitleOpen()" title="AI Suggest Title">✨ Suggest</button>{% endif %}</label>
                     <input type="text" id="title" name="title" value="{% if post %}{{ post.title }}{% endif %}" required class="input-lg">
                 </div>
                 <div class="form-group">
-                    <label for="slug">Slug</label>
+                    <label for="slug">Slug {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestSlug()" title="AI Suggest Slug">✨ Suggest</button>{% endif %}</label>
                     <input type="text" id="slug" name="slug" value="{% if post %}{{ post.slug }}{% endif %}" required>
                 </div>
                 <div class="form-group">
@@ -66,7 +77,7 @@
             </div>
 
             <div class="form-card collapsible">
-                <h4>Tags</h4>
+                <h4>Tags {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestTags()" title="AI Suggest Tags">✨ Suggest</button>{% endif %}</h4>
                 <div class="form-group">
                     <input type="text" name="tag_input" placeholder="Type to add tags..." class="tag-input">
                     <div class="tag-list">
@@ -82,7 +93,7 @@
             </div>
 
             <div class="form-card collapsible">
-                <h4>SEO</h4>
+                <h4>SEO {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestMeta()" title="AI Suggest Meta">✨ Suggest</button>{% endif %}</h4>
                 <div class="form-group">
                     <label for="meta_title">Meta Title</label>
                     <input type="text" id="meta_title" name="meta_title" value="{% if post %}{{ post.meta_title | default(value="") }}{% endif %}" maxlength="60">
@@ -106,6 +117,7 @@
         </div>
     </div>
 </form>
+
 {% endblock content %}
 
 {% block scripts %}
@@ -114,7 +126,7 @@
     tinymce.init({
         selector: '#content',
         plugins: 'lists advlist table link image media autolink code codesample searchreplace wordcount autoresize fullscreen quickbars charmap emoticons anchor visualblocks preview directionality',
-        toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat',
+        toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat{% if ai_enabled %} | aiassist{% endif %}',
         menubar: 'file edit view insert format tools table',
         height: 500,
         min_height: 400,
@@ -148,16 +160,31 @@
             { text: 'Java', value: 'java' },
             { text: 'C/C++', value: 'c' },
         ],
-        quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote',
+        quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote{% if ai_enabled %} | aiassist{% endif %}',
         quickbars_insert_toolbar: 'image media table hr codesample',
         setup: function(editor) {
             editor.on('init', function() {
-                // Sync TinyMCE content to textarea on form submit
                 var form = document.getElementById('post-form');
                 form.addEventListener('submit', function() {
                     editor.save();
                 });
             });
+            {% if ai_enabled %}
+            editor.ui.registry.addMenuButton('aiassist', {
+                text: '✨ AI',
+                fetch: function(callback) {
+                    var items = [
+                        {type:'menuitem', text:'Expand', onAction: function(){ aiInlineAssist(editor, 'expand'); }},
+                        {type:'menuitem', text:'Rewrite', onAction: function(){ aiInlineAssist(editor, 'rewrite'); }},
+                        {type:'menuitem', text:'Summarise', onAction: function(){ aiInlineAssist(editor, 'summarise'); }},
+                        {type:'menuitem', text:'Continue', onAction: function(){ aiInlineAssist(editor, 'continue'); }},
+                        {type:'menuitem', text:'More Formal', onAction: function(){ aiInlineAssist(editor, 'formal'); }},
+                        {type:'menuitem', text:'More Casual', onAction: function(){ aiInlineAssist(editor, 'casual'); }},
+                    ];
+                    callback(items);
+                }
+            });
+            {% endif %}
         }
     });
 
@@ -231,6 +258,173 @@
             zone.classList.remove('has-image');
         });
     })();
+
+    // AI Suggest functions
+    {% if ai_enabled %}
+    var AI_HAS_VISION = {{ ai_has_vision | default(value=false) }};
+    function aiToast(msg, type) {
+        var el = document.createElement('div');
+        el.className = 'ai-toast ai-toast-' + (type || 'info');
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(function() { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(function() { el.remove(); }, 300); }, 3500);
+    }
+    function fileToBase64(file) {
+        return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function() { resolve(reader.result.split(',')[1]); };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    function getFeaturedImageBase64() {
+        return new Promise(function(resolve) {
+            var fileInput = document.getElementById('featured-file');
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                fileToBase64(fileInput.files[0]).then(resolve).catch(function() { resolve(null); });
+            } else {
+                resolve(null);
+            }
+        });
+    }
+    function checkVision(imgB64) {
+        if (imgB64 && !AI_HAS_VISION) {
+            aiToast('Image analysis requires Ollama (with llava), OpenAI, or Gemini. Enable one in Settings → AI.', 'info');
+            return null;
+        }
+        return imgB64;
+    }
+    function aiSuggestTitleOpen() {
+        var excerpt = document.getElementById('excerpt').value || '';
+        getFeaturedImageBase64().then(function(imgB64) {
+            imgB64 = checkVision(imgB64);
+            if (!excerpt && !imgB64) {
+                aiToast('Enter an excerpt or upload a featured image first', 'info');
+                return;
+            }
+            var body = {};
+            if (excerpt) body.description = excerpt;
+            if (imgB64) body.image_base64 = imgB64;
+            aiCall('/{{ admin_slug }}/api/ai/suggest-title', body, function(data) {
+                if (data.title) {
+                    document.getElementById('title').value = data.title;
+                    document.getElementById('slug').value = data.title.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
+                    document.getElementById('slug').dataset.manual = 'true';
+                }
+            });
+        });
+    }
+    function aiSuggestMeta() {
+        var title = document.getElementById('title').value;
+        if (!title) { aiToast('Enter a title or upload a featured image first', 'info'); return; }
+        var excerpt = document.getElementById('excerpt').value || '';
+        if (!excerpt && tinymce.get('content')) {
+            excerpt = tinymce.get('content').getContent({format:'text'}).substring(0, 500);
+        }
+        getFeaturedImageBase64().then(function(imgB64) {
+            imgB64 = checkVision(imgB64);
+            var body = {title: title, content_excerpt: excerpt, content_type: 'post'};
+            if (imgB64) body.image_base64 = imgB64;
+            aiCall('/{{ admin_slug }}/api/ai/suggest-meta', body, function(data) {
+                if (data.meta_title) { document.getElementById('meta_title').value = data.meta_title; document.getElementById('meta_title').dispatchEvent(new Event('input')); }
+                if (data.meta_description) { document.getElementById('meta_description').value = data.meta_description; document.getElementById('meta_description').dispatchEvent(new Event('input')); }
+            });
+        });
+    }
+    function aiSuggestTags() {
+        var title = document.getElementById('title').value;
+        if (!title) { aiToast('Enter a title or upload a featured image first', 'info'); return; }
+        var excerpt = '';
+        if (tinymce.get('content')) { excerpt = tinymce.get('content').getContent({format:'text'}).substring(0, 500); }
+        getFeaturedImageBase64().then(function(imgB64) {
+            imgB64 = checkVision(imgB64);
+            var body = {title: title, content_excerpt: excerpt};
+            if (imgB64) body.image_base64 = imgB64;
+            aiCall('/{{ admin_slug }}/api/ai/suggest-tags', body, function(data) {
+                if (data.tags && data.tags.length) {
+                    var tagList = document.querySelector('.tag-list');
+                    data.tags.forEach(function(t) {
+                        var exists = false;
+                        tagList.querySelectorAll('.tag-pill').forEach(function(p) { if (p.textContent.trim().replace('\u00d7','').trim().toLowerCase() === t.toLowerCase()) exists = true; });
+                        if (!exists) {
+                            var pill = document.createElement('span');
+                            pill.className = 'tag-pill';
+                            pill.innerHTML = t + ' <button type="button" class="tag-remove" onclick="this.parentElement.remove()">&times;</button>';
+                            pill.dataset.tagName = t;
+                            tagList.appendChild(pill);
+                        }
+                    });
+                }
+            });
+        });
+    }
+    function aiSuggestSlug() {
+        var title = document.getElementById('title').value;
+        if (!title) { aiToast('Enter a title first', 'info'); return; }
+        aiCall('/{{ admin_slug }}/api/ai/suggest-slug', {title: title}, function(data) {
+            if (data.slug) { document.getElementById('slug').value = data.slug; document.getElementById('slug').dataset.manual = 'true'; }
+        });
+    }
+    function aiInlineAssist(editor, action) {
+        var selected = editor.selection.getContent();
+        if (!selected && action !== 'continue') { aiToast('Select some text first', 'info'); return; }
+        if (action === 'continue') {
+            selected = editor.getContent({format:'text'}).slice(-500);
+        }
+        editor.setProgressState(true);
+        aiCall('/{{ admin_slug }}/api/ai/inline-assist', {action: action, text: selected}, function(data) {
+            if (data.html) {
+                if (action === 'continue') {
+                    editor.selection.select(editor.getBody(), true);
+                    editor.selection.collapse(false);
+                    editor.insertContent(data.html);
+                } else {
+                    editor.selection.setContent(data.html);
+                }
+            }
+            editor.setProgressState(false);
+        }, function() { editor.setProgressState(false); });
+    }
+    function aiCall(url, body, onSuccess, onFinally) {
+        var btns = document.querySelectorAll('.btn-ai-suggest');
+        btns.forEach(function(b) { b.disabled = true; });
+        fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) { onSuccess(data); }
+                else { aiToast(data.error || 'Unknown error', 'error'); }
+            })
+            .catch(function(e) { aiToast('AI request failed: ' + e, 'error'); })
+            .finally(function() { btns.forEach(function(b) { b.disabled = false; }); if (onFinally) onFinally(); });
+    }
+    function aiGeneratePost() {
+        var desc = document.getElementById('ai-generate-input').value;
+        if (!desc) { aiToast('Enter a description for the post', 'info'); return; }
+        var btn = document.getElementById('ai-generate-btn');
+        btn.disabled = true; btn.textContent = 'Generating…';
+        aiCall('/{{ admin_slug }}/api/ai/generate-post', {description: desc}, function(data) {
+            if (data.title) document.getElementById('title').value = data.title;
+            if (data.title) {
+                document.getElementById('slug').value = data.title.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
+            }
+            if (data.content_html && tinymce.get('content')) {
+                tinymce.get('content').setContent(data.content_html);
+            }
+            if (data.excerpt) document.getElementById('excerpt').value = data.excerpt;
+            if (data.tags && data.tags.length) {
+                var tagList = document.querySelector('.tag-list');
+                data.tags.forEach(function(t) {
+                    var pill = document.createElement('span');
+                    pill.className = 'tag-pill';
+                    pill.innerHTML = t + ' <button type="button" class="tag-remove" onclick="this.parentElement.remove()">&times;</button>';
+                    pill.dataset.tagName = t;
+                    tagList.appendChild(pill);
+                });
+            }
+            document.getElementById('ai-generate-section').style.display = 'none';
+        }, function() { btn.disabled = false; btn.textContent = '✨ Generate'; });
+    }
+    {% endif %}
 
     // SEO Check
     function runSeoCheck(type, id) {

@@ -514,10 +514,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("downloads_expiry_hours", "48"),
         ("downloads_license_template", "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis license is granted by Oneguy (\"Licensor\") to the purchaser (\"Licensee\").\n\n1. GRANT OF LICENSE\nThe Licensor grants the Licensee a non-exclusive, non-transferable, worldwide license to use the purchased digital file (\"Work\") subject to the terms below.\n\n2. PERMITTED USES\n- Personal use (prints, wallpapers, personal projects)\n- Commercial use in a single end product (website, marketing material, publication)\n- Social media use with credit to the Licensor\n\n3. RESTRICTIONS\n- The Work may NOT be resold, sublicensed, or redistributed as-is\n- The Work may NOT be used in on-demand print services (POD) without a separate license\n- The Work may NOT be included in any competing stock/download service\n- The Work may NOT be used to train AI or machine learning models\n\n4. ATTRIBUTION\nAttribution is appreciated but not required for personal or commercial use.\n\n5. WARRANTY\nThe Work is provided \"as is\" without warranty of any kind. The Licensor is not liable for any damages arising from the use of the Work.\n\n6. TERMINATION\nThis license is effective until terminated. It terminates automatically if the Licensee breaches any terms. Upon termination, the Licensee must destroy all copies of the Work.\n\nBy downloading the Work, the Licensee agrees to these terms."),
         // AI (Phase 4 — defaults ready)
-        ("ai_failover_chain", "local,ollama,openai,gemini,cloudflare"),
-        ("ai_local_enabled", "false"),
-        ("ai_local_model", "smollm2-1.7b"),
-        ("ai_local_model_downloaded", "false"),
+        ("ai_failover_chain", "ollama,openai,gemini,groq,cloudflare"),
         ("ai_ollama_enabled", "false"),
         ("ai_ollama_url", "http://localhost:11434"),
         ("ai_ollama_model", ""),
@@ -532,6 +529,9 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("ai_cloudflare_account_id", ""),
         ("ai_cloudflare_api_token", ""),
         ("ai_cloudflare_model", "@cf/meta/llama-3-8b-instruct"),
+        ("ai_groq_enabled", "false"),
+        ("ai_groq_api_key", ""),
+        ("ai_groq_model", "llama-3.3-70b-versatile"),
         ("ai_suggest_meta", "true"),
         ("ai_suggest_tags", "true"),
         ("ai_suggest_categories", "false"),
@@ -597,6 +597,34 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             "INSERT INTO designs (name, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, 1)",
             params!["Default", "", ""],
         )?;
+    }
+
+    // Data migration: remove 'local' from AI failover chain, ensure 'groq' is present
+    {
+        let chain: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'ai_failover_chain'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|_| "ollama,openai,gemini,groq,cloudflare".to_string());
+
+        let mut providers: Vec<&str> = chain.split(',').map(|s| s.trim()).filter(|s| *s != "local" && !s.is_empty()).collect();
+        if !providers.contains(&"groq") {
+            // Insert groq before cloudflare, or at the end
+            if let Some(pos) = providers.iter().position(|p| *p == "cloudflare") {
+                providers.insert(pos, "groq");
+            } else {
+                providers.push("groq");
+            }
+        }
+        let new_chain = providers.join(",");
+        if new_chain != chain {
+            conn.execute(
+                "UPDATE settings SET value = ?1 WHERE key = 'ai_failover_chain'",
+                params![new_chain],
+            )?;
+        }
     }
 
     // Seed admin password if not set

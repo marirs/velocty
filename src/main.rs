@@ -4,6 +4,7 @@ extern crate rocket;
 use rocket::fs::FileServer;
 use rocket_dyn_templates::Template;
 
+mod ai;
 mod analytics;
 mod auth;
 mod boot;
@@ -124,6 +125,10 @@ fn rocket() -> _ {
         .mount(
             &admin_api_mount,
             routes::admin_api::routes(),
+        )
+        .mount(
+            &admin_api_mount,
+            routes::ai::routes(),
         )
         .mount(
             "/api",
