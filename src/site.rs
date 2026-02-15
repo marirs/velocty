@@ -12,6 +12,23 @@ use std::sync::Arc;
 
 use crate::db::DbPool;
 
+// ── Registry pool newtype (distinct from DbPool for Rocket managed state) ──
+
+pub struct RegistryPool(pub DbPool);
+
+impl RegistryPool {
+    pub fn get(&self) -> Result<r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>, r2d2::Error> {
+        self.0.get()
+    }
+}
+
+impl std::ops::Deref for RegistryPool {
+    type Target = DbPool;
+    fn deref(&self) -> &DbPool {
+        &self.0
+    }
+}
+
 // ── Site record from the central registry ────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,10 +92,9 @@ impl SitePoolManager {
 
 // ── Central registry DB helpers ──────────────────────────────
 
-pub type RegistryPool = DbPool;
-
 pub fn init_registry() -> Result<RegistryPool, String> {
-    crate::db::init_pool_at("website/sites.db")
+    let pool = crate::db::init_pool_at("website/sites.db")?;
+    Ok(RegistryPool(pool))
 }
 
 /// Detect a single-site installation at `website/site/` and migrate it
