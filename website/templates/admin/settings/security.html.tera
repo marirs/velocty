@@ -21,6 +21,7 @@
 
 <div class="sub-tabs">
     <button type="button" class="tab active" data-sec-tab="tab-sec-general">General</button>
+    <button type="button" class="tab" data-sec-tab="tab-sec-auth">Auth{% if settings.mfa_enabled == "true" %} <span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-sec-tab="tab-sec-firewall">Firewall{% if settings.firewall_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-sec-tab="tab-sec-akismet">Akismet{% if settings.security_akismet_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-sec-tab="tab-sec-cleantalk">CleanTalk{% if settings.security_cleantalk_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
@@ -43,116 +44,6 @@
                     <input type="text" id="admin_slug" name="admin_slug" value="{{ settings.admin_slug | default(value='admin') }}" style="width:140px" placeholder="admin">
                 </div>
                 <span class="form-help">Change the admin panel URL for added security. A server restart is required after changing this value.</span>
-            </div>
-        </div>
-
-        <div class="form-card">
-            <h3>Authentication</h3>
-            {% set email_enabled = settings.email_gmail_enabled == "true" or settings.email_resend_enabled == "true" or settings.email_ses_enabled == "true" or settings.email_postmark_enabled == "true" or settings.email_brevo_enabled == "true" or settings.email_sendpulse_enabled == "true" or settings.email_mailgun_enabled == "true" or settings.email_moosend_enabled == "true" or settings.email_mandrill_enabled == "true" or settings.email_sparkpost_enabled == "true" or settings.email_smtp_enabled == "true" %}
-            <div class="form-group">
-                <label>Login Method</label>
-                <div class="seg-control">
-                    <input type="radio" id="login_method_password" name="login_method" value="password" {% if settings.login_method != "magic_link" %}checked{% endif %}>
-                    <label for="login_method_password">Email &amp; Password</label>
-                    <input type="radio" id="login_method_magic" name="login_method" value="magic_link" {% if settings.login_method == "magic_link" %}checked{% endif %} {% if not email_enabled %}disabled{% endif %}>
-                    <label for="login_method_magic">Magic Link</label>
-                </div>
-                {% if not email_enabled %}
-                <span class="form-help" style="color:var(--warning)">Magic Link requires an email provider. Enable one in <a href="/{{ admin_slug }}/settings/email" style="color:var(--accent)">Email settings</a> first.</span>
-                {% else %}
-                <span class="form-help">Magic Link sends a one-time login link to your email — no password needed.</span>
-                {% endif %}
-            </div>
-
-            <div id="auth-password-fields" {% if settings.login_method == "magic_link" %}style="display:none"{% endif %}>
-                <div class="form-group">
-                    <label for="new_password">New Password</label>
-                    <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
-                </div>
-                <div class="form-group">
-                    <label for="confirm_password">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password">
-                </div>
-            </div>
-
-            <div id="auth-magic-fields" {% if settings.login_method != "magic_link" %}style="display:none"{% endif %}>
-                <div class="form-group">
-                    <label>Magic Link will be sent to</label>
-                    <input type="text" value="{{ settings.admin_email | default(value='—') }}" readonly style="opacity:0.7;cursor:default">
-                    <span class="form-help">This is your admin email from <a href="/{{ admin_slug }}/settings/users" style="color:var(--accent)">User settings</a>.</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-card" id="mfa-card">
-            <h3>Multi-Factor Authentication (TOTP)</h3>
-            {% if settings.mfa_enabled == "true" %}
-            <p style="margin-bottom:12px"><span class="status-dot enabled" style="margin-right:6px"></span> <strong>MFA is active.</strong> You'll be prompted for a 6-digit code from your authenticator app at login.</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button type="button" class="btn btn-sm" onclick="mfaOpenDrawer('recovery')">View Recovery Codes</button>
-                <button type="button" class="btn btn-sm btn-danger" onclick="mfaOpenDrawer('disable')">Disable MFA</button>
-            </div>
-            {% else %}
-            <p class="text-muted" style="font-size:13px;margin-bottom:14px">Add an extra layer of security to your account. You'll need a TOTP authenticator app like Google Authenticator, Authy, or 1Password.</p>
-            <button type="button" class="btn btn-sm btn-primary" id="mfa-setup-btn" onclick="mfaStartSetup()">Set Up MFA</button>
-            {% endif %}
-        </div>
-
-        <!-- MFA Modal -->
-        <div id="mfa-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .2s ease" onclick="mfaCloseModal()"></div>
-        <div id="mfa-modal" style="display:none;position:fixed;top:50%;left:50%;z-index:9999;transform:translate(-50%,-50%) scale(0.95);opacity:0;transition:transform .25s cubic-bezier(.32,.72,0,1),opacity .2s ease;width:420px;max-width:90vw;max-height:70vh;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
-            <div style="padding:24px 28px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-                    <h3 id="mfa-modal-title" style="margin:0;font-size:16px">Set Up MFA</h3>
-                    <button type="button" onclick="mfaCloseModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">&times;</button>
-                </div>
-
-                <!-- Setup: QR step -->
-                <div id="mfa-step-qr" style="display:none;text-align:center">
-                    <p class="text-muted" style="font-size:12px;margin-bottom:16px">Scan with your authenticator app</p>
-                    <img id="mfa-qr-img" src="" alt="QR Code" style="width:180px;height:180px;border-radius:10px;border:2px solid var(--border-subtle);margin-bottom:10px">
-                    <div style="margin-bottom:20px">
-                        <span class="text-muted" style="font-size:11px">Manual key:</span><br>
-                        <code id="mfa-secret-display" style="font-size:12px;letter-spacing:1px;user-select:all;word-break:break-all"></code>
-                    </div>
-                    <div style="border-top:1px solid var(--border-subtle);padding-top:16px">
-                        <p style="font-size:12px;margin-bottom:10px;color:var(--text-muted)">Enter the 6-digit code from your app</p>
-                        <input type="text" id="mfa-verify-code" placeholder="000000" style="width:160px;text-align:center;font-size:22px;letter-spacing:6px;margin-bottom:12px" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
-                        <br><button type="button" class="btn btn-sm btn-primary" onclick="mfaVerify()">Verify &amp; Enable</button>
-                        <p id="mfa-verify-error" style="color:var(--danger);font-size:12px;margin-top:10px;display:none"></p>
-                    </div>
-                </div>
-
-                <!-- Setup: Recovery codes step -->
-                <div id="mfa-step-codes" style="display:none;text-align:center">
-                    <div style="padding:10px 14px;border-radius:8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);margin-bottom:14px">
-                        <strong style="color:var(--success);font-size:13px">MFA Enabled Successfully</strong>
-                    </div>
-                    <p class="text-muted" style="font-size:12px;margin-bottom:12px"><strong>Save these recovery codes now.</strong> Each can only be used once.</p>
-                    <pre id="mfa-new-codes" style="font-family:monospace;font-size:14px;line-height:2;padding:14px;border-radius:8px;background:var(--bg-input);display:inline-block;text-align:left"></pre>
-                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
-                        <button type="button" class="btn btn-sm" onclick="mfaDownloadNewCodes()">Download .txt</button>
-                        <button type="button" class="btn btn-sm btn-primary" onclick="location.reload()">Done</button>
-                    </div>
-                </div>
-
-                <!-- Recovery codes view -->
-                <div id="mfa-recovery-view" style="display:none;text-align:center">
-                    <p class="text-muted" style="font-size:12px;margin-bottom:12px">Each code can only be used once. Store them somewhere safe.</p>
-                    <pre id="mfa-recovery-list" style="font-family:monospace;font-size:14px;line-height:2;padding:14px;border-radius:8px;background:var(--bg-input);display:inline-block;text-align:left"></pre>
-                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
-                        <button type="button" class="btn btn-sm" onclick="mfaDownloadCodes()">Download .txt</button>
-                        <button type="button" class="btn btn-sm" onclick="mfaCloseModal()">Close</button>
-                    </div>
-                </div>
-
-                <!-- Disable view -->
-                <div id="mfa-disable-view" style="display:none;text-align:center">
-                    <p class="text-muted" style="font-size:13px;margin-bottom:16px">Enter a code from your authenticator app to confirm.</p>
-                    <input type="text" id="mfa-disable-code" placeholder="000000" style="width:160px;text-align:center;font-size:22px;letter-spacing:6px;margin-bottom:12px" maxlength="6" inputmode="numeric">
-                    <br><button type="button" class="btn btn-sm btn-danger" onclick="mfaDisable()">Confirm Disable</button>
-                    <p id="mfa-disable-error" style="color:var(--danger);font-size:12px;margin-top:10px;display:none"></p>
-                </div>
             </div>
         </div>
 
@@ -190,6 +81,119 @@
                 <span class="form-help">Only captcha providers that are enabled in their respective tabs appear here.</span>
             </div>
             </fieldset>
+        </div>
+    </div>
+
+    <!-- Auth -->
+    <div id="tab-sec-auth" style="display:none">
+        <div class="form-card">
+            <h3>Authentication</h3>
+            {% set email_enabled = settings.email_gmail_enabled == "true" or settings.email_resend_enabled == "true" or settings.email_ses_enabled == "true" or settings.email_postmark_enabled == "true" or settings.email_brevo_enabled == "true" or settings.email_sendpulse_enabled == "true" or settings.email_mailgun_enabled == "true" or settings.email_moosend_enabled == "true" or settings.email_mandrill_enabled == "true" or settings.email_sparkpost_enabled == "true" or settings.email_smtp_enabled == "true" %}
+            <div class="form-group">
+                <label>Login Method</label>
+                <div class="seg-control">
+                    <input type="radio" id="login_method_password" name="login_method" value="password" {% if settings.login_method != "magic_link" %}checked{% endif %}>
+                    <label for="login_method_password">Email &amp; Password</label>
+                    <input type="radio" id="login_method_magic" name="login_method" value="magic_link" {% if settings.login_method == "magic_link" %}checked{% endif %} {% if not email_enabled %}disabled{% endif %}>
+                    <label for="login_method_magic">Magic Link</label>
+                </div>
+                {% if not email_enabled %}
+                <span class="form-help" style="color:var(--warning)">Magic Link requires an email provider. Enable one in <a href="/{{ admin_slug }}/settings/email" style="color:var(--accent)">Email settings</a> first.</span>
+                {% else %}
+                <span class="form-help">Magic Link sends a one-time login link to your email — no password needed.</span>
+                {% endif %}
+            </div>
+
+            <div id="auth-password-fields" {% if settings.login_method == "magic_link" %}style="display:none"{% endif %}>
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" placeholder="Leave blank to keep current">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password">
+                </div>
+            </div>
+
+            <div id="auth-magic-fields" {% if settings.login_method != "magic_link" %}style="display:none"{% endif %}>
+                <div class="form-group">
+                    <label>Magic Link will be sent to</label>
+                    <input type="text" value="{{ settings.admin_email | default(value='—') }}" readonly style="opacity:0.7;cursor:default">
+                    <span class="form-help">This is your admin email from <a href="/{{ admin_slug }}/users" style="color:var(--accent)">Users</a>.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card" id="mfa-card">
+            <h3>Multi-Factor Authentication (TOTP)</h3>
+            {% if settings.mfa_enabled == "true" %}
+            <p style="margin-bottom:12px"><span class="status-dot enabled" style="margin-right:6px"></span> <strong>MFA is active.</strong> You'll be prompted for a 6-digit code from your authenticator app at login.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-sm" onclick="mfaOpenDrawer('recovery')">View Recovery Codes</button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="mfaOpenDrawer('disable')">Disable MFA</button>
+            </div>
+            {% else %}
+            <p class="text-muted" style="font-size:13px;margin-bottom:14px">Add an extra layer of security to your account. You'll need a TOTP authenticator app like Google Authenticator, Authy, or 1Password.</p>
+            <button type="button" class="btn btn-sm btn-primary" id="mfa-setup-btn" onclick="mfaStartSetup()">Set Up MFA</button>
+            {% endif %}
+        </div>
+
+        <!-- MFA Modal -->
+        <div id="mfa-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .2s ease" onclick="mfaCloseModal()"></div>
+        <div id="mfa-modal" style="display:none;position:fixed;top:50%;left:50%;z-index:9999;transform:translate(-50%,-50%) scale(0.95);opacity:0;transition:transform .25s cubic-bezier(.32,.72,0,1),opacity .2s ease;width:420px;max-width:90vw;max-height:70vh;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+            <div style="padding:24px 28px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+                    <h3 id="mfa-modal-title" style="margin:0;font-size:16px">Set Up MFA</h3>
+                    <button type="button" onclick="mfaCloseModal()" style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">&times;</button>
+                </div>
+
+                <!-- Setup: QR step -->
+                <div id="mfa-step-qr" style="display:none;text-align:center">
+                    <p class="text-muted" style="font-size:12px;margin-bottom:16px">Scan with your authenticator app</p>
+                    <img id="mfa-qr-img" src="" alt="QR Code" style="width:180px;height:180px;border-radius:10px;border:2px solid var(--border-subtle);margin-bottom:10px">
+                    <div style="margin-bottom:20px">
+                        <span class="text-muted" style="font-size:11px">Manual key:</span><br>
+                        <code id="mfa-secret-display" style="font-size:12px;letter-spacing:1px;user-select:all;word-break:break-all"></code>
+                    </div>
+                    <div style="border-top:1px solid var(--border-subtle);padding-top:16px">
+                        <p style="font-size:12px;margin-bottom:10px;color:var(--text-secondary)">Enter the 6-digit code from your app</p>
+                        <input type="text" id="mfa-verify-code" placeholder="000000" style="width:160px;text-align:center;font-size:22px;letter-spacing:6px;margin-bottom:12px" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                        <br><button type="button" class="btn btn-sm btn-primary" onclick="mfaVerify()">Verify &amp; Enable</button>
+                        <p id="mfa-verify-error" style="color:var(--danger);font-size:12px;margin-top:10px;display:none"></p>
+                    </div>
+                </div>
+
+                <!-- Setup: Recovery codes step -->
+                <div id="mfa-step-codes" style="display:none;text-align:center">
+                    <div style="padding:10px 14px;border-radius:8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);margin-bottom:14px">
+                        <strong style="color:var(--success);font-size:13px">MFA Enabled Successfully</strong>
+                    </div>
+                    <p class="text-muted" style="font-size:12px;margin-bottom:12px"><strong>Save these recovery codes now.</strong> Each can only be used once.</p>
+                    <pre id="mfa-new-codes" style="font-family:monospace;font-size:14px;line-height:2;padding:14px;border-radius:8px;background:var(--bg-input);display:inline-block;text-align:left"></pre>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
+                        <button type="button" class="btn btn-sm" onclick="mfaDownloadNewCodes()">Download .txt</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="location.reload()">Done</button>
+                    </div>
+                </div>
+
+                <!-- Recovery codes view -->
+                <div id="mfa-recovery-view" style="display:none;text-align:center">
+                    <p class="text-muted" style="font-size:12px;margin-bottom:12px">Each code can only be used once. Store them somewhere safe.</p>
+                    <pre id="mfa-recovery-list" style="font-family:monospace;font-size:14px;line-height:2;padding:14px;border-radius:8px;background:var(--bg-input);display:inline-block;text-align:left"></pre>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
+                        <button type="button" class="btn btn-sm" onclick="mfaDownloadCodes()">Download .txt</button>
+                        <button type="button" class="btn btn-sm" onclick="mfaCloseModal()">Close</button>
+                    </div>
+                </div>
+
+                <!-- Disable view -->
+                <div id="mfa-disable-view" style="display:none;text-align:center">
+                    <p class="text-muted" style="font-size:13px;margin-bottom:16px">Enter a code from your authenticator app to confirm.</p>
+                    <input type="text" id="mfa-disable-code" placeholder="000000" style="width:160px;text-align:center;font-size:22px;letter-spacing:6px;margin-bottom:12px" maxlength="6" inputmode="numeric">
+                    <br><button type="button" class="btn btn-sm btn-danger" onclick="mfaDisable()">Confirm Disable</button>
+                    <p id="mfa-disable-error" style="color:var(--danger);font-size:12px;margin-top:10px;display:none"></p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -571,7 +575,7 @@
 (function() {
     // Sub-tab switching
     var tabs = document.querySelectorAll('[data-sec-tab]');
-    var panels = ['tab-sec-general','tab-sec-firewall','tab-sec-akismet','tab-sec-cleantalk','tab-sec-oopspam','tab-sec-recaptcha','tab-sec-turnstile','tab-sec-hcaptcha'];
+    var panels = ['tab-sec-general','tab-sec-auth','tab-sec-firewall','tab-sec-akismet','tab-sec-cleantalk','tab-sec-oopspam','tab-sec-recaptcha','tab-sec-turnstile','tab-sec-hcaptcha'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });

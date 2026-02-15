@@ -104,11 +104,16 @@
             <label id="um-pw-label">Password</label>
             <input type="password" id="um-password" class="form-control" placeholder="Min 8 characters">
         </div>
+        <div id="um-self-link" style="display:none;margin-top:12px">
+            <a href="" id="um-change-pw-link" class="btn btn-sm" style="font-size:12px;text-decoration:none">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Change Password &amp; MFA
+            </a>
+        </div>
         <div id="um-error" style="color:var(--danger, #ef4444);font-size:13px;margin-top:8px;display:none"></div>
     </div>
     <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
-        <button type="button" class="btn" onclick="closeUserModal()">Cancel</button>
-        <button type="button" class="btn btn-primary" id="um-save-btn" onclick="saveUser()">Create</button>
+        <button type="button" class="btn" onclick="closeUserModal()">Cancel <span class="kbd">Esc</span></button>
+        <button type="button" class="btn btn-primary" id="um-save-btn" onclick="saveUser()">Create <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>
 </div>
 
@@ -147,10 +152,27 @@
 var adminSlug = '{{ admin_slug }}';
 var isEditMode = false;
 
+// ⌘S / Ctrl+S to save, Esc to cancel when modal is open
+document.addEventListener('keydown', function(e) {
+    var modal = document.getElementById('user-modal');
+    if (!modal || modal.style.display === 'none') return;
+    var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    var mod = isMac ? e.metaKey : e.ctrlKey;
+    if (mod && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        e.stopPropagation();
+        saveUser();
+    }
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        closeUserModal();
+    }
+}, true);
+
 function showCreateModal() {
     isEditMode = false;
     document.getElementById('user-modal-title').textContent = 'New User';
-    document.getElementById('um-save-btn').textContent = 'Create';
+    document.getElementById('um-save-btn').innerHTML = 'Create <span class="kbd"><span class="kbd-mod">⌘</span>S</span>';
     document.getElementById('um-id').value = '';
     document.getElementById('um-name').value = '';
     document.getElementById('um-email').value = '';
@@ -161,6 +183,7 @@ function showCreateModal() {
     document.getElementById('um-error').style.display = 'none';
     document.getElementById('um-role-group').style.display = '';
     document.getElementById('um-pw-group').style.display = '';
+    document.getElementById('um-self-link').style.display = 'none';
     document.getElementById('user-modal-overlay').style.display = '';
     document.getElementById('user-modal').style.display = '';
 }
@@ -168,7 +191,7 @@ function showCreateModal() {
 function showEditModal(user, isSelf) {
     isEditMode = true;
     document.getElementById('user-modal-title').textContent = isSelf ? 'Edit Your Profile' : 'Edit User';
-    document.getElementById('um-save-btn').textContent = 'Save';
+    document.getElementById('um-save-btn').innerHTML = 'Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span>';
     document.getElementById('um-id').value = user.id;
     document.getElementById('um-name').value = user.display_name;
     document.getElementById('um-email').value = user.email;
@@ -177,9 +200,13 @@ function showEditModal(user, isSelf) {
     document.getElementById('um-pw-label').textContent = 'New Password (leave blank to keep)';
     document.getElementById('um-password').placeholder = 'Leave blank to keep current';
     document.getElementById('um-error').style.display = 'none';
-    // Hide role and password when editing yourself
+    // Hide role and password when editing yourself; show Change Password link instead
     document.getElementById('um-role-group').style.display = isSelf ? 'none' : '';
     document.getElementById('um-pw-group').style.display = isSelf ? 'none' : '';
+    document.getElementById('um-self-link').style.display = isSelf ? '' : 'none';
+    if (isSelf) {
+        document.getElementById('um-change-pw-link').href = '/' + adminSlug + '/settings/security#tab-sec-auth';
+    }
     document.getElementById('user-modal-overlay').style.display = '';
     document.getElementById('user-modal').style.display = '';
 }
