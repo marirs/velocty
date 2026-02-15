@@ -309,19 +309,56 @@ velocty/
 ├── src/
 │   ├── main.rs                  # Rocket launch, DB init, route mounting
 │   ├── db.rs                    # SQLite pool, migrations, seed defaults
-│   ├── auth.rs                  # Login, sessions, bcrypt, MFA
 │   ├── analytics.rs             # Page view logging fairing, GeoIP
-│   ├── render.rs                # Design + content merge
+│   ├── render.rs                # Design + content merge (with captcha widget injection)
 │   ├── seo.rs                   # Meta tags, JSON-LD, sitemap
 │   ├── rss.rs                   # RSS/Atom feed generation
-│   ├── email.rs                 # Purchase email delivery (Gmail SMTP, custom SMTP)
 │   ├── images.rs                # Upload, thumbnails, WebP conversion
 │   ├── license.rs               # Purchase license.txt generation
 │   ├── rate_limit.rs            # In-memory rate limiter (login, comments)
 │   ├── site.rs                  # Multi-site: SiteContext, SitePoolManager, SiteResolver (feature-gated)
-│   ├── models/                  # Data models (Post, Portfolio, Category, Order, DownloadToken, License, etc.)
-│   └── routes/                  # Route handlers (admin, auth, public, API, commerce, super_admin)
-│       └── commerce/            # Payment provider routes (paypal, stripe, razorpay, mollie, square, 2checkout, payoneer)
+│   ├── ai/                      # AI provider integrations
+│   │   ├── mod.rs               # Provider dispatch, failover chain, types
+│   │   ├── prompts.rs           # Prompt builders for all AI features
+│   │   ├── ollama.rs            # Ollama provider
+│   │   ├── openai.rs            # OpenAI provider
+│   │   ├── gemini.rs            # Google Gemini provider
+│   │   ├── groq.rs              # Groq provider
+│   │   └── cloudflare.rs        # Cloudflare Workers AI provider
+│   ├── email/                   # Email provider integrations
+│   │   ├── mod.rs               # Provider dispatch, failover chain, SMTP
+│   │   ├── gmail.rs             # Gmail / Google Workspace SMTP
+│   │   ├── resend.rs            # Resend API
+│   │   ├── ses.rs               # Amazon SES (SigV4)
+│   │   ├── postmark.rs          # Postmark API
+│   │   ├── brevo.rs             # Brevo (Sendinblue) API
+│   │   ├── sendpulse.rs         # SendPulse API (OAuth2)
+│   │   ├── mailgun.rs           # Mailgun API
+│   │   ├── moosend.rs           # Moosend API
+│   │   ├── mandrill.rs          # Mandrill (Mailchimp Transactional) API
+│   │   ├── sparkpost.rs         # SparkPost API
+│   │   └── smtp.rs              # Custom SMTP
+│   ├── security/                # Security module
+│   │   ├── mod.rs               # Captcha dispatch, spam dispatch, helpers
+│   │   ├── auth.rs              # AdminUser guard, sessions, password, IP hash
+│   │   ├── mfa.rs               # TOTP secret, QR code, verify, recovery codes
+│   │   ├── magic_link.rs        # Token gen, email send, verify, cleanup
+│   │   ├── recaptcha.rs         # Google reCAPTCHA v2/v3
+│   │   ├── turnstile.rs         # Cloudflare Turnstile
+│   │   ├── hcaptcha.rs          # hCaptcha
+│   │   ├── akismet.rs           # Akismet spam detection
+│   │   ├── cleantalk.rs         # CleanTalk spam detection
+│   │   └── oopspam.rs           # OOPSpam spam detection
+│   ├── models/                  # Data models (Post, Portfolio, Category, Order, etc.)
+│   └── routes/
+│       ├── admin.rs             # Admin panel routes
+│       ├── admin_api.rs         # Admin JSON API routes
+│       ├── api.rs               # Public API (likes, comments, portfolio filter)
+│       ├── public.rs            # Public-facing pages (blog, portfolio, archives)
+│       ├── ai/                  # AI API routes (suggest, generate, status)
+│       ├── commerce/            # Payment provider routes (paypal, stripe, razorpay, etc.)
+│       └── security/            # Auth & security routes
+│           └── auth/            # Login, MFA, magic link, setup, logout
 ├── website/
 │   ├── site/                    # Site-specific data (single-site mode)
 │   │   ├── db/velocty.db        # SQLite database
