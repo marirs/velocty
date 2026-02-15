@@ -27,6 +27,9 @@ mod tasks;
 #[cfg(feature = "multi-site")]
 mod site;
 
+#[cfg(test)]
+mod tests;
+
 use rocket::response::content::RawHtml;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
