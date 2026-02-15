@@ -26,7 +26,6 @@ It serves pure HTML/CSS to visitors with **microsecond response times**, while g
 
 ## Who is it NOT for?
 
-- Teams needing multi-user roles and permissions (Velocty is single-admin)
 - Sites needing a plugin/extension ecosystem
 - E-commerce stores with physical products, inventory, or shipping
 - Sites requiring server-side rendering frameworks (React, Next.js, etc.)
@@ -88,6 +87,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 | **GeoIP** | MaxMind GeoLite2 (offline, privacy-preserving) |
 | **Frontend (visitors)** | Pure HTML/CSS + minimal vanilla JS |
 | **Auth** | Bcrypt + session cookies + optional TOTP MFA + Magic Link |
+| **Background Tasks** | Tokio async runtime (session/token/analytics cleanup) |
 
 ### Why Rust?
 
@@ -107,8 +107,8 @@ Velocty guides you through a 4-step setup wizard on first run:
 
 ### Content
 
-- **Journal (Blog)** — Rich text posts with TinyMCE, categories, tags, excerpts, featured images
-- **Portfolio** — Image gallery with masonry grid, lightbox, categories, tags, likes
+- **Journal (Blog)** — Rich text posts with TinyMCE, categories, tags, excerpts, featured images, publish date picker, inline category creation
+- **Portfolio** — Image gallery with masonry grid, lightbox, categories, tags, likes, publish date picker, inline category creation
 - **Browse by tag** — `/tag/<slug>` routes for both blog and portfolio with pagination
 - **Browse by category** — `/category/<slug>` routes for both blog and portfolio with pagination
 - **Archives** — `/archives` page with posts grouped by year/month, drill-down to `/archives/<year>/<month>`
@@ -116,6 +116,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Comments** — Built-in commenting with honeypot spam protection, rate limiting, moderation queue
 - **RSS Feed** — Auto-generated RSS 2.0 feed with configurable post count (Settings › Site)
 - **WordPress Import** — Import posts, portfolio items, categories, tags, and comments from WP XML export
+- **Category management** — Create, edit, delete categories with type filter (post/portfolio/both)
 
 ### Portfolio & Photography
 
@@ -177,12 +178,15 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Dark & Light themes** — toggle from sidebar
 - **Ultra-narrow icon sidebar** that expands on hover with labels
 - **Responsive** — works on mobile (sidebar collapses to bottom tab bar)
-- **Keyboard shortcuts** — Cmd+S to save from any form
+- **Keyboard shortcuts** — Cmd+S to save from any form, `/` to focus settings search
 - **Flash notifications** — success/error toasts on save
+- **Settings search** — search across all settings with keyboard shortcut, grouped dropdown results, sub-tab navigation
+- **Multi-user system** — roles (admin/editor/author/subscriber), user management UI, per-user MFA
 - **Health Dashboard** — system health with disk usage, DB stats, filesystem permission checks (owner:group, recommended perms, world-writable detection), resource monitoring, and maintenance tools (vacuum, WAL checkpoint, orphan scan, session cleanup, export). Backend-aware: adapts for SQLite vs MongoDB
 - **Cookie Consent Banner** — GDPR-compliant banner with 3 styles (minimal bar, modal, corner card), dark/light/auto theme, configurable position. Analytics scripts gated behind consent
 - **Privacy Policy & Terms of Use** — pre-filled industry-standard templates, editable with TinyMCE from Settings › Frontend, rendered at `/privacy` and `/terms`
 - **Import page** — drag-and-drop file upload with 3-column card layout for WordPress and other importers
+- **Background tasks** — automatic session cleanup, magic link token cleanup, analytics data cleanup with configurable intervals (Settings › Tasks)
 
 ### Security
 
@@ -192,11 +196,13 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Authentication modes:**
   - **Email & Password** — traditional login
   - **Magic Link** — passwordless login via email (requires email provider)
-- **Optional TOTP MFA** — Google Authenticator, Authy, etc.
+- **Optional TOTP MFA** — per-user, Google Authenticator, Authy, etc. with recovery codes
+- **Multi-user auth guards** — AdminUser, EditorUser, AuthorUser, AuthenticatedUser with role-based route gating
 - **Login rate limiting** — in-memory IP-based enforcement, configurable attempts per 15 minutes
 - **Comment rate limiting** — in-memory enforcement, configurable per 15-minute window
 - **Login captcha** — reCAPTCHA v3, Cloudflare Turnstile, or hCaptcha
 - **Anti-spam services** — Akismet, CleanTalk, OOPSpam
+- **Firewall fairing** — bot detection, failed login tracking, auto-ban, XSS/SQLi/path traversal protection, rate limiting, geo-blocking, security headers
 - **Session expiry** — configurable (default 24h)
 - **Security headers** — X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy
 
@@ -214,7 +220,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Configurable sizes** for H1–H6 and body
 - **Text transform** options
 
-### Settings (13 sections)
+### Settings (16 sections)
 
 | Section | What it controls |
 |---|---|
@@ -230,7 +236,8 @@ Velocty guides you through a 4-step setup wizard on first run:
 | **Social** | Social media links with brand color icons |
 | **Email** | 11 provider configurations |
 | **Commerce** | 7 payment providers, currency, download limits, license template |
-| **AI** | Provider chain, model selection, failover (Phase 4) |
+| **AI** | Provider chain, model selection, failover |
+| **Tasks** | Background task intervals (session cleanup, magic link cleanup, analytics cleanup) |
 
 ---
 
@@ -316,6 +323,7 @@ velocty/
 │   ├── images.rs                # Upload, thumbnails, WebP conversion
 │   ├── license.rs               # Purchase license.txt generation
 │   ├── rate_limit.rs            # In-memory rate limiter (login, comments)
+│   ├── tasks.rs                 # Background tasks fairing (session/token/analytics cleanup)
 │   ├── site.rs                  # Multi-site: SiteContext, SitePoolManager, SiteResolver (feature-gated)
 │   ├── ai/                      # AI provider integrations
 │   │   ├── mod.rs               # Provider dispatch, failover chain, types
@@ -340,16 +348,18 @@ velocty/
 │   │   └── smtp.rs              # Custom SMTP
 │   ├── security/                # Security module
 │   │   ├── mod.rs               # Captcha dispatch, spam dispatch, helpers
-│   │   ├── auth.rs              # AdminUser guard, sessions, password, IP hash
+│   │   ├── auth.rs              # Auth guards (Admin/Editor/Author/Authenticated), sessions, password
+│   │   ├── firewall.rs          # Firewall fairing (bot/XSS/SQLi/geo-blocking/rate-limit)
 │   │   ├── mfa.rs               # TOTP secret, QR code, verify, recovery codes
 │   │   ├── magic_link.rs        # Token gen, email send, verify, cleanup
+│   │   ├── password_reset.rs    # Password reset flow
 │   │   ├── recaptcha.rs         # Google reCAPTCHA v2/v3
 │   │   ├── turnstile.rs         # Cloudflare Turnstile
 │   │   ├── hcaptcha.rs          # hCaptcha
 │   │   ├── akismet.rs           # Akismet spam detection
 │   │   ├── cleantalk.rs         # CleanTalk spam detection
 │   │   └── oopspam.rs           # OOPSpam spam detection
-│   ├── models/                  # Data models (Post, Portfolio, Category, Order, etc.)
+│   ├── models/                  # Data models (Post, Portfolio, Category, Order, User, etc.)
 │   └── routes/
 │       ├── admin.rs             # Admin panel routes
 │       ├── admin_api.rs         # Admin JSON API routes
@@ -379,7 +389,7 @@ velocty/
 
 ## Build Phases
 
-### Phase 1 — Core (Current) ✅
+### Phase 1 — Core ✅
 
 - Rocket + SQLite scaffold with full schema
 - Admin panel with dark/light themes
@@ -392,7 +402,7 @@ velocty/
 - Built-in SEO: meta fields, sitemap.xml, JSON-LD, OG/Twitter tags
 - Built-in analytics with D3.js dashboard
 - WordPress XML importer
-- 13 settings sections with full configuration
+- 16 settings sections with full configuration
 - Authentication: password, Magic Link, MFA, captcha
 - Login & comment rate limiting (in-memory, IP-based)
 - Image right-click protection (configurable)
@@ -426,7 +436,7 @@ velocty/
 
 ### Phase 4 — AI ✅
 
-- Pluggable LLM connector with failover chain (Ollama → OpenAI → Gemini → Cloudflare Workers AI)
+- Pluggable LLM connector with failover chain (Ollama → OpenAI → Gemini → Groq → Cloudflare Workers AI)
 - Provider-agnostic `ai::complete()` — automatic failover to next enabled provider on failure
 - SEO suggestions: ✨ buttons on Slug, Tags, Meta Title, Meta Description fields
 - Blog post generation from description (title, HTML content, excerpt, tags — all in one shot)
@@ -435,6 +445,17 @@ velocty/
 - All AI responses parsed with robust JSON extraction (handles markdown fences, leading text)
 - Settings UI: per-provider configuration, draggable failover chain ordering, model download for local LLM
 - Zero hardcoded API keys — all credentials stored in settings DB
+
+### Phase 5 — Users, Security & Polish ✅
+
+- **Multi-user system** — users table with roles (admin/editor/author/subscriber), status (active/suspended/locked), per-user MFA
+- **Auth guards** — AdminUser, EditorUser, AuthorUser, AuthenticatedUser with role-based route gating
+- **User management UI** — admin page with create/edit/suspend/lock/unlock/delete
+- **Firewall fairing** — bot detection, failed login tracking, auto-ban, XSS/SQLi/path traversal protection, rate limiting, geo-blocking, security headers
+- **Password reset** — email-based flow
+- **Background tasks** — tokio-spawned cleanup loops for sessions, magic link tokens, analytics data with configurable intervals
+- **Settings search** — client-side search across all 16 settings tabs with `/` keyboard shortcut and sub-tab navigation
+- **Editor enhancements** — inline category creation (JSON API), publish date picker, category edit on list page
 
 ---
 
