@@ -99,6 +99,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
             </div>
             <div class="sidebar-bottom">
                 {social_html}
+                {footer_legal_links}
                 <div class="footer-text">
                     <p>&copy; {year} {site_name}</p>
                 </div>
@@ -108,6 +109,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
             {body_html}
         </main>
     </div>
+    {back_to_top}
     <script>{lightbox_js}</script>
     {image_protection_js}
     {analytics_scripts}
@@ -123,8 +125,10 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         tagline = html_escape(site_tagline),
         categories_html = categories_html,
         social_html = social_html,
+        footer_legal_links = build_footer_legal_links(&settings),
         year = chrono::Utc::now().format("%Y"),
         body_html = body_html,
+        back_to_top = build_back_to_top(&settings),
         lightbox_js = LIGHTBOX_JS,
         image_protection_js = if settings
             .get("portfolio_image_protection")
@@ -165,10 +169,15 @@ pub fn render_legal_page(
     let site_name = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
     let site_tagline = settings.get("site_tagline").map(|s| s.as_str()).unwrap_or("");
 
-    let categories = crate::models::category::Category::list(pool, Some("portfolio"));
-    let cats_json = serde_json::to_value(&categories).unwrap_or_default();
-    let ctx = serde_json::json!({ "categories": cats_json });
-    let categories_html = build_categories_sidebar(&ctx);
+    let show_cats = settings.get("portfolio_show_categories").map(|s| s.as_str()).unwrap_or("true") == "true";
+    let categories_html = if show_cats {
+        let categories = crate::models::category::Category::list(pool, Some("portfolio"));
+        let cats_json = serde_json::to_value(&categories).unwrap_or_default();
+        let ctx = serde_json::json!({ "categories": cats_json });
+        build_categories_sidebar(&ctx)
+    } else {
+        String::new()
+    };
 
     let analytics_scripts = seo::build_analytics_scripts(&settings_json);
     let font_links = typography::build_font_links(&settings_json);
@@ -215,6 +224,7 @@ pub fn render_legal_page(
             </div>
             <div class="sidebar-bottom">
                 {social_html}
+                {footer_legal_links}
                 <div class="footer-text">
                     <p>&copy; {year} {site_name}</p>
                 </div>
@@ -226,6 +236,7 @@ pub fn render_legal_page(
             </div>
         </main>
     </div>
+    {back_to_top}
     {analytics_scripts}
     {cookie_consent}
 </body>
@@ -238,8 +249,10 @@ pub fn render_legal_page(
         base_css = DEFAULT_CSS,
         categories_html = categories_html,
         social_html = social_html,
+        footer_legal_links = build_footer_legal_links(&settings_json),
         year = chrono::Utc::now().format("%Y"),
         body = html_body,
+        back_to_top = build_back_to_top(&settings_json),
         analytics_scripts = analytics_scripts,
         cookie_consent = build_cookie_consent_banner(&settings_json),
     )
@@ -476,6 +489,48 @@ fn build_social_links(settings: &Value) -> String {
     String::from(r#"<div class="social-links"></div>"#)
 }
 
+
+fn build_footer_legal_links(settings: &Value) -> String {
+    let get = |key: &str| -> &str {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or("")
+    };
+    let privacy = get("privacy_policy_enabled") == "true";
+    let terms = get("terms_of_use_enabled") == "true";
+    if !privacy && !terms {
+        return String::new();
+    }
+    let mut html = String::from("<div class=\"footer-legal\">");
+    if privacy {
+        html.push_str("<a href=\"/privacy\">Privacy Policy</a>");
+    }
+    if privacy && terms {
+        html.push_str(" · ");
+    }
+    if terms {
+        html.push_str("<a href=\"/terms\">Terms of Use</a>");
+    }
+    html.push_str("</div>");
+    html
+}
+
+fn build_back_to_top(settings: &Value) -> String {
+    let enabled = settings
+        .get("design_back_to_top")
+        .and_then(|v| v.as_str())
+        .unwrap_or("false") == "true";
+    if !enabled {
+        return String::new();
+    }
+    r#"<button id="back-to-top" aria-label="Back to top" style="display:none;position:fixed;bottom:24px;right:24px;z-index:999;width:40px;height:40px;border-radius:50%;border:1px solid #ddd;background:rgba(255,255,255,0.9);cursor:pointer;font-size:18px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:opacity 0.3s">↑</button>
+<script>
+(function(){
+var btn=document.getElementById('back-to-top');
+if(!btn)return;
+window.addEventListener('scroll',function(){btn.style.display=window.scrollY>300?'block':'none';});
+btn.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'});});
+})();
+</script>"#.to_string()
+}
 
 fn build_cookie_consent_banner(settings: &Value) -> String {
     let get = |key: &str| -> &str {
@@ -1388,11 +1443,22 @@ h6 { font-size: var(--font-size-h6); }
     margin-top: auto;
 }
 
+.footer-legal {
+    font-family: var(--font-captions);
+    font-size: 11px;
+    margin-top: 12px;
+}
+.footer-legal a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+}
+.footer-legal a:hover { text-decoration: underline; }
+
 .footer-text {
     font-family: var(--font-captions);
     font-size: 11px;
     color: var(--color-text-secondary);
-    margin-top: 16px;
+    margin-top: 8px;
 }
 
 /* Content */

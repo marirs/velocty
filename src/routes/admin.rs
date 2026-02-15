@@ -395,8 +395,21 @@ pub fn settings_page(
         return None;
     }
 
+    let section_label = match section {
+        "design" => "Visitors".to_string(),
+        "blog" => "Journal".to_string(),
+        "images" => "Media".to_string(),
+        other => {
+            let mut c = other.chars();
+            match c.next() {
+                None => other.to_string(),
+                Some(f) => format!("{}{}", f.to_uppercase(), &other[f.len_utf8()..]),
+            }
+        }
+    };
+
     let mut context = json!({
-        "page_title": format!("Settings — {}", section.chars().next().unwrap().to_uppercase().to_string() + &section[1..]),
+        "page_title": format!("Settings — {}", section_label),
         "section": section,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),

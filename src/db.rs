@@ -331,6 +331,18 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("security_hcaptcha_enabled", "false"),
         ("security_hcaptcha_site_key", ""),
         ("security_hcaptcha_secret_key", ""),
+        // Visitors (Design)
+        ("design_back_to_top", "false"),
+        ("cookie_consent_enabled", "false"),
+        ("cookie_consent_style", "minimal"),
+        ("cookie_consent_position", "bottom"),
+        ("cookie_consent_policy_url", "/privacy"),
+        ("cookie_consent_theme", "auto"),
+        ("cookie_consent_show_reject", "false"),
+        ("privacy_policy_enabled", "false"),
+        ("privacy_policy_content", ""),
+        ("terms_of_use_enabled", "false"),
+        ("terms_of_use_content", ""),
         // Journal
         ("journal_enabled", "true"),
         ("blog_slug", "journal"),
