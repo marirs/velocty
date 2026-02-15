@@ -414,7 +414,7 @@ pub fn settings_page(
 
     let valid_sections = [
         "general", "blog", "portfolio", "comments", "typography", "images", "seo", "security",
-        "design", "social", "commerce", "paypal", "ai", "email",
+        "design", "social", "commerce", "paypal", "ai", "email", "tasks",
     ];
 
     if !valid_sections.contains(&section) {

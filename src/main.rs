@@ -22,6 +22,7 @@ mod import;
 mod license;
 mod models;
 mod routes;
+mod tasks;
 
 #[cfg(feature = "multi-site")]
 mod site;
@@ -107,6 +108,7 @@ fn rocket() -> _ {
         .attach(security::firewall::FirewallFairing)
         .attach(analytics::AnalyticsFairing)
         .attach(NoCacheAdmin)
+        .attach(tasks::BackgroundTasks)
         .mount("/static", FileServer::from("website/static"))
         .mount("/uploads", FileServer::from("website/site/uploads"))
         .mount(

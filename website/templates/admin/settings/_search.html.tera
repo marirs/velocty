@@ -139,6 +139,10 @@
         {t:'hCaptcha',s:'security',g:'Security › Captcha',k:'hcaptcha captcha site key secret',h:'#tab-sec-hcaptcha'},
         {t:'Firewall',s:'security',g:'Security › Firewall',k:'firewall enable ban block ip',h:'#tab-sec-firewall'},
         {t:'Geo Blocking',s:'security',g:'Security › Firewall',k:'geo blocking country block allow',h:'#tab-sec-firewall'},
+        // Tasks
+        {t:'Session Cleanup',s:'tasks',g:'Tasks',k:'session cleanup background task interval'},
+        {t:'Magic Link Cleanup',s:'tasks',g:'Tasks',k:'magic link token cleanup background task interval'},
+        {t:'Analytics Cleanup',s:'tasks',g:'Tasks',k:'analytics page views cleanup background task interval retention'},
     ];
 
     var input = document.getElementById('settings-search-input');
