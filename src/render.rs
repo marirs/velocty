@@ -37,7 +37,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         .unwrap_or("Velocty");
 
     let site_tagline = settings
-        .get("site_tagline")
+        .get("site_caption")
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
@@ -79,6 +79,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {seo_meta}
     {webmaster_meta}
+    {favicon_link}
 {font_links}    <style>
         {css_vars}
         {base_css}
@@ -89,6 +90,7 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         <aside class="sidebar">
             <div class="sidebar-top">
                 <div class="site-logo">
+                    {logo_html}
                     <h1 class="site-name">{site_name}</h1>
                     <p class="site-tagline">{tagline}</p>
                 </div>
@@ -118,9 +120,11 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
 </html>"#,
         seo_meta = seo_meta,
         webmaster_meta = seo::build_webmaster_meta(&settings),
+        favicon_link = build_favicon_link(&settings),
         font_links = font_links,
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
+        logo_html = build_logo_html(&settings),
         site_name = html_escape(site_name),
         tagline = html_escape(site_tagline),
         categories_html = categories_html,
@@ -167,7 +171,7 @@ pub fn render_legal_page(
     let social_html = build_social_links(&settings_json);
 
     let site_name = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
-    let site_tagline = settings.get("site_tagline").map(|s| s.as_str()).unwrap_or("");
+    let site_tagline = settings.get("site_caption").map(|s| s.as_str()).unwrap_or("");
 
     let show_cats = settings.get("portfolio_show_categories").map(|s| s.as_str()).unwrap_or("true") == "true";
     let categories_html = if show_cats {
@@ -189,6 +193,7 @@ pub fn render_legal_page(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} — {site_name}</title>
+    {favicon_link}
 {font_links}    <style>
         {css_vars}
         {base_css}
@@ -214,6 +219,7 @@ pub fn render_legal_page(
         <aside class="sidebar">
             <div class="sidebar-top">
                 <div class="site-logo">
+                    {logo_html}
                     <h1 class="site-name">{site_name}</h1>
                     <p class="site-tagline">{tagline}</p>
                 </div>
@@ -244,6 +250,8 @@ pub fn render_legal_page(
         title = html_escape(title),
         site_name = html_escape(site_name),
         tagline = html_escape(site_tagline),
+        favicon_link = build_favicon_link(&settings_json),
+        logo_html = build_logo_html(&settings_json),
         font_links = font_links,
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
@@ -490,6 +498,36 @@ fn build_social_links(settings: &Value) -> String {
 }
 
 
+fn build_favicon_link(settings: &Value) -> String {
+    let favicon = settings
+        .get("site_favicon")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if favicon.is_empty() {
+        return String::new();
+    }
+    format!("<link rel=\"icon\" href=\"{}\">", html_escape(favicon))
+}
+
+fn build_logo_html(settings: &Value) -> String {
+    let logo = settings
+        .get("site_logo")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if logo.is_empty() {
+        return String::new();
+    }
+    let site_name = settings
+        .get("site_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Velocty");
+    format!(
+        "<a href=\"/\"><img src=\"{}\" alt=\"{}\" class=\"logo-img\"></a>",
+        html_escape(logo),
+        html_escape(site_name)
+    )
+}
+
 fn build_footer_legal_links(settings: &Value) -> String {
     let get = |key: &str| -> &str {
         settings.get(key).and_then(|v| v.as_str()).unwrap_or("")
@@ -624,6 +662,34 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
     )
 }
 
+
+fn format_date(raw: &str, settings: &Value) -> String {
+    let fmt = settings
+        .get("date_format")
+        .and_then(|v| v.as_str())
+        .unwrap_or("%B %d, %Y");
+    let tz_name = settings
+        .get("timezone")
+        .and_then(|v| v.as_str())
+        .unwrap_or("UTC");
+
+    // Try parsing common DB formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
+    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S"));
+
+    match naive {
+        Ok(ndt) => {
+            // Try to apply timezone offset
+            let utc_dt = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc);
+            if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
+                utc_dt.with_timezone(&tz).format(fmt).to_string()
+            } else {
+                utc_dt.format(fmt).to_string()
+            }
+        }
+        Err(_) => raw.to_string(), // Fallback: return raw string
+    }
+}
 
 fn truncate_words(text: &str, max_words: usize) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
@@ -963,10 +1029,11 @@ fn render_blog_list(context: &Value) -> String {
         let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
         let raw_excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
-        let date = post
+        let raw_date = post
             .get("published_at")
             .and_then(|v| v.as_str())
             .unwrap_or("");
+        let date = format_date(raw_date, &settings);
         let thumb = post
             .get("featured_image")
             .and_then(|v| v.as_str())
@@ -1077,10 +1144,11 @@ fn render_blog_single(context: &Value) -> String {
         .get("content_html")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let date = post
+    let raw_date = post
         .get("published_at")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let date = format_date(raw_date, &settings);
     let featured = post
         .get("featured_image")
         .and_then(|v| v.as_str())
@@ -1398,6 +1466,13 @@ h6 { font-size: var(--font-size-h6); }
     justify-content: space-between;
     overflow-y: auto;
     border-right: 1px solid #eee;
+}
+
+.logo-img {
+    max-width: 160px;
+    max-height: 60px;
+    margin-bottom: 8px;
+    display: block;
 }
 
 .site-name {

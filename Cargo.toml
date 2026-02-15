@@ -32,6 +32,7 @@ sha2 = "0.10"
 
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 
 # Image processing
 image = "0.25"

@@ -396,6 +396,7 @@ pub fn settings_page(
     }
 
     let section_label = match section {
+        "general" => "Site".to_string(),
         "design" => "Visitors".to_string(),
         "blog" => "Journal".to_string(),
         "images" => "Media".to_string(),

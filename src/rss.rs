@@ -6,7 +6,7 @@ use crate::models::settings::Setting;
 pub fn generate_feed(pool: &DbPool) -> String {
     let site_name = Setting::get_or(pool, "site_name", "Velocty");
     let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
-    let site_tagline = Setting::get_or(pool, "site_tagline", "");
+    let site_tagline = Setting::get_or(pool, "site_caption", "");
 
     let blog_slug = Setting::get_or(pool, "blog_slug", "blog");
     let feed_count = Setting::get_or(pool, "rss_feed_count", "25")
