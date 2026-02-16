@@ -34,17 +34,11 @@ use rocket::response::content::RawHtml;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
 
-use models::settings::Setting;
+use models::settings::{Setting, SettingsCache};
 
 /// Holds the admin URL slug, read from DB at startup.
 /// Shared via Rocket managed state so routes, fairings, and templates can access it.
 pub struct AdminSlug(pub String);
-
-/// Holds the blog URL slug (e.g. "journal", "blog"), read from DB at startup.
-pub struct BlogSlug(pub String);
-
-/// Holds the portfolio URL slug (e.g. "portfolio", "gallery"), read from DB at startup.
-pub struct PortfolioSlug(pub String);
 
 pub struct NoCacheAdmin;
 
@@ -67,7 +61,16 @@ impl Fairing for NoCacheAdmin {
 }
 
 #[catch(404)]
-fn not_found() -> RawHtml<String> {
+fn not_found(req: &rocket::Request<'_>) -> RawHtml<String> {
+    if let Some(pool) = req.rocket().state::<db::DbPool>() {
+        let settings = Setting::all(pool);
+        let context = serde_json::json!({
+            "settings": settings,
+            "page_type": "404",
+            "seo": "<title>404 — Page Not Found</title>",
+        });
+        return RawHtml(render::render_page(pool, "404", &context));
+    }
     RawHtml("<html><body style='font-family:sans-serif;text-align:center;padding:80px'><h1>404</h1><p>Page not found.</p><a href='/'>← Home</a></body></html>".to_string())
 }
 
@@ -89,22 +92,18 @@ fn rocket() -> _ {
     db::seed_defaults(&pool).expect("Failed to seed default settings");
 
     let admin_slug = Setting::get_or(&pool, "admin_slug", "admin");
-    let blog_slug = Setting::get_or(&pool, "blog_slug", "journal");
-    let portfolio_slug = Setting::get_or(&pool, "portfolio_slug", "portfolio");
     let admin_mount = format!("/{}", admin_slug);
     let admin_api_mount = format!("/{}/api", admin_slug);
-    let blog_mount = format!("/{}", blog_slug);
-    let portfolio_mount = format!("/{}", portfolio_slug);
+
+    let settings_cache = SettingsCache::load(&pool);
 
     eprintln!("Admin panel mounted at: {}", admin_mount);
-    eprintln!("Blog mounted at: {}", blog_mount);
-    eprintln!("Portfolio mounted at: {}", portfolio_mount);
+    eprintln!("Dynamic routing enabled — blog/portfolio slugs and enabled flags read from cache at request time");
 
     let mut rocket = rocket::build()
         .manage(pool)
         .manage(AdminSlug(admin_slug))
-        .manage(BlogSlug(blog_slug))
-        .manage(PortfolioSlug(portfolio_slug))
+        .manage(settings_cache)
         .manage(rate_limit::RateLimiter::new())
         .manage(security::firewall::FwRateLimiter::new())
         .attach(Template::fairing())
@@ -117,14 +116,6 @@ fn rocket() -> _ {
         .mount(
             "/",
             routes::public::root_routes(),
-        )
-        .mount(
-            &blog_mount,
-            routes::public::blog_routes(),
-        )
-        .mount(
-            &portfolio_mount,
-            routes::public::portfolio_routes(),
         )
         .mount(
             &admin_mount,

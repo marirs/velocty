@@ -160,6 +160,31 @@
     </div>
 
     <div class="form-card">
+        <h3>Navigation Labels</h3>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Customize the labels shown in the sidebar navigation.</p>
+        <div class="form-group">
+            <label for="portfolio_label">Portfolio Label</label>
+            <input type="text" id="portfolio_label" name="portfolio_label" value="{{ settings.portfolio_label | default(value='experiences') }}" placeholder="experiences">
+            <span class="form-help">Label for the portfolio category dropdown in the sidebar</span>
+        </div>
+        <div class="form-group">
+            <label for="blog_label">Journal Label</label>
+            <input type="text" id="blog_label" name="blog_label" value="{{ settings.blog_label | default(value='journal') }}" placeholder="journal">
+            <span class="form-help">Label for the blog/journal link in the sidebar</span>
+        </div>
+        <div class="form-group">
+            <label for="contact_label">Contact Label</label>
+            <input type="text" id="contact_label" name="contact_label" value="{{ settings.contact_label | default(value='contact') }}" placeholder="contact">
+            <span class="form-help">Label for the contact page link in the sidebar</span>
+        </div>
+        <div class="form-group">
+            <label for="copyright_text">Copyright Text</label>
+            <input type="text" id="copyright_text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}" placeholder="Leave empty for default: © 2026 Site Name">
+            <span class="form-help">Custom copyright text for the sidebar footer. Leave empty for auto-generated.</span>
+        </div>
+    </div>
+
+    <div class="form-card">
         <h3>RSS Feed</h3>
         <p class="text-muted" style="font-size:12px;margin-bottom:14px">Your RSS feed is available at <code>{{ settings.site_url | default(value='http://localhost:8000') }}/feed</code>.<br>Subscribers can use this URL in any RSS reader to follow your blog posts.</p>
         <div class="form-group">

@@ -1,8 +1,41 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use crate::db::DbPool;
+
+/// In-memory settings cache. Loaded once at startup, refreshed on settings save.
+/// All public route dispatching reads from this — zero DB overhead per request.
+pub struct SettingsCache {
+    inner: RwLock<HashMap<String, String>>,
+}
+
+impl SettingsCache {
+    pub fn load(pool: &DbPool) -> Self {
+        Self {
+            inner: RwLock::new(Setting::all(pool)),
+        }
+    }
+
+    pub fn refresh(&self, pool: &DbPool) {
+        if let Ok(mut w) = self.inner.write() {
+            *w = Setting::all(pool);
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.inner.read().ok()?.get(key).cloned()
+    }
+
+    pub fn get_or(&self, key: &str, default: &str) -> String {
+        self.get(key).unwrap_or_else(|| default.to_string())
+    }
+
+    pub fn all(&self) -> HashMap<String, String> {
+        self.inner.read().ok().map(|r| r.clone()).unwrap_or_default()
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Setting {

@@ -374,6 +374,14 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         conn.execute_batch("ALTER TABLE portfolio ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
     }
 
+    // Add grapesjs_data to design_templates if missing (Phase 3: stores GrapesJS JSON for re-editing)
+    let has_grapesjs_data: bool = conn
+        .prepare("SELECT grapesjs_data FROM design_templates LIMIT 0")
+        .is_ok();
+    if !has_grapesjs_data {
+        conn.execute_batch("ALTER TABLE design_templates ADD COLUMN grapesjs_data TEXT DEFAULT '';")?;
+    }
+
     Ok(())
 }
 
@@ -435,6 +443,11 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("privacy_policy_content", ""),
         ("terms_of_use_enabled", "false"),
         ("terms_of_use_content", ""),
+        // Labels & Branding
+        ("blog_label", "journal"),
+        ("portfolio_label", "experiences"),
+        ("contact_label", "contact"),
+        ("copyright_text", ""),
         // Journal
         ("journal_enabled", "true"),
         ("blog_slug", "journal"),

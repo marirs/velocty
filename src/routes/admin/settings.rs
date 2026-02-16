@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
-use crate::models::settings::Setting;
+use crate::models::settings::{Setting, SettingsCache};
 use crate::AdminSlug;
 use super::admin_base;
 
@@ -73,6 +73,7 @@ pub fn settings_save(
     _admin: AdminUser,
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
+    cache: &State<SettingsCache>,
     section: &str,
     form: Form<HashMap<String, String>>,
 ) -> Result<Flash<Redirect>, Flash<Redirect>> {
@@ -336,33 +337,6 @@ pub fn settings_save(
 
     let _ = Setting::set_many(pool, &data);
 
-    // Proactive slug defaults: when re-enabling a module whose slug is empty,
-    // auto-fill the default slug to prevent future conflicts
-    if section == "blog" {
-        let journal_enabled = Setting::get_or(pool, "journal_enabled", "true") == "true";
-        let blog_slug = Setting::get_or(pool, "blog_slug", "");
-        if journal_enabled && blog_slug.is_empty() {
-            let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "");
-            if portfolio_slug.is_empty() || portfolio_slug != "journal" {
-                let _ = Setting::set(pool, "blog_slug", "journal");
-            } else {
-                let _ = Setting::set(pool, "blog_slug", "blog");
-            }
-        }
-    }
-    if section == "portfolio" {
-        let portfolio_enabled = Setting::get_or(pool, "portfolio_enabled", "false") == "true";
-        let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "");
-        if portfolio_enabled && portfolio_slug.is_empty() {
-            let blog_slug = Setting::get_or(pool, "blog_slug", "");
-            if blog_slug.is_empty() || blog_slug != "portfolio" {
-                let _ = Setting::set(pool, "portfolio_slug", "portfolio");
-            } else {
-                let _ = Setting::set(pool, "portfolio_slug", "gallery");
-            }
-        }
-    }
-
     // If email settings changed and no providers remain enabled, revert magic link to password
     if section == "email" {
         let email_keys = [
@@ -381,6 +355,9 @@ pub fn settings_save(
         .filter(|t| !t.is_empty())
         .map(|t| format!("#{}", t))
         .unwrap_or_default();
+
+    // Refresh in-memory settings cache so dynamic routing picks up changes immediately
+    cache.refresh(pool);
 
     AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "settings_change", Some("settings"), None, Some(section), None, None);
 

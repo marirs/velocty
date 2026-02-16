@@ -1,38 +1,53 @@
 {% extends "admin/base" %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
     <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Designer</h2>
 </div>
 
-<div class="designs-grid">
+<p style="color:var(--text-secondary);margin:0 0 24px">Click a design to customize fonts, colors, and preview your site.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:24px">
     {% for design in designs %}
-    <div class="design-card {% if design.is_active %}active{% endif %}">
-        <div class="design-thumb">
-            {% if design.thumbnail_path %}
-            <img src="/uploads/{{ design.thumbnail_path }}" alt="{{ design.name }}">
-            {% else %}
-            <div class="design-thumb-placeholder">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-            </div>
+    <div class="design-card-lg {% if design.is_active %}active{% endif %}" style="cursor:pointer;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;overflow:hidden;transition:box-shadow .2s,border-color .2s" onclick="if(!event.target.closest('button,form'))window.location='/{{ admin_slug }}/designer/{{ design.id }}'">
+        <!-- Live site preview -->
+        <div style="position:relative;width:100%;height:280px;overflow:hidden;background:#1a1a1a">
+            <iframe src="/" style="width:1280px;height:900px;border:none;transform:scale(0.3);transform-origin:top left;pointer-events:none;position:absolute;top:0;left:0"></iframe>
+            <div style="position:absolute;inset:0;cursor:pointer"></div>
+            {% if design.is_active %}
+            <div style="position:absolute;top:12px;right:12px;background:var(--success);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase">Active</div>
             {% endif %}
         </div>
-        <div class="design-info">
-            <h4>{{ design.name }}</h4>
-            {% if design.is_active %}
-            <span class="badge badge-published">Active</span>
-            {% else %}
-            <form method="post" action="/{{ admin_slug }}/designer/{{ design.id }}/activate" class="inline">
-                <button type="submit" class="btn btn-sm btn-primary">Activate</button>
-            </form>
-            {% endif %}
+        <!-- Card footer -->
+        <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-subtle)">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>
+                <span style="color:var(--text-primary);font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ design.name }}</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-shrink:0" onclick="event.stopPropagation()">
+                {% if not design.is_active %}
+                <form method="post" action="/{{ admin_slug }}/designer/{{ design.id }}/activate" style="margin:0">
+                    <button type="submit" class="btn btn-sm btn-primary">Activate</button>
+                </form>
+                {% endif %}
+                <button class="btn btn-sm" onclick="window.location='/{{ admin_slug }}/designer/{{ design.id }}'">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Customize
+                </button>
+            </div>
         </div>
     </div>
     {% endfor %}
     {% if designs | length == 0 %}
-    <div class="empty-state">No designs found.</div>
+    <div class="empty-state" style="grid-column:1/-1">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1" style="margin-bottom:12px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>
+        <p>No designs available.</p>
+    </div>
     {% endif %}
 </div>
 
-<p class="text-muted" style="margin-top:24px">Phase 3: Design editor (GrapesJS) will allow creating and editing designs visually.</p>
+<style>
+.design-card-lg:hover { border-color: var(--accent); box-shadow: 0 4px 20px rgba(0,0,0,.2); }
+.design-card-lg.active { border-color: var(--success); }
+</style>
 {% endblock content %}

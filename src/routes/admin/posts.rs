@@ -160,7 +160,11 @@ pub async fn posts_create(
                 let _ = Category::set_for_content(pool, id, "post", cat_ids);
             }
             AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("post"), Some(id), Some(&form.title), Some(&form.status), None);
-            Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id))
+            if form.status == "draft" {
+                Redirect::to(format!("{}/posts/{}/edit?saved=draft", admin_base(slug), id))
+            } else {
+                Redirect::to(format!("{}/posts", admin_base(slug)))
+            }
         }
         Err(_) => Redirect::to(format!("{}/posts", admin_base(slug))),
     }
@@ -206,5 +210,9 @@ pub async fn posts_update(
         let _ = Category::set_for_content(pool, id, "post", cat_ids);
     }
     AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "update", Some("post"), Some(id), Some(&form.title), Some(&form.status), None);
-    Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id))
+    if form.status == "draft" {
+        Redirect::to(format!("{}/posts/{}/edit?saved=draft", admin_base(slug), id))
+    } else {
+        Redirect::to(format!("{}/posts", admin_base(slug)))
+    }
 }

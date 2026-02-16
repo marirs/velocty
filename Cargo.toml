@@ -81,6 +81,9 @@ base64 = "0.22"
 # Email
 lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
 
+# ZIP (design import/export)
+zip = "2"
+
 # Multi-site (optional)
 dashmap = { version = "5", optional = true }
 

@@ -11,7 +11,7 @@ use crate::models::settings::Setting;
 use crate::AdminSlug;
 use super::admin_base;
 
-// ── Designs ────────────────────────────────────────────
+// ── Design List ──────────────────────────────────────────
 
 #[get("/designer")]
 pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
@@ -27,10 +27,28 @@ pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminS
     Template::render("admin/designs/list", &context)
 }
 
+// ── Activate ─────────────────────────────────────────────
+
 #[post("/designer/<id>/activate")]
 pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
     let name = Design::find_by_id(pool, id).map(|d| d.name).unwrap_or_default();
     let _ = Design::activate(pool, id);
     AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "activate", Some("design"), Some(id), Some(&name), None, None);
     Redirect::to(format!("{}/designer", admin_base(slug)))
+}
+
+// ── Design Overview (live preview) ───────────────────────
+
+#[get("/designer/<id>")]
+pub fn design_overview(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
+    let design = Design::find_by_id(pool, id)?;
+
+    let context = json!({
+        "page_title": format!("Design: {}", design.name),
+        "design": design,
+        "admin_slug": slug.0,
+        "settings": Setting::all(pool),
+    });
+
+    Some(Template::render("admin/designs/overview", &context))
 }

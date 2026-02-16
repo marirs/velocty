@@ -1,0 +1,338 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<!-- Customizer layout: settings panel left, preview right -->
+<div class="customizer-wrap">
+    <!-- Left panel -->
+    <div class="customizer-panel">
+        <div class="customizer-panel-header">
+            <a href="/{{ admin_slug }}/designer" class="btn btn-sm" title="Back" style="padding:4px 8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </a>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:15px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ design.name }}</div>
+                <div style="font-size:11px;color:var(--text-tertiary)">Customizer</div>
+            </div>
+            {% if design.is_active %}
+            <span class="badge badge-published" style="flex-shrink:0">Active</span>
+            {% else %}
+            <form method="post" action="/{{ admin_slug }}/designer/{{ design.id }}/activate" style="margin:0;flex-shrink:0">
+                <button type="submit" class="btn btn-sm btn-primary">Activate</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Accordion sections -->
+        <div class="customizer-sections">
+            <!-- Typography -->
+            <div class="cz-section open">
+                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                    <span>Typography</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Heading Font</label>
+                        <input type="text" name="font_heading" value="{{ settings.font_heading | default(value='Inter') }}" data-setting="font_heading" placeholder="Inter">
+                    </div>
+                    <div class="cz-field">
+                        <label>Body Font</label>
+                        <input type="text" name="font_primary" value="{{ settings.font_primary | default(value='Inter') }}" data-setting="font_primary" placeholder="Inter">
+                    </div>
+                    <div class="cz-field">
+                        <label>Font Source</label>
+                        <select name="font_source" data-setting="font_source">
+                            <option value="google" {% if settings.font_source == "google" or not settings.font_source %}selected{% endif %}>Google Fonts</option>
+                            <option value="adobe" {% if settings.font_source == "adobe" %}selected{% endif %}>Adobe Fonts</option>
+                            <option value="custom" {% if settings.font_source == "custom" %}selected{% endif %}>Custom / System</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Body Size</label>
+                        <input type="text" name="font_size_body" value="{{ settings.font_size_body | default(value='16px') }}" data-setting="font_size_body" placeholder="16px">
+                    </div>
+                    <div class="cz-field">
+                        <label>H1 Size</label>
+                        <input type="text" name="font_size_h1" value="{{ settings.font_size_h1 | default(value='2.5rem') }}" data-setting="font_size_h1" placeholder="2.5rem">
+                    </div>
+                    <div class="cz-field">
+                        <label>Text Transform</label>
+                        <select name="font_text_transform" data-setting="font_text_transform">
+                            <option value="none" {% if settings.font_text_transform == "none" or not settings.font_text_transform %}selected{% endif %}>None</option>
+                            <option value="uppercase" {% if settings.font_text_transform == "uppercase" %}selected{% endif %}>Uppercase</option>
+                            <option value="lowercase" {% if settings.font_text_transform == "lowercase" %}selected{% endif %}>Lowercase</option>
+                            <option value="capitalize" {% if settings.font_text_transform == "capitalize" %}selected{% endif %}>Capitalize</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Colors -->
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>
+                    <span>Colors</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Lightbox Border</label>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="color" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" style="width:36px;height:30px;padding:2px;border:1px solid var(--border-input);border-radius:4px;cursor:pointer">
+                            <input type="text" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" style="flex:1" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('change'))">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Lightbox Title Color</label>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="color" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" style="width:36px;height:30px;padding:2px;border:1px solid var(--border-input);border-radius:4px;cursor:pointer">
+                            <input type="text" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" style="flex:1" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('change'))">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Lightbox Tag Color</label>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="color" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" style="width:36px;height:30px;padding:2px;border:1px solid var(--border-input);border-radius:4px;cursor:pointer">
+                            <input type="text" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" style="flex:1" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('change'))">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Site Identity -->
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                    <span>Site Identity</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Site Name</label>
+                        <input type="text" name="site_name" value="{{ settings.site_name | default(value='') }}" data-setting="site_name">
+                    </div>
+                    <div class="cz-field">
+                        <label>Tagline</label>
+                        <input type="text" name="site_caption" value="{{ settings.site_caption | default(value='') }}" data-setting="site_caption">
+                    </div>
+                    <div class="cz-field">
+                        <label>Copyright Text</label>
+                        <input type="text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}" data-setting="copyright_text" placeholder="© 2026 My Site">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Labels -->
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    <span>Navigation</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    {% if settings.portfolio_enabled == "true" %}
+                    <div class="cz-field">
+                        <label>Portfolio Label</label>
+                        <input type="text" name="portfolio_label" value="{{ settings.portfolio_label | default(value='experiences') }}" data-setting="portfolio_label">
+                    </div>
+                    {% endif %}
+                    {% if settings.journal_enabled != "false" %}
+                    <div class="cz-field">
+                        <label>Blog Label</label>
+                        <input type="text" name="blog_label" value="{{ settings.blog_label | default(value='journal') }}" data-setting="blog_label">
+                    </div>
+                    {% endif %}
+                    <div class="cz-field">
+                        <label>Contact Label</label>
+                        <input type="text" name="contact_label" value="{{ settings.contact_label | default(value='contact') }}" data-setting="contact_label">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layout -->
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+                    <span>Layout</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Portfolio Display</label>
+                        <select name="portfolio_display_type" data-setting="portfolio_display_type">
+                            <option value="masonry" {% if settings.portfolio_display_type == "masonry" or not settings.portfolio_display_type %}selected{% endif %}>Masonry</option>
+                            <option value="grid" {% if settings.portfolio_display_type == "grid" %}selected{% endif %}>Grid</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Click Mode</label>
+                        <select name="portfolio_click_mode" data-setting="portfolio_click_mode">
+                            <option value="lightbox" {% if settings.portfolio_click_mode == "lightbox" or not settings.portfolio_click_mode %}selected{% endif %}>Lightbox</option>
+                            <option value="page" {% if settings.portfolio_click_mode == "page" %}selected{% endif %}>Single Page</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Show Categories</label>
+                        <select name="portfolio_show_categories" data-setting="portfolio_show_categories">
+                            <option value="true" {% if settings.portfolio_show_categories != "false" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.portfolio_show_categories == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Show Tags</label>
+                        <select name="portfolio_show_tags" data-setting="portfolio_show_tags">
+                            <option value="true" {% if settings.portfolio_show_tags != "false" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.portfolio_show_tags == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Fade Animation</label>
+                        <select name="portfolio_fade_animation" data-setting="portfolio_fade_animation">
+                            <option value="true" {% if settings.portfolio_fade_animation != "false" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.portfolio_fade_animation == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Publish button -->
+        <div class="customizer-panel-footer">
+            <button type="button" class="btn btn-primary" style="width:100%" onclick="saveCustomizer()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Publish Changes <span style="font-size:11px;opacity:.5;margin-left:6px">⌘P</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Right: live preview -->
+    <div class="customizer-preview">
+        <iframe id="preview-frame" src="/"></iframe>
+    </div>
+</div>
+
+<script>
+document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        saveCustomizer();
+    }
+});
+function saveCustomizer() {
+    var fields = document.querySelectorAll('[data-setting]');
+    var formData = new FormData();
+    fields.forEach(function(f) {
+        formData.append(f.getAttribute('data-setting'), f.value);
+    });
+    fetch('/{{ admin_slug }}/settings/customizer', { method: 'POST', body: formData, redirect: 'manual' })
+        .then(function(r) {
+            if (r.ok || r.type === 'opaqueredirect' || r.status === 0) {
+                var t = document.createElement('div');
+                t.textContent = 'Changes published';
+                t.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--success);color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .4s';
+                document.body.appendChild(t);
+                setTimeout(function(){ t.style.opacity='0'; }, 2500);
+                setTimeout(function(){ t.remove(); }, 3000);
+                document.getElementById('preview-frame').src = document.getElementById('preview-frame').src;
+            }
+        });
+}
+</script>
+
+<style>
+.customizer-wrap {
+    display: flex;
+    gap: 0;
+    margin: -24px -24px -24px -24px;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+.customizer-panel {
+    width: 320px;
+    min-width: 320px;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.customizer-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+.customizer-sections {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+.customizer-panel-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+.customizer-preview {
+    flex: 1;
+    background: #f0f0f0;
+    position: relative;
+}
+.customizer-preview iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* Accordion sections */
+.cz-section { border-bottom: 1px solid var(--border-subtle); }
+.cz-section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+.cz-section-toggle:hover { background: var(--bg-card-hover); }
+.cz-section-toggle .cz-arrow { margin-left: auto; transition: transform .2s; }
+.cz-section.open .cz-section-toggle .cz-arrow { transform: rotate(180deg); }
+.cz-section-body { display: none; padding: 0 16px 14px; }
+.cz-section.open .cz-section-body { display: block; }
+
+.cz-field { margin-bottom: 12px; }
+.cz-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+.cz-field input[type="text"],
+.cz-field select {
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 13px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 5px;
+    color: var(--text-primary);
+}
+.cz-field input[type="text"]:focus,
+.cz-field select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+</style>
+{% endblock content %}

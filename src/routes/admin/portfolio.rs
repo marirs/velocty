@@ -168,7 +168,11 @@ pub async fn portfolio_create(
                 let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
             }
             AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("portfolio"), Some(id), Some(&form.title), Some(&form.status), None);
-            Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id))
+            if form.status == "draft" {
+                Redirect::to(format!("{}/portfolio/{}/edit?saved=draft", admin_base(slug), id))
+            } else {
+                Redirect::to(format!("{}/portfolio", admin_base(slug)))
+            }
         }
         Err(_) => Redirect::to(format!("{}/portfolio", admin_base(slug))),
     }
@@ -221,5 +225,9 @@ pub async fn portfolio_update(
         let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
     }
     AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "update", Some("portfolio"), Some(id), Some(&form.title), Some(&form.status), None);
-    Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id))
+    if form.status == "draft" {
+        Redirect::to(format!("{}/portfolio/{}/edit?saved=draft", admin_base(slug), id))
+    } else {
+        Redirect::to(format!("{}/portfolio", admin_base(slug)))
+    }
 }

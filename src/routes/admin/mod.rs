@@ -65,6 +65,7 @@ pub fn routes() -> Vec<rocket::Route> {
         categories::tag_delete,
         designs::designs_list,
         designs::design_activate,
+        designs::design_overview,
         import::import_page,
         import::import_wordpress,
         import::import_velocty,

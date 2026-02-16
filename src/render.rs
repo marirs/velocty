@@ -1,14 +1,280 @@
 use serde_json::Value;
 
 use crate::db::DbPool;
+use crate::models::design::{Design, DesignTemplate};
 use crate::models::settings::Setting;
 use crate::seo;
 use crate::typography;
 
 /// Renders a full page by merging the active design template with content data.
-/// In Phase 1, this uses hardcoded default templates.
-/// In Phase 3, this will load from the GrapesJS design system.
+/// Phase 3: checks for a custom design template in the DB first.
+/// Falls back to the hardcoded default templates if none found.
 pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> String {
+    // Phase 3: Try to load from active design's custom template
+    if let Some(design) = Design::active(pool) {
+        if let Some(tmpl) = DesignTemplate::get(pool, design.id, template_type) {
+            if !tmpl.layout_html.trim().is_empty() {
+                return render_from_design(pool, &tmpl, context);
+            }
+        }
+    }
+
+    // Fallback: hardcoded default rendering (Phase 1)
+    render_page_default(pool, template_type, context)
+}
+
+/// Render a page from a custom design template stored in the DB.
+/// Replaces {{placeholder}} tags with real content generated from the context.
+fn render_from_design(pool: &DbPool, tmpl: &DesignTemplate, context: &Value) -> String {
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let css_vars = typography::build_css_variables(&settings);
+    let font_links = typography::build_font_links(&settings);
+
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+    };
+
+    let site_name = sg("site_name", "Velocty");
+    let site_tagline = sg("site_caption", "");
+
+    // Build all placeholder replacements
+    let mut html = tmpl.layout_html.clone();
+
+    // ── Global placeholders ──
+    html = html.replace("{{site_title}}", &html_escape(&site_name));
+    html = html.replace("{{site_tagline}}", &html_escape(&site_tagline));
+    html = html.replace("{{site_logo}}", &build_logo_html(&settings));
+    html = html.replace("{{navigation}}", &build_categories_sidebar(context));
+    html = html.replace("{{footer}}", &format!("<p>&copy; {} {}</p>", chrono::Utc::now().format("%Y"), html_escape(&site_name)));
+    html = html.replace("{{social_links}}", &build_social_links(&settings));
+    html = html.replace("{{current_year}}", &chrono::Utc::now().format("%Y").to_string());
+    html = html.replace("{{category_filter}}", &build_categories_sidebar(context));
+
+    // ── Portfolio placeholders ──
+    html = html.replace("{{portfolio_grid}}", &render_portfolio_grid(context));
+
+    if let Some(item) = context.get("item") {
+        let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let image = item.get("image_path").and_then(|v| v.as_str()).unwrap_or("");
+        let desc = item.get("description_html").and_then(|v| v.as_str()).unwrap_or("");
+        let likes = item.get("likes").and_then(|v| v.as_i64()).unwrap_or(0);
+        let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let portfolio_slug = sg("portfolio_slug", "portfolio");
+
+        html = html.replace("{{portfolio_title}}", &format!("<h1>{}</h1>", html_escape(title)));
+        html = html.replace("{{portfolio_image}}", &format!(r#"<div class="portfolio-image"><img src="/uploads/{}" alt="{}"></div>"#, image, html_escape(title)));
+        html = html.replace("{{portfolio_description}}", desc);
+        html = html.replace("{{portfolio_likes}}", &format!(
+            r#"<span class="like-btn" data-id="{}">♥ <span class="like-count">{}</span></span>"#,
+            item_id, format_likes(likes)
+        ));
+
+        // Portfolio meta (categories + tags)
+        let mut meta_html = String::new();
+        if let Some(Value::Array(cats)) = context.get("categories") {
+            if !cats.is_empty() {
+                meta_html.push_str(r#"<div class="portfolio-categories">"#);
+                for cat in cats {
+                    let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+                    meta_html.push_str(&format!("<a href=\"/{}/category/{}\">{}</a> ", portfolio_slug, slug, html_escape(name)));
+                }
+                meta_html.push_str("</div>");
+            }
+        }
+        if let Some(Value::Array(tags)) = context.get("tags") {
+            if !tags.is_empty() {
+                meta_html.push_str(r#"<div class="portfolio-tags">"#);
+                for tag in tags {
+                    let name = tag.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let tslug = tag.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+                    meta_html.push_str(&format!("<a href=\"/{}/tag/{}\">{}</a> ", portfolio_slug, tslug, html_escape(name)));
+                }
+                meta_html.push_str("</div>");
+            }
+        }
+        html = html.replace("{{portfolio_meta}}", &meta_html);
+        html = html.replace("{{portfolio_categories}}", &meta_html);
+        html = html.replace("{{portfolio_tags}}", "");
+
+        // Commerce buy button
+        let commerce_enabled = context.get("commerce_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+        if commerce_enabled {
+            let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let purchase_note = item.get("purchase_note").and_then(|v| v.as_str()).unwrap_or("");
+            let payment_provider = item.get("payment_provider").and_then(|v| v.as_str()).unwrap_or("");
+            html = html.replace("{{portfolio_buy_button}}", &build_commerce_html(price, purchase_note, item_id, &settings, payment_provider));
+        } else {
+            html = html.replace("{{portfolio_buy_button}}", "");
+        }
+
+        // Comments on portfolio
+        let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+        if comments_on {
+            html = html.replace("{{post_comments}}", &build_comments_section(context, &settings, item_id, "portfolio"));
+        } else {
+            html = html.replace("{{post_comments}}", "");
+        }
+    }
+
+    // ── Blog placeholders ──
+    html = html.replace("{{blog_list}}", &render_blog_list(context));
+    html = html.replace("{{blog_pagination}}", ""); // pagination is included in blog_list
+
+    if let Some(post) = context.get("post") {
+        let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let content = post.get("content_html").and_then(|v| v.as_str()).unwrap_or("");
+        let raw_date = post.get("published_at").and_then(|v| v.as_str()).unwrap_or("");
+        let date = format_date(raw_date, &settings);
+        let featured = post.get("featured_image").and_then(|v| v.as_str()).unwrap_or("");
+        let author = post.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
+        let excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
+        let post_id = post.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+
+        html = html.replace("{{post_title}}", &format!("<h1>{}</h1>", html_escape(title)));
+        html = html.replace("{{post_content}}", content);
+        html = html.replace("{{post_date}}", &date);
+        html = html.replace("{{post_author}}", &html_escape(author));
+        html = html.replace("{{post_excerpt}}", &html_escape(excerpt));
+        html = html.replace("{{post_meta}}", &format!(
+            r#"<div class="blog-meta"><time>{}</time>{}</div>"#,
+            date,
+            if !author.is_empty() { format!(" · <span>{}</span>", html_escape(author)) } else { String::new() }
+        ));
+
+        if !featured.is_empty() {
+            html = html.replace("{{post_featured_image}}", &format!(
+                r#"<div class="featured-image"><img src="/uploads/{}" alt="{}"></div>"#,
+                featured, html_escape(title)
+            ));
+        } else {
+            html = html.replace("{{post_featured_image}}", "");
+        }
+
+        // Post tags
+        if let Some(Value::Array(tags)) = context.get("tags") {
+            let blog_slug = sg("blog_slug", "journal");
+            let tag_html: String = tags.iter().filter_map(|t| {
+                let name = t.get("name").and_then(|v| v.as_str())?;
+                let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                Some(format!("<a href=\"/{}/tag/{}\">{}</a>", blog_slug, tslug, html_escape(name)))
+            }).collect::<Vec<_>>().join(" · ");
+            html = html.replace("{{post_tags}}", &format!(r#"<div class="post-tags">{}</div>"#, tag_html));
+        } else {
+            html = html.replace("{{post_tags}}", "");
+        }
+
+        // Post navigation (prev/next)
+        let mut nav_html = String::new();
+        if let Some(prev) = context.get("prev_post") {
+            let blog_slug = sg("blog_slug", "journal");
+            let pslug = prev.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let ptitle = prev.get("title").and_then(|v| v.as_str()).unwrap_or("Previous");
+            nav_html.push_str(&format!(r#"<a href="/{}/{}" class="nav-prev">&larr; {}</a>"#, blog_slug, pslug, html_escape(ptitle)));
+        }
+        if let Some(next) = context.get("next_post") {
+            let blog_slug = sg("blog_slug", "journal");
+            let nslug = next.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let ntitle = next.get("title").and_then(|v| v.as_str()).unwrap_or("Next");
+            nav_html.push_str(&format!(r#"<a href="/{}/{}" class="nav-next">{} &rarr;</a>"#, blog_slug, nslug, html_escape(ntitle)));
+        }
+        html = html.replace("{{post_navigation}}", &format!(r#"<nav class="post-nav">{}</nav>"#, nav_html));
+
+        // Comments on blog post
+        let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+        if comments_on {
+            html = html.replace("{{post_comments}}", &build_comments_section(context, &settings, post_id, "post"));
+        } else {
+            html = html.replace("{{post_comments}}", "");
+        }
+    }
+
+    // ── Clean up any remaining unreplaced placeholders ──
+    let html = strip_unreplaced_placeholders(&html);
+
+    // ── Strip GrapesJS placeholder wrapper divs for clean output ──
+    // The data-placeholder divs are visual aids in the editor; in production
+    // we've already replaced the content above, so the wrapper styling is kept
+    // but the label badge is removed.
+
+    // ── SEO meta tags ──
+    let seo_meta = context.get("seo").and_then(|s| s.as_str()).unwrap_or("").to_string();
+    let webmaster_meta = seo::build_webmaster_meta(&settings);
+    let favicon_link = build_favicon_link(&settings);
+    let analytics_scripts = seo::build_analytics_scripts(&settings);
+    let cookie_consent = build_cookie_consent_banner(&settings);
+    let back_to_top = build_back_to_top(&settings);
+
+    let click_mode = sg("portfolio_click_mode", "lightbox");
+    let show_likes = sg("portfolio_enable_likes", "true");
+    let show_cats = sg("portfolio_show_categories", "true");
+    let show_tags = sg("portfolio_show_tags", "true");
+    let fade_anim = sg("portfolio_fade_animation", "true");
+    let display_type = sg("portfolio_display_type", "masonry");
+    let pagination_type = sg("portfolio_pagination_type", "classic");
+    let lb_show_title = sg("portfolio_lightbox_show_title", "true");
+    let lb_show_tags = sg("portfolio_lightbox_show_tags", "true");
+    let lb_nav = sg("portfolio_lightbox_nav", "true");
+    let lb_keyboard = sg("portfolio_lightbox_keyboard", "true");
+
+    let image_protection_js = if sg("portfolio_image_protection", "false") == "true" {
+        IMAGE_PROTECTION_JS
+    } else {
+        ""
+    };
+
+    // Wrap in full HTML document
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {seo_meta}
+    {webmaster_meta}
+    {favicon_link}
+{font_links}    <style>
+        {css_vars}
+        {design_css}
+    </style>
+</head>
+<body data-click-mode="{click_mode}" data-show-likes="{show_likes}" data-show-categories="{show_cats}" data-show-tags="{show_tags}" data-fade-animation="{fade_anim}" data-display-type="{display_type}" data-pagination-type="{pagination_type}" data-lb-show-title="{lb_show_title}" data-lb-show-tags="{lb_show_tags}" data-lb-nav="{lb_nav}" data-lb-keyboard="{lb_keyboard}">
+    {body_html}
+    {back_to_top}
+    <script>{lightbox_js}</script>
+    {image_protection_js}
+    {analytics_scripts}
+    {cookie_consent}
+</body>
+</html>"#,
+        seo_meta = seo_meta,
+        webmaster_meta = webmaster_meta,
+        favicon_link = favicon_link,
+        font_links = font_links,
+        css_vars = css_vars,
+        design_css = tmpl.style_css,
+        body_html = html,
+        back_to_top = back_to_top,
+        lightbox_js = LIGHTBOX_JS,
+        image_protection_js = image_protection_js,
+        analytics_scripts = analytics_scripts,
+        cookie_consent = cookie_consent,
+        click_mode = click_mode,
+        show_likes = show_likes,
+        show_cats = show_cats,
+        show_tags = show_tags,
+        fade_anim = fade_anim,
+        display_type = display_type,
+        pagination_type = pagination_type,
+        lb_show_title = lb_show_title,
+        lb_show_tags = lb_show_tags,
+        lb_nav = lb_nav,
+        lb_keyboard = lb_keyboard,
+    )
+}
+
+/// Phase 1 fallback: hardcoded default rendering.
+fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> String {
     let settings = context.get("settings").cloned().unwrap_or_default();
 
     // Build CSS variables from settings
@@ -71,6 +337,45 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     let lb_nav = sg("portfolio_lightbox_nav", "true");
     let lb_keyboard = sg("portfolio_lightbox_keyboard", "true");
 
+    // Build additional nav links (journal, contact)
+    let blog_slug = sg("blog_slug", "journal");
+    let blog_label = sg("blog_label", "journal");
+    let blog_enabled = sg("journal_enabled", "true") != "false";
+    let contact_label = sg("contact_label", "catch up");
+    let contact_enabled = sg("contact_page_enabled", "false") == "true";
+    let copyright_text = sg("copyright_text", "");
+
+    let portfolio_slug = sg("portfolio_slug", "portfolio");
+    let portfolio_label = sg("portfolio_label", "experiences");
+    let portfolio_enabled = sg("portfolio_enabled", "false") == "true";
+
+    let mut nav_links = String::new();
+    if portfolio_enabled {
+        nav_links.push_str(&format!(
+            "<a href=\"/{}\" class=\"nav-link\">{}</a>\n",
+            portfolio_slug, html_escape(&portfolio_label)
+        ));
+    }
+    if blog_enabled {
+        nav_links.push_str(&format!(
+            "<a href=\"/{}\" class=\"nav-link\">{}</a>\n",
+            blog_slug, html_escape(&blog_label)
+        ));
+    }
+    if contact_enabled {
+        nav_links.push_str(&format!(
+            "<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
+            html_escape(&contact_label)
+        ));
+    }
+
+    // Build copyright / footer text
+    let footer_copyright = if !copyright_text.is_empty() {
+        format!("<div class=\"footer-text\">{}</div>", html_escape(&copyright_text))
+    } else {
+        format!("<div class=\"footer-text\"><p>&copy; {} {}</p></div>", chrono::Utc::now().format("%Y"), html_escape(site_name))
+    };
+
     // Full page shell — the default "Sidebar Portfolio" design
     format!(
         r#"<!DOCTYPE html>
@@ -87,25 +392,27 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
     </style>
 </head>
 <body data-click-mode="{click_mode}" data-show-likes="{show_likes}" data-show-categories="{show_cats}" data-show-tags="{show_tags}" data-fade-animation="{fade_anim}" data-display-type="{display_type}" data-pagination-type="{pagination_type}" data-lb-show-title="{lb_show_title}" data-lb-show-tags="{lb_show_tags}" data-lb-nav="{lb_nav}" data-lb-keyboard="{lb_keyboard}">
+    <div class="mobile-header">
+        {logo_html_mobile}
+        <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open')">&#9776;</button>
+    </div>
     <div class="site-wrapper">
         <aside class="sidebar">
             <div class="sidebar-top">
                 <div class="site-logo">
                     {logo_html}
-                    <h1 class="site-name">{site_name}</h1>
+                    <h1 class="site-name"><a href="/">{site_name}</a></h1>
                     <p class="site-tagline">{tagline}</p>
                 </div>
                 <nav class="category-nav">
                     {categories_html}
+                    {nav_links}
                 </nav>
-                <a href="/archives" class="archives-link">archives</a>
             </div>
             <div class="sidebar-bottom">
                 {social_html}
                 {footer_legal_links}
-                <div class="footer-text">
-                    <p>&copy; {year} {site_name}</p>
-                </div>
+                {footer_copyright}
             </div>
         </aside>
         <main class="content">
@@ -126,12 +433,14 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
         css_vars = css_vars,
         base_css = DEFAULT_CSS,
         logo_html = build_logo_html(&settings),
+        logo_html_mobile = build_logo_html(&settings),
         site_name = html_escape(site_name),
         tagline = html_escape(site_tagline),
         categories_html = categories_html,
+        nav_links = nav_links,
         social_html = social_html,
         footer_legal_links = build_footer_legal_links(&settings),
-        year = chrono::Utc::now().format("%Y"),
+        footer_copyright = footer_copyright,
         body_html = body_html,
         back_to_top = build_back_to_top(&settings),
         lightbox_js = LIGHTBOX_JS,
@@ -464,25 +773,50 @@ fn build_categories_sidebar(context: &Value) -> String {
         _ => return String::new(),
     };
 
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let portfolio_slug = settings.get("portfolio_slug").and_then(|v| v.as_str()).unwrap_or("portfolio");
+    let portfolio_label = settings.get("portfolio_label").and_then(|v| v.as_str()).unwrap_or("experiences");
+
     let active_slug = context
         .get("active_category")
         .and_then(|c| c.get("slug"))
         .and_then(|s| s.as_str())
         .unwrap_or("");
 
+    // Build collapsible category dropdown
     let mut html = String::new();
-    for cat in categories {
-        let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
-        let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        let active_class = if slug == active_slug { " active" } else { "" };
+
+    // Portfolio categories as collapsible group
+    if !categories.is_empty() {
         html.push_str(&format!(
-            r#"<a href="/portfolio/category/{slug}" class="cat-link{active}" data-category="{slug}">{name}</a>"#,
-            slug = slug,
-            name = html_escape(name),
-            active = active_class,
+            "<div class=\"nav-category-group\">\
+             <button class=\"nav-category-toggle open\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
+             <span>{}</span> <span class=\"arrow\">&#9662;</span></button>\
+             <div class=\"nav-subcategories open\">",
+            html_escape(portfolio_label)
         ));
-        html.push('\n');
+
+        // "all" link
+        let all_active = if active_slug.is_empty() { " active" } else { "" };
+        html.push_str(&format!(
+            "<a href=\"/{}\" class=\"cat-link{}\">all</a>\n",
+            portfolio_slug, all_active
+        ));
+
+        for cat in categories {
+            let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            if slug.is_empty() { continue; }
+            let active_class = if slug == active_slug { " active" } else { "" };
+            html.push_str(&format!(
+                "<a href=\"/{}/category/{}\" class=\"cat-link{}\">{}</a>\n",
+                portfolio_slug, slug, active_class, html_escape(name)
+            ));
+        }
+
+        html.push_str("</div></div>\n");
     }
+
     html
 }
 
@@ -492,10 +826,40 @@ fn build_social_links(settings: &Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("[]");
 
-    // Social links are stored as JSON array of {platform, url, icon}
-    // For now, return empty — will be populated when user configures
-    let _links: Vec<Value> = serde_json::from_str(links_json).unwrap_or_default();
-    String::from(r#"<div class="social-links"></div>"#)
+    let links: Vec<Value> = serde_json::from_str(links_json).unwrap_or_default();
+    if links.is_empty() {
+        return String::new();
+    }
+
+    let mut html = String::from("<div class=\"social-links\">");
+    for link in &links {
+        let platform = link.get("platform").and_then(|v| v.as_str()).unwrap_or("");
+        let url = link.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        if url.is_empty() { continue; }
+
+        let icon = match platform.to_lowercase().as_str() {
+            "instagram" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>"#,
+            "x" | "twitter" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+            "facebook" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>"#,
+            "youtube" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19.1c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>"#,
+            "linkedin" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>"#,
+            "pinterest" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12a4 4 0 1 1 8 0c0 2.5-1.5 5-4 5s-2.5-1-2.5-1l-1 4"/><circle cx="12" cy="12" r="10"/></svg>"#,
+            "tiktok" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>"#,
+            "github" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>"#,
+            "dribbble" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M19.13 5.09C15.22 9.14 10 10.44 2.25 10.94"/><path d="M21.75 12.84c-6.62-1.41-12.14 1-16.38 6.32"/><path d="M8.56 2.75c4.37 6 6 12.56 6.44 19.5"/></svg>"#,
+            "behance" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168z"/></svg>"#,
+            "vimeo" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.5c-.1 2.1-1.5 5-4.4 8.6C14.5 20.7 12 22 10 22c-1.3 0-2.3-1.2-3.1-3.5-.6-2-1.1-4-1.7-6-.6-2.3-1.3-3.5-2-3.5-.2 0-.7.3-1.5.9L.5 8.5c1-.9 2-1.7 2.9-2.6C4.8 4.7 5.8 4 6.5 4c1.8-.2 2.8 1 3.2 3.5.4 2.7.6 4.4.8 5 .5 2 .9 3 1.4 3 .4 0 1-.6 1.8-1.9.8-1.3 1.2-2.3 1.3-3 .1-1.2-.3-1.8-1.4-1.8-.5 0-1 .1-1.5.3 1-3.3 2.9-4.9 5.7-4.8 2.1.1 3.1 1.4 2.9 4.2z"/></svg>"#,
+            _ => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>"#,
+        };
+
+        let label = if platform.is_empty() { "link" } else { platform };
+        html.push_str(&format!(
+            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" title=\"{}\">{}</a>\n",
+            html_escape(url), html_escape(label), icon
+        ));
+    }
+    html.push_str("</div>");
+    html
 }
 
 
@@ -1046,7 +1410,8 @@ fn render_blog_list(context: &Value) -> String {
         _ => if list_style == "editorial" { "blog-list blog-editorial" } else { "blog-list" },
     };
 
-    let mut html = format!("<div class=\"{}\">", container_class);
+    let blog_label = sg("blog_label", "journal");
+    let mut html = format!("<div class=\"{}\">\n<h1>{}</h1>", container_class, html_escape(&blog_label));
 
     for post in posts {
         let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
@@ -1100,10 +1465,10 @@ fn render_blog_list(context: &Value) -> String {
         html.push_str(&format!(
             "<article class=\"blog-item\">\
              {thumb_html}\
-             <div class=\"blog-item-content\">\
+             <div class=\"blog-body\">\
              <h2><a href=\"/{blog_slug}/{slug}\">{title}</a></h2>\
              {meta_html}\
-             <p>{excerpt}</p>\
+             <div class=\"blog-excerpt\">{excerpt}</div>\
              </div>\
              </article>",
             thumb_html = thumb_html,
@@ -1209,6 +1574,51 @@ fn render_blog_single(context: &Value) -> String {
     }
 
     html.push_str(&format!(r#"<div class="post-content">{}</div>"#, content));
+
+    // Tags
+    let blog_slug = sg("blog_slug", "journal");
+    if let Some(Value::Array(tags)) = context.get("tags") {
+        if !tags.is_empty() {
+            html.push_str("<div class=\"post-tags\">");
+            let tag_strs: Vec<String> = tags.iter().filter_map(|t| {
+                let name = t.get("name").and_then(|v| v.as_str())?;
+                let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                Some(format!("<a href=\"/{}/tag/{}\">{}</a>", blog_slug, tslug, html_escape(name)))
+            }).collect();
+            html.push_str(&tag_strs.join(" "));
+            html.push_str("</div>");
+        }
+    }
+
+    // Share button (X / Twitter)
+    let site_url = sg("site_url", "");
+    let post_slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+    if !site_url.is_empty() {
+        let share_url = format!("{}/{}/{}", site_url, blog_slug, post_slug);
+        html.push_str(&format!(
+            "<div class=\"post-share\"><a href=\"https://x.com/intent/tweet?url={url}&text={title}\" target=\"_blank\" rel=\"noopener\">𝕏 Post</a></div>",
+            url = urlencoding_simple(&share_url),
+            title = urlencoding_simple(title),
+        ));
+    }
+
+    // Prev / Next post navigation
+    let mut nav_html = String::new();
+    if let Some(prev) = context.get("prev_post") {
+        let prev_title = prev.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let prev_slug = prev.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        nav_html.push_str(&format!("<a href=\"/{}/{}\">&larr; {}</a>", blog_slug, prev_slug, html_escape(prev_title)));
+    } else {
+        nav_html.push_str("<span></span>");
+    }
+    if let Some(next) = context.get("next_post") {
+        let next_title = next.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let next_slug = next.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        nav_html.push_str(&format!("<a href=\"/{}/{}\">{} &rarr;</a>", blog_slug, next_slug, html_escape(next_title)));
+    }
+    if !nav_html.is_empty() {
+        html.push_str(&format!("<nav class=\"post-nav\">{}</nav>", nav_html));
+    }
 
     // Comments (gated on comments_enabled flag from route)
     let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -1320,11 +1730,51 @@ fn render_404(_context: &Value) -> String {
         .to_string()
 }
 
+fn urlencoding_simple(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() * 2);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                result.push(b as char);
+            }
+            _ => {
+                result.push_str(&format!("%{:02X}", b));
+            }
+        }
+    }
+    result
+}
+
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+/// Remove any remaining {{placeholder}} tags from rendered HTML.
+/// Uses a simple scan instead of regex to avoid adding a dependency.
+fn strip_unreplaced_placeholders(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if i + 3 < len && bytes[i] == b'{' && bytes[i + 1] == b'{' {
+            // Look for closing }}
+            if let Some(end) = input[i + 2..].find("}}") {
+                let tag = &input[i + 2..i + 2 + end];
+                // Only strip if it looks like a valid placeholder (lowercase + underscores)
+                if !tag.is_empty() && tag.bytes().all(|b| b.is_ascii_lowercase() || b == b'_') {
+                    i = i + 2 + end + 2; // skip past }}
+                    continue;
+                }
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
 }
 
 fn format_likes(count: i64) -> String {
@@ -1518,6 +1968,8 @@ body {
     text-transform: var(--text-transform);
 }
 
+a { color: var(--color-accent); }
+
 h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
 h1 { font-size: var(--font-size-h1); }
 h2 { font-size: var(--font-size-h2); }
@@ -1531,47 +1983,81 @@ h6 { font-size: var(--font-size-h6); }
     min-height: 100vh;
 }
 
-/* Sidebar */
+/* ── Sidebar ── */
 .sidebar {
     width: var(--sidebar-width);
     position: fixed;
     top: 0;
     left: 0;
     height: 100vh;
-    padding: 30px;
+    padding: 28px 24px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     overflow-y: auto;
-    border-right: 1px solid #eee;
+    background: var(--color-bg);
+    z-index: 10;
 }
 
+.sidebar-top { flex: 1; }
+
 .logo-img {
-    max-width: 160px;
+    max-width: 180px;
     max-height: 60px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: block;
 }
 
 .site-name {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    line-height: 1.2;
 }
+
+.site-name a { color: var(--color-text); text-decoration: none; }
 
 .site-tagline {
-    font-size: 12px;
+    font-family: var(--font-captions);
+    font-size: 11px;
     color: var(--color-text-secondary);
-    font-style: italic;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    line-height: 1.5;
 }
 
+/* Collapsible category nav */
 .category-nav {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 16px;
+    gap: 2px;
+    margin-bottom: 8px;
+    font-family: var(--font-nav);
+    font-size: 13px;
 }
+
+.nav-category-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 3px 0;
+    color: var(--color-text);
+    font-family: var(--font-nav);
+    font-size: 13px;
+    background: none;
+    border: none;
+    text-align: left;
+}
+.nav-category-toggle:hover { color: var(--color-accent); }
+.nav-category-toggle .arrow { font-size: 9px; transition: transform 0.2s; }
+.nav-category-toggle.open .arrow { transform: rotate(180deg); }
+
+.nav-subcategories {
+    display: none;
+    flex-direction: column;
+    gap: 1px;
+    padding-left: 12px;
+}
+.nav-subcategories.open { display: flex; }
 
 .cat-link {
     font-family: var(--font-nav);
@@ -1581,25 +2067,49 @@ h6 { font-size: var(--font-size-h6); }
     padding: 2px 0;
 }
 
-.cat-link:hover { text-decoration: underline; }
+.cat-link:hover { color: var(--color-accent); }
 .cat-link.active { font-weight: 700; color: var(--color-accent); }
+
+.nav-link {
+    font-family: var(--font-nav);
+    font-size: 13px;
+    color: var(--color-text);
+    text-decoration: none;
+    padding: 3px 0;
+    display: block;
+}
+.nav-link:hover { color: var(--color-accent); }
+.nav-link.active { color: var(--color-accent); }
 
 .archives-link {
     font-family: var(--font-nav);
     font-size: 13px;
     color: var(--color-text);
     text-decoration: none;
-    margin-top: 8px;
+    margin-top: 4px;
+    display: inline-block;
 }
+.archives-link:hover { color: var(--color-accent); }
 
 .sidebar-bottom {
     margin-top: auto;
+    padding-top: 16px;
 }
+
+.social-links { margin-bottom: 8px; }
+.social-links a {
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 13px;
+    margin-right: 8px;
+}
+.social-links a:hover { color: var(--color-accent); }
 
 .footer-legal {
     font-family: var(--font-captions);
-    font-size: 11px;
-    margin-top: 12px;
+    font-size: 10px;
+    margin-top: 8px;
+    line-height: 1.5;
 }
 .footer-legal a {
     color: var(--color-text-secondary);
@@ -1609,26 +2119,27 @@ h6 { font-size: var(--font-size-h6); }
 
 .footer-text {
     font-family: var(--font-captions);
-    font-size: 11px;
+    font-size: 10px;
     color: var(--color-text-secondary);
-    margin-top: 8px;
+    margin-top: 6px;
+    line-height: 1.5;
 }
 
-/* Content */
+/* ── Content ── */
 .content {
     margin-left: var(--sidebar-width);
     flex: 1;
     padding: 0;
+    min-height: 100vh;
 }
 
-/* Masonry Grid (default) */
+/* ── Portfolio Masonry Grid ── */
 .masonry-grid {
     column-count: var(--grid-columns);
     column-gap: var(--grid-gap);
     padding: var(--grid-gap);
 }
 
-/* CSS Grid mode (when data-display-type="grid") */
 .css-grid {
     display: grid;
     grid-template-columns: repeat(var(--grid-columns), 1fr);
@@ -1641,9 +2152,7 @@ h6 { font-size: var(--font-size-h6); }
     margin-bottom: var(--grid-gap);
 }
 
-.css-grid .grid-item {
-    margin-bottom: 0;
-}
+.css-grid .grid-item { margin-bottom: 0; }
 
 .grid-item img {
     width: 100%;
@@ -1656,11 +2165,10 @@ h6 { font-size: var(--font-size-h6); }
 }
 
 .grid-item img:hover {
-    opacity: 0.85;
+    opacity: 0.88;
     transition: opacity 0.2s;
 }
 
-/* Fade-in scroll animation */
 .grid-item.fade-in {
     opacity: 0;
     transform: translateY(20px);
@@ -1677,61 +2185,57 @@ h6 { font-size: var(--font-size-h6); }
     color: var(--color-text-secondary);
     padding: 4px 0 8px;
 }
-
-.item-tags a {
-    color: var(--color-text-secondary);
-    text-decoration: none;
-}
-
+.item-tags a { color: var(--color-text-secondary); text-decoration: none; }
 .item-tags a:hover { text-decoration: underline; }
 
-/* Lightbox */
+/* ── Lightbox ── */
 .lightbox-overlay {
     display: none;
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.88);
     z-index: 1000;
     justify-content: center;
     align-items: center;
 }
 
-.lightbox-overlay.active {
-    display: flex;
-}
+.lightbox-overlay.active { display: flex; }
 
 .lb-content {
     text-align: center;
     max-width: 80vw;
-    max-height: 80vh;
+    max-height: 85vh;
 }
 
 .lb-image {
     max-width: 80vw;
-    max-height: 75vh;
+    max-height: 78vh;
     object-fit: contain;
     border: 8px solid var(--lightbox-border-color);
 }
 
 .lb-title {
     color: var(--lightbox-title-color);
-    font-size: 16px;
+    font-family: var(--font-captions);
+    font-size: 14px;
     margin-top: 12px;
 }
 
 .lb-tags {
     color: var(--lightbox-tag-color);
-    font-size: 13px;
-    margin-top: 6px;
+    font-size: 12px;
+    margin-top: 4px;
 }
 
 .lb-close {
     position: absolute;
-    top: 20px; right: 20px;
+    top: 16px; right: 20px;
     background: none; border: none;
-    color: #fff; font-size: 30px;
+    color: #fff; font-size: 32px;
     cursor: pointer;
+    opacity: 0.7;
 }
+.lb-close:hover { opacity: 1; }
 
 .lb-prev, .lb-next {
     position: absolute;
@@ -1739,36 +2243,71 @@ h6 { font-size: var(--font-size-h6); }
     transform: translateY(-50%);
     background: none; border: none;
     color: var(--lightbox-nav-color);
-    opacity: 0.6;
-    font-size: 40px;
+    opacity: 0.5;
+    font-size: 48px;
     cursor: pointer;
     padding: 20px;
 }
-
 .lb-prev:hover, .lb-next:hover { opacity: 1; }
-.lb-prev { left: 10px; }
-.lb-next { right: 10px; }
+.lb-prev { left: 8px; }
+.lb-next { right: 8px; }
 
-/* Blog List — default (compact list) */
-.blog-list { max-width: 900px; padding: 30px; }
+/* ── Journal / Blog List ── */
+.blog-list {
+    max-width: 900px;
+    padding: 28px 30px;
+}
+
+.blog-list > h1 {
+    font-size: 18px;
+    font-weight: 400;
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+}
 
 .blog-item {
     display: flex;
-    gap: 16px;
-    margin-bottom: 24px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid #eee;
+    gap: 20px;
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    align-items: flex-start;
 }
 
-.blog-thumb img { width: 170px; height: 170px; object-fit: cover; }
+.blog-thumb { flex-shrink: 0; }
+.blog-thumb img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+}
 
-.blog-item h2 { font-size: 18px; margin-bottom: 4px; }
+.blog-body { flex: 1; min-width: 0; }
+
+.blog-item h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    line-height: 1.3;
+}
 .blog-item h2 a { color: var(--color-text); text-decoration: none; }
 .blog-item h2 a:hover { text-decoration: underline; }
-.blog-meta { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
-.blog-meta time { font-size: 12px; color: var(--color-text-secondary); }
+
+.blog-meta {
+    font-family: var(--font-captions);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+.blog-meta time { font-size: 11px; color: var(--color-text-secondary); }
 .reading-time { font-style: italic; }
-.blog-item p { font-size: 14px; color: var(--color-text-secondary); margin-top: 8px; }
+
+.blog-item .blog-excerpt {
+    font-size: 13px;
+    color: var(--color-text);
+    line-height: 1.6;
+    text-align: justify;
+}
 
 /* Blog Grid mode */
 .blog-list.blog-grid {
@@ -1809,74 +2348,194 @@ h6 { font-size: var(--font-size-h6); }
 }
 .blog-editorial .blog-thumb img { width: 100%; height: 300px; }
 .blog-editorial .blog-item h2 { font-size: 24px; }
-.blog-editorial .blog-item p { font-size: 16px; }
+.blog-editorial .blog-item .blog-excerpt { font-size: 16px; }
 
-/* Blog Single */
-.blog-single { max-width: 800px; padding: 30px; }
-.blog-single h1 { font-size: var(--font-size-h1); margin-bottom: 8px; }
-.blog-single .blog-meta { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 20px; }
-.blog-single time { font-size: 13px; color: var(--color-text-secondary); }
-.featured-image img { width: 100%; margin-bottom: 24px; }
-.post-content { line-height: 1.8; }
+/* ── Journal / Blog Single ── */
+.blog-single {
+    max-width: 680px;
+    padding: 28px 30px;
+}
 
-/* Portfolio Single */
-.portfolio-single { max-width: 1000px; padding: 30px; }
-.portfolio-image img { width: 100%; }
-.portfolio-meta { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; }
+.blog-single h1 {
+    font-size: var(--font-size-h1);
+    font-weight: 700;
+    margin-bottom: 4px;
+    line-height: 1.2;
+}
+
+.blog-single .blog-meta {
+    font-family: var(--font-captions);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 24px;
+}
+.blog-single time { font-size: 12px; color: var(--color-text-secondary); }
+
+.featured-image img {
+    width: 100%;
+    margin-bottom: 28px;
+    display: block;
+}
+
+.post-content {
+    line-height: 1.8;
+    text-align: justify;
+}
+.post-content p { margin-bottom: 1em; }
+.post-content h2, .post-content h3 { margin-top: 1.5em; margin-bottom: 0.5em; }
+.post-content blockquote {
+    border-left: 3px solid var(--color-accent);
+    padding-left: 16px;
+    margin: 1.2em 0;
+    font-style: italic;
+    color: var(--color-text-secondary);
+}
+.post-content img { max-width: 100%; height: auto; margin: 1em 0; }
+
+.post-tags {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+    font-family: var(--font-captions);
+    font-size: 12px;
+}
+.post-tags a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    margin-right: 6px;
+}
+.post-tags a:hover { text-decoration: underline; }
+.post-tags a::before { content: '#'; }
+
+.post-share {
+    margin-top: 16px;
+}
+.post-share a {
+    display: inline-block;
+    padding: 6px 16px;
+    background: #000;
+    color: #fff;
+    font-size: 12px;
+    text-decoration: none;
+    border-radius: 3px;
+}
+.post-share a:hover { background: #333; }
+
+.post-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+    font-size: 13px;
+}
+.post-nav a { color: var(--color-text); text-decoration: none; }
+.post-nav a:hover { color: var(--color-accent); }
+
+/* ── Portfolio Single ── */
+.portfolio-single {
+    max-width: 1000px;
+    padding: 28px 30px;
+}
+
+.portfolio-image img { width: 100%; display: block; margin-bottom: 8px; }
+
+.portfolio-images .portfolio-image { margin-bottom: 16px; }
+
+.portfolio-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 16px 0;
+}
 .portfolio-meta h1 { font-size: var(--font-size-h1); }
 .like-btn { cursor: pointer; font-size: 18px; }
-.portfolio-categories a { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
+.portfolio-categories a {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-right: 8px;
+    text-decoration: none;
+}
+.portfolio-categories a:hover { text-decoration: underline; }
 
-/* Comments */
+.portfolio-description {
+    line-height: 1.8;
+    text-align: justify;
+    margin-top: 16px;
+}
+
+/* ── Comments ── */
 .comments { margin-top: 40px; }
-.comments h3 { margin-bottom: 16px; }
-.comment { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+.comments h3 { margin-bottom: 16px; font-size: 16px; }
+.comment { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.06); }
 .comment strong { font-size: 14px; }
-.comment time { font-size: 12px; color: var(--color-text-secondary); margin-left: 8px; }
+.comment time { font-size: 11px; color: var(--color-text-secondary); margin-left: 8px; }
 .comment p { margin-top: 4px; font-size: 14px; }
 
 .comment-form { margin-top: 30px; }
 .comment-form input, .comment-form textarea {
     display: block; width: 100%; max-width: 500px;
     padding: 8px 12px; margin-bottom: 12px;
-    border: 1px solid #ddd; border-radius: 4px;
+    border: 1px solid #ddd; border-radius: 3px;
     font-family: inherit; font-size: 14px;
 }
 .comment-form textarea { min-height: 100px; resize: vertical; }
 .comment-form button {
     font-family: var(--font-buttons);
     padding: 8px 24px; background: var(--color-accent);
-    color: #fff; border: none; border-radius: 4px;
+    color: #fff; border: none; border-radius: 3px;
     cursor: pointer; font-size: 14px;
 }
 
-/* Pagination */
-.pagination { display: flex; gap: 8px; padding: 20px 0; }
+/* ── Pagination ── */
+.pagination { display: flex; gap: 8px; padding: 20px 30px; }
 .pagination a, .pagination .current {
     font-family: var(--font-buttons);
-    padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;
+    padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px;
     text-decoration: none; color: var(--color-text); font-size: 13px;
 }
 .pagination .current { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
 
-/* Error */
+/* ── Error ── */
 .error-page { padding: 60px 30px; text-align: center; }
 .error-page h1 { font-size: 72px; color: var(--color-text-secondary); }
-.error-page a { color: var(--color-accent); }
+.error-page p { margin-top: 12px; color: var(--color-text-secondary); }
+.error-page a { color: var(--color-accent); text-decoration: none; }
 
-/* Responsive */
+/* ── Mobile Menu ── */
+.mobile-header {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: var(--color-bg);
+    padding: 12px 16px;
+    z-index: 20;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.mobile-header .logo-img { max-height: 32px; margin: 0; }
+.mobile-menu-btn {
+    background: none; border: none;
+    font-size: 24px; cursor: pointer;
+    color: var(--color-text);
+}
+
+/* ── Responsive ── */
 @media (max-width: 1024px) {
-    .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; padding: 16px 20px; }
-    .content { margin-left: 0; }
+    .sidebar { display: none; }
+    .mobile-header { display: flex; }
+    .sidebar.mobile-open { display: flex; width: 100%; height: 100vh; z-index: 100; }
+    .content { margin-left: 0; padding-top: 56px; }
     .masonry-grid { column-count: 2; }
-    .sidebar-bottom { display: none; }
-    .category-nav { flex-direction: row; flex-wrap: wrap; gap: 8px; }
 }
 
 @media (max-width: 768px) {
     .masonry-grid { column-count: 1; }
     .blog-item { flex-direction: column; }
     .blog-thumb img { width: 100%; height: auto; }
+    .blog-single { padding: 20px 16px; }
+    .portfolio-single { padding: 20px 16px; }
 }
 "#;
 

@@ -23,6 +23,7 @@ pub struct DesignTemplate {
     pub template_type: String,
     pub layout_html: String,
     pub style_css: String,
+    pub grapesjs_data: String,
     pub updated_at: NaiveDateTime,
 }
 
@@ -113,9 +114,9 @@ impl Design {
         let templates = DesignTemplate::for_design(pool, id);
         for tmpl in templates {
             conn.execute(
-                "INSERT INTO design_templates (design_id, template_type, layout_html, style_css)
-                 VALUES (?1, ?2, ?3, ?4)",
-                params![new_id, tmpl.template_type, tmpl.layout_html, tmpl.style_css],
+                "INSERT INTO design_templates (design_id, template_type, layout_html, style_css, grapesjs_data)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![new_id, tmpl.template_type, tmpl.layout_html, tmpl.style_css, tmpl.grapesjs_data],
             )
             .map_err(|e| e.to_string())?;
         }
@@ -144,6 +145,7 @@ impl DesignTemplate {
             template_type: row.get("template_type")?,
             layout_html: row.get("layout_html")?,
             style_css: row.get("style_css")?,
+            grapesjs_data: row.get::<_, Option<String>>("grapesjs_data")?.unwrap_or_default(),
             updated_at: row.get("updated_at")?,
         })
     }
@@ -188,6 +190,26 @@ impl DesignTemplate {
              ON CONFLICT(design_id, template_type)
              DO UPDATE SET layout_html = ?3, style_css = ?4, updated_at = CURRENT_TIMESTAMP",
             params![design_id, template_type, layout_html, style_css],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn upsert_full(
+        pool: &DbPool,
+        design_id: i64,
+        template_type: &str,
+        layout_html: &str,
+        style_css: &str,
+        grapesjs_data: &str,
+    ) -> Result<(), String> {
+        let conn = pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO design_templates (design_id, template_type, layout_html, style_css, grapesjs_data)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(design_id, template_type)
+             DO UPDATE SET layout_html = ?3, style_css = ?4, grapesjs_data = ?5, updated_at = CURRENT_TIMESTAMP",
+            params![design_id, template_type, layout_html, style_css, grapesjs_data],
         )
         .map_err(|e| e.to_string())?;
         Ok(())

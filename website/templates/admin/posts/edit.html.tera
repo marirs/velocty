@@ -517,5 +517,14 @@
         time_24hr: false,
         allowInput: true,
     });
+    if (new URLSearchParams(window.location.search).get('saved') === 'draft') {
+        var t = document.createElement('div');
+        t.textContent = 'Draft saved';
+        t.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--success);color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .4s';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.style.opacity='0'; }, 2500);
+        setTimeout(function(){ t.remove(); }, 3000);
+        history.replaceState(null, '', window.location.pathname);
+    }
 </script>
 {% endblock scripts %}

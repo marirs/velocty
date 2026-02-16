@@ -205,6 +205,26 @@ impl Post {
         Ok(())
     }
 
+    /// Get the previous published post (older, by published_at)
+    pub fn prev_published(pool: &DbPool, published_at: &NaiveDateTime) -> Option<Self> {
+        let conn = pool.get().ok()?;
+        conn.query_row(
+            "SELECT * FROM posts WHERE status = 'published' AND published_at < ?1 ORDER BY published_at DESC LIMIT 1",
+            params![published_at],
+            Self::from_row,
+        ).ok()
+    }
+
+    /// Get the next published post (newer, by published_at)
+    pub fn next_published(pool: &DbPool, published_at: &NaiveDateTime) -> Option<Self> {
+        let conn = pool.get().ok()?;
+        conn.query_row(
+            "SELECT * FROM posts WHERE status = 'published' AND published_at > ?1 ORDER BY published_at ASC LIMIT 1",
+            params![published_at],
+            Self::from_row,
+        ).ok()
+    }
+
     pub fn update_status(pool: &DbPool, id: i64, status: &str) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
         conn.execute(
