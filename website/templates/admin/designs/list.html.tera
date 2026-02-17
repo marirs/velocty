@@ -7,25 +7,40 @@
 
 <p style="color:var(--text-secondary);margin:0 0 24px">Click a design to customize fonts, colors, and preview your site.</p>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:24px">
+<div class="design-grid">
     {% for design in designs %}
-    <div class="design-card-lg {% if design.is_active %}active{% endif %}" style="cursor:pointer;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;overflow:hidden;transition:box-shadow .2s,border-color .2s" onclick="if(!event.target.closest('button,form'))window.location='/{{ admin_slug }}/designer/{{ design.slug }}'">
-        <!-- Live site preview -->
-        <div style="position:relative;width:100%;height:280px;overflow:hidden;background:#1a1a1a">
-            <iframe src="/" style="width:1280px;height:900px;border:none;transform:scale(0.3);transform-origin:top left;pointer-events:none;position:absolute;top:0;left:0"></iframe>
-            <div style="position:absolute;inset:0;cursor:pointer"></div>
-            {% if design.is_active %}
-            <div style="position:absolute;top:12px;right:12px;background:var(--success);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase">Active</div>
-            {% endif %}
-        </div>
-        <!-- Card footer -->
-        <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-subtle)">
-            <div style="display:flex;align-items:center;gap:10px;min-width:0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>
-                <span style="color:var(--text-primary);font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ design.name }}</span>
+    <div class="design-card {% if design.is_active %}active{% endif %}" onclick="if(!event.target.closest('button,form'))window.location='/{{ admin_slug }}/designer/{{ design.slug }}'">
+        <!-- Left: Browser chrome + live preview -->
+        <div class="design-card-browser">
+            <div class="browser-chrome">
+                <span class="browser-dot" style="background:#ff5f57"></span>
+                <span class="browser-dot" style="background:#febc2e"></span>
+                <span class="browser-dot" style="background:#28c840"></span>
             </div>
-            <div style="display:flex;gap:6px;align-items:center;flex-shrink:0" onclick="event.stopPropagation()">
-                {% if not design.is_active %}
+            <div class="design-card-preview">
+                <iframe src="/" style="width:1280px;height:900px;border:none;transform:scale(0.32);transform-origin:top left;pointer-events:none;position:absolute;top:0;left:0"></iframe>
+                <div style="position:absolute;inset:0;cursor:pointer"></div>
+            </div>
+        </div>
+        <!-- Right: Info panel -->
+        <div class="design-card-info">
+            <div class="design-card-header">
+                <span class="design-card-name">{{ design.name }}</span>
+            </div>
+            {% if design.description %}
+            <p class="design-card-desc">{{ design.description }}</p>
+            {% endif %}
+            <div class="design-card-tags">
+                <span class="design-tag">Sidebar Nav</span>
+                <span class="design-tag">Masonry Grid</span>
+                <span class="design-tag">Blog</span>
+                <span class="design-tag">Lightbox</span>
+                <span class="design-tag">Commerce</span>
+            </div>
+            <div class="design-card-actions" onclick="event.stopPropagation()">
+                {% if design.is_active %}
+                <span class="design-badge-active">Active</span>
+                {% else %}
                 <form method="post" action="/{{ admin_slug }}/designer/{{ design.id }}/activate" style="margin:0">
                     <button type="submit" class="btn btn-sm btn-primary">Activate</button>
                 </form>
@@ -47,7 +62,139 @@
 </div>
 
 <style>
-.design-card-lg:hover { border-color: var(--accent); box-shadow: 0 4px 20px rgba(0,0,0,.2); }
-.design-card-lg.active { border-color: var(--success); }
+.design-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(620px, 1fr));
+    gap: 24px;
+}
+.design-card {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow .2s, border-color .2s;
+}
+.design-card:hover { border-color: var(--accent); box-shadow: 0 4px 20px rgba(0,0,0,.2); }
+.design-card.active { border-color: var(--success); }
+
+/* Browser chrome wrapper */
+.design-card-browser {
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+    min-width: 420px;
+    flex-shrink: 0;
+    margin: 12px 0 12px 12px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+}
+.browser-chrome {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #2c2c2c;
+    border-bottom: 1px solid #1a1a1a;
+}
+[data-theme="light"] .browser-chrome {
+    background: #e8e8e8;
+    border-bottom-color: #d0d0d0;
+}
+[data-theme="light"] .design-card-preview {
+    background: #f5f5f5;
+}
+.browser-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.design-card-preview {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    background: #1a1a1a;
+    min-height: 260px;
+}
+
+.design-card-info {
+    flex: 1;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.design-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.design-card-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.design-badge-active {
+    background: var(--success);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.design-card-desc {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.55;
+    margin-bottom: 12px;
+}
+
+.design-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 0;
+}
+
+.design-tag {
+    font-size: 10px;
+    padding: 2px 9px;
+    border-radius: 20px;
+    background: rgba(232, 145, 58, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(232, 145, 58, 0.3);
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.design-card-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+@media (max-width: 720px) {
+    .design-grid { grid-template-columns: 1fr; }
+    .design-card { flex-direction: column; }
+    .design-card-browser { width: 100%; min-width: 0; margin: 12px 12px 0 12px; }
+    .design-card-preview { height: 220px; }
+}
 </style>
 {% endblock content %}

@@ -162,6 +162,7 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
             slug TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
             layout_html TEXT NOT NULL DEFAULT '',
             style_css TEXT NOT NULL DEFAULT '',
             thumbnail_path TEXT,
@@ -764,8 +765,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
 
     if design_count == 0 {
         conn.execute(
-            "INSERT INTO designs (name, slug, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, 1)",
-            params!["Oneguy", "oneguy", "", ""],
+            "INSERT INTO designs (name, slug, description, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 1)",
+            params!["Oneguy", "oneguy", "A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself.", "", ""],
         )?;
     }
 
@@ -910,6 +911,20 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     if !has_design_slug {
         conn.execute_batch("ALTER TABLE designs ADD COLUMN slug TEXT NOT NULL DEFAULT '';")?;
     }
+
+    // Add description column to designs if missing
+    let has_design_desc: bool = conn
+        .prepare("SELECT description FROM designs LIMIT 0")
+        .is_ok();
+    if !has_design_desc {
+        conn.execute_batch("ALTER TABLE designs ADD COLUMN description TEXT NOT NULL DEFAULT '';")?;
+    }
+
+    // Backfill Oneguy description if empty
+    conn.execute(
+        "UPDATE designs SET description = ?1 WHERE slug = 'oneguy' AND description = ''",
+        params!["A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself."],
+    )?;
 
     // Rename "Default" design to "Oneguy" and set slug
     conn.execute(
