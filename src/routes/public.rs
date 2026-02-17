@@ -61,6 +61,15 @@ fn dispatch_root(
     let portfolio_enabled = cache.get_or("portfolio_enabled", "false") == "true";
 
     let path = path.unwrap_or("");
+    let path = path.trim_end_matches('/');
+
+    // Skip reserved paths so admin, static files, API, etc. are never intercepted
+    let admin_slug = cache.get_or("admin_slug", "admin");
+    let first_segment = path.split('/').next().unwrap_or("");
+    let reserved = [admin_slug.as_str(), "static", "uploads", "api", "archives", "rss", "sitemap.xml", "robots.txt", "super", ".well-known", "favicon.ico"];
+    if reserved.contains(&first_segment) {
+        return None;
+    }
 
     // Try blog: strip blog_slug prefix
     if journal_enabled {

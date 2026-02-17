@@ -62,6 +62,22 @@ impl Fairing for NoCacheAdmin {
 
 #[catch(404)]
 fn not_found(req: &rocket::Request<'_>) -> RawHtml<String> {
+    // If the 404 is for an admin path (auth guard forwarded), redirect to login
+    let slug = req.rocket().state::<AdminSlug>()
+        .map(|s| s.0.as_str())
+        .unwrap_or("admin");
+    let admin_prefix = format!("/{}/", slug);
+    let path = req.uri().path().as_str();
+    if path == &format!("/{}", slug) || path.starts_with(&admin_prefix) {
+        if !path.ends_with("/login") && !path.ends_with("/setup") {
+            let login_url = format!("/{}/login", slug);
+            return RawHtml(format!(
+                "<html><head><meta http-equiv=\"refresh\" content=\"0;url={}\"></head><body></body></html>",
+                login_url
+            ));
+        }
+    }
+
     if let Some(pool) = req.rocket().state::<db::DbPool>() {
         let settings = Setting::all(pool);
         let context = serde_json::json!({
