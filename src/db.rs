@@ -2,7 +2,7 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 
-use crate::render::ONEGUY_DESIGN_CSS;
+use crate::render::{ONEGUY_DESIGN_CSS, ONEGUY_SHELL_HTML};
 
 pub type DbPool = Pool<SqliteConnectionManager>;
 
@@ -949,10 +949,10 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         params!["A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself."],
     )?;
 
-    // Backfill Oneguy style_css if empty (migrating from hardcoded to DB-driven)
+    // Keep Oneguy design in sync with the binary constants
     conn.execute(
-        "UPDATE designs SET style_css = ?1 WHERE slug = 'oneguy' AND (style_css = '' OR style_css IS NULL)",
-        params![ONEGUY_DESIGN_CSS],
+        "UPDATE designs SET layout_html = ?1, style_css = ?2 WHERE slug = 'oneguy'",
+        params![ONEGUY_SHELL_HTML, ONEGUY_DESIGN_CSS],
     )?;
 
     // Rename "Default" design to "Oneguy" and set slug
