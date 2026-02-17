@@ -24,8 +24,220 @@
 
         <!-- Accordion sections -->
         <div class="customizer-sections">
-            <!-- Typography -->
+
+            <!-- ═══ LAYOUT ═══ -->
             <div class="cz-section open">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+                    <span>Layout</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Header</label>
+                        <select name="layout_header_type" data-setting="layout_header_type" onchange="czConditions()">
+                            <option value="sidebar" {% if not settings.layout_header_type is defined or settings.layout_header_type == "sidebar" %}selected{% endif %}>Sidebar</option>
+                            <option value="topbar" {% if settings.layout_header_type is defined and settings.layout_header_type == "topbar" %}selected{% endif %}>Top Bar</option>
+                        </select>
+                    </div>
+
+                    <!-- Sidebar-specific options -->
+                    <div data-cz-show="layout_header_type=sidebar">
+                        <div class="cz-field">
+                            <label>Sidebar Position</label>
+                            <select name="layout_sidebar_position" data-setting="layout_sidebar_position">
+                                <option value="left" {% if not settings.layout_sidebar_position is defined or settings.layout_sidebar_position == "left" %}selected{% endif %}>Left</option>
+                                <option value="right" {% if settings.layout_sidebar_position is defined and settings.layout_sidebar_position == "right" %}selected{% endif %}>Right</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="cz-field">
+                        <label>Sidebar Custom Heading <small style="opacity:.5">(optional)</small></label>
+                        <input type="text" name="layout_sidebar_custom_heading" value="{{ settings.layout_sidebar_custom_heading | default(value='') }}" data-setting="layout_sidebar_custom_heading" placeholder="e.g. About Me">
+                    </div>
+                    <div class="cz-field">
+                        <label>Sidebar Custom Text <small style="opacity:.5">(HTML, optional)</small></label>
+                        <textarea name="layout_sidebar_custom_text" data-setting="layout_sidebar_custom_text" rows="3" placeholder="A short blurb about you...">{{ settings.layout_sidebar_custom_text | default(value='') }}</textarea>
+                    </div>
+
+                    <div class="cz-field">
+                        <label>Content Boundary</label>
+                        <select name="layout_content_boundary" data-setting="layout_content_boundary" onchange="czConditions()">
+                            <option value="full" {% if not settings.layout_content_boundary is defined or settings.layout_content_boundary == "full" %}selected{% endif %}>Full Page</option>
+                            <option value="boxed" {% if settings.layout_content_boundary is defined and settings.layout_content_boundary == "boxed" %}selected{% endif %}>Boxed</option>
+                        </select>
+                    </div>
+
+                    <!-- Full page margin options -->
+                    <div data-cz-show="layout_content_boundary=full">
+                        <div class="cz-row-2">
+                            <div class="cz-field">
+                                <label>Top Margin</label>
+                                <input type="text" name="layout_margin_top" value="{{ settings.layout_margin_top | default(value='0') }}" data-setting="layout_margin_top" placeholder="0">
+                            </div>
+                            <div class="cz-field">
+                                <label>Bottom Margin</label>
+                                <input type="text" name="layout_margin_bottom" value="{{ settings.layout_margin_bottom | default(value='0') }}" data-setting="layout_margin_bottom" placeholder="0">
+                            </div>
+                        </div>
+                        <div class="cz-row-2">
+                            <div class="cz-field">
+                                <label>Left Margin</label>
+                                <input type="text" name="layout_margin_left" value="{{ settings.layout_margin_left | default(value='0') }}" data-setting="layout_margin_left" placeholder="0">
+                            </div>
+                            <div class="cz-field">
+                                <label>Right Margin</label>
+                                <input type="text" name="layout_margin_right" value="{{ settings.layout_margin_right | default(value='0') }}" data-setting="layout_margin_right" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+
+                    {% if settings.portfolio_enabled == "true" %}
+                    <div class="cz-field">
+                        <label>Portfolio Display</label>
+                        <select name="portfolio_display_type" data-setting="portfolio_display_type">
+                            <option value="masonry" {% if not settings.portfolio_display_type is defined or settings.portfolio_display_type == "masonry" %}selected{% endif %}>Masonry</option>
+                            <option value="grid" {% if settings.portfolio_display_type is defined and settings.portfolio_display_type == "grid" %}selected{% endif %}>Grid</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Portfolio Border Style</label>
+                        <select name="portfolio_border_style" data-setting="portfolio_border_style">
+                            <option value="none" {% if not settings.portfolio_border_style is defined or settings.portfolio_border_style == "none" %}selected{% endif %}>None</option>
+                            <option value="standard" {% if settings.portfolio_border_style is defined and settings.portfolio_border_style == "standard" %}selected{% endif %}>Standard</option>
+                            <option value="polaroid" {% if settings.portfolio_border_style is defined and settings.portfolio_border_style == "polaroid" %}selected{% endif %}>Polaroid</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Show Title Below Image</label>
+                        <select name="portfolio_show_title" data-setting="portfolio_show_title">
+                            <option value="false" {% if not settings.portfolio_show_title is defined or settings.portfolio_show_title == "false" %}selected{% endif %}>No</option>
+                            <option value="true" {% if settings.portfolio_show_title is defined and settings.portfolio_show_title == "true" %}selected{% endif %}>Yes</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Show Categories</label>
+                        <select name="portfolio_show_categories" data-setting="portfolio_show_categories">
+                            <option value="false" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "false" %}selected{% endif %}>Don't Show</option>
+                            <option value="hover" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "hover" %}selected{% endif %}>On Hover</option>
+                            <option value="bottom_left" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "bottom_left" %}selected{% endif %}>Bottom Left (over image)</option>
+                            <option value="bottom_right" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "bottom_right" %}selected{% endif %}>Bottom Right (over image)</option>
+                            <option value="below_left" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "below_left" %}selected{% endif %}>Below Left</option>
+                            <option value="below_right" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "below_right" %}selected{% endif %}>Below Right</option>
+                            <option value="true" {% if not settings.portfolio_show_categories is defined or settings.portfolio_show_categories == "true" %}selected{% endif %}>Yes (default)</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Show Tags</label>
+                        <select name="portfolio_show_tags" data-setting="portfolio_show_tags">
+                            <option value="false" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "false" %}selected{% endif %}>Don't Show</option>
+                            <option value="hover" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "hover" %}selected{% endif %}>On Hover</option>
+                            <option value="bottom_left" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "bottom_left" %}selected{% endif %}>Bottom Left (over image)</option>
+                            <option value="bottom_right" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "bottom_right" %}selected{% endif %}>Bottom Right (over image)</option>
+                            <option value="below_left" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "below_left" %}selected{% endif %}>Below Left</option>
+                            <option value="below_right" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "below_right" %}selected{% endif %}>Below Right</option>
+                            <option value="true" {% if not settings.portfolio_show_tags is defined or settings.portfolio_show_tags == "true" %}selected{% endif %}>Yes (default)</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Portfolio Click Action</label>
+                        <select name="portfolio_click_mode" data-setting="portfolio_click_mode">
+                            <option value="lightbox" {% if not settings.portfolio_click_mode is defined or settings.portfolio_click_mode == "lightbox" %}selected{% endif %}>Open in Lightbox</option>
+                            <option value="page" {% if settings.portfolio_click_mode is defined and settings.portfolio_click_mode == "page" %}selected{% endif %}>Open Detail Page</option>
+                        </select>
+                    </div>
+                    {% if settings.portfolio_likes_enabled is defined and settings.portfolio_likes_enabled == "true" %}
+                    <div class="cz-field">
+                        <label>Heart / Like Position</label>
+                        <select name="portfolio_like_position" data-setting="portfolio_like_position">
+                            <option value="image_bottom_right" {% if not settings.portfolio_like_position is defined or settings.portfolio_like_position == "image_bottom_right" %}selected{% endif %}>Image Bottom Right</option>
+                            <option value="image_bottom_left" {% if settings.portfolio_like_position is defined and settings.portfolio_like_position == "image_bottom_left" %}selected{% endif %}>Image Bottom Left</option>
+                            <option value="below_bottom_right" {% if settings.portfolio_like_position is defined and settings.portfolio_like_position == "below_bottom_right" %}selected{% endif %}>Below Image Right</option>
+                            <option value="below_bottom_left" {% if settings.portfolio_like_position is defined and settings.portfolio_like_position == "below_bottom_left" %}selected{% endif %}>Below Image Left</option>
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="cz-field">
+                        <label>Scroll Animation</label>
+                        <select name="portfolio_fade_animation" data-setting="portfolio_fade_animation">
+                            <option value="fade" {% if not settings.portfolio_fade_animation is defined or settings.portfolio_fade_animation == "fade" or settings.portfolio_fade_animation == "true" %}selected{% endif %}>Fade In</option>
+                            <option value="slide_up" {% if settings.portfolio_fade_animation is defined and settings.portfolio_fade_animation == "slide_up" %}selected{% endif %}>Slide Up</option>
+                            <option value="none" {% if settings.portfolio_fade_animation is defined and (settings.portfolio_fade_animation == "none" or settings.portfolio_fade_animation == "false") %}selected{% endif %}>None</option>
+                        </select>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ═══ SITE IDENTITY ═══ -->
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                    <span>Site Identity</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Site Name Display</label>
+                        <select name="site_name_display" data-setting="site_name_display" onchange="czConditions()">
+                            <option value="text" {% if not settings.site_name_display is defined or settings.site_name_display == "text" %}selected{% endif %}>{{ settings.site_name | default(value='Site Name') }}</option>
+                            {% if settings.site_logo is defined and settings.site_logo %}
+                            <option value="logo" {% if settings.site_name_display is defined and settings.site_name_display == "logo" %}selected{% endif %}>Site Logo</option>
+                            {% endif %}
+                            <option value="none" {% if settings.site_name_display is defined and settings.site_name_display == "none" %}selected{% endif %}>None</option>
+                        </select>
+                    </div>
+
+                    <!-- Logo options (only when logo is selected) -->
+                    <div data-cz-show="site_name_display=logo">
+                        <div class="cz-field">
+                            <label>Logo Position</label>
+                            <select name="site_logo_position" data-setting="site_logo_position">
+                                <option value="left" {% if settings.site_logo_position is defined and settings.site_logo_position == "left" %}selected{% endif %}>Left</option>
+                                <option value="center" {% if not settings.site_logo_position is defined or settings.site_logo_position == "center" %}selected{% endif %}>Center</option>
+                                <option value="right" {% if settings.site_logo_position is defined and settings.site_logo_position == "right" %}selected{% endif %}>Right</option>
+                            </select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Logo Width</label>
+                            <input type="text" name="site_logo_width" value="{{ settings.site_logo_width | default(value='180px') }}" data-setting="site_logo_width" placeholder="180px">
+                        </div>
+                    </div>
+
+                    <div class="cz-field">
+                        <label>Show Tagline</label>
+                        <select name="site_tagline_enabled" data-setting="site_tagline_enabled" onchange="czConditions()">
+                            <option value="true" {% if not settings.site_tagline_enabled is defined or settings.site_tagline_enabled == "true" %}selected{% endif %}>Enabled</option>
+                            <option value="false" {% if settings.site_tagline_enabled is defined and settings.site_tagline_enabled == "false" %}selected{% endif %}>Disabled</option>
+                        </select>
+                    </div>
+                    <div data-cz-show="site_tagline_enabled=true">
+                        <div class="cz-field">
+                            <label>Tagline</label>
+                            <input type="text" name="site_caption" value="{{ settings.site_caption | default(value='') }}" data-setting="site_caption">
+                        </div>
+                    </div>
+
+                    <div class="cz-field">
+                        <label>Copyright Text <small style="opacity:.5">(HTML allowed)</small></label>
+                        <textarea name="copyright_text" data-setting="copyright_text" rows="2" placeholder="&copy; 2026 My Site">{{ settings.copyright_text | default(value='') }}</textarea>
+                    </div>
+                    <div class="cz-field">
+                        <label>Copyright Alignment</label>
+                        <select name="copyright_alignment" data-setting="copyright_alignment">
+                            <option value="left" {% if settings.copyright_alignment is defined and settings.copyright_alignment == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if not settings.copyright_alignment is defined or settings.copyright_alignment == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.copyright_alignment is defined and settings.copyright_alignment == "right" %}selected{% endif %}>Right</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TYPOGRAPHY ═══ -->
+            <div class="cz-section">
                 <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
                     <span>Typography</span>
@@ -48,34 +260,179 @@
                         </select>
                     </div>
                     <div class="cz-field">
-                        <label>Heading Font</label>
-                        <select id="font-heading-select" name="font_heading" data-setting="font_heading"></select>
-                    </div>
-                    <div class="cz-field">
-                        <label>Body Font</label>
+                        <label>Site-wide Font</label>
                         <select id="font-body-select" name="font_primary" data-setting="font_primary"></select>
                     </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Logo</div>
                     <div class="cz-field">
-                        <label>Body Size</label>
+                        <label>Logo Font</label>
+                        <select id="font-logo-select" class="cz-font-select" name="font_logo" data-setting="font_logo"></select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Logo Font Size</label>
+                        <input type="text" name="font_size_logo" value="{{ settings.font_size_logo | default(value='1.5rem') }}" data-setting="font_size_logo" placeholder="1.5rem">
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Headings</div>
+                    <div class="cz-field">
+                        <label>Heading Font</label>
+                        <select id="font-heading-select" class="cz-font-select" name="font_heading" data-setting="font_heading"></select>
+                    </div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>H1 Size</label>
+                            <input type="text" name="font_size_h1" value="{{ settings.font_size_h1 | default(value='2.5rem') }}" data-setting="font_size_h1" placeholder="2.5rem">
+                        </div>
+                        <div class="cz-field">
+                            <label>H2 Size</label>
+                            <input type="text" name="font_size_h2" value="{{ settings.font_size_h2 | default(value='2rem') }}" data-setting="font_size_h2" placeholder="2rem">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Sub-heading Font (H2)</label>
+                        <select id="font-subheading-select" class="cz-font-select" name="font_subheading" data-setting="font_subheading"></select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Caption Font (H3)</label>
+                        <select id="font-caption-select" class="cz-font-select" name="font_captions" data-setting="font_captions"></select>
+                    </div>
+                    <div class="cz-field">
+                        <label>H3 Size</label>
+                        <input type="text" name="font_size_h3" value="{{ settings.font_size_h3 | default(value='1.75rem') }}" data-setting="font_size_h3" placeholder="1.75rem">
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Navigation</div>
+                    <div class="cz-field">
+                        <label>Navigation Font</label>
+                        <select id="font-nav-select" class="cz-font-select" name="font_navigation" data-setting="font_navigation"></select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Navigation Font Size</label>
+                        <input type="text" name="font_size_nav" value="{{ settings.font_size_nav | default(value='14px') }}" data-setting="font_size_nav" placeholder="14px">
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Body</div>
+                    <div class="cz-field">
+                        <label>Body Font</label>
+                        <select id="font-body2-select" class="cz-font-select" name="font_body" data-setting="font_body"></select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Body Font Size</label>
                         <input type="text" name="font_size_body" value="{{ settings.font_size_body | default(value='16px') }}" data-setting="font_size_body" placeholder="16px">
                     </div>
                     <div class="cz-field">
-                        <label>H1 Size</label>
-                        <input type="text" name="font_size_h1" value="{{ settings.font_size_h1 | default(value='2.5rem') }}" data-setting="font_size_h1" placeholder="2.5rem">
+                        <label>Line Height</label>
+                        <input type="text" name="font_line_height" value="{{ settings.font_line_height | default(value='1.6') }}" data-setting="font_line_height" placeholder="1.6">
                     </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Blockquote &amp; Lists</div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>Blockquote Font</label>
+                            <select id="font-blockquote-select" class="cz-font-select" name="font_blockquote" data-setting="font_blockquote"></select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Size</label>
+                            <input type="text" name="font_size_blockquote" value="{{ settings.font_size_blockquote | default(value='1.1rem') }}" data-setting="font_size_blockquote" placeholder="1.1rem">
+                        </div>
+                    </div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>List Font</label>
+                            <select id="font-list-select" class="cz-font-select" name="font_list" data-setting="font_list"></select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Size</label>
+                            <input type="text" name="font_size_list" value="{{ settings.font_size_list | default(value='16px') }}" data-setting="font_size_list" placeholder="16px">
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Footer</div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>Footer Font</label>
+                            <select id="font-footer-select" class="cz-font-select" name="font_footer" data-setting="font_footer"></select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Size</label>
+                            <input type="text" name="font_size_footer" value="{{ settings.font_size_footer | default(value='12px') }}" data-setting="font_size_footer" placeholder="12px">
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Lightbox</div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>Title Font</label>
+                            <select id="font-lb-title-select" class="cz-font-select" name="font_lightbox_title" data-setting="font_lightbox_title"></select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Size</label>
+                            <input type="text" name="font_size_lightbox_title" value="{{ settings.font_size_lightbox_title | default(value='18px') }}" data-setting="font_size_lightbox_title" placeholder="18px">
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Categories &amp; Tags</div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>Categories Font</label>
+                            <select id="font-categories-select" class="cz-font-select" name="font_categories" data-setting="font_categories"></select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Size</label>
+                            <input type="text" name="font_size_categories" value="{{ settings.font_size_categories | default(value='13px') }}" data-setting="font_size_categories" placeholder="13px">
+                        </div>
+                    </div>
+                    <div class="cz-row-2">
+                        <div class="cz-field">
+                            <label>Tags Font</label>
+                            <select id="font-tags-select" class="cz-font-select" name="font_tags" data-setting="font_tags"></select>
+                        </div>
+                        <div class="cz-field">
+                            <label>Size</label>
+                            <input type="text" name="font_size_tags" value="{{ settings.font_size_tags | default(value='12px') }}" data-setting="font_size_tags" placeholder="12px">
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Global</div>
                     <div class="cz-field">
                         <label>Text Transform</label>
                         <select name="font_text_transform" data-setting="font_text_transform">
-                            <option value="none" {% if settings.font_text_transform == "none" or not settings.font_text_transform %}selected{% endif %}>None</option>
-                            <option value="uppercase" {% if settings.font_text_transform == "uppercase" %}selected{% endif %}>Uppercase</option>
-                            <option value="lowercase" {% if settings.font_text_transform == "lowercase" %}selected{% endif %}>Lowercase</option>
-                            <option value="capitalize" {% if settings.font_text_transform == "capitalize" %}selected{% endif %}>Capitalize</option>
+                            <option value="none" {% if not settings.font_text_transform is defined or settings.font_text_transform == "none" %}selected{% endif %}>None</option>
+                            <option value="uppercase" {% if settings.font_text_transform is defined and settings.font_text_transform == "uppercase" %}selected{% endif %}>Uppercase</option>
+                            <option value="lowercase" {% if settings.font_text_transform is defined and settings.font_text_transform == "lowercase" %}selected{% endif %}>Lowercase</option>
+                            <option value="capitalize" {% if settings.font_text_transform is defined and settings.font_text_transform == "capitalize" %}selected{% endif %}>Capitalize</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Text Direction</label>
+                        <select name="font_text_direction" data-setting="font_text_direction">
+                            <option value="ltr" {% if not settings.font_text_direction is defined or settings.font_text_direction == "ltr" %}selected{% endif %}>LTR (Left to Right)</option>
+                            <option value="rtl" {% if settings.font_text_direction is defined and settings.font_text_direction == "rtl" %}selected{% endif %}>RTL (Right to Left)</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Text Alignment</label>
+                        <select name="font_text_alignment" data-setting="font_text_alignment">
+                            <option value="left" {% if not settings.font_text_alignment is defined or settings.font_text_alignment == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if settings.font_text_alignment is defined and settings.font_text_alignment == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.font_text_alignment is defined and settings.font_text_alignment == "right" %}selected{% endif %}>Right</option>
+                            <option value="justify" {% if settings.font_text_alignment is defined and settings.font_text_alignment == "justify" %}selected{% endif %}>Justified</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            <!-- Colors -->
+            <!-- ═══ COLORS ═══ -->
             <div class="cz-section">
                 <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>
@@ -83,6 +440,7 @@
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div class="cz-section-body">
+                    <div class="cz-sub-heading">Page</div>
                     <div class="cz-field">
                         <label>Background</label>
                         <div class="cz-color-row">
@@ -91,17 +449,41 @@
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Text Color</label>
-                        <div class="cz-color-row">
-                            <div class="cz-swatch" style="background:{{ settings.site_text_color | default(value='#111827') }}" onclick="czOpenPicker(this)"></div>
-                            <input type="text" name="site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" data-setting="site_text_color" class="cz-color-text" oninput="czSyncFromHex(this)">
-                        </div>
-                    </div>
-                    <div class="cz-field">
-                        <label>Accent Color</label>
+                        <label>Accent</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.site_accent_color | default(value='#3b82f6') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="site_accent_color" value="{{ settings.site_accent_color | default(value='#3b82f6') }}" data-setting="site_accent_color" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Link</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_link | default(value='#3b82f6') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_link" value="{{ settings.color_link | default(value='#3b82f6') }}" data-setting="color_link" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Link Hover</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_link_hover | default(value='#2563eb') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_link_hover" value="{{ settings.color_link_hover | default(value='#2563eb') }}" data-setting="color_link_hover" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Border</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_border | default(value='#e5e7eb') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_border" value="{{ settings.color_border | default(value='#e5e7eb') }}" data-setting="color_border" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Text</div>
+                    <div class="cz-field">
+                        <label>Text</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.site_text_color | default(value='#111827') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" data-setting="site_text_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
@@ -112,61 +494,99 @@
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Lightbox Border</label>
+                        <label>Logo Text</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_logo_text | default(value='#111827') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_logo_text" value="{{ settings.color_logo_text | default(value='#111827') }}" data-setting="color_logo_text" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Tagline</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_tagline | default(value='#6b7280') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_tagline" value="{{ settings.color_tagline | default(value='#6b7280') }}" data-setting="color_tagline" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Heading (H1)</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_heading | default(value='#111827') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_heading" value="{{ settings.color_heading | default(value='#111827') }}" data-setting="color_heading" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Sub-heading (H2)</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_subheading | default(value='#1f2937') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_subheading" value="{{ settings.color_subheading | default(value='#1f2937') }}" data-setting="color_subheading" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Caption (H3)</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_caption | default(value='#374151') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_caption" value="{{ settings.color_caption | default(value='#374151') }}" data-setting="color_caption" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Footer</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_footer | default(value='#9ca3af') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_footer" value="{{ settings.color_footer | default(value='#9ca3af') }}" data-setting="color_footer" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Lightbox</div>
+                    <div class="cz-field">
+                        <label>Border</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Lightbox Title</label>
+                        <label>Title</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Lightbox Tags</label>
+                        <label>Tags</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
-                </div>
-            </div>
+                    <div class="cz-field">
+                        <label>Categories</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_lightbox_categories | default(value='#AAAAAA') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_lightbox_categories" value="{{ settings.color_lightbox_categories | default(value='#AAAAAA') }}" data-setting="color_lightbox_categories" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
 
-            <!-- Site Identity -->
-            <div class="cz-section">
-                <button class="cz-section-toggle" onclick="czToggle(this)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
-                    <span>Site Identity</span>
-                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <div class="cz-section-body">
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Categories &amp; Tags</div>
                     <div class="cz-field">
-                        <label>Site Name</label>
-                        <input type="text" name="site_name" value="{{ settings.site_name | default(value='') }}" data-setting="site_name">
+                        <label>Categories</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_categories | default(value='#6b7280') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_categories" value="{{ settings.color_categories | default(value='#6b7280') }}" data-setting="color_categories" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
                     </div>
                     <div class="cz-field">
-                        <label>Tagline</label>
-                        <input type="text" name="site_caption" value="{{ settings.site_caption | default(value='') }}" data-setting="site_caption">
-                    </div>
-                    <div class="cz-field">
-                        <label>Copyright Text <small style="opacity:.5">(HTML allowed)</small></label>
-                        <textarea name="copyright_text" data-setting="copyright_text" rows="2" placeholder="&copy; 2026 My Site">{{ settings.copyright_text | default(value='') }}</textarea>
-                    </div>
-                    <div class="cz-field">
-                        <label>Copyright Alignment</label>
-                        <select name="copyright_alignment" data-setting="copyright_alignment">
-                            <option value="left" {% if settings.copyright_alignment is defined and settings.copyright_alignment == "left" %}selected{% endif %}>Left</option>
-                            <option value="center" {% if not settings.copyright_alignment is defined or settings.copyright_alignment == "center" %}selected{% endif %}>Center</option>
-                            <option value="right" {% if settings.copyright_alignment is defined and settings.copyright_alignment == "right" %}selected{% endif %}>Right</option>
-                        </select>
+                        <label>Tags</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.color_tags | default(value='#6b7280') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="color_tags" value="{{ settings.color_tags | default(value='#6b7280') }}" data-setting="color_tags" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Navigation Labels -->
+            <!-- ═══ NAVIGATION ═══ -->
             <div class="cz-section">
                 <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -174,10 +594,30 @@
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div class="cz-section-body">
+                    <!-- Nav position only for Top Bar -->
+                    <div data-cz-show="layout_header_type=topbar">
+                        <div class="cz-field">
+                            <label>Navigation Position</label>
+                            <select name="nav_position" data-setting="nav_position">
+                                <option value="below_logo" {% if not settings.nav_position is defined or settings.nav_position == "below_logo" %}selected{% endif %}>Below Logo</option>
+                                <option value="right" {% if settings.nav_position is defined and settings.nav_position == "right" %}selected{% endif %}>Right of Logo</option>
+                            </select>
+                        </div>
+                    </div>
+
                     {% if settings.portfolio_enabled == "true" %}
                     <div class="cz-field">
                         <label>Portfolio Label</label>
                         <input type="text" name="portfolio_label" value="{{ settings.portfolio_label | default(value='experiences') }}" data-setting="portfolio_label">
+                    </div>
+                    <div class="cz-field">
+                        <label>Portfolio Category Filters</label>
+                        <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories">
+                            <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
+                            <option value="under_link" {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
+                            <option value="page_top" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
+                            <option value="submenu" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "submenu" %}selected{% endif %}>Sub-menu</option>
+                        </select>
                     </div>
                     {% endif %}
                     {% if settings.journal_enabled != "false" %}
@@ -193,7 +633,7 @@
                 </div>
             </div>
 
-            <!-- Social & Share Icons -->
+            <!-- ═══ SOCIAL & SHARING ═══ -->
             <div class="cz-section">
                 <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
@@ -211,14 +651,6 @@
                         </select>
                     </div>
                     <div class="cz-field">
-                        <label>Share Icons Position</label>
-                        <select name="share_icons_position" data-setting="share_icons_position">
-                            <option value="below_content" {% if not settings.share_icons_position is defined or settings.share_icons_position == "below_content" %}selected{% endif %}>Below Content</option>
-                            <option value="sidebar" {% if settings.share_icons_position is defined and settings.share_icons_position == "sidebar" %}selected{% endif %}>Sidebar</option>
-                            <option value="hidden" {% if settings.share_icons_position is defined and settings.share_icons_position == "hidden" %}selected{% endif %}>Hidden</option>
-                        </select>
-                    </div>
-                    <div class="cz-field">
                         <label>Social Icons Alignment</label>
                         <select name="footer_alignment" data-setting="footer_alignment">
                             <option value="left" {% if settings.footer_alignment is defined and settings.footer_alignment == "left" %}selected{% endif %}>Left</option>
@@ -226,54 +658,18 @@
                             <option value="right" {% if settings.footer_alignment is defined and settings.footer_alignment == "right" %}selected{% endif %}>Right</option>
                         </select>
                     </div>
+                    <div class="cz-field">
+                        <label>Share Icons Position</label>
+                        <select name="share_icons_position" data-setting="share_icons_position">
+                            <option value="below_image" {% if settings.share_icons_position is defined and settings.share_icons_position == "below_image" %}selected{% endif %}>Below Image</option>
+                            <option value="below_content" {% if not settings.share_icons_position is defined or settings.share_icons_position == "below_content" %}selected{% endif %}>Below Content</option>
+                            <option value="sidebar" {% if settings.share_icons_position is defined and settings.share_icons_position == "sidebar" %}selected{% endif %}>Header / Sidebar</option>
+                            <option value="hidden" {% if settings.share_icons_position is defined and settings.share_icons_position == "hidden" %}selected{% endif %}>Hidden</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <!-- Layout -->
-            <div class="cz-section">
-                <button class="cz-section-toggle" onclick="czToggle(this)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
-                    <span>Layout</span>
-                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                <div class="cz-section-body">
-                    <div class="cz-field">
-                        <label>Portfolio Display</label>
-                        <select name="portfolio_display_type" data-setting="portfolio_display_type">
-                            <option value="masonry" {% if settings.portfolio_display_type == "masonry" or not settings.portfolio_display_type %}selected{% endif %}>Masonry</option>
-                            <option value="grid" {% if settings.portfolio_display_type == "grid" %}selected{% endif %}>Grid</option>
-                        </select>
-                    </div>
-                    <div class="cz-field">
-                        <label>Click Mode</label>
-                        <select name="portfolio_click_mode" data-setting="portfolio_click_mode">
-                            <option value="lightbox" {% if settings.portfolio_click_mode == "lightbox" or not settings.portfolio_click_mode %}selected{% endif %}>Lightbox</option>
-                            <option value="page" {% if settings.portfolio_click_mode == "page" %}selected{% endif %}>Single Page</option>
-                        </select>
-                    </div>
-                    <div class="cz-field">
-                        <label>Show Categories</label>
-                        <select name="portfolio_show_categories" data-setting="portfolio_show_categories">
-                            <option value="true" {% if settings.portfolio_show_categories != "false" %}selected{% endif %}>Yes</option>
-                            <option value="false" {% if settings.portfolio_show_categories == "false" %}selected{% endif %}>No</option>
-                        </select>
-                    </div>
-                    <div class="cz-field">
-                        <label>Show Tags</label>
-                        <select name="portfolio_show_tags" data-setting="portfolio_show_tags">
-                            <option value="true" {% if settings.portfolio_show_tags != "false" %}selected{% endif %}>Yes</option>
-                            <option value="false" {% if settings.portfolio_show_tags == "false" %}selected{% endif %}>No</option>
-                        </select>
-                    </div>
-                    <div class="cz-field">
-                        <label>Fade Animation</label>
-                        <select name="portfolio_fade_animation" data-setting="portfolio_fade_animation">
-                            <option value="true" {% if settings.portfolio_fade_animation != "false" %}selected{% endif %}>Yes</option>
-                            <option value="false" {% if settings.portfolio_fade_animation == "false" %}selected{% endif %}>No</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Publish button -->
@@ -540,19 +936,43 @@ var fontLists = {
     ]
 };
 
-var savedHeading = '{{ settings.font_heading | default(value="Inter") }}';
-var savedBody = '{{ settings.font_primary | default(value="Inter") }}';
+// Saved font values from DB
+var savedFonts = {
+    'font-body-select': '{{ settings.font_primary | default(value="Inter") }}',
+    'font-heading-select': '{{ settings.font_heading | default(value="Inter") }}',
+    'font-logo-select': '{{ settings.font_logo | default(value="") }}',
+    'font-subheading-select': '{{ settings.font_subheading | default(value="") }}',
+    'font-caption-select': '{{ settings.font_captions | default(value="") }}',
+    'font-nav-select': '{{ settings.font_navigation | default(value="") }}',
+    'font-body2-select': '{{ settings.font_body | default(value="") }}',
+    'font-blockquote-select': '{{ settings.font_blockquote | default(value="") }}',
+    'font-list-select': '{{ settings.font_list | default(value="") }}',
+    'font-footer-select': '{{ settings.font_footer | default(value="") }}',
+    'font-lb-title-select': '{{ settings.font_lightbox_title | default(value="") }}',
+    'font-categories-select': '{{ settings.font_categories | default(value="") }}',
+    'font-tags-select': '{{ settings.font_tags | default(value="") }}'
+};
 
 function updateFontDropdowns() {
     var source = document.getElementById('font-source-select').value;
     var fonts = fontLists[source] || fontLists.google;
-    populateSelect('font-heading-select', fonts, savedHeading);
-    populateSelect('font-body-select', fonts, savedBody);
+    Object.keys(savedFonts).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) populateSelect(id, fonts, savedFonts[id]);
+    });
 }
 
 function populateSelect(id, fonts, currentVal) {
     var sel = document.getElementById(id);
+    if (!sel) return;
     sel.innerHTML = '';
+    // Add inherit option for secondary font selects
+    if (id !== 'font-body-select') {
+        var inh = document.createElement('option');
+        inh.value = ''; inh.textContent = '(Inherit site-wide)';
+        if (!currentVal) inh.selected = true;
+        sel.appendChild(inh);
+    }
     var found = false;
     fonts.forEach(function(f) {
         var opt = document.createElement('option');
@@ -560,16 +980,28 @@ function populateSelect(id, fonts, currentVal) {
         if (f === currentVal) { opt.selected = true; found = true; }
         sel.appendChild(opt);
     });
-    // If current value not in list, add it at top
     if (!found && currentVal) {
         var opt = document.createElement('option');
         opt.value = currentVal; opt.textContent = currentVal + ' (current)';
         opt.selected = true;
-        sel.insertBefore(opt, sel.firstChild);
+        sel.insertBefore(opt, sel.children[id !== 'font-body-select' ? 1 : 0]);
     }
 }
 
 updateFontDropdowns();
+
+// ── Conditional show/hide ──
+function czConditions() {
+    document.querySelectorAll('[data-cz-show]').forEach(function(el) {
+        var cond = el.getAttribute('data-cz-show');
+        var parts = cond.split('=');
+        var field = document.querySelector('[data-setting="' + parts[0] + '"]');
+        if (field) {
+            el.style.display = (field.value === parts[1]) ? '' : 'none';
+        }
+    });
+}
+czConditions();
 
 // ── Keyboard shortcut: Cmd+S / Ctrl+S ──
 document.addEventListener('keydown', function(e) {
@@ -681,7 +1113,7 @@ function saveCustomizer() {
     display: block;
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: #446D7F;
     margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: .5px;
@@ -726,6 +1158,39 @@ function saveCustomizer() {
     border: 1px solid var(--border-input);
     border-radius: 5px;
     color: var(--text-primary);
+}
+
+.cz-sub-heading {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    margin: 4px 0 10px;
+}
+.cz-divider {
+    border-top: 1px solid var(--border-subtle);
+    margin: 14px 0;
+}
+.cz-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.cz-field textarea {
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 13px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 5px;
+    color: var(--text-primary);
+    resize: vertical;
+    font-family: inherit;
+}
+.cz-field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 </style>
 {% endblock content %}

@@ -592,6 +592,27 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         // Terms of Use
         ("terms_of_use_enabled", "false"),
         ("terms_of_use_content", "<h1>Terms of Use</h1><p><strong>Last updated:</strong> [Date]</p><h2>1. Acceptance of Terms</h2><p>By accessing and using [Site Name] (&ldquo;the Website&rdquo;), you accept and agree to be bound by these Terms of Use. If you do not agree to these terms, please do not use the Website.</p><h2>2. Use of the Website</h2><p>You may use the Website for lawful purposes only. You agree not to:</p><ul><li>Use the Website in any way that violates applicable laws or regulations</li><li>Attempt to gain unauthorized access to any part of the Website</li><li>Interfere with or disrupt the Website or its servers</li><li>Scrape, crawl, or use automated tools to extract content without permission</li><li>Upload or transmit viruses or malicious code</li></ul><h2>3. Intellectual Property</h2><p>All content on the Website &mdash; including text, images, photographs, graphics, logos, and software &mdash; is the property of [Site Name] or its content creators and is protected by copyright and intellectual property laws.</p><p>You may not reproduce, distribute, modify, or create derivative works from any content without explicit written permission.</p><h2>4. User-Generated Content</h2><p>If you submit comments or other content to the Website:</p><ul><li>You retain ownership of your content</li><li>You grant us a non-exclusive, royalty-free license to display your content on the Website</li><li>You are responsible for ensuring your content does not violate any third-party rights</li><li>We reserve the right to remove any content at our discretion</li></ul><h2>5. Digital Purchases</h2><p>If you purchase digital products from the Website:</p><ul><li>All sales are final due to the nature of digital goods</li><li>You receive a limited, non-transferable license to use the purchased content</li><li>Specific license terms are provided with each purchase</li><li>Download links are subject to expiration and download limits</li></ul><h2>6. Disclaimer of Warranties</h2><p>The Website is provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without warranties of any kind, either express or implied. We do not warrant that:</p><ul><li>The Website will be uninterrupted or error-free</li><li>The content is accurate, complete, or current</li><li>The Website is free of viruses or harmful components</li></ul><h2>7. Limitation of Liability</h2><p>To the fullest extent permitted by law, [Site Name] shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Website.</p><h2>8. Links to Third-Party Websites</h2><p>The Website may contain links to third-party websites. We are not responsible for the content or practices of these external sites.</p><h2>9. Modifications</h2><p>We reserve the right to modify these Terms of Use at any time. Changes will be effective immediately upon posting. Your continued use of the Website after changes constitutes acceptance of the modified terms.</p><h2>10. Governing Law</h2><p>These Terms of Use shall be governed by and construed in accordance with the laws of [Jurisdiction], without regard to conflict of law principles.</p><h2>11. Contact Us</h2><p>If you have any questions about these Terms of Use, please contact us at [email].</p>"),
+        // Layout (Customizer)
+        ("layout_header_type", "sidebar"),
+        ("layout_sidebar_position", "left"),
+        ("layout_sidebar_custom_heading", ""),
+        ("layout_sidebar_custom_text", ""),
+        ("layout_content_boundary", "full"),
+        ("layout_margin_top", "0"),
+        ("layout_margin_bottom", "0"),
+        ("layout_margin_left", "0"),
+        ("layout_margin_right", "0"),
+        ("portfolio_border_style", "none"),
+        ("portfolio_show_title", "false"),
+        ("portfolio_like_position", "image_bottom_right"),
+        ("portfolio_nav_categories", "under_link"),
+        ("nav_position", "below_logo"),
+        // Site Identity (Customizer)
+        ("site_name_display", "text"),
+        ("site_logo_position", "center"),
+        ("site_logo_width", "180px"),
+        ("site_tagline_enabled", "true"),
+        ("copyright_alignment", "center"),
         // Design
         ("design_active_id", "1"),
         ("social_instagram", ""),

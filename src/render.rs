@@ -306,23 +306,44 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         .unwrap_or("")
         .to_string();
 
-    let site_name = settings
+    let site_name_raw = settings
         .get("site_name")
         .and_then(|v| v.as_str())
         .unwrap_or("Velocty");
 
-    let site_tagline = settings
-        .get("site_caption")
+    let site_name_display = settings
+        .get("site_name_display")
         .and_then(|v| v.as_str())
-        .unwrap_or("");
+        .unwrap_or("text");
+
+    // If display mode is "none", hide both logo and text name
+    // If display mode is "logo", the logo_html handles it; hide the text h1
+    let site_name = if site_name_display == "none" || site_name_display == "logo" {
+        ""
+    } else {
+        site_name_raw
+    };
+
+    let tagline_enabled = settings
+        .get("site_tagline_enabled")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true") != "false";
+
+    let site_tagline = if tagline_enabled {
+        settings.get("site_caption").and_then(|v| v.as_str()).unwrap_or("")
+    } else {
+        ""
+    };
 
     // Settings helper
     let sg = |key: &str, def: &str| -> String {
         settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
     };
 
-    // Build the sidebar categories (gated on portfolio_show_categories)
-    let categories_html = if sg("portfolio_show_categories", "true") == "true" {
+    // Build the sidebar categories — controlled by portfolio_nav_categories
+    let nav_cats_mode = sg("portfolio_nav_categories", "under_link");
+    let show_cats_enabled = sg("portfolio_show_categories", "true") == "true";
+    let categories_html = if show_cats_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
         build_categories_sidebar(context)
     } else {
         String::new()
@@ -338,7 +359,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
     let share_pos = sg("share_icons_position", "below_content");
     let site_url = sg("site_url", "");
     let share_sidebar = if share_pos == "sidebar" && !site_url.is_empty() {
-        build_share_buttons(&settings, &site_url, site_name)
+        build_share_buttons(&settings, &site_url, site_name_raw)
     } else {
         String::new()
     };
@@ -458,7 +479,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         {design_css}
     </style>
 </head>
-<body data-click-mode="{click_mode}" data-show-likes="{show_likes}" data-show-categories="{show_cats}" data-show-tags="{show_tags}" data-fade-animation="{fade_anim}" data-display-type="{display_type}" data-pagination-type="{pagination_type}" data-lb-show-title="{lb_show_title}" data-lb-show-tags="{lb_show_tags}" data-lb-nav="{lb_nav}" data-lb-keyboard="{lb_keyboard}">
+<body data-click-mode="{click_mode}" data-show-likes="{show_likes}" data-show-categories="{show_cats}" data-show-tags="{show_tags}" data-fade-animation="{fade_anim}" data-display-type="{display_type}" data-pagination-type="{pagination_type}" data-lb-show-title="{lb_show_title}" data-lb-show-tags="{lb_show_tags}" data-lb-nav="{lb_nav}" data-lb-keyboard="{lb_keyboard}" data-share-position="{share_position}" data-site-url="{site_url_data}">
     <div class="mobile-header">
         {logo_html_mobile}
         <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open')">&#9776;</button>
@@ -476,6 +497,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
                     {nav_links}
                 </nav>
                 {share_sidebar}
+                {custom_sidebar_html}
             </div>
             <div class="sidebar-bottom">
                 {social_sidebar}
@@ -513,6 +535,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         nav_links = nav_links,
         social_sidebar = social_sidebar,
         share_sidebar = share_sidebar,
+        custom_sidebar_html = build_custom_sidebar_html(&settings),
         footer_inner = footer_inner,
         footer_legal_links = build_footer_legal_links(&settings),
         body_html = body_html,
@@ -540,6 +563,8 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         lb_show_tags = lb_show_tags,
         lb_nav = lb_nav,
         lb_keyboard = lb_keyboard,
+        share_position = sg("share_icons_position", "below_content"),
+        site_url_data = sg("site_url", ""),
     )
 }
 
@@ -560,8 +585,11 @@ pub fn render_legal_page(
         .filter(|css| !css.trim().is_empty())
         .unwrap_or_else(|| ONEGUY_DESIGN_CSS.to_string());
 
-    let site_name = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
-    let site_tagline = settings.get("site_caption").map(|s| s.as_str()).unwrap_or("");
+    let site_name_raw = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
+    let site_name_display = settings.get("site_name_display").map(|s| s.as_str()).unwrap_or("text");
+    let site_name = if site_name_display == "none" || site_name_display == "logo" { "" } else { site_name_raw };
+    let tagline_enabled = settings.get("site_tagline_enabled").map(|s| s.as_str()).unwrap_or("true") != "false";
+    let site_tagline = if tagline_enabled { settings.get("site_caption").map(|s| s.as_str()).unwrap_or("") } else { "" };
 
     let show_cats = settings.get("portfolio_show_categories").map(|s| s.as_str()).unwrap_or("true") == "true";
     let categories_html = if show_cats {
@@ -1119,22 +1147,49 @@ fn build_favicon_link(settings: &Value) -> String {
 }
 
 fn build_logo_html(settings: &Value) -> String {
-    let logo = settings
-        .get("site_logo")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let display = settings.get("site_name_display").and_then(|v| v.as_str()).unwrap_or("text");
+    let logo = settings.get("site_logo").and_then(|v| v.as_str()).unwrap_or("");
+
+    // In "none" mode, no logo image shown
+    if display == "none" {
+        return String::new();
+    }
+
+    // Only show logo image if one is uploaded
     if logo.is_empty() {
         return String::new();
     }
-    let site_name = settings
-        .get("site_name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Velocty");
+
+    let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
+    let logo_width = settings.get("site_logo_width").and_then(|v| v.as_str()).unwrap_or("180px");
+    let width_style = if logo_width != "180px" && !logo_width.is_empty() {
+        format!(" style=\"max-width:{}\"", html_escape(logo_width))
+    } else {
+        String::new()
+    };
     format!(
-        "<a href=\"/\"><img src=\"{}\" alt=\"{}\" class=\"logo-img\"></a>",
+        "<a href=\"/\"><img src=\"{}\" alt=\"{}\" class=\"logo-img\"{}></a>",
         html_escape(logo),
-        html_escape(site_name)
+        html_escape(site_name),
+        width_style
     )
+}
+
+fn build_custom_sidebar_html(settings: &Value) -> String {
+    let heading = settings.get("layout_sidebar_custom_heading").and_then(|v| v.as_str()).unwrap_or("");
+    let text = settings.get("layout_sidebar_custom_text").and_then(|v| v.as_str()).unwrap_or("");
+    if heading.is_empty() && text.is_empty() {
+        return String::new();
+    }
+    let mut html = String::from("<div class=\"sidebar-custom\">");
+    if !heading.is_empty() {
+        html.push_str(&format!("<h3 class=\"sidebar-custom-heading\">{}</h3>", html_escape(heading)));
+    }
+    if !text.is_empty() {
+        html.push_str(&format!("<div class=\"sidebar-custom-text\">{}</div>", text));
+    }
+    html.push_str("</div>");
+    html
 }
 
 fn build_footer_legal_links(settings: &Value) -> String {
@@ -1367,12 +1422,23 @@ fn render_portfolio_grid(context: &Value) -> String {
         settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
     };
     let display_type = sg("portfolio_display_type", "masonry");
-    let show_tags = sg("portfolio_show_tags", "true") == "true";
+    let show_tags_mode = sg("portfolio_show_tags", "true");
+    let show_tags = show_tags_mode != "false";
+    let show_cats_mode = sg("portfolio_show_categories", "true");
     let _show_likes = sg("portfolio_enable_likes", "true") == "true";
-    let fade_anim = sg("portfolio_fade_animation", "true") == "true";
+    let fade_mode = sg("portfolio_fade_animation", "true");
+    let fade_anim = fade_mode != "none" && fade_mode != "false";
+    let fade_class = if fade_mode == "slide_up" { "slide-up" } else if fade_anim { "fade-in" } else { "" };
+    let border_style = sg("portfolio_border_style", "none");
+    let show_title = sg("portfolio_show_title", "false") == "true";
 
     let grid_class = if display_type == "grid" { "css-grid" } else { "masonry-grid" };
-    let item_class = if fade_anim { "grid-item fade-in" } else { "grid-item" };
+    let border_class = match border_style.as_str() {
+        "standard" => " border-standard",
+        "polaroid" => " border-polaroid",
+        _ => "",
+    };
+    let item_class_str = format!("grid-item{}{}", if fade_class.is_empty() { String::new() } else { format!(" {}", fade_class) }, border_class);
 
     let mut html = format!(r#"<div class="{}">"#, grid_class);
 
@@ -1418,7 +1484,7 @@ fn render_portfolio_grid(context: &Value) -> String {
     <a href="{item_url}" class="portfolio-link" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
         <img src="/uploads/{image}" alt="{title}" loading="lazy">
     </a>"#,
-            item_class = item_class,
+            item_class = item_class_str,
             cats_data = cats_data,
             item_url = item_url,
             title = html_escape(title),
@@ -1426,6 +1492,14 @@ fn render_portfolio_grid(context: &Value) -> String {
             likes = likes,
             tag_data = html_escape(&tag_data),
         ));
+
+        // Title below image
+        if show_title && !title.is_empty() {
+            html.push_str(&format!(
+                r#"<div class="item-title">{}</div>"#,
+                html_escape(title)
+            ));
+        }
 
         // Tags below image
         if show_tags {
@@ -1524,11 +1598,28 @@ fn render_portfolio_single(context: &Value) -> String {
         String::new()
     };
 
+    let share_pos = sg("share_icons_position", "below_content");
+    let site_url = sg("site_url", "");
+    let item_slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+    let page_url = if !site_url.is_empty() {
+        format!("{}{}", site_url, slug_url(&portfolio_slug, item_slug))
+    } else {
+        String::new()
+    };
+
+    // Share buttons below image (between image and meta)
+    let share_below_image = if share_pos == "below_image" && !page_url.is_empty() {
+        build_share_buttons(&settings, &page_url, title)
+    } else {
+        String::new()
+    };
+
     let mut html = format!(
         r#"<article class="portfolio-single">
     <div class="portfolio-image">
         <img src="/uploads/{image}" alt="{title}">
     </div>
+    {share_below_image}
     <div class="portfolio-meta">
         <h1>{title}</h1>
         {like_html}
@@ -1536,6 +1627,7 @@ fn render_portfolio_single(context: &Value) -> String {
         image = image,
         title = html_escape(title),
         like_html = like_html,
+        share_below_image = share_below_image,
     );
 
     if show_cats {
@@ -1581,12 +1673,8 @@ fn render_portfolio_single(context: &Value) -> String {
         html.push_str(&format!(r#"<div class="portfolio-description">{}</div>"#, desc));
     }
 
-    // Share buttons — only inline when position is "below_content"
-    let share_pos = sg("share_icons_position", "below_content");
-    let site_url = sg("site_url", "");
-    let item_slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-    if share_pos == "below_content" && !site_url.is_empty() {
-        let page_url = format!("{}{}", site_url, slug_url(&portfolio_slug, item_slug));
+    // Share buttons — below content (after description)
+    if share_pos == "below_content" && !page_url.is_empty() {
         html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
 
@@ -1817,18 +1905,31 @@ fn render_blog_single(context: &Value) -> String {
         html.push_str(&format!("\n    <div class=\"blog-meta\">{}</div>", meta_parts.join(" · ")));
     }
 
+    let share_pos = sg("share_icons_position", "below_content");
+    let site_url = sg("site_url", "");
+    let blog_slug = sg("blog_slug", "journal");
+    let post_slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+    let page_url = if !site_url.is_empty() {
+        format!("{}/{}/{}", site_url, blog_slug, post_slug)
+    } else {
+        String::new()
+    };
+
     if !featured.is_empty() {
         html.push_str(&format!(
             r#"<div class="featured-image"><img src="/uploads/{}" alt="{}"></div>"#,
             featured,
             html_escape(title)
         ));
+        // Share buttons below image
+        if share_pos == "below_image" && !page_url.is_empty() {
+            html.push_str(&build_share_buttons(&settings, &page_url, title));
+        }
     }
 
     html.push_str(&format!(r#"<div class="post-content">{}</div>"#, content));
 
     // Tags
-    let blog_slug = sg("blog_slug", "journal");
     if let Some(Value::Array(tags)) = context.get("tags") {
         if !tags.is_empty() {
             html.push_str("<div class=\"post-tags\">");
@@ -1842,12 +1943,8 @@ fn render_blog_single(context: &Value) -> String {
         }
     }
 
-    // Share buttons — only inline when position is "below_content"
-    let share_pos = sg("share_icons_position", "below_content");
-    let site_url = sg("site_url", "");
-    let post_slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-    if share_pos == "below_content" && !site_url.is_empty() {
-        let page_url = format!("{}/{}/{}", site_url, blog_slug, post_slug);
+    // Share buttons — below content (after tags)
+    if share_pos == "below_content" && !page_url.is_empty() {
         html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
 
@@ -2047,9 +2144,12 @@ const LIGHTBOX_JS: &str = r#"
     const showNav = b.lbNav !== 'false';
     const useKeyboard = b.lbKeyboard !== 'false';
     const showLikes = b.showLikes !== 'false';
+    const sharePos = b.sharePosition || 'below_content';
+    const siteUrl = b.siteUrl || '';
+    const showLbShare = sharePos === 'below_image' && siteUrl;
 
     const links = document.querySelectorAll('.portfolio-link');
-    let overlay, img, titleEl, tagsEl, likesEl, closeBtn, prevBtn, nextBtn;
+    let overlay, img, titleEl, tagsEl, likesEl, shareEl, closeBtn, prevBtn, nextBtn;
     let currentIndex = 0;
     const items = Array.from(links);
 
@@ -2061,6 +2161,7 @@ const LIGHTBOX_JS: &str = r#"
             (showNav ? '<button class="lb-prev">&lsaquo;</button><button class="lb-next">&rsaquo;</button>' : '') +
             '<div class="lb-content">' +
                 '<img class="lb-image" src="" alt="">' +
+                (showLbShare ? '<div class="lb-share"></div>' : '') +
                 (showTitle ? '<div class="lb-title"></div>' : '') +
                 (showTags ? '<div class="lb-tags"></div>' : '') +
                 (showLikes ? '<div class="lb-likes" style="color:#fff;font-size:14px;margin-top:4px"></div>' : '') +
@@ -2070,6 +2171,7 @@ const LIGHTBOX_JS: &str = r#"
         titleEl = overlay.querySelector('.lb-title');
         tagsEl = overlay.querySelector('.lb-tags');
         likesEl = overlay.querySelector('.lb-likes');
+        shareEl = overlay.querySelector('.lb-share');
         closeBtn = overlay.querySelector('.lb-close');
         prevBtn = overlay.querySelector('.lb-prev');
         nextBtn = overlay.querySelector('.lb-next');
@@ -2085,10 +2187,19 @@ const LIGHTBOX_JS: &str = r#"
         currentIndex = index;
         var link = items[index];
         var imgSrc = link.querySelector('img').src;
+        var itemTitle = link.dataset.title || '';
         img.src = imgSrc;
-        if (titleEl) titleEl.textContent = link.dataset.title || '';
+        if (titleEl) titleEl.textContent = itemTitle;
         if (tagsEl) tagsEl.textContent = link.dataset.tags || '';
         if (likesEl) { var lk = link.dataset.likes || '0'; likesEl.innerHTML = '&#9829; ' + lk; }
+        if (shareEl) {
+            var shareUrl = encodeURIComponent(link.href || imgSrc);
+            var shareTitle = encodeURIComponent(itemTitle);
+            shareEl.innerHTML =
+                '<a href="https://www.facebook.com/sharer/sharer.php?u=' + shareUrl + '" target="_blank" rel="noopener" class="lb-share-btn" title="Share on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>' +
+                '<a href="https://twitter.com/intent/tweet?url=' + shareUrl + '&text=' + shareTitle + '" target="_blank" rel="noopener" class="lb-share-btn" title="Share on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+                '<a href="https://www.linkedin.com/sharing/share-offsite/?url=' + shareUrl + '" target="_blank" rel="noopener" class="lb-share-btn" title="Share on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>';
+        }
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
     }
@@ -2119,9 +2230,9 @@ const LIGHTBOX_JS: &str = r#"
         });
     }
 
-    // Fade-in animation via IntersectionObserver
-    if (b.fadeAnimation === 'true') {
-        var fadeItems = document.querySelectorAll('.grid-item.fade-in');
+    // Fade/slide animation via IntersectionObserver
+    if (b.fadeAnimation && b.fadeAnimation !== 'false' && b.fadeAnimation !== 'none') {
+        var fadeItems = document.querySelectorAll('.grid-item.fade-in, .grid-item.slide-up');
         if (fadeItems.length && 'IntersectionObserver' in window) {
             var obs = new IntersectionObserver(function(entries) {
                 entries.forEach(function(entry) {
@@ -2215,16 +2326,19 @@ body {
     font-size: var(--font-size-body);
     color: var(--color-text);
     background: var(--color-bg);
-    line-height: 1.6;
+    line-height: var(--line-height, 1.6);
     text-transform: var(--text-transform);
+    direction: var(--text-direction, ltr);
+    text-align: var(--text-alignment, left);
 }
 
-a { color: var(--color-accent); }
+a { color: var(--color-link, var(--color-accent)); }
+a:hover { color: var(--color-link-hover, var(--color-accent)); }
 
 h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
-h1 { font-size: var(--font-size-h1); }
-h2 { font-size: var(--font-size-h2); }
-h3 { font-size: var(--font-size-h3); }
+h1 { font-size: var(--font-size-h1); color: var(--color-heading, var(--color-text)); }
+h2 { font-size: var(--font-size-h2); color: var(--color-subheading, var(--color-text)); }
+h3 { font-size: var(--font-size-h3); color: var(--color-caption, var(--color-text)); }
 h4 { font-size: var(--font-size-h4); }
 h5 { font-size: var(--font-size-h5); }
 h6 { font-size: var(--font-size-h6); }
@@ -2266,6 +2380,29 @@ h6 { font-size: var(--font-size-h6); }
     color: var(--lightbox-tag-color);
     font-size: 12px;
     margin-top: 4px;
+}
+
+.lb-share {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 10px;
+}
+.lb-share-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    text-decoration: none;
+    transition: background .2s;
+}
+.lb-share-btn:hover {
+    background: rgba(255,255,255,.25);
+    color: #fff;
 }
 
 .lb-close {
@@ -2357,6 +2494,7 @@ h6 { font-size: var(--font-size-h6); }
 pub const ONEGUY_DESIGN_CSS: &str = r#"
 .site-wrapper {
     display: flex;
+    flex-direction: var(--sidebar-direction, row);
     min-height: 100vh;
 }
 
@@ -2374,6 +2512,12 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     background: var(--color-bg);
     z-index: 10;
 }
+/* Right sidebar */
+.site-wrapper[style*="row-reverse"] .sidebar,
+.sidebar-right .sidebar {
+    left: auto;
+    right: 0;
+}
 
 .sidebar-top { flex: 1; }
 
@@ -2385,18 +2529,18 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
 }
 
 .site-name {
-    font-size: 22px;
+    font-family: var(--font-logo, var(--font-primary));
+    font-size: var(--font-size-logo, 22px);
     font-weight: 700;
     margin-bottom: 2px;
     line-height: 1.2;
 }
-
-.site-name a { color: var(--color-text); text-decoration: none; }
+.site-name a { color: var(--color-logo-text, var(--color-text)); text-decoration: none; }
 
 .site-tagline {
     font-family: var(--font-captions);
     font-size: 11px;
-    color: var(--color-text-secondary);
+    color: var(--color-tagline, var(--color-text-secondary));
     margin-bottom: 20px;
     line-height: 1.5;
 }
@@ -2449,7 +2593,7 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
 
 .nav-link {
     font-family: var(--font-nav);
-    font-size: 13px;
+    font-size: var(--font-size-nav, 13px);
     color: var(--color-text);
     text-decoration: none;
     padding: 3px 0;
@@ -2495,9 +2639,9 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
 .footer-legal a:hover { text-decoration: underline; }
 
 .footer-text {
-    font-family: var(--font-captions);
-    font-size: 10px;
-    color: var(--color-text-secondary);
+    font-family: var(--font-footer, var(--font-captions));
+    font-size: var(--font-size-footer, 10px);
+    color: var(--color-footer, var(--color-text-secondary));
     margin-top: 6px;
     line-height: 1.5;
 }
@@ -2510,9 +2654,9 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     gap: 8px;
 }
 .footer-copyright {
-    font-family: var(--font-captions);
-    font-size: 12px;
-    color: var(--color-text);
+    font-family: var(--font-footer, var(--font-captions));
+    font-size: var(--font-size-footer, 12px);
+    color: var(--color-footer, var(--color-text));
     line-height: 1;
     white-space: nowrap;
 }
@@ -2531,13 +2675,45 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     border-top: none;
 }
 
+/* Custom sidebar text */
+.sidebar-custom {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(128,128,128,.15);
+}
+.sidebar-custom-heading {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 8px;
+    color: var(--color-text);
+}
+.sidebar-custom-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+}
+
 .content-column {
     margin-left: var(--sidebar-width);
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    max-width: var(--content-max-width, none);
+    padding-top: var(--content-margin-top, 0);
+    padding-bottom: var(--content-margin-bottom, 0);
+    padding-left: var(--content-margin-left, 0);
+    padding-right: var(--content-margin-right, 0);
 }
+/* Right sidebar: flip margin */
+.site-wrapper[style*="row-reverse"] .content-column {
+    margin-left: 0;
+    margin-right: var(--sidebar-width);
+}
+/* Boxed mode centering */
+.content-column[style*="max-width"] { margin-left: auto; margin-right: auto; }
 /* ── Content ── */
 .content {
     flex: 1;
@@ -2588,6 +2764,37 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
 .grid-item.fade-in.visible {
     opacity: 1;
     transform: translateY(0);
+}
+.grid-item.slide-up {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.grid-item.slide-up.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Border styles */
+.grid-item.border-standard .portfolio-link {
+    border: 10px solid var(--color-border, #e5e7eb);
+}
+.grid-item.border-polaroid {
+    background: #fff;
+    padding: 10px 10px 40px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.grid-item.border-polaroid .portfolio-link {
+    overflow: hidden;
+}
+
+/* Title below image */
+.item-title {
+    font-family: var(--font-body, var(--font-primary));
+    font-size: 13px;
+    color: var(--color-text);
+    padding: 6px 0 2px;
+    text-align: left;
 }
 
 .item-tags {
