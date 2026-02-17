@@ -52,13 +52,15 @@
                         </div>
                     </div>
 
-                    <div class="cz-field">
-                        <label>Sidebar Custom Heading <small style="opacity:.5">(optional)</small></label>
-                        <input type="text" name="layout_sidebar_custom_heading" value="{{ settings.layout_sidebar_custom_heading | default(value='') }}" data-setting="layout_sidebar_custom_heading" placeholder="e.g. About Me">
-                    </div>
-                    <div class="cz-field">
-                        <label>Sidebar Custom Text <small style="opacity:.5">(HTML, optional)</small></label>
-                        <textarea name="layout_sidebar_custom_text" data-setting="layout_sidebar_custom_text" rows="3" placeholder="A short blurb about you...">{{ settings.layout_sidebar_custom_text | default(value='') }}</textarea>
+                    <div data-cz-show="layout_header_type=sidebar">
+                        <div class="cz-field">
+                            <label>Sidebar Custom Heading <small style="opacity:.5">(optional)</small></label>
+                            <input type="text" name="layout_sidebar_custom_heading" value="{{ settings.layout_sidebar_custom_heading | default(value='') }}" data-setting="layout_sidebar_custom_heading" placeholder="e.g. About Me">
+                        </div>
+                        <div class="cz-field">
+                            <label>Sidebar Custom Text <small style="opacity:.5">(HTML, optional)</small></label>
+                            <textarea name="layout_sidebar_custom_text" data-setting="layout_sidebar_custom_text" rows="3" placeholder="A short blurb about you...">{{ settings.layout_sidebar_custom_text | default(value='') }}</textarea>
+                        </div>
                     </div>
 
                     <div class="cz-field">
@@ -612,11 +614,11 @@
                     </div>
                     <div class="cz-field">
                         <label>Portfolio Category Filters</label>
-                        <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories">
+                        <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories" id="portfolio-nav-categories">
                             <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
                             <option value="under_link" {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
                             <option value="page_top" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
-                            {# Sub-menu option: only for top-bar layouts (not sidebar) #}
+                            <option value="submenu" data-topbar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "submenu" %}selected{% endif %}>Sub-menu</option>
                         </select>
                     </div>
                     {% endif %}
@@ -1002,6 +1004,15 @@ function czConditions() {
         var field = document.querySelector('[data-setting="' + parts[0] + '"]');
         if (field) {
             el.style.display = (field.value === parts[1]) ? '' : 'none';
+        }
+    });
+    // Show/hide topbar-only options in dropdowns
+    var headerType = document.querySelector('[data-setting="layout_header_type"]');
+    var isTopbar = headerType && headerType.value === 'topbar';
+    document.querySelectorAll('option[data-topbar-only]').forEach(function(opt) {
+        opt.style.display = isTopbar ? '' : 'none';
+        if (!isTopbar && opt.selected) {
+            opt.parentElement.value = opt.parentElement.options[0].value;
         }
     });
 }

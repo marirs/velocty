@@ -47,8 +47,10 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     // ── Navigation ──
     let nav_cats_mode = sg("portfolio_nav_categories", "under_link");
     let show_cats_enabled = sg("portfolio_show_categories", "true") == "true";
+    let header_type_early = sg("layout_header_type", "sidebar");
+    let cats_start_open = header_type_early != "topbar";
     let categories_html = if show_cats_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
-        build_categories_sidebar(context)
+        build_categories_sidebar(context, cats_start_open)
     } else { String::new() };
 
     let portfolio_slug = sg("portfolio_slug", "portfolio");
@@ -61,7 +63,7 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     let contact_enabled = sg("contact_page_enabled", "false") == "true";
 
     let mut nav_links = String::new();
-    if portfolio_enabled {
+    if portfolio_enabled && categories_html.is_empty() {
         nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
             slug_url(&portfolio_slug, ""), html_escape(&portfolio_label)));
     }
@@ -132,12 +134,24 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
         }
     };
 
+    // ── Layout mode ──
+    let header_type = sg("layout_header_type", "sidebar");
+    let is_topbar = header_type == "topbar";
+
     // ── Layout classes ──
-    let body_class = if sg("layout_content_boundary", "full") == "boxed" { "boxed-mode" } else { "" };
+    let body_class = {
+        let mut cls = String::new();
+        if sg("layout_content_boundary", "full") == "boxed" { cls.push_str("boxed-mode"); }
+        cls
+    };
     let wrapper_classes = {
         let mut cls = String::new();
-        if sg("layout_sidebar_position", "left") == "right" { cls.push_str(" sidebar-right"); }
+        if !is_topbar && sg("layout_sidebar_position", "left") == "right" { cls.push_str(" sidebar-right"); }
         if sg("layout_content_boundary", "full") == "boxed" { cls.push_str(" layout-boxed"); }
+        if is_topbar {
+            let nav_pos = sg("nav_position", "below_logo");
+            if nav_pos == "right" { cls.push_str(" topbar-nav-right"); }
+        }
         cls
     };
 
@@ -172,7 +186,11 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     let seo_meta = context.get("seo").and_then(|s| s.as_str()).unwrap_or("").to_string();
 
     // ── Replace placeholders in the shell ──
-    let mut html = design.layout_html.clone();
+    let mut html = if is_topbar {
+        ONEGUY_TOPBAR_SHELL_HTML.to_string()
+    } else {
+        design.layout_html.clone()
+    };
     html = html.replace("{{seo_meta}}", &seo_meta);
     html = html.replace("{{webmaster_meta}}", &seo::build_webmaster_meta(&settings));
     html = html.replace("{{favicon_link}}", &build_favicon_link(&settings));
@@ -180,7 +198,7 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{css_vars}}", &css_vars);
     html = html.replace("{{base_css}}", BASE_CSS);
     html = html.replace("{{design_css}}", &design.style_css);
-    html = html.replace("{{body_class}}", body_class);
+    html = html.replace("{{body_class}}", &body_class);
     html = html.replace("{{data_attrs}}", &data_attrs);
     html = html.replace("{{wrapper_classes}}", &wrapper_classes);
     html = html.replace("{{logo_html}}", &build_logo_html(&settings));
@@ -189,9 +207,11 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{categories_html}}", &categories_html);
     html = html.replace("{{nav_links}}", &nav_links);
     html = html.replace("{{share_sidebar}}", &share_sidebar);
-    html = html.replace("{{custom_sidebar_html}}", &build_custom_sidebar_html(&settings));
+    let custom_sidebar = if is_topbar { String::new() } else { build_custom_sidebar_html(&settings) };
+    html = html.replace("{{custom_sidebar_html}}", &custom_sidebar);
     html = html.replace("{{social_sidebar}}", &social_sidebar);
-    html = html.replace("{{footer_legal_links}}", &build_footer_legal_links(&settings));
+    let legal_links = if is_topbar { String::new() } else { build_footer_legal_links(&settings) };
+    html = html.replace("{{footer_legal_links}}", &legal_links);
     html = html.replace("{{body_content}}", &body_html);
     html = html.replace("{{footer_inner}}", &footer_inner);
     html = html.replace("{{back_to_top}}", &build_back_to_top(&settings));
@@ -253,7 +273,7 @@ pub fn render_legal_page(
         let tagline_on = sg("site_tagline_enabled", "true") != "false";
         let tagline = if tagline_on { sg("site_caption", "") } else { String::new() };
         html = html.replace("{{tagline}}", &html_escape(&tagline));
-        html = html.replace("{{categories_html}}", &build_categories_sidebar(&context));
+        html = html.replace("{{categories_html}}", &build_categories_sidebar(&context, true));
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
@@ -462,7 +482,7 @@ fn render_comment(html: &mut String, comment: &Value, all_replies: &[&Value], de
     }
 }
 
-fn build_categories_sidebar(context: &Value) -> String {
+fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
     let categories = match context.get("categories") {
         Some(Value::Array(cats)) => cats,
         _ => return String::new(),
@@ -483,12 +503,12 @@ fn build_categories_sidebar(context: &Value) -> String {
 
     // Portfolio categories as collapsible group
     if !categories.is_empty() {
+        let open_cls = if start_open { " open" } else { "" };
         html.push_str(&format!(
-            "<div class=\"nav-category-group\">\
-             <button class=\"nav-category-toggle open\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
+            "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
              <span>{}</span> <span class=\"arrow\">&#9662;</span></button>\
-             <div class=\"nav-subcategories open\">",
-            html_escape(portfolio_label)
+             <div class=\"nav-subcategories{}\">",
+            open_cls, html_escape(portfolio_label), open_cls
         ));
 
         // "all" link
@@ -2140,6 +2160,59 @@ pub const ONEGUY_SHELL_HTML: &str = r#"<!DOCTYPE html>
 </body>
 </html>"#;
 
+/// Oneguy top-bar shell HTML — horizontal header layout with {{placeholder}} tags.
+/// Used when layout_header_type = "topbar".
+pub const ONEGUY_TOPBAR_SHELL_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{seo_meta}}
+    {{webmaster_meta}}
+    {{favicon_link}}
+{{font_links}}    <style>
+        {{css_vars}}
+        {{base_css}}
+        {{design_css}}
+    </style>
+</head>
+<body class="topbar-layout {{body_class}}" {{data_attrs}}>
+    <header class="topbar{{wrapper_classes}}">
+        <div class="topbar-inner">
+            <div class="topbar-brand">
+                {{logo_html}}
+                <h1 class="site-name"><a href="/">{{site_name}}</a></h1>
+                <p class="site-tagline">{{tagline}}</p>
+            </div>
+            <nav class="topbar-nav">
+                {{nav_links}}
+                {{categories_html}}
+            </nav>
+            <div class="topbar-right">
+                {{social_sidebar}}
+                {{share_sidebar}}
+            </div>
+            <button class="topbar-hamburger" onclick="document.querySelector('.topbar-nav').classList.toggle('mobile-open');this.classList.toggle('active')" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+    <div class="topbar-page{{wrapper_classes}}">
+        <main class="content">
+            {{body_content}}
+        </main>
+        <footer class="site-footer">
+            {{footer_inner}}
+        </footer>
+    </div>
+    {{back_to_top}}
+    <script>{{lightbox_js}}</script>
+    {{image_protection_js}}
+    {{analytics_scripts}}
+    {{cookie_consent}}
+</body>
+</html>"#;
+
 /// Oneguy design CSS — layout-specific, seeded into DB on first run.
 /// Contains: sidebar, nav, footer, grids, blog, portfolio, mobile.
 pub const ONEGUY_DESIGN_CSS: &str = r#"
@@ -2726,6 +2799,235 @@ body.boxed-mode {
     .blog-thumb img { width: 100%; height: auto; }
     .blog-single { padding: 20px 16px; }
     .portfolio-single { padding: 20px 16px; }
+}
+
+/* ═══════════════════════════════════════════════════
+   TOP BAR LAYOUT
+   ═══════════════════════════════════════════════════ */
+
+body.topbar-layout .sidebar,
+body.topbar-layout .mobile-header,
+body.topbar-layout .site-wrapper { display: none; }
+
+.topbar {
+    background: var(--color-bg);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    padding: 0 32px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.topbar.layout-boxed {
+    max-width: var(--content-max-width, 1200px);
+    margin: 0 auto;
+}
+
+.topbar-inner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    min-height: 60px;
+    gap: 8px;
+}
+
+/* Brand area: logo + name + tagline */
+.topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.topbar-brand .site-name { margin-bottom: 0; }
+.topbar-brand .site-tagline { margin-bottom: 0; font-size: 11px; }
+.topbar-brand .logo-img { max-height: 40px; margin-bottom: 0; }
+
+/* Navigation */
+.topbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-nav);
+    font-size: 13px;
+    margin-left: 32px;
+}
+.topbar-nav .nav-link {
+    padding: 6px 12px;
+    color: var(--color-text);
+    text-decoration: none;
+    white-space: nowrap;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+}
+.topbar-nav .nav-link:hover {
+    color: var(--color-accent);
+    background: rgba(0,0,0,.04);
+}
+
+/* Nav right of logo: push nav + right section to the right */
+.topbar-nav-right .topbar-nav { margin-left: auto; }
+.topbar-nav-right .topbar-right { margin-left: 16px; }
+
+/* Below logo: nav wraps to second row */
+.topbar:not(.topbar-nav-right) .topbar-inner {
+    flex-wrap: wrap;
+}
+.topbar:not(.topbar-nav-right) .topbar-brand {
+    width: 100%;
+    padding-top: 12px;
+}
+.topbar:not(.topbar-nav-right) .topbar-nav {
+    margin-left: 0;
+    padding-bottom: 8px;
+}
+.topbar:not(.topbar-nav-right) .topbar-right {
+    margin-left: auto;
+    padding-bottom: 8px;
+}
+
+/* Right section: social + share icons */
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+.topbar-right .social-links {
+    margin-bottom: 0;
+}
+.topbar-right .share-icons {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+/* Submenu dropdown for categories */
+.topbar-nav .nav-category-group {
+    position: relative;
+}
+.topbar-nav .nav-category-toggle {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.topbar-nav .nav-category-toggle:hover {
+    background: rgba(0,0,0,.04);
+}
+.topbar-nav .nav-subcategories {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--color-bg);
+    border: 1px solid rgba(0,0,0,.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+    padding: 6px 0;
+    min-width: 160px;
+    z-index: 200;
+    flex-direction: column;
+}
+.topbar-nav .nav-category-toggle.open + .nav-subcategories {
+    display: flex;
+}
+.topbar-nav .nav-subcategories .cat-link {
+    padding: 6px 16px;
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.topbar-nav .nav-subcategories .cat-link:hover {
+    background: rgba(0,0,0,.04);
+    color: var(--color-accent);
+}
+.topbar-nav .nav-subcategories .cat-link.active {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+/* Page content area */
+.topbar-page {
+    min-height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+}
+.topbar-page.layout-boxed {
+    max-width: var(--content-max-width, 1200px);
+    margin: 0 auto;
+}
+.topbar-page .content {
+    flex: 1;
+    margin-left: 0;
+    padding: var(--grid-gap);
+}
+.topbar-page .site-footer {
+    margin-top: auto;
+}
+
+/* Hamburger button */
+.topbar-hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    margin-left: auto;
+}
+.topbar-hamburger span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--color-text);
+    border-radius: 2px;
+    transition: transform 0.2s, opacity 0.2s;
+}
+.topbar-hamburger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.topbar-hamburger.active span:nth-child(2) { opacity: 0; }
+.topbar-hamburger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Topbar responsive */
+@media (max-width: 900px) {
+    body.topbar-layout .topbar-hamburger { display: flex; }
+    body.topbar-layout .topbar-nav {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        padding: 8px 0 12px;
+        margin-left: 0;
+        gap: 2px;
+    }
+    body.topbar-layout .topbar-nav.mobile-open {
+        display: flex;
+    }
+    body.topbar-layout .topbar-nav .nav-link {
+        padding: 8px 12px;
+        width: 100%;
+    }
+    body.topbar-layout .topbar-right {
+        display: none;
+    }
+    body.topbar-layout .topbar-nav.mobile-open ~ .topbar-right {
+        display: flex;
+        width: 100%;
+        padding: 0 12px 12px;
+    }
+    body.topbar-layout .topbar-inner {
+        flex-wrap: wrap;
+    }
+    body.topbar-layout .topbar-brand {
+        flex: 1;
+    }
+    /* Submenu in mobile: inline instead of dropdown */
+    body.topbar-layout .topbar-nav .nav-subcategories {
+        position: static;
+        box-shadow: none;
+        border: none;
+        padding: 0 0 0 16px;
+    }
 }
 "#;
 
