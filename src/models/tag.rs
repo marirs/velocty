@@ -153,7 +153,7 @@ impl Tag {
 
         for tag_id in tag_ids {
             conn.execute(
-                "INSERT INTO content_tags (content_id, content_type, tag_id) VALUES (?1, ?2, ?3)",
+                "INSERT OR IGNORE INTO content_tags (content_id, content_type, tag_id) VALUES (?1, ?2, ?3)",
                 params![content_id, content_type, tag_id],
             )
             .map_err(|e| e.to_string())?;

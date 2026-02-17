@@ -97,12 +97,13 @@
             <div class="form-card collapsible">
                 <h4>Tags {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestTags()" title="AI Suggest Tags">✨ Suggest</button>{% endif %}</h4>
                 <div class="form-group">
-                    <input type="text" name="tag_input" placeholder="Type to add tags..." class="tag-input">
-                    <div class="tag-list">
+                    <input type="text" placeholder="Type to add tags..." class="tag-input" id="tag-input-field">
+                    <input type="hidden" name="tag_names" id="tag-names-hidden">
+                    <div class="tag-list" id="tag-list">
                         {% if post_tags is defined %}
                         {% for tag in tags %}
                         {% if tag.id in post_tags %}
-                        <span class="tag-pill">{{ tag.name }} <button type="button" class="tag-remove">&times;</button></span>
+                        <span class="tag-pill" data-tag-name="{{ tag.name }}">{{ tag.name }} <button type="button" class="tag-remove">&times;</button></span>
                         {% endif %}
                         {% endfor %}
                         {% endif %}
@@ -259,6 +260,57 @@
         if (new Date(dt) <= new Date()) { e.preventDefault(); alert('Schedule date must be in the future.'); return; }
     });
 
+    // ── Tag input handling ──
+    (function() {
+        var input = document.getElementById('tag-input-field');
+        var list = document.getElementById('tag-list');
+        var hidden = document.getElementById('tag-names-hidden');
+
+        function addTagPill(name) {
+            name = name.trim();
+            if (!name) return;
+            var exists = false;
+            list.querySelectorAll('.tag-pill').forEach(function(p) {
+                if ((p.dataset.tagName || '').toLowerCase() === name.toLowerCase()) exists = true;
+            });
+            if (exists) return;
+            var pill = document.createElement('span');
+            pill.className = 'tag-pill';
+            pill.dataset.tagName = name;
+            pill.innerHTML = name + ' <button type="button" class="tag-remove">&times;</button>';
+            list.appendChild(pill);
+        }
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                addTagPill(this.value.replace(/,/g, ''));
+                this.value = '';
+            }
+        });
+
+        list.addEventListener('click', function(e) {
+            if (e.target.classList.contains('tag-remove') || e.target.closest('.tag-remove')) {
+                var pill = e.target.closest('.tag-pill');
+                if (pill) pill.remove();
+            }
+        });
+
+        var form = input.closest('form');
+        if (form) {
+            form.addEventListener('submit', function() {
+                var names = [];
+                list.querySelectorAll('.tag-pill').forEach(function(p) {
+                    var n = p.dataset.tagName || p.textContent.replace('\u00d7','').trim();
+                    if (n) names.push(n);
+                });
+                hidden.value = names.join(',');
+            });
+        }
+
+        window.addTagPill = addTagPill;
+    })();
+
     // Character counters
     document.querySelectorAll('[maxlength]').forEach(el => {
         const counter = el.parentElement.querySelector('.char-count');
@@ -398,18 +450,7 @@
             if (imgB64) body.image_base64 = imgB64;
             aiCall('/{{ admin_slug }}/api/ai/suggest-tags', body, function(data) {
                 if (data.tags && data.tags.length) {
-                    var tagList = document.querySelector('.tag-list');
-                    data.tags.forEach(function(t) {
-                        var exists = false;
-                        tagList.querySelectorAll('.tag-pill').forEach(function(p) { if (p.textContent.trim().replace('\u00d7','').trim().toLowerCase() === t.toLowerCase()) exists = true; });
-                        if (!exists) {
-                            var pill = document.createElement('span');
-                            pill.className = 'tag-pill';
-                            pill.innerHTML = t + ' <button type="button" class="tag-remove" onclick="this.parentElement.remove()">&times;</button>';
-                            pill.dataset.tagName = t;
-                            tagList.appendChild(pill);
-                        }
-                    });
+                    data.tags.forEach(function(t) { if (window.addTagPill) window.addTagPill(t); });
                 }
             });
         });
@@ -468,14 +509,7 @@
             }
             if (data.excerpt) document.getElementById('excerpt').value = data.excerpt;
             if (data.tags && data.tags.length) {
-                var tagList = document.querySelector('.tag-list');
-                data.tags.forEach(function(t) {
-                    var pill = document.createElement('span');
-                    pill.className = 'tag-pill';
-                    pill.innerHTML = t + ' <button type="button" class="tag-remove" onclick="this.parentElement.remove()">&times;</button>';
-                    pill.dataset.tagName = t;
-                    tagList.appendChild(pill);
-                });
+                data.tags.forEach(function(t) { if (window.addTagPill) window.addTagPill(t); });
             }
             document.getElementById('ai-generate-section').style.display = 'none';
         }, function() { btn.disabled = false; btn.textContent = '✨ Generate'; });

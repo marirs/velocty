@@ -123,6 +123,7 @@ pub struct PortfolioFormData<'f> {
     pub status: String,
     pub published_at: Option<String>,
     pub category_ids: Option<Vec<i64>>,
+    pub tag_names: Option<String>,
     pub image: Option<TempFile<'f>>,
 }
 
@@ -166,6 +167,14 @@ pub async fn portfolio_create(
         Ok(id) => {
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
+            }
+            if let Some(ref names) = form.tag_names {
+                let tag_ids: Vec<i64> = names.split(',').filter_map(|n| {
+                    let n = n.trim();
+                    if n.is_empty() { return None; }
+                    Tag::find_or_create(pool, n).ok()
+                }).collect();
+                let _ = Tag::set_for_content(pool, id, "portfolio", &tag_ids);
             }
             AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("portfolio"), Some(id), Some(&form.title), Some(&form.status), None);
             if form.status == "draft" {
@@ -223,6 +232,15 @@ pub async fn portfolio_update(
     let _ = PortfolioItem::update(pool, id, &pf);
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
+    }
+    {
+        let tag_names_str = form.tag_names.as_deref().unwrap_or("");
+        let tag_ids: Vec<i64> = tag_names_str.split(',').filter_map(|n| {
+            let n = n.trim();
+            if n.is_empty() { return None; }
+            Tag::find_or_create(pool, n).ok()
+        }).collect();
+        let _ = Tag::set_for_content(pool, id, "portfolio", &tag_ids);
     }
     AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "update", Some("portfolio"), Some(id), Some(&form.title), Some(&form.status), None);
     if form.status == "draft" {

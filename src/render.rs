@@ -1194,8 +1194,8 @@ fn render_portfolio_grid(context: &Value) -> String {
             String::new()
         };
 
-        // Build category label HTML
-        let cats_html = if show_cats {
+        // Build category inner HTML (just the links, no wrapper div)
+        let cats_inner = if show_cats {
             let cat_list = entry.get("categories").and_then(|c| c.as_array());
             if let Some(cats) = cat_list {
                 if !cats.is_empty() {
@@ -1208,16 +1208,13 @@ fn render_portfolio_grid(context: &Value) -> String {
                             html_escape(name)
                         ))
                     }).collect();
-                    if !cat_strs.is_empty() {
-                        format!("<div class=\"item-categories item-meta-{}\">{}</div>",
-                            show_cats_mode, cat_strs.join(" · "))
-                    } else { String::new() }
+                    if !cat_strs.is_empty() { cat_strs.join(" · ") } else { String::new() }
                 } else { String::new() }
             } else { String::new() }
         } else { String::new() };
 
-        // Build tag label HTML
-        let tags_html = if show_tags {
+        // Build tag inner HTML (just the links, no wrapper div)
+        let tags_inner = if show_tags {
             if let Some(tag_list) = tags {
                 if !tag_list.is_empty() {
                     let tag_strs: Vec<String> = tag_list.iter().filter_map(|t| {
@@ -1229,10 +1226,7 @@ fn render_portfolio_grid(context: &Value) -> String {
                             html_escape(name)
                         ))
                     }).collect();
-                    if !tag_strs.is_empty() {
-                        format!("<div class=\"item-tags item-meta-{}\">{}</div>",
-                            show_tags_mode, tag_strs.join(" · "))
-                    } else { String::new() }
+                    if !tag_strs.is_empty() { tag_strs.join(" · ") } else { String::new() }
                 } else { String::new() }
             } else { String::new() }
         } else { String::new() };
@@ -1252,14 +1246,33 @@ fn render_portfolio_grid(context: &Value) -> String {
             tag_data = html_escape(&tag_data),
         ));
 
-        // Overlay categories (hover, bottom_left, bottom_right) — positioned over image via CSS
-        if cats_is_overlay && !cats_html.is_empty() {
-            html.push_str(&cats_html);
+        // Hover overlay: shared container with dimmed background, centered content
+        let cats_is_hover = show_cats_mode == "hover";
+        let tags_is_hover = show_tags_mode == "hover";
+        if (cats_is_hover && !cats_inner.is_empty()) || (tags_is_hover && !tags_inner.is_empty()) {
+            html.push_str("<div class=\"item-hover-overlay\">");
+            html.push_str("<div class=\"item-hover-content\">");
+            if cats_is_hover && !cats_inner.is_empty() {
+                html.push_str(&format!("<div class=\"item-categories item-meta-hover\">{}</div>", cats_inner));
+            }
+            if tags_is_hover && !tags_inner.is_empty() {
+                html.push_str(&format!("<div class=\"item-tags item-meta-hover\">{}</div>", tags_inner));
+            }
+            html.push_str("</div></div>");
         }
 
-        // Overlay tags (hover, bottom_left, bottom_right)
-        if tags_is_overlay && !tags_html.is_empty() {
-            html.push_str(&tags_html);
+        // Corner overlays (bottom_left, bottom_right) — always visible, positioned in corners
+        if show_cats_mode == "bottom_left" && !cats_inner.is_empty() {
+            html.push_str(&format!("<div class=\"item-categories item-meta-bottom_left\">{}</div>", cats_inner));
+        }
+        if show_cats_mode == "bottom_right" && !cats_inner.is_empty() {
+            html.push_str(&format!("<div class=\"item-categories item-meta-bottom_right\">{}</div>", cats_inner));
+        }
+        if show_tags_mode == "bottom_left" && !tags_inner.is_empty() {
+            html.push_str(&format!("<div class=\"item-tags item-meta-bottom_left\">{}</div>", tags_inner));
+        }
+        if show_tags_mode == "bottom_right" && !tags_inner.is_empty() {
+            html.push_str(&format!("<div class=\"item-tags item-meta-bottom_right\">{}</div>", tags_inner));
         }
 
         // Title below image
@@ -1271,13 +1284,15 @@ fn render_portfolio_grid(context: &Value) -> String {
         }
 
         // Below-image categories
-        if cats_is_below && !cats_html.is_empty() {
-            html.push_str(&cats_html);
+        if cats_is_below && !cats_inner.is_empty() {
+            html.push_str(&format!("<div class=\"item-categories item-meta-{}\">{}</div>",
+                show_cats_mode, cats_inner));
         }
 
         // Below-image tags
-        if tags_is_below && !tags_html.is_empty() {
-            html.push_str(&tags_html);
+        if tags_is_below && !tags_inner.is_empty() {
+            html.push_str(&format!("<div class=\"item-tags item-meta-{}\">{}</div>",
+                show_tags_mode, tags_inner));
         }
 
         html.push_str("</div>\n");
@@ -2663,33 +2678,59 @@ body.boxed-mode {
 .item-categories a { color: inherit; text-decoration: none; }
 .item-categories a:hover { text-decoration: underline; }
 
-/* Overlay modes (inside portfolio-link, over image) */
-.item-meta-hover,
+/* Hover overlay: dimmed background, centered content */
+.item-hover-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: rgba(0,0,0,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+.grid-item:hover .item-hover-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+.item-hover-content {
+    text-align: center;
+    padding: 16px;
+    max-width: 90%;
+}
+.item-hover-content .item-categories {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #fff;
+}
+.item-hover-content .item-tags {
+    font-size: 11px;
+    color: rgba(255,255,255,.75);
+    margin-top: 8px;
+}
+.item-hover-content a { color: #fff; text-decoration: none; }
+.item-hover-content a:hover { text-decoration: underline; }
+
+/* Corner overlays (bottom_left, bottom_right) — always visible */
 .item-meta-bottom_left,
 .item-meta-bottom_right {
     position: absolute;
     z-index: 2;
-    padding: 6px 10px;
+    padding: 5px 10px;
     font-size: 11px;
     background: rgba(0,0,0,.55);
     color: #fff;
     pointer-events: auto;
 }
-.item-meta-hover a,
 .item-meta-bottom_left a,
-.item-meta-bottom_right a { color: #fff; }
-
+.item-meta-bottom_right a { color: #fff; text-decoration: none; }
+.item-meta-bottom_left a:hover,
+.item-meta-bottom_right a:hover { text-decoration: underline; }
 .item-meta-bottom_left { bottom: 0; left: 0; border-radius: 0 4px 0 0; }
 .item-meta-bottom_right { bottom: 0; right: 0; border-radius: 4px 0 0 0; }
-
-.item-meta-hover {
-    bottom: 0; left: 0; right: 0;
-    text-align: center;
-    border-radius: 0;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-.grid-item:hover .item-meta-hover { opacity: 1; }
 
 /* Below modes (outside portfolio-link, under image) */
 .item-meta-below_left { text-align: left; }

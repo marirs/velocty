@@ -479,6 +479,93 @@ fn tag_find_or_create() {
     assert_eq!(Tag::count(&pool), 1);
 }
 
+/// Simulates the exact route handler logic: comma-separated tag names → find_or_create → set_for_content.
+/// This is the integration path that was broken (form never sent tag_names, handler never resolved them).
+#[test]
+fn tag_names_to_content_roundtrip_portfolio() {
+    let pool = test_pool();
+    let item_id = PortfolioItem::create(&pool, &PortfolioForm {
+        title: "Test".to_string(), slug: "test".to_string(),
+        description_json: None, description_html: None,
+        image_path: "img.jpg".to_string(), thumbnail_path: None,
+        meta_title: None, meta_description: None,
+        sell_enabled: None, price: None, purchase_note: None,
+        payment_provider: None, download_file_path: None,
+        status: "published".to_string(), published_at: None,
+        category_ids: None, tag_ids: None,
+    }).unwrap();
+
+    // Simulate form submission with comma-separated tag names
+    let tag_names_str = "Aerial, Golden Hour, Aerial";  // includes duplicate
+    let tag_ids: Vec<i64> = tag_names_str.split(',').filter_map(|n| {
+        let n = n.trim();
+        if n.is_empty() { return None; }
+        Tag::find_or_create(&pool, n).ok()
+    }).collect();
+    Tag::set_for_content(&pool, item_id, "portfolio", &tag_ids).unwrap();
+
+    // Verify tags persisted and are retrievable
+    let saved = Tag::for_content(&pool, item_id, "portfolio");
+    assert_eq!(saved.len(), 2, "should have 2 unique tags (duplicate ignored by find_or_create)");
+    let names: Vec<&str> = saved.iter().map(|t| t.name.as_str()).collect();
+    assert!(names.contains(&"Aerial"), "should contain Aerial");
+    assert!(names.contains(&"Golden Hour"), "should contain Golden Hour");
+
+    // Verify tags appear in global tag list
+    assert!(Tag::count(&pool) >= 2);
+    assert!(Tag::find_by_slug(&pool, "aerial").is_some());
+    assert!(Tag::find_by_slug(&pool, "golden-hour").is_some());
+}
+
+#[test]
+fn tag_names_to_content_roundtrip_post() {
+    let pool = test_pool();
+    let post_id = Post::create(&pool, &make_post_form("Tag Test", "tag-test", "draft")).unwrap();
+
+    let tag_names_str = "Rust, Web Dev";
+    let tag_ids: Vec<i64> = tag_names_str.split(',').filter_map(|n| {
+        let n = n.trim();
+        if n.is_empty() { return None; }
+        Tag::find_or_create(&pool, n).ok()
+    }).collect();
+    Tag::set_for_content(&pool, post_id, "post", &tag_ids).unwrap();
+
+    let saved = Tag::for_content(&pool, post_id, "post");
+    assert_eq!(saved.len(), 2);
+
+    // Update: remove one tag
+    let tag_ids2: Vec<i64> = "Rust".split(',').filter_map(|n| {
+        let n = n.trim();
+        if n.is_empty() { return None; }
+        Tag::find_or_create(&pool, n).ok()
+    }).collect();
+    Tag::set_for_content(&pool, post_id, "post", &tag_ids2).unwrap();
+
+    let saved2 = Tag::for_content(&pool, post_id, "post");
+    assert_eq!(saved2.len(), 1, "should have 1 tag after update");
+    assert_eq!(saved2[0].name, "Rust");
+}
+
+#[test]
+fn tag_names_empty_clears_all() {
+    let pool = test_pool();
+    let post_id = Post::create(&pool, &make_post_form("Clear Test", "clear-test", "draft")).unwrap();
+
+    // Add tags
+    let tag_ids: Vec<i64> = vec![Tag::find_or_create(&pool, "A").unwrap(), Tag::find_or_create(&pool, "B").unwrap()];
+    Tag::set_for_content(&pool, post_id, "post", &tag_ids).unwrap();
+    assert_eq!(Tag::for_content(&pool, post_id, "post").len(), 2);
+
+    // Simulate empty tag_names (user removed all pills)
+    let empty_ids: Vec<i64> = "".split(',').filter_map(|n| {
+        let n = n.trim();
+        if n.is_empty() { return None; }
+        Tag::find_or_create(&pool, n).ok()
+    }).collect();
+    Tag::set_for_content(&pool, post_id, "post", &empty_ids).unwrap();
+    assert_eq!(Tag::for_content(&pool, post_id, "post").len(), 0, "all tags should be cleared");
+}
+
 // ═══════════════════════════════════════════════════════════
 // Comments
 // ═══════════════════════════════════════════════════════════
