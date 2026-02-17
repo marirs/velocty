@@ -702,7 +702,11 @@ fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> St
         return String::new();
     }
 
-    format!("<div class=\"share-icons\">{}</div>", icons.join("\n"))
+    let share_label = sg("share_label");
+    let label_html = if !share_label.is_empty() {
+        format!("<span class=\"share-label\">{}</span>", html_escape(&share_label))
+    } else { String::new() };
+    format!("<div class=\"share-icons\">{}{}</div>", label_html, icons.join("\n"))
 }
 
 /// Build a URL path from a slug prefix and an optional sub-path.
@@ -2258,7 +2262,14 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     padding-top: 16px;
 }
 
-.social-links { margin-bottom: 8px; }
+.social-links { margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.share-label {
+    font-family: var(--font-captions);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-right: 4px;
+    white-space: nowrap;
+}
 .social-links a {
     color: var(--color-text);
     text-decoration: none;

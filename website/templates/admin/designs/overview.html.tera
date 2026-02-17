@@ -659,6 +659,10 @@
                         </select>
                     </div>
                     <div class="cz-field">
+                        <label>Share Label</label>
+                        <input type="text" name="share_label" data-setting="share_label" value="{{ settings.share_label | default(value='') }}" placeholder="e.g. Share">
+                    </div>
+                    <div class="cz-field">
                         <label>Share Icons Position</label>
                         <select name="share_icons_position" data-setting="share_icons_position">
                             <option value="below_image" {% if settings.share_icons_position is defined and settings.share_icons_position == "below_image" %}selected{% endif %}>Below Image</option>
