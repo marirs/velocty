@@ -2349,3 +2349,239 @@ fn render_sidebar_right_class() {
 
     assert!(html.contains("sidebar-right"), "sidebar position=right should add sidebar-right class");
 }
+
+// ═══════════════════════════════════════════════════════════
+// Render: Portfolio Show Categories / Tags Position Modes
+// ═══════════════════════════════════════════════════════════
+
+/// Helper: build a portfolio_grid context with one item that has categories and tags.
+fn render_context_with_items(pool: &DbPool) -> serde_json::Value {
+    let settings = Setting::all(pool);
+    let categories = Category::list(pool, Some("portfolio"));
+    json!({
+        "settings": settings,
+        "items": [
+            {
+                "item": {
+                    "id": 1,
+                    "title": "Sunset Flight",
+                    "slug": "sunset-flight",
+                    "image_path": "test.jpg",
+                    "thumbnail_path": "",
+                    "likes": 5,
+                    "status": "published"
+                },
+                "categories": [
+                    {"id": 1, "name": "Flights", "slug": "flights"},
+                    {"id": 2, "name": "Nature", "slug": "nature"}
+                ],
+                "tags": [
+                    {"id": 1, "name": "Aerial", "slug": "aerial"},
+                    {"id": 2, "name": "Golden Hour", "slug": "golden-hour"}
+                ]
+            }
+        ],
+        "categories": categories,
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    })
+}
+
+#[test]
+fn render_portfolio_cats_false_no_visible_labels() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "false"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(!body.contains("class=\"item-categories"), "false: no category labels");
+    assert!(body.contains("data-categories=\"flights nature\""), "data-categories attr always present");
+}
+
+#[test]
+fn render_portfolio_tags_false_no_visible_labels() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_tags", "false"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(!body.contains("class=\"item-tags"), "false: no tag labels");
+}
+
+#[test]
+fn render_portfolio_cats_hover() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "hover"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-hover"), "hover: category overlay class");
+    assert!(body.contains(">Flights</a>"), "hover: category name rendered");
+}
+
+#[test]
+fn render_portfolio_tags_hover() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_tags", "hover"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-tags item-meta-hover"), "hover: tag overlay class");
+    assert!(body.contains(">Aerial</a>"), "hover: tag name rendered");
+}
+
+#[test]
+fn render_portfolio_cats_bottom_left() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "bottom_left"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-bottom_left"), "bottom_left overlay class");
+}
+
+#[test]
+fn render_portfolio_cats_bottom_right() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "bottom_right"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-bottom_right"), "bottom_right overlay class");
+}
+
+#[test]
+fn render_portfolio_cats_below_left() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "below_left"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-below_left"), "below_left class");
+    assert!(body.contains(">Flights</a>"), "below_left: category name rendered");
+}
+
+#[test]
+fn render_portfolio_cats_below_right() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "below_right"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-below_right"), "below_right class");
+}
+
+#[test]
+fn render_portfolio_tags_below_left() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_tags", "below_left"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-tags item-meta-below_left"), "below_left tag class");
+    assert!(body.contains(">Aerial</a>"), "below_left: tag name");
+    assert!(body.contains(">Golden Hour</a>"), "below_left: second tag");
+}
+
+#[test]
+fn render_portfolio_tags_below_right() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_tags", "below_right"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-tags item-meta-below_right"), "below_right tag class");
+}
+
+#[test]
+fn render_portfolio_legacy_true_normalizes_to_below_left() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "true"),
+        ("portfolio_show_tags", "true"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-below_left"),
+        "legacy true normalizes to below_left for categories");
+    assert!(body.contains("item-tags item-meta-below_left"),
+        "legacy true normalizes to below_left for tags");
+}
+
+#[test]
+fn render_portfolio_overlay_outside_link_tag() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "hover"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    // Overlay div should be AFTER </a>, not inside it
+    let link_end = body.find("</a>").unwrap_or(0);
+    let cats_pos = body.find("item-categories item-meta-hover").unwrap_or(0);
+    assert!(cats_pos > link_end, "overlay should be outside the <a> tag (after </a>)");
+}
+
+#[test]
+fn render_portfolio_mixed_cats_hover_tags_below() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("portfolio_show_categories", "hover"),
+        ("portfolio_show_tags", "below_left"),
+    ]);
+    let ctx = render_context_with_items(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+
+    assert!(body.contains("item-categories item-meta-hover"), "cats should be hover overlay");
+    assert!(body.contains("item-tags item-meta-below_left"), "tags should be below_left");
+}

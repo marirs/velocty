@@ -127,9 +127,8 @@
                             <option value="hover" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "hover" %}selected{% endif %}>On Hover</option>
                             <option value="bottom_left" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "bottom_left" %}selected{% endif %}>Bottom Left (over image)</option>
                             <option value="bottom_right" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "bottom_right" %}selected{% endif %}>Bottom Right (over image)</option>
-                            <option value="below_left" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "below_left" %}selected{% endif %}>Below Left</option>
+                            <option value="below_left" {% if not settings.portfolio_show_categories is defined or settings.portfolio_show_categories == "below_left" or settings.portfolio_show_categories == "true" %}selected{% endif %}>Below Left</option>
                             <option value="below_right" {% if settings.portfolio_show_categories is defined and settings.portfolio_show_categories == "below_right" %}selected{% endif %}>Below Right</option>
-                            <option value="true" {% if not settings.portfolio_show_categories is defined or settings.portfolio_show_categories == "true" %}selected{% endif %}>Yes (default)</option>
                         </select>
                     </div>
                     <div class="cz-field">
@@ -139,9 +138,8 @@
                             <option value="hover" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "hover" %}selected{% endif %}>On Hover</option>
                             <option value="bottom_left" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "bottom_left" %}selected{% endif %}>Bottom Left (over image)</option>
                             <option value="bottom_right" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "bottom_right" %}selected{% endif %}>Bottom Right (over image)</option>
-                            <option value="below_left" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "below_left" %}selected{% endif %}>Below Left</option>
+                            <option value="below_left" {% if not settings.portfolio_show_tags is defined or settings.portfolio_show_tags == "below_left" or settings.portfolio_show_tags == "true" %}selected{% endif %}>Below Left</option>
                             <option value="below_right" {% if settings.portfolio_show_tags is defined and settings.portfolio_show_tags == "below_right" %}selected{% endif %}>Below Right</option>
-                            <option value="true" {% if not settings.portfolio_show_tags is defined or settings.portfolio_show_tags == "true" %}selected{% endif %}>Yes (default)</option>
                         </select>
                     </div>
                     <div class="cz-field">

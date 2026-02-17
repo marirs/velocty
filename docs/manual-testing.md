@@ -148,6 +148,69 @@ This document covers visual and interactive test scenarios that cannot be fully 
   - Category filter options should be: Hidden, Sub-menu, Below Main Menu
   - Under Portfolio Link and Page Top should NOT be visible
 
+### 3.7 Show Categories — Don't Show (default)
+- **Precondition:** Show Categories = **Don't Show**
+- **Steps:** Open portfolio page with items that have categories assigned
+- **Expected:**
+  - No visible category labels on grid items
+  - `data-categories` attribute still present on each grid item (for JS filtering)
+
+### 3.8 Show Categories — On Hover
+- **Precondition:** Show Categories = **On Hover**
+- **Steps:** Open portfolio page, hover over a grid item
+- **Expected:**
+  - Category names appear as a dark semi-transparent bar at the bottom of the image on hover
+  - Bar fades in smoothly (opacity transition)
+  - Bar disappears when mouse leaves the item
+  - Category names are clickable links
+
+### 3.9 Show Categories — Bottom Left (over image)
+- **Precondition:** Show Categories = **Bottom Left (over image)**
+- **Steps:** Open portfolio page
+- **Expected:**
+  - Category names appear as a dark pill/badge at the bottom-left corner of the image
+  - Always visible (not hover-dependent)
+  - Rounded corner on top-right
+
+### 3.10 Show Categories — Bottom Right (over image)
+- **Precondition:** Show Categories = **Bottom Right (over image)**
+- **Expected:**
+  - Same as Bottom Left but positioned at bottom-right corner
+  - Rounded corner on top-left
+
+### 3.11 Show Categories — Below Left
+- **Precondition:** Show Categories = **Below Left**
+- **Expected:**
+  - Category names appear below the image, left-aligned
+  - Not overlapping the image
+  - Uses the Categories font and color from Typography/Colors settings
+
+### 3.12 Show Categories — Below Right
+- **Precondition:** Show Categories = **Below Right**
+- **Expected:**
+  - Category names appear below the image, right-aligned
+
+### 3.13 Show Tags — All Position Modes
+- **Precondition:** Test each Show Tags option (same 6 modes as categories)
+- **Expected:** Same positioning behavior as categories but for tag labels
+  - Tags use the Tags font and color from Typography/Colors settings
+  - Tags are separated by " · " (middle dot)
+
+### 3.14 Mixed Modes — Categories Hover + Tags Below
+- **Precondition:** Show Categories = **On Hover**, Show Tags = **Below Left**
+- **Steps:** Open portfolio page, hover over a grid item
+- **Expected:**
+  - Tags always visible below the image (left-aligned)
+  - Categories appear on hover as overlay on the image
+  - Both render independently — hover works even when tags use a different mode
+
+### 3.15 Legacy "true" Migration
+- **Precondition:** Existing database with old `portfolio_show_categories = "true"` value
+- **Steps:** Restart the server
+- **Expected:**
+  - Value auto-migrated to `"false"` (Don't Show)
+  - Customizer shows "Don't Show" selected
+
 ---
 
 ## 4. Social Icons

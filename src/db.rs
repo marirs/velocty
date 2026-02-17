@@ -478,8 +478,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("portfolio_image_protection", "false"),
         ("portfolio_featured_image_scale", "original"),
         ("portfolio_fade_animation", "true"),
-        ("portfolio_show_categories", "true"),
-        ("portfolio_show_tags", "true"),
+        ("portfolio_show_categories", "false"),
+        ("portfolio_show_tags", "false"),
         ("portfolio_click_mode", "lightbox"),
         ("portfolio_lightbox_border_color", "#D4A017"),
         ("portfolio_lightbox_title_color", "#FFFFFF"),
@@ -820,6 +820,16 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             )?;
         }
     }
+
+    // Migrate legacy "true" for portfolio show categories/tags to "false" (Don't Show)
+    conn.execute(
+        "UPDATE settings SET value = 'false' WHERE key = 'portfolio_show_categories' AND value = 'true'",
+        [],
+    )?;
+    conn.execute(
+        "UPDATE settings SET value = 'false' WHERE key = 'portfolio_show_tags' AND value = 'true'",
+        [],
+    )?;
 
     // Add parent_id to comments for threaded replies
     let has_parent_id: bool = conn

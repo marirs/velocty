@@ -175,8 +175,8 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     // ── Data attributes for JS ──
     let click_mode = sg("portfolio_click_mode", "lightbox");
     let show_likes = sg("portfolio_enable_likes", "true");
-    let show_cats = sg("portfolio_show_categories", "true");
-    let show_tags = sg("portfolio_show_tags", "true");
+    let show_cats = sg("portfolio_show_categories", "false");
+    let show_tags = sg("portfolio_show_tags", "false");
     let fade_anim = sg("portfolio_fade_animation", "true");
     let display_type = sg("portfolio_display_type", "masonry");
     let pagination_type = sg("portfolio_pagination_type", "classic");
@@ -1129,9 +1129,12 @@ fn render_portfolio_grid(context: &Value) -> String {
         settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
     };
     let display_type = sg("portfolio_display_type", "masonry");
-    let show_tags_mode = sg("portfolio_show_tags", "true");
+    let show_tags_mode_raw = sg("portfolio_show_tags", "false");
+    let show_tags_mode = if show_tags_mode_raw == "true" { "below_left".to_string() } else { show_tags_mode_raw };
     let show_tags = show_tags_mode != "false";
-    let show_cats_mode = sg("portfolio_show_categories", "true");
+    let show_cats_mode_raw = sg("portfolio_show_categories", "false");
+    let show_cats_mode = if show_cats_mode_raw == "true" { "below_left".to_string() } else { show_cats_mode_raw };
+    let show_cats = show_cats_mode != "false";
     let _show_likes = sg("portfolio_enable_likes", "true") == "true";
     let fade_mode = sg("portfolio_fade_animation", "true");
     let fade_anim = fade_mode != "none" && fade_mode != "false";
@@ -1146,6 +1149,12 @@ fn render_portfolio_grid(context: &Value) -> String {
         _ => "",
     };
     let item_class_str = format!("grid-item{}{}", if fade_class.is_empty() { String::new() } else { format!(" {}", fade_class) }, border_class);
+
+    // Determine if we need overlay positioning on the link
+    let cats_is_overlay = matches!(show_cats_mode.as_str(), "hover" | "bottom_left" | "bottom_right");
+    let tags_is_overlay = matches!(show_tags_mode.as_str(), "hover" | "bottom_left" | "bottom_right");
+    let cats_is_below = matches!(show_cats_mode.as_str(), "below_left" | "below_right");
+    let tags_is_below = matches!(show_tags_mode.as_str(), "below_left" | "below_right");
 
     let mut html = format!(r#"<div class="{}">"#, grid_class);
 
@@ -1185,6 +1194,49 @@ fn render_portfolio_grid(context: &Value) -> String {
             String::new()
         };
 
+        // Build category label HTML
+        let cats_html = if show_cats {
+            let cat_list = entry.get("categories").and_then(|c| c.as_array());
+            if let Some(cats) = cat_list {
+                if !cats.is_empty() {
+                    let cat_strs: Vec<String> = cats.iter().filter_map(|c| {
+                        let name = c.get("name").and_then(|v| v.as_str())?;
+                        let cslug = c.get("slug").and_then(|v| v.as_str())?;
+                        Some(format!(
+                            "<a href=\"{}\">{}</a>",
+                            slug_url(&portfolio_slug, &format!("category/{}", cslug)),
+                            html_escape(name)
+                        ))
+                    }).collect();
+                    if !cat_strs.is_empty() {
+                        format!("<div class=\"item-categories item-meta-{}\">{}</div>",
+                            show_cats_mode, cat_strs.join(" · "))
+                    } else { String::new() }
+                } else { String::new() }
+            } else { String::new() }
+        } else { String::new() };
+
+        // Build tag label HTML
+        let tags_html = if show_tags {
+            if let Some(tag_list) = tags {
+                if !tag_list.is_empty() {
+                    let tag_strs: Vec<String> = tag_list.iter().filter_map(|t| {
+                        let name = t.get("name").and_then(|v| v.as_str())?;
+                        let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                        Some(format!(
+                            "<a href=\"{}\">{}</a>",
+                            slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
+                            html_escape(name)
+                        ))
+                    }).collect();
+                    if !tag_strs.is_empty() {
+                        format!("<div class=\"item-tags item-meta-{}\">{}</div>",
+                            show_tags_mode, tag_strs.join(" · "))
+                    } else { String::new() }
+                } else { String::new() }
+            } else { String::new() }
+        } else { String::new() };
+
         let item_url = slug_url(&portfolio_slug, slug);
         html.push_str(&format!(
             r#"<div class="{item_class}" data-categories="{cats_data}">
@@ -1200,6 +1252,16 @@ fn render_portfolio_grid(context: &Value) -> String {
             tag_data = html_escape(&tag_data),
         ));
 
+        // Overlay categories (hover, bottom_left, bottom_right) — positioned over image via CSS
+        if cats_is_overlay && !cats_html.is_empty() {
+            html.push_str(&cats_html);
+        }
+
+        // Overlay tags (hover, bottom_left, bottom_right)
+        if tags_is_overlay && !tags_html.is_empty() {
+            html.push_str(&tags_html);
+        }
+
         // Title below image
         if show_title && !title.is_empty() {
             html.push_str(&format!(
@@ -1208,27 +1270,14 @@ fn render_portfolio_grid(context: &Value) -> String {
             ));
         }
 
-        // Tags below image
-        if show_tags {
-            if let Some(tag_list) = tags {
-                if !tag_list.is_empty() {
-                    html.push_str(r#"<div class="item-tags">"#);
-                    let tag_strs: Vec<String> = tag_list
-                        .iter()
-                        .filter_map(|t| {
-                            let name = t.get("name").and_then(|v| v.as_str())?;
-                            let tslug = t.get("slug").and_then(|v| v.as_str())?;
-                            Some(format!(
-                                "<a href=\"{}\">{}</a>",
-                                slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
-                                html_escape(name)
-                            ))
-                        })
-                        .collect();
-                    html.push_str(&tag_strs.join(" · "));
-                    html.push_str("</div>");
-                }
-            }
+        // Below-image categories
+        if cats_is_below && !cats_html.is_empty() {
+            html.push_str(&cats_html);
+        }
+
+        // Below-image tags
+        if tags_is_below && !tags_html.is_empty() {
+            html.push_str(&tags_html);
         }
 
         html.push_str("</div>\n");
@@ -1280,8 +1329,8 @@ fn render_portfolio_single(context: &Value) -> String {
         settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
     };
     let show_likes = sg("portfolio_enable_likes", "true") == "true";
-    let show_cats = sg("portfolio_show_categories", "true") == "true";
-    let show_tags = sg("portfolio_show_tags", "true") == "true";
+    let show_cats = sg("portfolio_show_categories", "false") != "false";
+    let show_tags = sg("portfolio_show_tags", "false") != "false";
     let portfolio_slug = sg("portfolio_slug", "portfolio");
 
     let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
@@ -2583,6 +2632,7 @@ body.boxed-mode {
 .grid-item {
     break-inside: avoid;
     margin-bottom: var(--grid-gap);
+    position: relative;
 }
 
 .css-grid .grid-item { margin-bottom: 0; }
@@ -2594,12 +2644,63 @@ body.boxed-mode {
 
 .grid-item .portfolio-link {
     display: block;
-    overflow: hidden;
 }
 
-.grid-item img:hover {
-    opacity: 0.88;
+.grid-item .portfolio-link img {
     transition: opacity 0.2s;
+}
+
+.grid-item:hover .portfolio-link img {
+    opacity: 0.88;
+}
+
+/* ── Item categories & tags position modes ── */
+.item-categories {
+    font-family: var(--font-categories, var(--font-captions));
+    font-size: var(--font-size-categories, 11px);
+    color: var(--color-categories, var(--color-text-secondary));
+}
+.item-categories a { color: inherit; text-decoration: none; }
+.item-categories a:hover { text-decoration: underline; }
+
+/* Overlay modes (inside portfolio-link, over image) */
+.item-meta-hover,
+.item-meta-bottom_left,
+.item-meta-bottom_right {
+    position: absolute;
+    z-index: 2;
+    padding: 6px 10px;
+    font-size: 11px;
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    pointer-events: auto;
+}
+.item-meta-hover a,
+.item-meta-bottom_left a,
+.item-meta-bottom_right a { color: #fff; }
+
+.item-meta-bottom_left { bottom: 0; left: 0; border-radius: 0 4px 0 0; }
+.item-meta-bottom_right { bottom: 0; right: 0; border-radius: 4px 0 0 0; }
+
+.item-meta-hover {
+    bottom: 0; left: 0; right: 0;
+    text-align: center;
+    border-radius: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.grid-item:hover .item-meta-hover { opacity: 1; }
+
+/* Below modes (outside portfolio-link, under image) */
+.item-meta-below_left { text-align: left; }
+.item-meta-below_right { text-align: right; }
+.item-categories.item-meta-below_left,
+.item-categories.item-meta-below_right {
+    padding: 4px 0 2px;
+}
+.item-tags.item-meta-below_left,
+.item-tags.item-meta-below_right {
+    padding: 4px 0 8px;
 }
 
 .grid-item.fade-in {
