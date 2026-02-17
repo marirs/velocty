@@ -494,7 +494,7 @@ fn build_categories_sidebar(context: &Value) -> String {
         // "all" link
         let all_active = if active_slug.is_empty() { " active" } else { "" };
         html.push_str(&format!(
-            "<a href=\"{}\" class=\"cat-link{}\">all</a>\n",
+            "<a href=\"{}\" class=\"cat-link{}\">All</a>\n",
             slug_url(portfolio_slug, ""), all_active
         ));
 

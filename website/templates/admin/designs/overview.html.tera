@@ -616,7 +616,7 @@
                             <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
                             <option value="under_link" {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
                             <option value="page_top" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
-                            <option value="submenu" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "submenu" %}selected{% endif %}>Sub-menu</option>
+                            {# Sub-menu option: only for top-bar layouts (not sidebar) #}
                         </select>
                     </div>
                     {% endif %}
