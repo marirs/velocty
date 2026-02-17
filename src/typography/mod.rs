@@ -64,11 +64,15 @@ pub fn build_css_variables(settings: &Value) -> String {
     --lightbox-title-color: {lb_title_color};
     --lightbox-tag-color: {lb_tag_color};
     --lightbox-nav-color: {lb_nav_color};
-    --color-text: #111827;
-    --color-text-secondary: #6b7280;
-    --color-bg: #ffffff;
-    --color-accent: #3b82f6;
+    --color-text: {color_text};
+    --color-text-secondary: {color_text_secondary};
+    --color-bg: {color_bg};
+    --color-accent: {color_accent};
 }}"#,
+        color_text = get("site_text_color", "#111827"),
+        color_text_secondary = get("site_text_secondary_color", "#6b7280"),
+        color_bg = get("site_background_color", "#ffffff"),
+        color_accent = get("site_accent_color", "#3b82f6"),
         font_primary = font_primary,
         font_headings = font_headings,
         font_body = font_body,

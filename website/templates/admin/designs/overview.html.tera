@@ -26,27 +26,34 @@
         <div class="customizer-sections">
             <!-- Typography -->
             <div class="cz-section open">
-                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
                     <span>Typography</span>
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div class="cz-section-body">
                     <div class="cz-field">
+                        <label>Font Source</label>
+                        <select id="font-source-select" name="font_source" data-setting="font_source" onchange="updateFontDropdowns()">
+                            {% if settings.font_google_enabled is defined and settings.font_google_enabled == "true" or not settings.font_google_enabled is defined %}
+                            <option value="google" {% if settings.font_source == "google" or not settings.font_source is defined %}selected{% endif %}>Google Fonts</option>
+                            {% endif %}
+                            {% if settings.font_adobe_enabled is defined and settings.font_adobe_enabled == "true" %}
+                            <option value="adobe" {% if settings.font_source == "adobe" %}selected{% endif %}>Adobe Fonts</option>
+                            {% endif %}
+                            {% if settings.font_custom_name is defined and settings.font_custom_name %}
+                            <option value="custom" {% if settings.font_source == "custom" %}selected{% endif %}>Custom Font</option>
+                            {% endif %}
+                            <option value="system" {% if settings.font_source == "system" %}selected{% endif %}>System Fonts</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
                         <label>Heading Font</label>
-                        <input type="text" name="font_heading" value="{{ settings.font_heading | default(value='Inter') }}" data-setting="font_heading" placeholder="Inter">
+                        <select id="font-heading-select" name="font_heading" data-setting="font_heading"></select>
                     </div>
                     <div class="cz-field">
                         <label>Body Font</label>
-                        <input type="text" name="font_primary" value="{{ settings.font_primary | default(value='Inter') }}" data-setting="font_primary" placeholder="Inter">
-                    </div>
-                    <div class="cz-field">
-                        <label>Font Source</label>
-                        <select name="font_source" data-setting="font_source">
-                            <option value="google" {% if settings.font_source == "google" or not settings.font_source %}selected{% endif %}>Google Fonts</option>
-                            <option value="adobe" {% if settings.font_source == "adobe" %}selected{% endif %}>Adobe Fonts</option>
-                            <option value="custom" {% if settings.font_source == "custom" %}selected{% endif %}>Custom / System</option>
-                        </select>
+                        <select id="font-body-select" name="font_primary" data-setting="font_primary"></select>
                     </div>
                     <div class="cz-field">
                         <label>Body Size</label>
@@ -70,31 +77,59 @@
 
             <!-- Colors -->
             <div class="cz-section">
-                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>
                     <span>Colors</span>
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div class="cz-section-body">
                     <div class="cz-field">
+                        <label>Background</label>
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_site_background_color" value="{{ settings.site_background_color | default(value='#ffffff') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="site_background_color" value="{{ settings.site_background_color | default(value='#ffffff') }}" data-setting="site_background_color" class="cz-color-text" oninput="czSyncColor(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Text Color</label>
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" data-setting="site_text_color" class="cz-color-text" oninput="czSyncColor(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Accent Color</label>
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_site_accent_color" value="{{ settings.site_accent_color | default(value='#3b82f6') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="site_accent_color" value="{{ settings.site_accent_color | default(value='#3b82f6') }}" data-setting="site_accent_color" class="cz-color-text" oninput="czSyncColor(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Secondary Text</label>
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_site_text_secondary_color" value="{{ settings.site_text_secondary_color | default(value='#6b7280') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="site_text_secondary_color" value="{{ settings.site_text_secondary_color | default(value='#6b7280') }}" data-setting="site_text_secondary_color" class="cz-color-text" oninput="czSyncColor(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
                         <label>Lightbox Border</label>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <input type="color" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" style="width:36px;height:30px;padding:2px;border:1px solid var(--border-input);border-radius:4px;cursor:pointer">
-                            <input type="text" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" style="flex:1" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('change'))">
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" class="cz-color-text" oninput="czSyncColor(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Lightbox Title Color</label>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <input type="color" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" style="width:36px;height:30px;padding:2px;border:1px solid var(--border-input);border-radius:4px;cursor:pointer">
-                            <input type="text" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" style="flex:1" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('change'))">
+                        <label>Lightbox Title</label>
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" class="cz-color-text" oninput="czSyncColor(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Lightbox Tag Color</label>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <input type="color" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" style="width:36px;height:30px;padding:2px;border:1px solid var(--border-input);border-radius:4px;cursor:pointer">
-                            <input type="text" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" style="flex:1" oninput="this.previousElementSibling.value=this.value;this.previousElementSibling.dispatchEvent(new Event('change'))">
+                        <label>Lightbox Tags</label>
+                        <div class="cz-color-row">
+                            <input type="color" class="cz-swatch" name="_clr_portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" oninput="czSyncHex(this)">
+                            <input type="text" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" class="cz-color-text" oninput="czSyncColor(this)">
                         </div>
                     </div>
                 </div>
@@ -102,7 +137,7 @@
 
             <!-- Site Identity -->
             <div class="cz-section">
-                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
                     <span>Site Identity</span>
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -118,14 +153,14 @@
                     </div>
                     <div class="cz-field">
                         <label>Copyright Text</label>
-                        <input type="text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}" data-setting="copyright_text" placeholder="© 2026 My Site">
+                        <input type="text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}" data-setting="copyright_text" placeholder="&copy; 2026 My Site">
                     </div>
                 </div>
             </div>
 
             <!-- Navigation Labels -->
             <div class="cz-section">
-                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                     <span>Navigation</span>
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -150,9 +185,38 @@
                 </div>
             </div>
 
+            <!-- Social & Share Icons -->
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    <span>Social &amp; Sharing</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Social Icons Position</label>
+                        <select name="social_icons_position" data-setting="social_icons_position">
+                            <option value="sidebar" {% if not settings.social_icons_position is defined or settings.social_icons_position == "sidebar" %}selected{% endif %}>Sidebar</option>
+                            <option value="footer" {% if settings.social_icons_position is defined and settings.social_icons_position == "footer" %}selected{% endif %}>Footer</option>
+                            <option value="both" {% if settings.social_icons_position is defined and settings.social_icons_position == "both" %}selected{% endif %}>Both</option>
+                            <option value="hidden" {% if settings.social_icons_position is defined and settings.social_icons_position == "hidden" %}selected{% endif %}>Hidden</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Share Icons Position</label>
+                        <select name="share_icons_position" data-setting="share_icons_position">
+                            <option value="below_content" {% if not settings.share_icons_position is defined or settings.share_icons_position == "below_content" %}selected{% endif %}>Below Content</option>
+                            <option value="sidebar" {% if settings.share_icons_position is defined and settings.share_icons_position == "sidebar" %}selected{% endif %}>Sidebar</option>
+                            <option value="floating" {% if settings.share_icons_position is defined and settings.share_icons_position == "floating" %}selected{% endif %}>Floating</option>
+                            <option value="hidden" {% if settings.share_icons_position is defined and settings.share_icons_position == "hidden" %}selected{% endif %}>Hidden</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <!-- Layout -->
             <div class="cz-section">
-                <button class="cz-section-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
                     <span>Layout</span>
                     <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -201,7 +265,7 @@
         <div class="customizer-panel-footer">
             <button type="button" class="btn btn-primary" style="width:100%" onclick="saveCustomizer()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Publish Changes <span style="font-size:11px;opacity:.5;margin-left:6px">⌘P</span>
+                Publish Changes <span style="font-size:11px;opacity:.5;margin-left:6px">&shortmid; &#8984;S</span>
             </button>
         </div>
     </div>
@@ -213,12 +277,98 @@
 </div>
 
 <script>
+// ── Accordion: only one section open at a time ──
+function czToggle(btn) {
+    var section = btn.parentElement;
+    var wasOpen = section.classList.contains('open');
+    // Close all
+    document.querySelectorAll('.cz-section.open').forEach(function(s) { s.classList.remove('open'); });
+    // Toggle clicked
+    if (!wasOpen) section.classList.add('open');
+}
+
+// ── Inline color picker: swatch IS the <input type="color">, hex text syncs ──
+function czSyncHex(colorInput) {
+    var textInput = colorInput.nextElementSibling;
+    if (textInput) textInput.value = colorInput.value;
+}
+function czSyncColor(textInput) {
+    var colorInput = textInput.previousElementSibling;
+    if (colorInput && colorInput.type === 'color') {
+        var v = textInput.value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) colorInput.value = v;
+    }
+}
+
+// ── Font lists by source ──
+var fontLists = {
+    google: [
+        'Inter','Roboto','Open Sans','Lato','Montserrat','Oswald','Raleway','Poppins','Nunito','Merriweather',
+        'Playfair Display','Source Sans 3','PT Sans','Noto Sans','Ubuntu','Rubik','Work Sans','Fira Sans',
+        'Quicksand','Mulish','Barlow','Josefin Sans','Cabin','DM Sans','Karla','Libre Baskerville',
+        'Crimson Text','Cormorant Garamond','EB Garamond','Bitter','Arvo','Vollkorn','Spectral',
+        'Space Grotesk','Space Mono','JetBrains Mono','Inconsolata','Source Code Pro','IBM Plex Sans',
+        'IBM Plex Serif','IBM Plex Mono','Manrope','Outfit','Sora','Lexend','Figtree','Geist'
+    ],
+    adobe: [
+        'Acumin Pro','Aktiv Grotesk','Arno Pro','Baskerville URW','Birch Std','Brandon Grotesque',
+        'Calluna','Chaparral Pro','Cronos Pro','Freight Sans Pro','Freight Text Pro','Futura PT',
+        'Garamond Premier Pro','Gill Sans Nova','Halyard Display','Henriette','Hypatia Sans Pro',
+        'ITC Avant Garde Gothic','ITC Caslon 224','ITC Garamond','Kepler Std','Kinesis Pro',
+        'Milo Serif','Minion Pro','Myriad Pro','Neue Haas Grotesk','Proxima Nova','Roslindale',
+        'Source Serif Pro','Warnock Pro'
+    ],
+    custom: [
+        {% if settings.font_custom_name is defined and settings.font_custom_name %}'{{ settings.font_custom_name }}',{% endif %}
+        'system-ui','Arial','Helvetica','Georgia','Times New Roman','Courier New','Verdana'
+    ],
+    system: [
+        'system-ui','Arial','Helvetica','Helvetica Neue','Georgia','Times New Roman','Courier New',
+        'Verdana','Tahoma','Trebuchet MS','Palatino','Garamond','Bookman','Avant Garde',
+        'SF Pro Display','SF Mono','Segoe UI','Consolas','Menlo','Monaco'
+    ]
+};
+
+var savedHeading = '{{ settings.font_heading | default(value="Inter") }}';
+var savedBody = '{{ settings.font_primary | default(value="Inter") }}';
+
+function updateFontDropdowns() {
+    var source = document.getElementById('font-source-select').value;
+    var fonts = fontLists[source] || fontLists.google;
+    populateSelect('font-heading-select', fonts, savedHeading);
+    populateSelect('font-body-select', fonts, savedBody);
+}
+
+function populateSelect(id, fonts, currentVal) {
+    var sel = document.getElementById(id);
+    sel.innerHTML = '';
+    var found = false;
+    fonts.forEach(function(f) {
+        var opt = document.createElement('option');
+        opt.value = f; opt.textContent = f;
+        if (f === currentVal) { opt.selected = true; found = true; }
+        sel.appendChild(opt);
+    });
+    // If current value not in list, add it at top
+    if (!found && currentVal) {
+        var opt = document.createElement('option');
+        opt.value = currentVal; opt.textContent = currentVal + ' (current)';
+        opt.selected = true;
+        sel.insertBefore(opt, sel.firstChild);
+    }
+}
+
+updateFontDropdowns();
+
+// ── Keyboard shortcut: Cmd+S / Ctrl+S ──
 document.addEventListener('keydown', function(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         saveCustomizer();
     }
 });
+
+// ── Save ──
 function saveCustomizer() {
     var fields = document.querySelectorAll('[data-setting]');
     var formData = new FormData();
@@ -244,9 +394,14 @@ function saveCustomizer() {
 .customizer-wrap {
     display: flex;
     gap: 0;
-    margin: -24px -24px -24px -24px;
-    height: calc(100vh - 60px);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
     overflow: hidden;
+    background: var(--bg-page);
 }
 .customizer-panel {
     width: 320px;
@@ -277,6 +432,7 @@ function saveCustomizer() {
 }
 .customizer-preview {
     flex: 1;
+    min-width: 0;
     background: #f0f0f0;
     position: relative;
 }
@@ -333,6 +489,40 @@ function saveCustomizer() {
 .cz-field select:focus {
     outline: none;
     border-color: var(--accent);
+}
+.cz-color-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.cz-swatch {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 6px;
+    border: 2px solid var(--border-input);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color .15s;
+    padding: 0;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background: none;
+}
+.cz-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.cz-swatch::-webkit-color-swatch { border: none; border-radius: 4px; }
+.cz-swatch::-moz-color-swatch { border: none; border-radius: 4px; }
+.cz-swatch:hover { border-color: var(--accent); }
+.cz-color-text {
+    flex: 1;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: monospace;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 5px;
+    color: var(--text-primary);
 }
 </style>
 {% endblock content %}

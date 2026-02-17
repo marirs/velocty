@@ -77,7 +77,7 @@ fn render_from_design(pool: &DbPool, tmpl: &DesignTemplate, context: &Value) -> 
                 for cat in cats {
                     let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
                     let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-                    meta_html.push_str(&format!("<a href=\"/{}/category/{}\">{}</a> ", portfolio_slug, slug, html_escape(name)));
+                    meta_html.push_str(&format!("<a href=\"{}\">{}</a> ", slug_url(&portfolio_slug, &format!("category/{}", slug)), html_escape(name)));
                 }
                 meta_html.push_str("</div>");
             }
@@ -88,7 +88,7 @@ fn render_from_design(pool: &DbPool, tmpl: &DesignTemplate, context: &Value) -> 
                 for tag in tags {
                     let name = tag.get("name").and_then(|v| v.as_str()).unwrap_or("");
                     let tslug = tag.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-                    meta_html.push_str(&format!("<a href=\"/{}/tag/{}\">{}</a> ", portfolio_slug, tslug, html_escape(name)));
+                    meta_html.push_str(&format!("<a href=\"{}\">{}</a> ", slug_url(&portfolio_slug, &format!("tag/{}", tslug)), html_escape(name)));
                 }
                 meta_html.push_str("</div>");
             }
@@ -320,8 +320,11 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         String::new()
     };
 
-    // Build social links
-    let social_html = build_social_links(&settings);
+    // Build social links — position controlled by setting
+    let social_pos = sg("social_icons_position", "sidebar");
+    let social_full = build_social_links(&settings);
+    let social_sidebar = if social_pos == "sidebar" || social_pos == "both" { social_full.clone() } else { String::new() };
+    let social_footer = if social_pos == "footer" || social_pos == "both" { social_full.clone() } else { String::new() };
 
     // Build font loading tags
     let font_links = typography::build_font_links(&settings);
@@ -352,14 +355,14 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
     let mut nav_links = String::new();
     if portfolio_enabled {
         nav_links.push_str(&format!(
-            "<a href=\"/{}\" class=\"nav-link\">{}</a>\n",
-            portfolio_slug, html_escape(&portfolio_label)
+            "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+            slug_url(&portfolio_slug, ""), html_escape(&portfolio_label)
         ));
     }
     if blog_enabled {
         nav_links.push_str(&format!(
-            "<a href=\"/{}\" class=\"nav-link\">{}</a>\n",
-            blog_slug, html_escape(&blog_label)
+            "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+            slug_url(&blog_slug, ""), html_escape(&blog_label)
         ));
     }
     if contact_enabled {
@@ -369,11 +372,11 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         ));
     }
 
-    // Build copyright / footer text
+    // Build copyright / footer text — only show if user has set it
     let footer_copyright = if !copyright_text.is_empty() {
         format!("<div class=\"footer-text\">{}</div>", html_escape(&copyright_text))
     } else {
-        format!("<div class=\"footer-text\"><p>&copy; {} {}</p></div>", chrono::Utc::now().format("%Y"), html_escape(site_name))
+        String::new()
     };
 
     // Full page shell — the default "Sidebar Portfolio" design
@@ -410,7 +413,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
                 </nav>
             </div>
             <div class="sidebar-bottom">
-                {social_html}
+                {social_sidebar}
                 {footer_legal_links}
                 {footer_copyright}
             </div>
@@ -418,6 +421,9 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         <main class="content">
             {body_html}
         </main>
+        <footer class="site-footer">
+            {social_footer}
+        </footer>
     </div>
     {back_to_top}
     <script>{lightbox_js}</script>
@@ -438,7 +444,8 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         tagline = html_escape(site_tagline),
         categories_html = categories_html,
         nav_links = nav_links,
-        social_html = social_html,
+        social_sidebar = social_sidebar,
+        social_footer = social_footer,
         footer_legal_links = build_footer_legal_links(&settings),
         footer_copyright = footer_copyright,
         body_html = body_html,
@@ -799,8 +806,8 @@ fn build_categories_sidebar(context: &Value) -> String {
         // "all" link
         let all_active = if active_slug.is_empty() { " active" } else { "" };
         html.push_str(&format!(
-            "<a href=\"/{}\" class=\"cat-link{}\">all</a>\n",
-            portfolio_slug, all_active
+            "<a href=\"{}\" class=\"cat-link{}\">all</a>\n",
+            slug_url(portfolio_slug, ""), all_active
         ));
 
         for cat in categories {
@@ -809,8 +816,8 @@ fn build_categories_sidebar(context: &Value) -> String {
             if slug.is_empty() { continue; }
             let active_class = if slug == active_slug { " active" } else { "" };
             html.push_str(&format!(
-                "<a href=\"/{}/category/{}\" class=\"cat-link{}\">{}</a>\n",
-                portfolio_slug, slug, active_class, html_escape(name)
+                "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
+                slug_url(portfolio_slug, &format!("category/{}", slug)), active_class, html_escape(name)
             ));
         }
 
@@ -821,47 +828,135 @@ fn build_categories_sidebar(context: &Value) -> String {
 }
 
 fn build_social_links(settings: &Value) -> String {
-    let links_json = settings
-        .get("social_links")
-        .and_then(|v| v.as_str())
-        .unwrap_or("[]");
+    let sg = |key: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+    };
 
-    let links: Vec<Value> = serde_json::from_str(links_json).unwrap_or_default();
-    if links.is_empty() {
+    let brand_colors = sg("social_brand_colors") == "true";
+
+    // (setting_key, platform_label, icon_svg, brand_color)
+    let platforms: &[(&str, &str, &str, &str)] = &[
+        ("social_instagram", "Instagram",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>"#,
+         "#E4405F"),
+        ("social_twitter", "X",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+         "#1DA1F2"),
+        ("social_facebook", "Facebook",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>"#,
+         "#1877F2"),
+        ("social_youtube", "YouTube",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19.1c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>"#,
+         "#FF0000"),
+        ("social_tiktok", "TikTok",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>"#,
+         "#ff0050"),
+        ("social_linkedin", "LinkedIn",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>"#,
+         "#0A66C2"),
+        ("social_pinterest", "Pinterest",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12a4 4 0 1 1 8 0c0 2.5-1.5 5-4 5s-2.5-1-2.5-1l-1 4"/><circle cx="12" cy="12" r="10"/></svg>"#,
+         "#BD081C"),
+        ("social_behance", "Behance",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168z"/></svg>"#,
+         "#1769FF"),
+        ("social_dribbble", "Dribbble",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M19.13 5.09C15.22 9.14 10 10.44 2.25 10.94"/><path d="M21.75 12.84c-6.62-1.41-12.14 1-16.38 6.32"/><path d="M8.56 2.75c4.37 6 6 12.56 6.44 19.5"/></svg>"#,
+         "#EA4C89"),
+        ("social_github", "GitHub",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>"#,
+         "#f0f0f0"),
+        ("social_vimeo", "Vimeo",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.5c-.1 2.1-1.5 5-4.4 8.6C14.5 20.7 12 22 10 22c-1.3 0-2.3-1.2-3.1-3.5-.6-2-1.1-4-1.7-6-.6-2.3-1.3-3.5-2-3.5-.2 0-.7.3-1.5.9L.5 8.5c1-.9 2-1.7 2.9-2.6C4.8 4.7 5.8 4 6.5 4c1.8-.2 2.8 1 3.2 3.5.4 2.7.6 4.4.8 5 .5 2 .9 3 1.4 3 .4 0 1-.6 1.8-1.9.8-1.3 1.2-2.3 1.3-3 .1-1.2-.3-1.8-1.4-1.8-.5 0-1 .1-1.5.3 1-3.3 2.9-4.9 5.7-4.8 2.1.1 3.1 1.4 2.9 4.2z"/></svg>"#,
+         "#1AB7EA"),
+        ("social_500px", "500px",
+         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>"#,
+         "#0099E5"),
+    ];
+
+    let collected: Vec<(String, String, &str, &str)> = platforms.iter()
+        .filter_map(|&(key, label, icon, color)| {
+            let url = sg(key);
+            if url.is_empty() { None } else { Some((label.to_string(), url, icon, color)) }
+        })
+        .collect();
+
+    if collected.is_empty() {
         return String::new();
     }
 
     let mut html = String::from("<div class=\"social-links\">");
-    for link in &links {
-        let platform = link.get("platform").and_then(|v| v.as_str()).unwrap_or("");
-        let url = link.get("url").and_then(|v| v.as_str()).unwrap_or("");
-        if url.is_empty() { continue; }
-
-        let icon = match platform.to_lowercase().as_str() {
-            "instagram" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>"#,
-            "x" | "twitter" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
-            "facebook" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>"#,
-            "youtube" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19.1c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>"#,
-            "linkedin" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>"#,
-            "pinterest" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12a4 4 0 1 1 8 0c0 2.5-1.5 5-4 5s-2.5-1-2.5-1l-1 4"/><circle cx="12" cy="12" r="10"/></svg>"#,
-            "tiktok" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>"#,
-            "github" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>"#,
-            "dribbble" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M19.13 5.09C15.22 9.14 10 10.44 2.25 10.94"/><path d="M21.75 12.84c-6.62-1.41-12.14 1-16.38 6.32"/><path d="M8.56 2.75c4.37 6 6 12.56 6.44 19.5"/></svg>"#,
-            "behance" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168z"/></svg>"#,
-            "vimeo" => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.5c-.1 2.1-1.5 5-4.4 8.6C14.5 20.7 12 22 10 22c-1.3 0-2.3-1.2-3.1-3.5-.6-2-1.1-4-1.7-6-.6-2.3-1.3-3.5-2-3.5-.2 0-.7.3-1.5.9L.5 8.5c1-.9 2-1.7 2.9-2.6C4.8 4.7 5.8 4 6.5 4c1.8-.2 2.8 1 3.2 3.5.4 2.7.6 4.4.8 5 .5 2 .9 3 1.4 3 .4 0 1-.6 1.8-1.9.8-1.3 1.2-2.3 1.3-3 .1-1.2-.3-1.8-1.4-1.8-.5 0-1 .1-1.5.3 1-3.3 2.9-4.9 5.7-4.8 2.1.1 3.1 1.4 2.9 4.2z"/></svg>"#,
-            _ => r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>"#,
-        };
-
-        let label = if platform.is_empty() { "link" } else { platform };
+    for (label, url, icon, color) in &collected {
+        let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
         html.push_str(&format!(
-            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" title=\"{}\">{}</a>\n",
-            html_escape(url), html_escape(label), icon
+            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" title=\"{}\"{}>{}</a>\n",
+            html_escape(url), html_escape(label), style, icon
         ));
     }
     html.push_str("</div>");
     html
 }
 
+
+/// Build share buttons for single post/portfolio pages.
+/// Reads share_enabled, share_facebook, share_x, share_linkedin from settings.
+fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> String {
+    let sg = |key: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+    };
+
+    if sg("share_enabled") != "true" {
+        return String::new();
+    }
+
+    let encoded_url = urlencoding_simple(page_url);
+    let encoded_title = urlencoding_simple(page_title);
+
+    let mut buttons = Vec::new();
+
+    if sg("share_facebook") == "true" {
+        buttons.push(format!(
+            r#"<a href="https://www.facebook.com/sharer/sharer.php?u={url}" target="_blank" rel="noopener" class="share-btn share-facebook" title="Share on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> Facebook</a>"#,
+            url = encoded_url
+        ));
+    }
+
+    if sg("share_x") == "true" {
+        buttons.push(format!(
+            r#"<a href="https://x.com/intent/tweet?url={url}&text={title}" target="_blank" rel="noopener" class="share-btn share-x" title="Share on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> Post</a>"#,
+            url = encoded_url,
+            title = encoded_title
+        ));
+    }
+
+    if sg("share_linkedin") == "true" {
+        buttons.push(format!(
+            r#"<a href="https://www.linkedin.com/sharing/share-offsite/?url={url}" target="_blank" rel="noopener" class="share-btn share-linkedin" title="Share on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg> LinkedIn</a>"#,
+            url = encoded_url
+        ));
+    }
+
+    if buttons.is_empty() {
+        return String::new();
+    }
+
+    format!("<div class=\"share-buttons\">{}</div>", buttons.join("\n"))
+}
+
+/// Build a URL path from a slug prefix and an optional sub-path.
+/// When slug is empty, the feature owns "/" so we avoid double slashes.
+/// e.g. slug_url("portfolio", "my-item") => "/portfolio/my-item"
+///      slug_url("", "my-item")          => "/my-item"
+///      slug_url("portfolio", "")         => "/portfolio"
+///      slug_url("", "")                  => "/"
+fn slug_url(slug: &str, sub: &str) -> String {
+    match (slug.is_empty(), sub.is_empty()) {
+        (true, true) => "/".to_string(),
+        (true, false) => format!("/{}", sub),
+        (false, true) => format!("/{}", slug),
+        (false, false) => format!("/{}/{}", slug, sub),
+    }
+}
 
 fn build_favicon_link(settings: &Value) -> String {
     let favicon = settings
@@ -1142,8 +1237,9 @@ fn render_portfolio_grid(context: &Value) -> String {
         let slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
         let image = item
             .get("thumbnail_path")
-            .or_else(|| item.get("image_path"))
             .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| item.get("image_path").and_then(|v| v.as_str()))
             .unwrap_or("");
         let likes = item.get("likes").and_then(|v| v.as_i64()).unwrap_or(0);
 
@@ -1167,15 +1263,15 @@ fn render_portfolio_grid(context: &Value) -> String {
             String::new()
         };
 
+        let item_url = slug_url(&portfolio_slug, slug);
         html.push_str(&format!(
             r#"<div class="{item_class}" data-categories="{cats_data}">
-    <a href="/{portfolio_slug}/{slug}" class="portfolio-link" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
+    <a href="{item_url}" class="portfolio-link" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
         <img src="/uploads/{image}" alt="{title}" loading="lazy">
     </a>"#,
             item_class = item_class,
             cats_data = cats_data,
-            portfolio_slug = portfolio_slug,
-            slug = slug,
+            item_url = item_url,
             title = html_escape(title),
             image = image,
             likes = likes,
@@ -1193,9 +1289,8 @@ fn render_portfolio_grid(context: &Value) -> String {
                             let name = t.get("name").and_then(|v| v.as_str())?;
                             let tslug = t.get("slug").and_then(|v| v.as_str())?;
                             Some(format!(
-                                "<a href=\"/{}/tag/{}\">{}</a>",
-                                portfolio_slug,
-                                tslug,
+                                "<a href=\"{}\">{}</a>",
+                                slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
                                 html_escape(name)
                             ))
                         })
@@ -1302,9 +1397,8 @@ fn render_portfolio_single(context: &Value) -> String {
                     let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
                     let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
                     html.push_str(&format!(
-                        "<a href=\"/{}/category/{}\">{}</a>",
-                        portfolio_slug,
-                        slug,
+                        "<a href=\"{}\">{}</a>",
+                        slug_url(&portfolio_slug, &format!("category/{}", slug)),
                         html_escape(name)
                     ));
                 }
@@ -1323,8 +1417,8 @@ fn render_portfolio_single(context: &Value) -> String {
                         let name = t.get("name").and_then(|v| v.as_str())?;
                         let tslug = t.get("slug").and_then(|v| v.as_str())?;
                         Some(format!(
-                            "<a href=\"/{}/tag/{}\">{}</a>",
-                            portfolio_slug, tslug, html_escape(name)
+                            "<a href=\"{}\">{}</a>",
+                            slug_url(&portfolio_slug, &format!("tag/{}", tslug)), html_escape(name)
                         ))
                     })
                     .collect();
@@ -1336,6 +1430,14 @@ fn render_portfolio_single(context: &Value) -> String {
 
     if !desc.is_empty() {
         html.push_str(&format!(r#"<div class="portfolio-description">{}</div>"#, desc));
+    }
+
+    // Share buttons
+    let site_url = sg("site_url", "");
+    let item_slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+    if !site_url.is_empty() {
+        let page_url = format!("{}{}", site_url, slug_url(&portfolio_slug, item_slug));
+        html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
 
     // Commerce: Buy / Download section
@@ -1371,13 +1473,13 @@ fn render_portfolio_single(context: &Value) -> String {
     "name": "{}",
     "description": "{}",
     "contentUrl": "{}/uploads/{}",
-    "url": "{}/{}/{}",
+    "url": "{}{}",
     "publisher": {{ "@type": "Organization", "name": "{}" }}
 }}
 </script>"#,
             html_escape(title), html_escape(meta_desc),
             site_url, image,
-            site_url, portfolio_slug, slug,
+            site_url, slug_url(portfolio_slug, slug),
             html_escape(site_name),
         ));
     }
@@ -1590,16 +1692,12 @@ fn render_blog_single(context: &Value) -> String {
         }
     }
 
-    // Share button (X / Twitter)
+    // Share buttons (Facebook, X, LinkedIn — gated on settings)
     let site_url = sg("site_url", "");
     let post_slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
     if !site_url.is_empty() {
-        let share_url = format!("{}/{}/{}", site_url, blog_slug, post_slug);
-        html.push_str(&format!(
-            "<div class=\"post-share\"><a href=\"https://x.com/intent/tweet?url={url}&text={title}\" target=\"_blank\" rel=\"noopener\">𝕏 Post</a></div>",
-            url = urlencoding_simple(&share_url),
-            title = urlencoding_simple(title),
-        ));
+        let page_url = format!("{}/{}/{}", site_url, blog_slug, post_slug);
+        html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
 
     // Prev / Next post navigation
@@ -2124,6 +2222,40 @@ h6 { font-size: var(--font-size-h6); }
     margin-top: 6px;
     line-height: 1.5;
 }
+
+.site-footer {
+    margin-left: var(--sidebar-width);
+    padding: 24px var(--grid-gap);
+    border-top: 1px solid rgba(0,0,0,.08);
+    text-align: center;
+}
+.site-footer .social-links { justify-content: center; display: flex; gap: 12px; flex-wrap: wrap; }
+.site-footer .social-links a { margin-right: 0; }
+
+.share-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    padding: 16px 0;
+    border-top: 1px solid rgba(0,0,0,.08);
+}
+.share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: var(--font-nav);
+    text-decoration: none;
+    color: #fff;
+    transition: opacity .2s;
+}
+.share-btn:hover { opacity: .85; }
+.share-facebook { background: #1877F2; }
+.share-x { background: #000; }
+.share-linkedin { background: #0A66C2; }
 
 /* ── Content ── */
 .content {
