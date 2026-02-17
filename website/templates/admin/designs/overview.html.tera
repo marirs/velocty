@@ -86,50 +86,50 @@
                     <div class="cz-field">
                         <label>Background</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_site_background_color" value="{{ settings.site_background_color | default(value='#ffffff') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="site_background_color" value="{{ settings.site_background_color | default(value='#ffffff') }}" data-setting="site_background_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.site_background_color | default(value='#ffffff') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="site_background_color" value="{{ settings.site_background_color | default(value='#ffffff') }}" data-setting="site_background_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
                         <label>Text Color</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" data-setting="site_text_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.site_text_color | default(value='#111827') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="site_text_color" value="{{ settings.site_text_color | default(value='#111827') }}" data-setting="site_text_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
                         <label>Accent Color</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_site_accent_color" value="{{ settings.site_accent_color | default(value='#3b82f6') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="site_accent_color" value="{{ settings.site_accent_color | default(value='#3b82f6') }}" data-setting="site_accent_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.site_accent_color | default(value='#3b82f6') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="site_accent_color" value="{{ settings.site_accent_color | default(value='#3b82f6') }}" data-setting="site_accent_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
                         <label>Secondary Text</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_site_text_secondary_color" value="{{ settings.site_text_secondary_color | default(value='#6b7280') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="site_text_secondary_color" value="{{ settings.site_text_secondary_color | default(value='#6b7280') }}" data-setting="site_text_secondary_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.site_text_secondary_color | default(value='#6b7280') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="site_text_secondary_color" value="{{ settings.site_text_secondary_color | default(value='#6b7280') }}" data-setting="site_text_secondary_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
                         <label>Lightbox Border</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
                         <label>Lightbox Title</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
                         <label>Lightbox Tags</label>
                         <div class="cz-color-row">
-                            <input type="color" class="cz-swatch" name="_clr_portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" oninput="czSyncHex(this)">
-                            <input type="text" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" class="cz-color-text" oninput="czSyncColor(this)">
+                            <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                 </div>
@@ -152,8 +152,16 @@
                         <input type="text" name="site_caption" value="{{ settings.site_caption | default(value='') }}" data-setting="site_caption">
                     </div>
                     <div class="cz-field">
-                        <label>Copyright Text</label>
-                        <input type="text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}" data-setting="copyright_text" placeholder="&copy; 2026 My Site">
+                        <label>Copyright Text <small style="opacity:.5">(HTML allowed)</small></label>
+                        <textarea name="copyright_text" data-setting="copyright_text" rows="2" placeholder="&copy; 2026 My Site">{{ settings.copyright_text | default(value='') }}</textarea>
+                    </div>
+                    <div class="cz-field">
+                        <label>Copyright Alignment</label>
+                        <select name="copyright_alignment" data-setting="copyright_alignment">
+                            <option value="left" {% if settings.copyright_alignment is defined and settings.copyright_alignment == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if not settings.copyright_alignment is defined or settings.copyright_alignment == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.copyright_alignment is defined and settings.copyright_alignment == "right" %}selected{% endif %}>Right</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -207,8 +215,15 @@
                         <select name="share_icons_position" data-setting="share_icons_position">
                             <option value="below_content" {% if not settings.share_icons_position is defined or settings.share_icons_position == "below_content" %}selected{% endif %}>Below Content</option>
                             <option value="sidebar" {% if settings.share_icons_position is defined and settings.share_icons_position == "sidebar" %}selected{% endif %}>Sidebar</option>
-                            <option value="floating" {% if settings.share_icons_position is defined and settings.share_icons_position == "floating" %}selected{% endif %}>Floating</option>
                             <option value="hidden" {% if settings.share_icons_position is defined and settings.share_icons_position == "hidden" %}selected{% endif %}>Hidden</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Social Icons Alignment</label>
+                        <select name="footer_alignment" data-setting="footer_alignment">
+                            <option value="left" {% if settings.footer_alignment is defined and settings.footer_alignment == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if not settings.footer_alignment is defined or settings.footer_alignment == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.footer_alignment is defined and settings.footer_alignment == "right" %}selected{% endif %}>Right</option>
                         </select>
                     </div>
                 </div>
@@ -276,6 +291,21 @@
     </div>
 </div>
 
+<!-- Color Picker Popover (positioned next to swatch) -->
+<div id="czPickerModal" style="display:none;position:fixed;inset:0;z-index:9998;" onclick="if(event.target===this)czClosePicker()"></div>
+<div id="czPickerPopover" style="display:none;position:fixed;z-index:9999;background:var(--bg-card,#1e1e2e);border-radius:12px;padding:16px;width:260px;box-shadow:0 12px 40px rgba(0,0,0,.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-weight:600;font-size:13px;color:var(--text-primary,#fff);">Pick a Color</span>
+        <button onclick="czClosePicker()" style="background:none;border:none;color:var(--text-tertiary,#888);font-size:18px;cursor:pointer;padding:0;line-height:1;">&times;</button>
+    </div>
+    <canvas id="czSVCanvas" width="228" height="150" style="width:100%;border-radius:6px;cursor:crosshair;display:block;"></canvas>
+    <canvas id="czHueCanvas" width="228" height="14" style="width:100%;height:14px;border-radius:7px;cursor:pointer;margin-top:10px;display:block;"></canvas>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+        <div id="czPickerPreview" style="width:32px;height:32px;border-radius:6px;border:2px solid rgba(255,255,255,.15);flex-shrink:0;"></div>
+        <input id="czPickerHex" type="text" maxlength="7" style="flex:1;padding:7px 10px;font-size:13px;font-family:monospace;background:var(--bg-input,#2a2a3e);border:1px solid var(--border-input,#3a3a4e);border-radius:6px;color:var(--text-primary,#fff);outline:none;">
+    </div>
+</div>
+
 <script>
 // ── Accordion: only one section open at a time ──
 function czToggle(btn) {
@@ -287,18 +317,199 @@ function czToggle(btn) {
     if (!wasOpen) section.classList.add('open');
 }
 
-// ── Inline color picker: swatch IS the <input type="color">, hex text syncs ──
-function czSyncHex(colorInput) {
-    var textInput = colorInput.nextElementSibling;
-    if (textInput) textInput.value = colorInput.value;
-}
-function czSyncColor(textInput) {
-    var colorInput = textInput.previousElementSibling;
-    if (colorInput && colorInput.type === 'color') {
-        var v = textInput.value.trim();
-        if (/^#[0-9a-fA-F]{6}$/.test(v)) colorInput.value = v;
+// ── Modal Color Picker ──
+var _cpTarget = null; // { swatch, textInput }
+
+function czSyncFromHex(textInput) {
+    var v = textInput.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        var swatch = textInput.previousElementSibling;
+        if (swatch) swatch.style.background = v;
     }
 }
+
+function czOpenPicker(swatch) {
+    var textInput = swatch.nextElementSibling;
+    _cpTarget = { swatch: swatch, textInput: textInput };
+    var hex = textInput.value.trim() || '#000000';
+    var backdrop = document.getElementById('czPickerModal');
+    var popover = document.getElementById('czPickerPopover');
+    backdrop.style.display = 'block';
+    popover.style.display = 'block';
+    // Position next to the swatch
+    var rect = swatch.getBoundingClientRect();
+    var top = rect.top;
+    var left = rect.right + 10;
+    // If it would go off-screen right, place it to the left of the swatch
+    if (left + 276 > window.innerWidth) left = rect.left - 276;
+    // If it would go off-screen bottom, shift up
+    if (top + 300 > window.innerHeight) top = window.innerHeight - 310;
+    if (top < 10) top = 10;
+    popover.style.top = top + 'px';
+    popover.style.left = left + 'px';
+    document.getElementById('czPickerHex').value = hex;
+    _cpSetFromHex(hex);
+}
+
+function czClosePicker() {
+    document.getElementById('czPickerModal').style.display = 'none';
+    document.getElementById('czPickerPopover').style.display = 'none';
+    _cpTarget = null;
+}
+
+function _cpApply(hex) {
+    if (!_cpTarget) return;
+    _cpTarget.swatch.style.background = hex;
+    _cpTarget.textInput.value = hex;
+    // Trigger input event so save picks it up
+    _cpTarget.textInput.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// HSV <-> RGB helpers
+function _hsvToRgb(h, s, v) {
+    var i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+    var r, g, b;
+    switch (i % 6) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        case 5: r = v; g = p; b = q; break;
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+function _rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    var h = 0, s = mx === 0 ? 0 : d / mx, v = mx;
+    if (d !== 0) {
+        if (mx === r) h = ((g - b) / d + 6) % 6;
+        else if (mx === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h /= 6;
+    }
+    return [h, s, v];
+}
+function _rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(function(c) { return ('0' + c.toString(16)).slice(-2); }).join('');
+}
+function _hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    return [parseInt(hex.substr(0, 2), 16), parseInt(hex.substr(2, 2), 16), parseInt(hex.substr(4, 2), 16)];
+}
+
+var _cpHue = 0, _cpSat = 1, _cpVal = 1;
+
+function _cpSetFromHex(hex) {
+    var rgb = _hexToRgb(hex);
+    var hsv = _rgbToHsv(rgb[0], rgb[1], rgb[2]);
+    _cpHue = hsv[0]; _cpSat = hsv[1]; _cpVal = hsv[2];
+    _cpDrawSV();
+    _cpDrawHue();
+    _cpUpdatePreview();
+}
+
+function _cpDrawSV() {
+    var c = document.getElementById('czSVCanvas');
+    var ctx = c.getContext('2d');
+    var w = c.width, h = c.height;
+    // Background: hue color
+    var hueRgb = _hsvToRgb(_cpHue, 1, 1);
+    ctx.fillStyle = 'rgb(' + hueRgb[0] + ',' + hueRgb[1] + ',' + hueRgb[2] + ')';
+    ctx.fillRect(0, 0, w, h);
+    // White gradient left to right
+    var gW = ctx.createLinearGradient(0, 0, w, 0);
+    gW.addColorStop(0, 'rgba(255,255,255,1)');
+    gW.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gW; ctx.fillRect(0, 0, w, h);
+    // Black gradient top to bottom
+    var gB = ctx.createLinearGradient(0, 0, 0, h);
+    gB.addColorStop(0, 'rgba(0,0,0,0)');
+    gB.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = gB; ctx.fillRect(0, 0, w, h);
+    // Cursor
+    var cx = _cpSat * w, cy = (1 - _cpVal) * h;
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+}
+
+function _cpDrawHue() {
+    var c = document.getElementById('czHueCanvas');
+    var ctx = c.getContext('2d');
+    var w = c.width, h = c.height;
+    var g = ctx.createLinearGradient(0, 0, w, 0);
+    for (var i = 0; i <= 6; i++) {
+        var rgb = _hsvToRgb(i / 6, 1, 1);
+        g.addColorStop(i / 6, 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')');
+    }
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // Cursor
+    var cx = _cpHue * w;
+    ctx.fillStyle = '#fff'; ctx.fillRect(cx - 2, 0, 4, h);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(cx - 2, 0, 4, h);
+}
+
+function _cpUpdatePreview() {
+    var rgb = _hsvToRgb(_cpHue, _cpSat, _cpVal);
+    var hex = _rgbToHex(rgb[0], rgb[1], rgb[2]);
+    document.getElementById('czPickerPreview').style.background = hex;
+    document.getElementById('czPickerHex').value = hex;
+    _cpApply(hex);
+}
+
+// Mouse/touch handlers for SV canvas
+(function() {
+    var draggingSV = false, draggingHue = false;
+
+    function svPos(e, c) {
+        var r = c.getBoundingClientRect();
+        var x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        var y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+        _cpSat = Math.max(0, Math.min(1, x / r.width));
+        _cpVal = Math.max(0, Math.min(1, 1 - y / r.height));
+        _cpDrawSV(); _cpUpdatePreview();
+    }
+    function huePos(e, c) {
+        var r = c.getBoundingClientRect();
+        var x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        _cpHue = Math.max(0, Math.min(1, x / r.width));
+        _cpDrawSV(); _cpDrawHue(); _cpUpdatePreview();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var sv = document.getElementById('czSVCanvas');
+        var hue = document.getElementById('czHueCanvas');
+
+        sv.addEventListener('mousedown', function(e) { draggingSV = true; svPos(e, sv); });
+        sv.addEventListener('touchstart', function(e) { draggingSV = true; svPos(e, sv); e.preventDefault(); }, { passive: false });
+
+        hue.addEventListener('mousedown', function(e) { draggingHue = true; huePos(e, hue); });
+        hue.addEventListener('touchstart', function(e) { draggingHue = true; huePos(e, hue); e.preventDefault(); }, { passive: false });
+
+        document.addEventListener('mousemove', function(e) {
+            if (draggingSV) svPos(e, sv);
+            if (draggingHue) huePos(e, hue);
+        });
+        document.addEventListener('touchmove', function(e) {
+            if (draggingSV) svPos(e, sv);
+            if (draggingHue) huePos(e, hue);
+        }, { passive: false });
+
+        document.addEventListener('mouseup', function() { draggingSV = false; draggingHue = false; });
+        document.addEventListener('touchend', function() { draggingSV = false; draggingHue = false; });
+
+        document.getElementById('czPickerHex').addEventListener('input', function() {
+            var v = this.value.trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                _cpSetFromHex(v);
+                _cpApply(v);
+            }
+        });
+    });
+})();
 
 // ── Font lists by source ──
 var fontLists = {
@@ -504,15 +715,7 @@ function saveCustomizer() {
     cursor: pointer;
     flex-shrink: 0;
     transition: border-color .15s;
-    padding: 0;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background: none;
 }
-.cz-swatch::-webkit-color-swatch-wrapper { padding: 0; }
-.cz-swatch::-webkit-color-swatch { border: none; border-radius: 4px; }
-.cz-swatch::-moz-color-swatch { border: none; border-radius: 4px; }
 .cz-swatch:hover { border-color: var(--accent); }
 .cz-color-text {
     flex: 1;

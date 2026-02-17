@@ -324,7 +324,16 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
     let social_pos = sg("social_icons_position", "sidebar");
     let social_full = build_social_links(&settings);
     let social_sidebar = if social_pos == "sidebar" || social_pos == "both" { social_full.clone() } else { String::new() };
-    let social_footer = if social_pos == "footer" || social_pos == "both" { social_full.clone() } else { String::new() };
+    let social_footer = if social_pos == "footer" || social_pos == "both" { build_social_links_inline(&settings) } else { String::new() };
+
+    // Build share buttons for sidebar — shares the site URL, not individual pages
+    let share_pos = sg("share_icons_position", "below_content");
+    let site_url = sg("site_url", "");
+    let share_sidebar = if share_pos == "sidebar" && !site_url.is_empty() {
+        build_share_buttons(&settings, &site_url, site_name)
+    } else {
+        String::new()
+    };
 
     // Build font loading tags
     let font_links = typography::build_font_links(&settings);
@@ -347,6 +356,8 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
     let contact_label = sg("contact_label", "catch up");
     let contact_enabled = sg("contact_page_enabled", "false") == "true";
     let copyright_text = sg("copyright_text", "");
+    let copyright_align = sg("copyright_alignment", "center");
+    let social_footer_align = sg("footer_alignment", "center");
 
     let portfolio_slug = sg("portfolio_slug", "portfolio");
     let portfolio_label = sg("portfolio_label", "experiences");
@@ -372,11 +383,55 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         ));
     }
 
-    // Build copyright / footer text — only show if user has set it
-    let footer_copyright = if !copyright_text.is_empty() {
-        format!("<div class=\"footer-text\">{}</div>", html_escape(&copyright_text))
-    } else {
-        String::new()
+    // Build footer content: always a single flex row
+    // Copyright and social icons each get a margin style to position independently
+    let footer_inner = {
+        let has_copyright = !copyright_text.is_empty();
+        let has_social = !social_footer.is_empty();
+        if !has_copyright && !has_social {
+            String::new()
+        } else {
+            let mut items = String::new();
+            if has_copyright {
+                let margin = if has_social {
+                    match (copyright_align.as_str(), social_footer_align.as_str()) {
+                        ("left", "right") | ("left", "center") => "",
+                        ("center", "right") => "margin-left:auto;",
+                        ("right", _) => "margin-left:auto;",
+                        _ => "",
+                    }
+                } else {
+                    match copyright_align.as_str() {
+                        "center" => "margin:0 auto;",
+                        "right" => "margin-left:auto;",
+                        _ => "",
+                    }
+                };
+                let style = if margin.is_empty() { String::new() } else { format!(" style=\"{}\"", margin) };
+                items.push_str(&format!("<span class=\"footer-copyright\"{}>{}</span>", style, copyright_text));
+            }
+            if has_social {
+                let margin = if has_copyright {
+                    match (copyright_align.as_str(), social_footer_align.as_str()) {
+                        ("left", "right") => "margin-left:auto;",
+                        ("center", "right") => "",
+                        ("left", "center") => "margin-left:auto;margin-right:auto;",
+                        ("center", "left") => "margin-right:auto;",
+                        ("right", "right") => "",
+                        _ => "",
+                    }
+                } else {
+                    match social_footer_align.as_str() {
+                        "center" => "margin:0 auto;",
+                        "right" => "margin-left:auto;",
+                        _ => "",
+                    }
+                };
+                let style = if margin.is_empty() { String::new() } else { format!(" style=\"{}\"", margin) };
+                items.push_str(&format!("<span class=\"footer-social\"{}>{}</span>", style, social_footer));
+            }
+            items
+        }
     };
 
     // Full page shell — the default "Sidebar Portfolio" design
@@ -411,19 +466,21 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
                     {categories_html}
                     {nav_links}
                 </nav>
+                {share_sidebar}
             </div>
             <div class="sidebar-bottom">
                 {social_sidebar}
                 {footer_legal_links}
-                {footer_copyright}
             </div>
         </aside>
-        <main class="content">
-            {body_html}
-        </main>
-        <footer class="site-footer">
-            {social_footer}
-        </footer>
+        <div class="content-column">
+            <main class="content">
+                {body_html}
+            </main>
+            <footer class="site-footer">
+                {footer_inner}
+            </footer>
+        </div>
     </div>
     {back_to_top}
     <script>{lightbox_js}</script>
@@ -445,9 +502,9 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         categories_html = categories_html,
         nav_links = nav_links,
         social_sidebar = social_sidebar,
-        social_footer = social_footer,
+        share_sidebar = share_sidebar,
+        footer_inner = footer_inner,
         footer_legal_links = build_footer_legal_links(&settings),
-        footer_copyright = footer_copyright,
         body_html = body_html,
         back_to_top = build_back_to_top(&settings),
         lightbox_js = LIGHTBOX_JS,
@@ -835,42 +892,43 @@ fn build_social_links(settings: &Value) -> String {
     let brand_colors = sg("social_brand_colors") == "true";
 
     // (setting_key, platform_label, icon_svg, brand_color)
+    // All icons use fill="currentColor" so color is controlled by the style attribute or CSS
     let platforms: &[(&str, &str, &str, &str)] = &[
         ("social_instagram", "Instagram",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>"#,
          "#E4405F"),
         ("social_twitter", "X",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
-         "#1DA1F2"),
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+         "#000"),
         ("social_facebook", "Facebook",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
          "#1877F2"),
         ("social_youtube", "YouTube",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19.1c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>"#,
          "#FF0000"),
         ("social_tiktok", "TikTok",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>"#,
          "#ff0050"),
         ("social_linkedin", "LinkedIn",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
          "#0A66C2"),
         ("social_pinterest", "Pinterest",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12a4 4 0 1 1 8 0c0 2.5-1.5 5-4 5s-2.5-1-2.5-1l-1 4"/><circle cx="12" cy="12" r="10"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641 0 12.017 0z"/></svg>"#,
          "#BD081C"),
         ("social_behance", "Behance",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168z"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168zM15.61 13.28c-.078-1.229-.996-2.28-2.34-2.28-1.258 0-2.205.906-2.405 2.28h4.745zM6.832 17.36c0-1.665-1.133-2.34-2.76-2.34H1.5v4.68h2.572c1.627 0 2.76-.675 2.76-2.34zM6.435 12c0-1.44-.96-2.16-2.394-2.16H1.5v4.32h2.541c1.434 0 2.394-.72 2.394-2.16zM0 8h4.5c2.58 0 4.32 1.26 4.32 3.6 0 1.44-.72 2.52-1.98 3.12 1.62.48 2.58 1.8 2.58 3.48 0 2.52-1.98 3.8-4.68 3.8H0V8z"/></svg>"#,
          "#1769FF"),
         ("social_dribbble", "Dribbble",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M19.13 5.09C15.22 9.14 10 10.44 2.25 10.94"/><path d="M21.75 12.84c-6.62-1.41-12.14 1-16.38 6.32"/><path d="M8.56 2.75c4.37 6 6 12.56 6.44 19.5"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308a10.174 10.174 0 004.392-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4a10.15 10.15 0 006.29 2.166c1.42 0 2.77-.29 4.006-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702A10.13 10.13 0 0012 1.8c-.82 0-1.62.09-2.4.252zm10.14 3.2c-.21.29-1.9 2.49-5.69 4.02.24.49.47.985.68 1.485.075.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.35-6.37z"/></svg>"#,
          "#EA4C89"),
         ("social_github", "GitHub",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>"#,
-         "#f0f0f0"),
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"#,
+         "#333"),
         ("social_vimeo", "Vimeo",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.5c-.1 2.1-1.5 5-4.4 8.6C14.5 20.7 12 22 10 22c-1.3 0-2.3-1.2-3.1-3.5-.6-2-1.1-4-1.7-6-.6-2.3-1.3-3.5-2-3.5-.2 0-.7.3-1.5.9L.5 8.5c1-.9 2-1.7 2.9-2.6C4.8 4.7 5.8 4 6.5 4c1.8-.2 2.8 1 3.2 3.5.4 2.7.6 4.4.8 5 .5 2 .9 3 1.4 3 .4 0 1-.6 1.8-1.9.8-1.3 1.2-2.3 1.3-3 .1-1.2-.3-1.8-1.4-1.8-.5 0-1 .1-1.5.3 1-3.3 2.9-4.9 5.7-4.8 2.1.1 3.1 1.4 2.9 4.2z"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197a315.065 315.065 0 003.501-3.123C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.263-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.011.01z"/></svg>"#,
          "#1AB7EA"),
         ("social_500px", "500px",
-         r#"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>"#,
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.439 9.01A2.994 2.994 0 004.449 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 015.949 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zm9.122-4.48A2.994 2.994 0 0013.571 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 0115.071 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zM12 2C6.478 2 2 6.478 2 12s4.478 10 10 10 10-4.478 10-10S17.522 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5z"/></svg>"#,
          "#0099E5"),
     ];
 
@@ -889,7 +947,7 @@ fn build_social_links(settings: &Value) -> String {
     for (label, url, icon, color) in &collected {
         let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
         html.push_str(&format!(
-            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" title=\"{}\"{}>{}</a>\n",
+            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" title=\"{}\"{}>{}</a>",
             html_escape(url), html_escape(label), style, icon
         ));
     }
@@ -897,9 +955,77 @@ fn build_social_links(settings: &Value) -> String {
     html
 }
 
+/// Build social links as bare <a> tags (no wrapper div) for footer flex layout.
+fn build_social_links_inline(settings: &Value) -> String {
+    let sg = |key: &str| -> String {
+        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+    };
 
-/// Build share buttons for single post/portfolio pages.
-/// Reads share_enabled, share_facebook, share_x, share_linkedin from settings.
+    let brand_colors = sg("social_brand_colors") == "true";
+
+    let platforms: &[(&str, &str, &str, &str)] = &[
+        ("social_instagram", "Instagram",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>"#,
+         "#E4405F"),
+        ("social_twitter", "X",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+         "#000"),
+        ("social_facebook", "Facebook",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
+         "#1877F2"),
+        ("social_youtube", "YouTube",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>"#,
+         "#FF0000"),
+        ("social_tiktok", "TikTok",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>"#,
+         "#ff0050"),
+        ("social_linkedin", "LinkedIn",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
+         "#0A66C2"),
+        ("social_pinterest", "Pinterest",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641 0 12.017 0z"/></svg>"#,
+         "#BD081C"),
+        ("social_behance", "Behance",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168zM15.61 13.28c-.078-1.229-.996-2.28-2.34-2.28-1.258 0-2.205.906-2.405 2.28h4.745zM6.832 17.36c0-1.665-1.133-2.34-2.76-2.34H1.5v4.68h2.572c1.627 0 2.76-.675 2.76-2.34zM6.435 12c0-1.44-.96-2.16-2.394-2.16H1.5v4.32h2.541c1.434 0 2.394-.72 2.394-2.16zM0 8h4.5c2.58 0 4.32 1.26 4.32 3.6 0 1.44-.72 2.52-1.98 3.12 1.62.48 2.58 1.8 2.58 3.48 0 2.52-1.98 3.8-4.68 3.8H0V8z"/></svg>"#,
+         "#1769FF"),
+        ("social_dribbble", "Dribbble",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308a10.174 10.174 0 004.392-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4a10.15 10.15 0 006.29 2.166c1.42 0 2.77-.29 4.006-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702A10.13 10.13 0 0012 1.8c-.82 0-1.62.09-2.4.252zm10.14 3.2c-.21.29-1.9 2.49-5.69 4.02.24.49.47.985.68 1.485.075.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.35-6.37z"/></svg>"#,
+         "#EA4C89"),
+        ("social_github", "GitHub",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"#,
+         "#333"),
+        ("social_vimeo", "Vimeo",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197a315.065 315.065 0 003.501-3.123C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.263-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.011.01z"/></svg>"#,
+         "#1AB7EA"),
+        ("social_500px", "500px",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.439 9.01A2.994 2.994 0 004.449 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 015.949 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zm9.122-4.48A2.994 2.994 0 0013.571 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 0115.071 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zM12 2C6.478 2 2 6.478 2 12s4.478 10 10 10 10-4.478 10-10S17.522 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5z"/></svg>"#,
+         "#0099E5"),
+    ];
+
+    let collected: Vec<(String, String, &str, &str)> = platforms.iter()
+        .filter_map(|&(key, label, icon, color)| {
+            let url = sg(key);
+            if url.is_empty() { None } else { Some((label.to_string(), url, icon, color)) }
+        })
+        .collect();
+
+    if collected.is_empty() {
+        return String::new();
+    }
+
+    let mut html = String::new();
+    for (label, url, icon, color) in &collected {
+        let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
+        html.push_str(&format!(
+            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" class=\"social-icon-footer\" title=\"{}\"{}>{}</a>",
+            html_escape(url), html_escape(label), style, icon
+        ));
+    }
+    html
+}
+
+/// Build share icons for sharing pages/site.
+/// Renders icon-only links (no text). Respects social_brand_colors setting.
 fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> String {
     let sg = |key: &str| -> String {
         settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
@@ -909,38 +1035,43 @@ fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> St
         return String::new();
     }
 
+    let brand_colors = sg("social_brand_colors") == "true";
     let encoded_url = urlencoding_simple(page_url);
     let encoded_title = urlencoding_simple(page_title);
 
-    let mut buttons = Vec::new();
+    // (setting_key, label, share_url_template, icon_svg, brand_color)
+    // All icons use fill="currentColor" — color controlled by style attr or CSS
+    let platforms: &[(&str, &str, &str, &str, &str)] = &[
+        ("share_facebook", "Share on Facebook",
+         "https://www.facebook.com/sharer/sharer.php?u={url}",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
+         "#1877F2"),
+        ("share_x", "Share on X",
+         "https://x.com/intent/tweet?url={url}&text={title}",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+         "#000"),
+        ("share_linkedin", "Share on LinkedIn",
+         "https://www.linkedin.com/sharing/share-offsite/?url={url}",
+         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
+         "#0A66C2"),
+    ];
 
-    if sg("share_facebook") == "true" {
-        buttons.push(format!(
-            r#"<a href="https://www.facebook.com/sharer/sharer.php?u={url}" target="_blank" rel="noopener" class="share-btn share-facebook" title="Share on Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> Facebook</a>"#,
-            url = encoded_url
+    let mut icons = Vec::new();
+    for &(key, label, url_tpl, icon, color) in platforms {
+        if sg(key) != "true" { continue; }
+        let href = url_tpl.replace("{url}", &encoded_url).replace("{title}", &encoded_title);
+        let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
+        icons.push(format!(
+            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" class=\"share-icon\" title=\"{}\"{}>{}</a>",
+            href, label, style, icon
         ));
     }
 
-    if sg("share_x") == "true" {
-        buttons.push(format!(
-            r#"<a href="https://x.com/intent/tweet?url={url}&text={title}" target="_blank" rel="noopener" class="share-btn share-x" title="Share on X"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> Post</a>"#,
-            url = encoded_url,
-            title = encoded_title
-        ));
-    }
-
-    if sg("share_linkedin") == "true" {
-        buttons.push(format!(
-            r#"<a href="https://www.linkedin.com/sharing/share-offsite/?url={url}" target="_blank" rel="noopener" class="share-btn share-linkedin" title="Share on LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg> LinkedIn</a>"#,
-            url = encoded_url
-        ));
-    }
-
-    if buttons.is_empty() {
+    if icons.is_empty() {
         return String::new();
     }
 
-    format!("<div class=\"share-buttons\">{}</div>", buttons.join("\n"))
+    format!("<div class=\"share-icons\">{}</div>", icons.join("\n"))
 }
 
 /// Build a URL path from a slug prefix and an optional sub-path.
@@ -1432,10 +1563,11 @@ fn render_portfolio_single(context: &Value) -> String {
         html.push_str(&format!(r#"<div class="portfolio-description">{}</div>"#, desc));
     }
 
-    // Share buttons
+    // Share buttons — only inline when position is "below_content"
+    let share_pos = sg("share_icons_position", "below_content");
     let site_url = sg("site_url", "");
     let item_slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-    if !site_url.is_empty() {
+    if share_pos == "below_content" && !site_url.is_empty() {
         let page_url = format!("{}{}", site_url, slug_url(&portfolio_slug, item_slug));
         html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
@@ -1692,10 +1824,11 @@ fn render_blog_single(context: &Value) -> String {
         }
     }
 
-    // Share buttons (Facebook, X, LinkedIn — gated on settings)
+    // Share buttons — only inline when position is "below_content"
+    let share_pos = sg("share_icons_position", "below_content");
     let site_url = sg("site_url", "");
     let post_slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-    if !site_url.is_empty() {
+    if share_pos == "below_content" && !site_url.is_empty() {
         let page_url = format!("{}/{}/{}", site_url, blog_slug, post_slug);
         html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
@@ -2224,45 +2357,64 @@ h6 { font-size: var(--font-size-h6); }
 }
 
 .site-footer {
-    margin-left: var(--sidebar-width);
     padding: 24px var(--grid-gap);
     border-top: 1px solid rgba(0,0,0,.08);
-    text-align: center;
-}
-.site-footer .social-links { justify-content: center; display: flex; gap: 12px; flex-wrap: wrap; }
-.site-footer .social-links a { margin-right: 0; }
-
-.share-buttons {
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin: 20px 0;
-    padding: 16px 0;
-    border-top: 1px solid rgba(0,0,0,.08);
+    align-items: center;
+    gap: 8px;
 }
-.share-btn {
-    display: inline-flex;
+.footer-copyright {
+    font-family: var(--font-captions);
+    font-size: 12px;
+    color: var(--color-text);
+    line-height: 1;
+    white-space: nowrap;
+}
+.footer-copyright a { color: inherit; }
+.footer-social {
+    display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: var(--font-nav);
+}
+.social-icon-footer { display: flex; align-items: center; color: inherit; text-decoration: none; }
+.social-icon-footer svg { width: 14px; height: 14px; }
+
+.share-icons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 16px 0;
+    padding: 12px 0;
+    border-top: 1px solid rgba(0,0,0,.08);
+}
+.share-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text);
     text-decoration: none;
-    color: #fff;
     transition: opacity .2s;
 }
-.share-btn:hover { opacity: .85; }
-.share-facebook { background: #1877F2; }
-.share-x { background: #000; }
-.share-linkedin { background: #0A66C2; }
+.share-icon:hover { opacity: .65; }
 
-/* ── Content ── */
-.content {
+.sidebar-top .share-icons {
+    margin: 16px 0 0;
+    padding: 0;
+    border-top: none;
+}
+
+.content-column {
     margin-left: var(--sidebar-width);
     flex: 1;
-    padding: 0;
+    display: flex;
+    flex-direction: column;
     min-height: 100vh;
+}
+/* ── Content ── */
+.content {
+    flex: 1;
+    padding: 0;
 }
 
 /* ── Portfolio Masonry Grid ── */
