@@ -97,46 +97,38 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
         if !has_copyright && !has_social {
             String::new()
         } else {
-            let mut items = String::new();
+            let copyright_html = if has_copyright {
+                format!("<span class=\"footer-copyright\">{}</span>", copyright_text)
+            } else { String::new() };
+            let social_html = if has_social {
+                format!("<span class=\"footer-social\">{}</span>", social_footer)
+            } else { String::new() };
+
+            let mut left = String::new();
+            let mut center = String::new();
+            let mut right = String::new();
+
+            // Place copyright into its slot
             if has_copyright {
-                let margin = if has_social {
-                    match (copyright_align.as_str(), social_footer_align.as_str()) {
-                        ("left", "right") | ("left", "center") => "",
-                        ("center", "right") => "margin-left:auto;",
-                        ("right", _) => "margin-left:auto;",
-                        _ => "",
-                    }
-                } else {
-                    match copyright_align.as_str() {
-                        "center" => "margin:0 auto;",
-                        "right" => "margin-left:auto;",
-                        _ => "",
-                    }
-                };
-                let style = if margin.is_empty() { String::new() } else { format!(" style=\"{}\"", margin) };
-                items.push_str(&format!("<span class=\"footer-copyright\"{}>{}</span>", style, copyright_text));
+                match copyright_align.as_str() {
+                    "center" => center.push_str(&copyright_html),
+                    "right" => right.push_str(&copyright_html),
+                    _ => left.push_str(&copyright_html),
+                }
             }
+            // Place social into its slot
             if has_social {
-                let margin = if has_copyright {
-                    match (copyright_align.as_str(), social_footer_align.as_str()) {
-                        ("left", "right") => "margin-left:auto;",
-                        ("center", "right") => "",
-                        ("left", "center") => "margin-left:auto;margin-right:auto;",
-                        ("center", "left") => "margin-right:auto;",
-                        ("right", "right") => "",
-                        _ => "",
-                    }
-                } else {
-                    match social_footer_align.as_str() {
-                        "center" => "margin:0 auto;",
-                        "right" => "margin-left:auto;",
-                        _ => "",
-                    }
-                };
-                let style = if margin.is_empty() { String::new() } else { format!(" style=\"{}\"", margin) };
-                items.push_str(&format!("<span class=\"footer-social\"{}>{}</span>", style, social_footer));
+                match social_footer_align.as_str() {
+                    "center" => center.push_str(&social_html),
+                    "right" => right.push_str(&social_html),
+                    _ => left.push_str(&social_html),
+                }
             }
-            items
+
+            format!(
+                "<div class=\"footer-cell footer-left\">{}</div><div class=\"footer-cell footer-center\">{}</div><div class=\"footer-cell footer-right\">{}</div>",
+                left, center, right
+            )
         }
     };
 
@@ -2298,10 +2290,15 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
 .site-footer {
     padding: 24px var(--grid-gap);
     border-top: 1px solid rgba(0,0,0,.08);
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 8px;
 }
+.footer-cell { display: flex; align-items: center; gap: 8px; }
+.footer-left { justify-self: start; }
+.footer-center { justify-self: center; }
+.footer-right { justify-self: end; }
 .footer-copyright {
     font-family: var(--font-footer, var(--font-captions));
     font-size: var(--font-size-footer, 12px);
