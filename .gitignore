@@ -11,10 +11,11 @@ Thumbs.db
 *.db-shm
 *.db-wal
 
-website/db/
-website/uploads/
-website/models/
-website/site/models/
+website/db/*
+website/uploads/*
+website/site/uploads/*
+website/models/*
+website/site/models/*
 website/site/db/velocty.db
 GeoLite2-City.mmdb
 
