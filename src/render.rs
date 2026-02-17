@@ -279,6 +279,12 @@ fn render_from_design(pool: &DbPool, tmpl: &DesignTemplate, context: &Value) -> 
 fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> String {
     let settings = context.get("settings").cloned().unwrap_or_default();
 
+    // Load design CSS from active design in DB, fallback to hardcoded constant
+    let active_design_css = Design::active(pool)
+        .map(|d| d.style_css)
+        .filter(|css| !css.trim().is_empty())
+        .unwrap_or_else(|| ONEGUY_DESIGN_CSS.to_string());
+
     // Build CSS variables from settings
     let css_vars = typography::build_css_variables(&settings);
 
@@ -498,7 +504,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         font_links = font_links,
         css_vars = css_vars,
         base_css = BASE_CSS,
-        design_css = ONEGUY_DESIGN_CSS,
+        design_css = active_design_css,
         logo_html = build_logo_html(&settings),
         logo_html_mobile = build_logo_html(&settings),
         site_name = html_escape(site_name),
@@ -547,6 +553,12 @@ pub fn render_legal_page(
     let settings_json = serde_json::to_value(settings).unwrap_or_default();
     let css_vars = typography::build_css_variables(&settings_json);
     let social_html = build_social_links(&settings_json);
+
+    // Load design CSS from active design in DB, fallback to hardcoded constant
+    let active_design_css = Design::active(pool)
+        .map(|d| d.style_css)
+        .filter(|css| !css.trim().is_empty())
+        .unwrap_or_else(|| ONEGUY_DESIGN_CSS.to_string());
 
     let site_name = settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty");
     let site_tagline = settings.get("site_caption").map(|s| s.as_str()).unwrap_or("");
@@ -634,7 +646,7 @@ pub fn render_legal_page(
         font_links = font_links,
         css_vars = css_vars,
         base_css = BASE_CSS,
-        design_css = ONEGUY_DESIGN_CSS,
+        design_css = active_design_css,
         categories_html = categories_html,
         social_html = social_html,
         footer_legal_links = build_footer_legal_links(&settings_json),

@@ -2,6 +2,8 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 
+use crate::render::ONEGUY_DESIGN_CSS;
+
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 pub fn init_pool() -> Result<DbPool, Box<dyn std::error::Error>> {
@@ -766,7 +768,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     if design_count == 0 {
         conn.execute(
             "INSERT INTO designs (name, slug, description, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 1)",
-            params!["Oneguy", "oneguy", "A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself.", "", ""],
+            params!["Oneguy", "oneguy", "A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself.", "", ONEGUY_DESIGN_CSS],
         )?;
     }
 
@@ -924,6 +926,12 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute(
         "UPDATE designs SET description = ?1 WHERE slug = 'oneguy' AND description = ''",
         params!["A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself."],
+    )?;
+
+    // Backfill Oneguy style_css if empty (migrating from hardcoded to DB-driven)
+    conn.execute(
+        "UPDATE designs SET style_css = ?1 WHERE slug = 'oneguy' AND (style_css = '' OR style_css IS NULL)",
+        params![ONEGUY_DESIGN_CSS],
     )?;
 
     // Rename "Default" design to "Oneguy" and set slug
