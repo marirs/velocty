@@ -235,6 +235,7 @@ fn render_from_design(pool: &DbPool, tmpl: &DesignTemplate, context: &Value) -> 
     {favicon_link}
 {font_links}    <style>
         {css_vars}
+        {base_css}
         {design_css}
     </style>
 </head>
@@ -252,6 +253,7 @@ fn render_from_design(pool: &DbPool, tmpl: &DesignTemplate, context: &Value) -> 
         favicon_link = favicon_link,
         font_links = font_links,
         css_vars = css_vars,
+        base_css = BASE_CSS,
         design_css = tmpl.style_css,
         body_html = html,
         back_to_top = back_to_top,
@@ -447,6 +449,7 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
 {font_links}    <style>
         {css_vars}
         {base_css}
+        {design_css}
     </style>
 </head>
 <body data-click-mode="{click_mode}" data-show-likes="{show_likes}" data-show-categories="{show_cats}" data-show-tags="{show_tags}" data-fade-animation="{fade_anim}" data-display-type="{display_type}" data-pagination-type="{pagination_type}" data-lb-show-title="{lb_show_title}" data-lb-show-tags="{lb_show_tags}" data-lb-nav="{lb_nav}" data-lb-keyboard="{lb_keyboard}">
@@ -494,7 +497,8 @@ fn render_page_default(pool: &DbPool, template_type: &str, context: &Value) -> S
         favicon_link = build_favicon_link(&settings),
         font_links = font_links,
         css_vars = css_vars,
-        base_css = DEFAULT_CSS,
+        base_css = BASE_CSS,
+        design_css = ONEGUY_DESIGN_CSS,
         logo_html = build_logo_html(&settings),
         logo_html_mobile = build_logo_html(&settings),
         site_name = html_escape(site_name),
@@ -571,6 +575,7 @@ pub fn render_legal_page(
 {font_links}    <style>
         {css_vars}
         {base_css}
+        {design_css}
         .legal-content {{
             max-width: 780px;
             padding: 40px 24px;
@@ -628,7 +633,8 @@ pub fn render_legal_page(
         logo_html = build_logo_html(&settings_json),
         font_links = font_links,
         css_vars = css_vars,
-        base_css = DEFAULT_CSS,
+        base_css = BASE_CSS,
+        design_css = ONEGUY_DESIGN_CSS,
         categories_html = categories_html,
         social_html = social_html,
         footer_legal_links = build_footer_legal_links(&settings_json),
@@ -2187,7 +2193,9 @@ const IMAGE_PROTECTION_JS: &str = r#"<script>
 })();
 </script>"#;
 
-const DEFAULT_CSS: &str = r#"
+/// Universal base CSS — shared across all designs. Stays in binary.
+/// Contains: reset, body, typography, lightbox, comments, pagination, error, share icons.
+pub const BASE_CSS: &str = r#"
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -2209,6 +2217,132 @@ h4 { font-size: var(--font-size-h4); }
 h5 { font-size: var(--font-size-h5); }
 h6 { font-size: var(--font-size-h6); }
 
+/* ── Lightbox ── */
+.lightbox-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.lightbox-overlay.active { display: flex; }
+
+.lb-content {
+    text-align: center;
+    max-width: 80vw;
+    max-height: 85vh;
+}
+
+.lb-image {
+    max-width: 80vw;
+    max-height: 78vh;
+    object-fit: contain;
+    border: 8px solid var(--lightbox-border-color);
+}
+
+.lb-title {
+    color: var(--lightbox-title-color);
+    font-family: var(--font-captions);
+    font-size: 14px;
+    margin-top: 12px;
+}
+
+.lb-tags {
+    color: var(--lightbox-tag-color);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.lb-close {
+    position: absolute;
+    top: 16px; right: 20px;
+    background: none; border: none;
+    color: #fff; font-size: 32px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.lb-close:hover { opacity: 1; }
+
+.lb-prev, .lb-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--lightbox-nav-color);
+    opacity: 0.5;
+    font-size: 48px;
+    cursor: pointer;
+    padding: 20px;
+}
+.lb-prev:hover, .lb-next:hover { opacity: 1; }
+.lb-prev { left: 8px; }
+.lb-next { right: 8px; }
+
+/* ── Share Icons ── */
+.share-icons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 16px 0;
+    padding: 12px 0;
+    border-top: 1px solid rgba(0,0,0,.08);
+}
+.share-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text);
+    text-decoration: none;
+    transition: opacity .2s;
+}
+.share-icon:hover { opacity: .65; }
+
+/* ── Comments ── */
+.comments { margin-top: 40px; }
+.comments h3 { margin-bottom: 16px; font-size: 16px; }
+.comment { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.comment strong { font-size: 14px; }
+.comment time { font-size: 11px; color: var(--color-text-secondary); margin-left: 8px; }
+.comment p { margin-top: 4px; font-size: 14px; }
+
+.comment-form { margin-top: 30px; }
+.comment-form input, .comment-form textarea {
+    display: block; width: 100%; max-width: 500px;
+    padding: 8px 12px; margin-bottom: 12px;
+    border: 1px solid #ddd; border-radius: 3px;
+    font-family: inherit; font-size: 14px;
+}
+.comment-form textarea { min-height: 100px; resize: vertical; }
+.comment-form button {
+    font-family: var(--font-buttons);
+    padding: 8px 24px; background: var(--color-accent);
+    color: #fff; border: none; border-radius: 3px;
+    cursor: pointer; font-size: 14px;
+}
+
+/* ── Pagination ── */
+.pagination { display: flex; gap: 8px; padding: 20px 30px; }
+.pagination a, .pagination .current {
+    font-family: var(--font-buttons);
+    padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px;
+    text-decoration: none; color: var(--color-text); font-size: 13px;
+}
+.pagination .current { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+
+/* ── Error ── */
+.error-page { padding: 60px 30px; text-align: center; }
+.error-page h1 { font-size: 72px; color: var(--color-text-secondary); }
+.error-page p { margin-top: 12px; color: var(--color-text-secondary); }
+.error-page a { color: var(--color-accent); text-decoration: none; }
+"#;
+
+/// Oneguy design CSS — layout-specific, seeded into DB on first run.
+/// Contains: sidebar, nav, footer, grids, blog, portfolio, mobile.
+pub const ONEGUY_DESIGN_CSS: &str = r#"
 .site-wrapper {
     display: flex;
     min-height: 100vh;
@@ -2379,25 +2513,6 @@ h6 { font-size: var(--font-size-h6); }
 .social-icon-footer { display: flex; align-items: center; color: inherit; text-decoration: none; }
 .social-icon-footer svg { width: 14px; height: 14px; }
 
-.share-icons {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin: 16px 0;
-    padding: 12px 0;
-    border-top: 1px solid rgba(0,0,0,.08);
-}
-.share-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text);
-    text-decoration: none;
-    transition: opacity .2s;
-}
-.share-icon:hover { opacity: .65; }
-
 .sidebar-top .share-icons {
     margin: 16px 0 0;
     padding: 0;
@@ -2471,70 +2586,6 @@ h6 { font-size: var(--font-size-h6); }
 }
 .item-tags a { color: var(--color-text-secondary); text-decoration: none; }
 .item-tags a:hover { text-decoration: underline; }
-
-/* ── Lightbox ── */
-.lightbox-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.88);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-}
-
-.lightbox-overlay.active { display: flex; }
-
-.lb-content {
-    text-align: center;
-    max-width: 80vw;
-    max-height: 85vh;
-}
-
-.lb-image {
-    max-width: 80vw;
-    max-height: 78vh;
-    object-fit: contain;
-    border: 8px solid var(--lightbox-border-color);
-}
-
-.lb-title {
-    color: var(--lightbox-title-color);
-    font-family: var(--font-captions);
-    font-size: 14px;
-    margin-top: 12px;
-}
-
-.lb-tags {
-    color: var(--lightbox-tag-color);
-    font-size: 12px;
-    margin-top: 4px;
-}
-
-.lb-close {
-    position: absolute;
-    top: 16px; right: 20px;
-    background: none; border: none;
-    color: #fff; font-size: 32px;
-    cursor: pointer;
-    opacity: 0.7;
-}
-.lb-close:hover { opacity: 1; }
-
-.lb-prev, .lb-next {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none; border: none;
-    color: var(--lightbox-nav-color);
-    opacity: 0.5;
-    font-size: 48px;
-    cursor: pointer;
-    padding: 20px;
-}
-.lb-prev:hover, .lb-next:hover { opacity: 1; }
-.lb-prev { left: 8px; }
-.lb-next { right: 8px; }
 
 /* ── Journal / Blog List ── */
 .blog-list {
@@ -2747,44 +2798,6 @@ h6 { font-size: var(--font-size-h6); }
     text-align: justify;
     margin-top: 16px;
 }
-
-/* ── Comments ── */
-.comments { margin-top: 40px; }
-.comments h3 { margin-bottom: 16px; font-size: 16px; }
-.comment { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.06); }
-.comment strong { font-size: 14px; }
-.comment time { font-size: 11px; color: var(--color-text-secondary); margin-left: 8px; }
-.comment p { margin-top: 4px; font-size: 14px; }
-
-.comment-form { margin-top: 30px; }
-.comment-form input, .comment-form textarea {
-    display: block; width: 100%; max-width: 500px;
-    padding: 8px 12px; margin-bottom: 12px;
-    border: 1px solid #ddd; border-radius: 3px;
-    font-family: inherit; font-size: 14px;
-}
-.comment-form textarea { min-height: 100px; resize: vertical; }
-.comment-form button {
-    font-family: var(--font-buttons);
-    padding: 8px 24px; background: var(--color-accent);
-    color: #fff; border: none; border-radius: 3px;
-    cursor: pointer; font-size: 14px;
-}
-
-/* ── Pagination ── */
-.pagination { display: flex; gap: 8px; padding: 20px 30px; }
-.pagination a, .pagination .current {
-    font-family: var(--font-buttons);
-    padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px;
-    text-decoration: none; color: var(--color-text); font-size: 13px;
-}
-.pagination .current { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
-
-/* ── Error ── */
-.error-page { padding: 60px 30px; text-align: center; }
-.error-page h1 { font-size: 72px; color: var(--color-text-secondary); }
-.error-page p { margin-top: 12px; color: var(--color-text-secondary); }
-.error-page a { color: var(--color-accent); text-decoration: none; }
 
 /* ── Mobile Menu ── */
 .mobile-header {

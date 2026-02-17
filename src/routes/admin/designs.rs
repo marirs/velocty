@@ -39,9 +39,9 @@ pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Adm
 
 // ── Design Overview (live preview) ───────────────────────
 
-#[get("/designer/<id>")]
-pub fn design_overview(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Option<Template> {
-    let design = Design::find_by_id(pool, id)?;
+#[get("/designer/<design_slug>")]
+pub fn design_overview(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, design_slug: String) -> Option<Template> {
+    let design = Design::find_by_slug(pool, &design_slug)?;
 
     let context = json!({
         "page_title": format!("Design: {}", design.name),

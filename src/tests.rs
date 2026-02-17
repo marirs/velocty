@@ -1248,7 +1248,7 @@ fn user_list_paginated() {
 fn design_crud() {
     let pool = test_pool();
 
-    // seed_defaults creates a "Default" design, so count starts at 1
+    // seed_defaults creates an "Oneguy" design, so count starts at 1
     let baseline = Design::list(&pool).len();
 
     let id = Design::create(&pool, "Custom Theme").unwrap();
@@ -1256,7 +1256,12 @@ fn design_crud() {
 
     let design = Design::find_by_id(&pool, id).unwrap();
     assert_eq!(design.name, "Custom Theme");
+    assert_eq!(design.slug, "custom-theme");
     assert!(!design.is_active);
+
+    // Find by slug
+    let by_slug = Design::find_by_slug(&pool, "custom-theme").unwrap();
+    assert_eq!(by_slug.id, id);
 
     // List
     assert_eq!(Design::list(&pool).len(), baseline + 1);
@@ -1301,6 +1306,7 @@ fn design_duplicate() {
 
     let dup_design = Design::find_by_id(&pool, dup).unwrap();
     assert_eq!(dup_design.name, "Copy of Original");
+    assert_eq!(dup_design.slug, "copy-of-original");
 
     // Templates should be duplicated
     let templates = DesignTemplate::for_design(&pool, dup);

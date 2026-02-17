@@ -161,6 +161,7 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         CREATE TABLE IF NOT EXISTS designs (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
+            slug TEXT NOT NULL DEFAULT '',
             layout_html TEXT NOT NULL DEFAULT '',
             style_css TEXT NOT NULL DEFAULT '',
             thumbnail_path TEXT,
@@ -763,8 +764,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
 
     if design_count == 0 {
         conn.execute(
-            "INSERT INTO designs (name, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, 1)",
-            params!["Default", "", ""],
+            "INSERT INTO designs (name, slug, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, 1)",
+            params!["Oneguy", "oneguy", "", ""],
         )?;
     }
 
@@ -901,6 +902,44 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
 
     // Migrate any "suspended" status to "locked" (suspend concept removed)
     conn.execute_batch("UPDATE users SET status = 'locked' WHERE status = 'suspended';")?;
+
+    // Add slug column to designs if missing
+    let has_design_slug: bool = conn
+        .prepare("SELECT slug FROM designs LIMIT 0")
+        .is_ok();
+    if !has_design_slug {
+        conn.execute_batch("ALTER TABLE designs ADD COLUMN slug TEXT NOT NULL DEFAULT '';")?;
+    }
+
+    // Rename "Default" design to "Oneguy" and set slug
+    conn.execute(
+        "UPDATE designs SET name = 'Oneguy', slug = 'oneguy' WHERE name = 'Default' AND slug = ''",
+        [],
+    )?;
+
+    // Backfill empty slugs from name (lowercase, spaces→hyphens, strip non-alnum)
+    {
+        let mut stmt = conn.prepare("SELECT id, name FROM designs WHERE slug = ''")?;
+        let rows: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        for (id, name) in rows {
+            let slug: String = name
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .split('-')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>()
+                .join("-");
+            conn.execute(
+                "UPDATE designs SET slug = ?1 WHERE id = ?2",
+                params![slug, id],
+            )?;
+        }
+    }
 
     Ok(())
 }

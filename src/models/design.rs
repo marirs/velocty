@@ -8,6 +8,7 @@ use crate::db::DbPool;
 pub struct Design {
     pub id: i64,
     pub name: String,
+    pub slug: String,
     pub layout_html: String,
     pub style_css: String,
     pub thumbnail_path: Option<String>,
@@ -33,6 +34,7 @@ impl Design {
         Ok(Design {
             id: row.get("id")?,
             name: row.get("name")?,
+            slug: row.get::<_, Option<String>>("slug")?.unwrap_or_default(),
             layout_html: row.get("layout_html")?,
             style_css: row.get("style_css")?,
             thumbnail_path: row.get("thumbnail_path")?,
@@ -88,11 +90,33 @@ impl Design {
         Ok(())
     }
 
+    pub fn find_by_slug(pool: &DbPool, slug: &str) -> Option<Self> {
+        let conn = pool.get().ok()?;
+        conn.query_row(
+            "SELECT * FROM designs WHERE slug = ?1",
+            params![slug],
+            Self::from_row,
+        )
+        .ok()
+    }
+
+    pub fn slugify(name: &str) -> String {
+        name.to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>()
+            .join("-")
+    }
+
     pub fn create(pool: &DbPool, name: &str) -> Result<i64, String> {
+        let slug = Self::slugify(name);
         let conn = pool.get().map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT INTO designs (name, layout_html, style_css) VALUES (?1, '', '')",
-            params![name],
+            "INSERT INTO designs (name, slug, layout_html, style_css) VALUES (?1, ?2, '', '')",
+            params![name, slug],
         )
         .map_err(|e| e.to_string())?;
         Ok(conn.last_insert_rowid())
@@ -100,11 +124,12 @@ impl Design {
 
     pub fn duplicate(pool: &DbPool, id: i64, new_name: &str) -> Result<i64, String> {
         let original = Self::find_by_id(pool, id).ok_or("Design not found")?;
+        let slug = Self::slugify(new_name);
         let conn = pool.get().map_err(|e| e.to_string())?;
 
         conn.execute(
-            "INSERT INTO designs (name, layout_html, style_css) VALUES (?1, ?2, ?3)",
-            params![new_name, original.layout_html, original.style_css],
+            "INSERT INTO designs (name, slug, layout_html, style_css) VALUES (?1, ?2, ?3, ?4)",
+            params![new_name, slug, original.layout_html, original.style_css],
         )
         .map_err(|e| e.to_string())?;
 

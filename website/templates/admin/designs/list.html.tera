@@ -9,7 +9,7 @@
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:24px">
     {% for design in designs %}
-    <div class="design-card-lg {% if design.is_active %}active{% endif %}" style="cursor:pointer;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;overflow:hidden;transition:box-shadow .2s,border-color .2s" onclick="if(!event.target.closest('button,form'))window.location='/{{ admin_slug }}/designer/{{ design.id }}'">
+    <div class="design-card-lg {% if design.is_active %}active{% endif %}" style="cursor:pointer;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;overflow:hidden;transition:box-shadow .2s,border-color .2s" onclick="if(!event.target.closest('button,form'))window.location='/{{ admin_slug }}/designer/{{ design.slug }}'">
         <!-- Live site preview -->
         <div style="position:relative;width:100%;height:280px;overflow:hidden;background:#1a1a1a">
             <iframe src="/" style="width:1280px;height:900px;border:none;transform:scale(0.3);transform-origin:top left;pointer-events:none;position:absolute;top:0;left:0"></iframe>
@@ -30,7 +30,7 @@
                     <button type="submit" class="btn btn-sm btn-primary">Activate</button>
                 </form>
                 {% endif %}
-                <button class="btn btn-sm" onclick="window.location='/{{ admin_slug }}/designer/{{ design.id }}'">
+                <button class="btn btn-sm" onclick="window.location='/{{ admin_slug }}/designer/{{ design.slug }}'">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     Customize
                 </button>
