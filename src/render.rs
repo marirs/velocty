@@ -46,16 +46,33 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
 
     // ── Navigation ──
     let nav_cats_mode = sg("portfolio_nav_categories", "under_link");
-    let show_cats_enabled = sg("portfolio_show_categories", "true") == "true";
     let header_type_early = sg("layout_header_type", "sidebar");
-    let cats_start_open = header_type_early != "topbar";
-    let categories_html = if show_cats_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
-        build_categories_sidebar(context, cats_start_open)
-    } else { String::new() };
-
     let portfolio_slug = sg("portfolio_slug", "portfolio");
     let portfolio_label = sg("portfolio_label", "experiences");
     let portfolio_enabled = sg("portfolio_enabled", "false") == "true";
+
+    // categories_html: inline in nav (under_link for sidebar, submenu for topbar)
+    let categories_html = if portfolio_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
+        let start_open = nav_cats_mode == "under_link"; // sidebar under_link starts open, topbar submenu starts closed
+        build_categories_sidebar(context, start_open)
+    } else { String::new() };
+
+    // categories_page_top: rendered at top of portfolio page content (sidebar only)
+    let categories_page_top = if portfolio_enabled && nav_cats_mode == "page_top" {
+        let align = sg("portfolio_nav_categories_align", "left");
+        build_categories_page_top(context, &portfolio_slug, &align)
+    } else { String::new() };
+
+    // categories_below_menu: horizontal row below topbar nav (topbar only)
+    let categories_below_menu = if portfolio_enabled && nav_cats_mode == "below_menu" {
+        build_categories_below_menu(context, &portfolio_slug)
+    } else { String::new() };
+
+    // Portfolio nav-link: only show when categories don't replace it
+    // under_link and submenu use the category toggle AS the portfolio link → skip nav-link
+    // page_top, below_menu, hidden → show portfolio as normal nav-link
+    let portfolio_in_nav = portfolio_enabled && (nav_cats_mode == "hidden" || nav_cats_mode == "page_top" || nav_cats_mode == "below_menu");
+
     let blog_slug = sg("blog_slug", "journal");
     let blog_label = sg("blog_label", "journal");
     let blog_enabled = sg("journal_enabled", "true") != "false";
@@ -63,7 +80,7 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     let contact_enabled = sg("contact_page_enabled", "false") == "true";
 
     let mut nav_links = String::new();
-    if portfolio_enabled && categories_html.is_empty() {
+    if portfolio_in_nav {
         nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
             slug_url(&portfolio_slug, ""), html_escape(&portfolio_label)));
     }
@@ -205,6 +222,7 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{site_name}}", &html_escape(site_name));
     html = html.replace("{{tagline}}", &html_escape(site_tagline));
     html = html.replace("{{categories_html}}", &categories_html);
+    html = html.replace("{{categories_below_menu}}", &categories_below_menu);
     html = html.replace("{{nav_links}}", &nav_links);
     html = html.replace("{{share_sidebar}}", &share_sidebar);
     let custom_sidebar = if is_topbar { String::new() } else { build_custom_sidebar_html(&settings) };
@@ -212,7 +230,12 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{social_sidebar}}", &social_sidebar);
     let legal_links = if is_topbar { String::new() } else { build_footer_legal_links(&settings) };
     html = html.replace("{{footer_legal_links}}", &legal_links);
-    html = html.replace("{{body_content}}", &body_html);
+    let body_with_cats = if categories_page_top.is_empty() {
+        body_html.clone()
+    } else {
+        format!("{}{}", categories_page_top, body_html)
+    };
+    html = html.replace("{{body_content}}", &body_with_cats);
     html = html.replace("{{footer_inner}}", &footer_inner);
     html = html.replace("{{back_to_top}}", &build_back_to_top(&settings));
     html = html.replace("{{lightbox_js}}", LIGHTBOX_JS);
@@ -532,6 +555,81 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
         html.push_str("</div></div>\n");
     }
 
+    html
+}
+
+/// Page Top mode: horizontal category links at the top of portfolio content area (sidebar layout)
+fn build_categories_page_top(context: &Value, portfolio_slug: &str, align: &str) -> String {
+    let categories = match context.get("categories") {
+        Some(Value::Array(cats)) => cats,
+        _ => return String::new(),
+    };
+    if categories.is_empty() { return String::new(); }
+
+    let active_slug = context
+        .get("active_category")
+        .and_then(|c| c.get("slug"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+
+    let align_cls = if align == "right" { " cats-right" } else { "" };
+    let mut html = format!("<div class=\"categories-page-top{}\">", align_cls);
+
+    let all_active = if active_slug.is_empty() { " active" } else { "" };
+    html.push_str(&format!(
+        "<a href=\"{}\" class=\"cat-link{}\">All</a>",
+        slug_url(portfolio_slug, ""), all_active
+    ));
+
+    for cat in categories {
+        let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        if slug.is_empty() { continue; }
+        let active_class = if slug == active_slug { " active" } else { "" };
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
+            slug_url(portfolio_slug, &format!("category/{}", slug)), active_class, html_escape(name)
+        ));
+    }
+
+    html.push_str("</div>");
+    html
+}
+
+/// Below Main Menu mode: horizontal category links below the topbar navigation (topbar layout)
+fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String {
+    let categories = match context.get("categories") {
+        Some(Value::Array(cats)) => cats,
+        _ => return String::new(),
+    };
+    if categories.is_empty() { return String::new(); }
+
+    let active_slug = context
+        .get("active_category")
+        .and_then(|c| c.get("slug"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+
+    let mut html = String::from("<div class=\"categories-below-menu\">");
+
+    let all_active = if active_slug.is_empty() { " active" } else { "" };
+    html.push_str(&format!(
+        "<a href=\"{}\" class=\"cat-link{}\">All</a>",
+        slug_url(portfolio_slug, ""), all_active
+    ));
+
+    for cat in categories {
+        let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        if slug.is_empty() { continue; }
+        let active_class = if slug == active_slug { " active" } else { "" };
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
+            slug_url(portfolio_slug, &format!("category/{}", slug)), active_class, html_escape(name)
+        ));
+    }
+
+    html.push_str("</div>");
     html
 }
 
@@ -2197,6 +2295,7 @@ pub const ONEGUY_TOPBAR_SHELL_HTML: &str = r#"<!DOCTYPE html>
             </button>
         </div>
     </header>
+    {{categories_below_menu}}
     <div class="topbar-page{{wrapper_classes}}">
         <main class="content">
             {{body_content}}
@@ -2898,6 +2997,61 @@ body.topbar-layout .site-wrapper { display: none; }
     margin: 0;
     padding: 0;
     border: none;
+}
+
+/* Page Top categories (sidebar layout) */
+.categories-page-top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 0 16px;
+    font-family: var(--font-nav);
+    font-size: 13px;
+}
+.categories-page-top.cats-right {
+    justify-content: flex-end;
+}
+.categories-page-top .cat-link {
+    padding: 4px 12px;
+    color: var(--color-text);
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+}
+.categories-page-top .cat-link:hover {
+    color: var(--color-accent);
+    background: rgba(0,0,0,.04);
+}
+.categories-page-top .cat-link.active {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+/* Below Main Menu categories (topbar layout) */
+.categories-below-menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 32px 10px;
+    font-family: var(--font-nav);
+    font-size: 12px;
+    background: var(--color-bg);
+    border-bottom: 1px solid rgba(0,0,0,.05);
+}
+.categories-below-menu .cat-link {
+    padding: 3px 10px;
+    color: var(--color-text-secondary, var(--color-text));
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+}
+.categories-below-menu .cat-link:hover {
+    color: var(--color-accent);
+    background: rgba(0,0,0,.04);
+}
+.categories-below-menu .cat-link.active {
+    color: var(--color-accent);
+    font-weight: 600;
 }
 
 /* Submenu dropdown for categories */

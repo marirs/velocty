@@ -614,11 +614,19 @@
                     </div>
                     <div class="cz-field">
                         <label>Portfolio Category Filters</label>
-                        <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories" id="portfolio-nav-categories">
+                        <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories" id="portfolio-nav-categories" onchange="czConditions()">
                             <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
-                            <option value="under_link" {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
-                            <option value="page_top" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
+                            <option value="under_link" data-sidebar-only {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
+                            <option value="page_top" data-sidebar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
                             <option value="submenu" data-topbar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "submenu" %}selected{% endif %}>Sub-menu</option>
+                            <option value="below_menu" data-topbar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "below_menu" %}selected{% endif %}>Below Main Menu</option>
+                        </select>
+                    </div>
+                    <div class="cz-field" data-cz-show="portfolio_nav_categories=page_top" id="page-top-align-field">
+                        <label>Page Top Alignment</label>
+                        <select name="portfolio_nav_categories_align" data-setting="portfolio_nav_categories_align">
+                            <option value="left" {% if not settings.portfolio_nav_categories_align is defined or settings.portfolio_nav_categories_align == "left" %}selected{% endif %}>Left</option>
+                            <option value="right" {% if settings.portfolio_nav_categories_align is defined and settings.portfolio_nav_categories_align == "right" %}selected{% endif %}>Right</option>
                         </select>
                     </div>
                     {% endif %}
@@ -1006,13 +1014,27 @@ function czConditions() {
             el.style.display = (field.value === parts[1]) ? '' : 'none';
         }
     });
-    // Show/hide topbar-only options in dropdowns
+    // Show/hide header-type-specific options in dropdowns
     var headerType = document.querySelector('[data-setting="layout_header_type"]');
     var isTopbar = headerType && headerType.value === 'topbar';
+    var isSidebar = !isTopbar;
+    // Hide topbar-only options when sidebar, hide sidebar-only options when topbar
     document.querySelectorAll('option[data-topbar-only]').forEach(function(opt) {
         opt.style.display = isTopbar ? '' : 'none';
-        if (!isTopbar && opt.selected) {
-            opt.parentElement.value = opt.parentElement.options[0].value;
+    });
+    document.querySelectorAll('option[data-sidebar-only]').forEach(function(opt) {
+        opt.style.display = isSidebar ? '' : 'none';
+    });
+    // If current selected option is now hidden, reset to first visible option
+    document.querySelectorAll('select').forEach(function(sel) {
+        var selected = sel.options[sel.selectedIndex];
+        if (selected && selected.style.display === 'none') {
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].style.display !== 'none') {
+                    sel.value = sel.options[i].value;
+                    break;
+                }
+            }
         }
     });
 }
