@@ -1918,3 +1918,434 @@ fn all_tables_exist() {
         assert!(count >= 0, "Table '{}' query failed", table);
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+// Render: Category Filters
+// ═══════════════════════════════════════════════════════════
+
+use crate::render;
+use serde_json::json;
+
+/// Helper: set multiple settings in one go for render tests.
+fn set_settings(pool: &DbPool, pairs: &[(&str, &str)]) {
+    for &(k, v) in pairs {
+        Setting::set(pool, k, v).unwrap();
+    }
+}
+
+/// Helper: extract the HTML body (after </style>) to avoid matching CSS selectors.
+fn body_html(full: &str) -> &str {
+    full.rfind("</style>").map(|i| &full[i..]).unwrap_or(full)
+}
+
+/// Helper: build a minimal portfolio_grid context with categories.
+fn render_context(pool: &DbPool) -> serde_json::Value {
+    let settings = Setting::all(pool);
+    let categories = Category::list(pool, Some("portfolio"));
+    json!({
+        "settings": settings,
+        "items": [],
+        "categories": categories,
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    })
+}
+
+#[test]
+fn render_sidebar_under_link_has_toggle_open() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("layout_header_type", "sidebar"),
+        ("portfolio_nav_categories", "under_link"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // Toggle should have "open" class (sidebar under_link starts open)
+    assert!(html.contains("nav-category-toggle open"), "under_link toggle should start open");
+    // Subcategories div should also be open
+    assert!(html.contains("nav-subcategories open"), "under_link subcategories should start open");
+    // "All" link present
+    assert!(html.contains(">All</a>"), "should have 'All' category link");
+    // Category link present
+    assert!(html.contains(">Flights</a>"), "should have 'Flights' category link");
+    // Portfolio should NOT appear as a separate nav-link (the toggle replaces it)
+    assert!(!html.contains("class=\"nav-link\">Experiences</a>"),
+        "under_link: portfolio should not be a separate nav-link");
+}
+
+#[test]
+fn render_sidebar_page_top_has_horizontal_cats() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Nature", "nature", "portfolio")).unwrap();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("layout_header_type", "sidebar"),
+        ("portfolio_nav_categories", "page_top"),
+        ("portfolio_nav_categories_align", "left"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // Page top categories div present
+    assert!(html.contains("categories-page-top"), "should have page-top categories");
+    // No right alignment class in the body HTML (not CSS)
+    let body = body_html(&html);
+    assert!(!body.contains("cats-right"), "left align should not have cats-right class");
+    // Portfolio should appear as a normal nav-link
+    assert!(html.contains("class=\"nav-link\">experiences</a>") || html.contains("class=\"nav-link\">Experiences</a>"),
+        "page_top: portfolio should be a normal nav-link");
+}
+
+#[test]
+fn render_sidebar_page_top_right_alignment() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Travel", "travel", "portfolio")).unwrap();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("layout_header_type", "sidebar"),
+        ("portfolio_nav_categories", "page_top"),
+        ("portfolio_nav_categories_align", "right"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("categories-page-top cats-right"), "right align should have cats-right class");
+}
+
+#[test]
+fn render_topbar_submenu_no_duplicate_portfolio() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("layout_header_type", "topbar"),
+        ("portfolio_nav_categories", "submenu"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // Should use topbar shell
+    assert!(html.contains("topbar-layout"), "should use topbar body class");
+    // Toggle should NOT have "open" class (topbar submenu starts closed)
+    assert!(!html.contains("nav-category-toggle open"), "submenu toggle should start closed");
+    // Portfolio should NOT appear as a separate nav-link
+    let nav_link_count = html.matches("class=\"nav-link\"").count();
+    // Only blog (journal) should be a nav-link, not portfolio
+    assert!(!html.contains("nav-link\">experiences</a>"),
+        "submenu: portfolio should not be a separate nav-link");
+    // But the toggle should show the portfolio label
+    assert!(html.contains("<span>experiences</span>"), "submenu toggle should show portfolio label");
+}
+
+#[test]
+fn render_topbar_below_menu_has_category_row() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("layout_header_type", "topbar"),
+        ("portfolio_nav_categories", "below_menu"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // Below menu categories div present
+    assert!(html.contains("categories-below-menu"), "should have below-menu categories");
+    // Portfolio should appear as a normal nav-link
+    assert!(html.contains("nav-link\">experiences</a>"),
+        "below_menu: portfolio should be a normal nav-link");
+    // All + Flights links in the below-menu div
+    assert!(html.contains(">All</a>"), "below-menu should have All link");
+    assert!(html.contains(">Flights</a>"), "below-menu should have Flights link");
+}
+
+#[test]
+fn render_hidden_categories_no_output() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
+    set_settings(&pool, &[
+        ("portfolio_enabled", "true"),
+        ("layout_header_type", "sidebar"),
+        ("portfolio_nav_categories", "hidden"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // No category HTML at all (check body only, CSS has these class names)
+    let body = body_html(&html);
+    assert!(!body.contains("class=\"nav-category-group"), "hidden: no category group");
+    assert!(!body.contains("class=\"categories-page-top"), "hidden: no page-top categories");
+    assert!(!body.contains("class=\"categories-below-menu"), "hidden: no below-menu categories");
+    // Portfolio should appear as a normal nav-link
+    assert!(html.contains("nav-link\">experiences</a>"),
+        "hidden: portfolio should be a normal nav-link");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render: Social Icons
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_social_links_in_sidebar() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("social_icons_position", "sidebar"),
+        ("social_instagram", "https://instagram.com/test"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("class=\"social-links\""), "should have social-links div");
+    assert!(html.contains("instagram.com/test"), "should have instagram link");
+    assert!(html.contains("title=\"Instagram\""), "should have Instagram title");
+}
+
+#[test]
+fn render_social_brand_colors() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("social_icons_position", "sidebar"),
+        ("social_instagram", "https://instagram.com/test"),
+        ("social_brand_colors", "true"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("style=\"color:#E4405F\""), "brand colors should add style attribute");
+}
+
+#[test]
+fn render_social_empty_when_no_urls() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("social_icons_position", "sidebar"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // social-links div should NOT appear (no URLs set)
+    assert!(!html.contains("class=\"social-links\""), "no social URLs = no social-links div");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render: Share Icons & Label
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_share_label_prepended() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("share_enabled", "true"),
+        ("share_facebook", "true"),
+        ("share_icons_position", "sidebar"),
+        ("share_label", "Share this:"),
+        ("site_url", "https://example.com"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("<span class=\"share-label\">Share this:</span>"),
+        "share label should be prepended before share icons");
+    assert!(html.contains("class=\"share-icons\""), "should have share-icons div");
+}
+
+#[test]
+fn render_share_buttons_rendered() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("share_enabled", "true"),
+        ("share_facebook", "true"),
+        ("share_x", "true"),
+        ("share_icons_position", "sidebar"),
+        ("site_url", "https://example.com"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("Share on Facebook"), "should have Facebook share link");
+    assert!(html.contains("Share on X"), "should have X share link");
+}
+
+#[test]
+fn render_share_disabled_no_output() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("share_enabled", "false"),
+        ("share_facebook", "true"),
+        ("share_icons_position", "sidebar"),
+        ("site_url", "https://example.com"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(!html.contains("class=\"share-icons\""), "share disabled = no share-icons div");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render: Footer / Copyright
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_footer_copyright_center() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("copyright_text", "© 2026 Test"),
+        ("copyright_alignment", "center"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("footer-copyright"), "should have copyright span");
+    assert!(html.contains("© 2026 Test"), "should contain copyright text");
+    // Center: copyright in center cell
+    assert!(html.contains("footer-cell footer-center\"><span class=\"footer-copyright\">"),
+        "center alignment: copyright should be in center cell");
+}
+
+#[test]
+fn render_footer_copyright_right() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("copyright_text", "© 2026 Right"),
+        ("copyright_alignment", "right"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("footer-cell footer-right\"><span class=\"footer-copyright\">"),
+        "right alignment: copyright should be in right cell");
+}
+
+#[test]
+fn render_footer_3_column_grid() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("copyright_text", "© 2026"),
+        ("copyright_alignment", "left"),
+        ("social_icons_position", "footer"),
+        ("social_instagram", "https://instagram.com/test"),
+        ("footer_alignment", "right"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // Should have all 3 footer cells
+    assert!(html.contains("footer-cell footer-left"), "should have left cell");
+    assert!(html.contains("footer-cell footer-center"), "should have center cell");
+    assert!(html.contains("footer-cell footer-right"), "should have right cell");
+    // Copyright in left, social in right
+    assert!(html.contains("footer-cell footer-left\"><span class=\"footer-copyright\">"),
+        "copyright should be in left cell");
+    assert!(html.contains("footer-cell footer-right\"><span class=\"footer-social\">"),
+        "social should be in right cell");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render: Layout Switching (Sidebar vs Topbar)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_sidebar_layout_has_site_wrapper() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "sidebar"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("class=\"site-wrapper"), "sidebar layout should have site-wrapper");
+    assert!(html.contains("<aside class=\"sidebar\">"), "sidebar layout should have aside.sidebar");
+    // Check body class specifically, not CSS rules
+    assert!(!html.contains("class=\"topbar-layout"), "sidebar layout should not have topbar-layout body class");
+}
+
+#[test]
+fn render_topbar_layout_has_topbar_shell() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "topbar"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("topbar-layout"), "topbar layout should have topbar-layout body class");
+    assert!(html.contains("<header class=\"topbar"), "topbar layout should have header.topbar");
+    assert!(html.contains("topbar-brand"), "topbar layout should have topbar-brand");
+    assert!(html.contains("topbar-hamburger"), "topbar layout should have hamburger button");
+    assert!(!html.contains("<aside class=\"sidebar\">"), "topbar layout should not have aside.sidebar");
+}
+
+#[test]
+fn render_topbar_nav_right_class() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "topbar"),
+        ("nav_position", "right"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("topbar-nav-right"), "nav_position=right should add topbar-nav-right class");
+}
+
+#[test]
+fn render_topbar_boxed_mode() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "topbar"),
+        ("layout_content_boundary", "boxed"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("boxed-mode"), "boxed mode should add boxed-mode body class");
+    assert!(html.contains("layout-boxed"), "boxed mode should add layout-boxed class");
+}
+
+#[test]
+fn render_topbar_hides_custom_sidebar() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "topbar"),
+        ("layout_sidebar_custom_heading", "About Me"),
+        ("layout_sidebar_custom_text", "Hello world"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(!html.contains("About Me"), "topbar should not show sidebar custom heading");
+    assert!(!html.contains("Hello world"), "topbar should not show sidebar custom text");
+}
+
+#[test]
+fn render_sidebar_shows_custom_sidebar() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "sidebar"),
+        ("layout_sidebar_custom_heading", "About Me"),
+        ("layout_sidebar_custom_text", "Hello world"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("About Me"), "sidebar should show custom heading");
+    assert!(html.contains("Hello world"), "sidebar should show custom text");
+}
+
+#[test]
+fn render_sidebar_right_class() {
+    let pool = test_pool();
+    set_settings(&pool, &[
+        ("layout_header_type", "sidebar"),
+        ("layout_sidebar_position", "right"),
+    ]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    assert!(html.contains("sidebar-right"), "sidebar position=right should add sidebar-right class");
+}
