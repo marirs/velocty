@@ -6,6 +6,7 @@ use serde_json::json;
 use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
+use crate::models::category::Category;
 use crate::models::design::Design;
 use crate::models::settings::Setting;
 use crate::AdminSlug;
@@ -42,12 +43,17 @@ pub fn design_activate(_admin: AdminUser, pool: &State<DbPool>, slug: &State<Adm
 #[get("/designer/<design_slug>")]
 pub fn design_overview(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>, design_slug: String) -> Option<Template> {
     let design = Design::find_by_slug(pool, &design_slug)?;
+    let portfolio_categories: Vec<serde_json::Value> = Category::list(pool, Some("portfolio"))
+        .iter()
+        .map(|c| json!({"id": c.id, "name": c.name, "slug": c.slug, "show_in_nav": c.show_in_nav}))
+        .collect();
 
     let context = json!({
         "page_title": format!("Design: {}", design.name),
         "design": design,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
+        "portfolio_categories": portfolio_categories,
     });
 
     Some(Template::render("admin/designs/overview", &context))

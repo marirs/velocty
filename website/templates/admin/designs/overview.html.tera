@@ -605,13 +605,17 @@
                         </div>
                     </div>
 
-                    {% if settings.portfolio_enabled == "true" %}
-                    <div class="cz-field">
-                        <label>Portfolio Label</label>
-                        <input type="text" name="portfolio_label" value="{{ settings.portfolio_label | default(value='experiences') }}" data-setting="portfolio_label" required>
+                    <div class="cz-sub-heading">Menu Items <small style="opacity:.5">(drag to reorder)</small></div>
+                    <input type="hidden" name="nav_order" data-setting="nav_order" value="{{ settings.nav_order | default(value='portfolio,blog,contact') }}">
+                    <div id="nav-sortable" class="nav-sortable">
+                        <!-- Items injected by JS based on nav_order -->
                     </div>
+
+                    {% if settings.portfolio_enabled == "true" %}
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Portfolio Options</div>
                     <div class="cz-field">
-                        <label>Portfolio Category Filters</label>
+                        <label>Category Filters</label>
                         <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories" id="portfolio-nav-categories" onchange="czConditions()">
                             <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
                             <option value="under_link" data-sidebar-only {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
@@ -627,17 +631,23 @@
                             <option value="right" {% if settings.portfolio_nav_categories_align is defined and settings.portfolio_nav_categories_align == "right" %}selected{% endif %}>Right</option>
                         </select>
                     </div>
-                    {% endif %}
-                    {% if settings.journal_enabled != "false" %}
-                    <div class="cz-field">
-                        <label>Journal Label</label>
-                        <input type="text" name="blog_label" value="{{ settings.blog_label | default(value='journal') }}" data-setting="blog_label" required>
+
+                    <div class="cz-sub-heading" style="margin-top:8px">Category Visibility</div>
+                    <div class="cz-cat-toggles">
+                        {% for cat in portfolio_categories %}
+                        <div class="cz-cat-toggle-row">
+                            <label class="toggle-switch-sm" title="Show in navigation">
+                                <input type="checkbox" {% if cat.show_in_nav %}checked{% endif %} onchange="czToggleCatNav({{ cat.id }}, this.checked)">
+                                <span class="toggle-slider-sm"></span>
+                            </label>
+                            <span class="cz-cat-name">{{ cat.name }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if portfolio_categories | length == 0 %}
+                        <div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No portfolio categories yet.</div>
+                        {% endif %}
                     </div>
                     {% endif %}
-                    <div class="cz-field">
-                        <label>Contact Label</label>
-                        <input type="text" name="contact_label" value="{{ settings.contact_label | default(value='contact') }}" data-setting="contact_label" required>
-                    </div>
                 </div>
             </div>
 
@@ -746,6 +756,107 @@ function czToggle(btn) {
         sections[0].classList.add('open');
     }
 })();
+
+// ── Nav Sortable (drag to reorder) ──
+(function() {
+    var NAV_ITEMS = {
+        portfolio: { label: 'portfolio_label', defaultLabel: '{{ settings.portfolio_label | default(value="experiences") }}', enabled: {{ settings.portfolio_enabled | default(value="false") }} },
+        blog:      { label: 'blog_label',      defaultLabel: '{{ settings.blog_label | default(value="journal") }}',      enabled: {{ settings.journal_enabled | default(value="true") }} },
+        contact:   { label: 'contact_label',   defaultLabel: '{{ settings.contact_label | default(value="contact") }}',   enabled: true }
+    };
+    var orderInput = document.querySelector('[data-setting="nav_order"]');
+    var container = document.getElementById('nav-sortable');
+    if (!orderInput || !container) return;
+
+    function buildItems() {
+        container.innerHTML = '';
+        var order = orderInput.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        // Ensure all known keys are present
+        ['portfolio','blog','contact'].forEach(function(k){ if (order.indexOf(k) === -1) order.push(k); });
+        order.forEach(function(key) {
+            var cfg = NAV_ITEMS[key];
+            if (!cfg) return;
+            var row = document.createElement('div');
+            row.className = 'nav-sort-item';
+            row.setAttribute('data-key', key);
+            row.draggable = true;
+            var labelInput = document.querySelector('[data-setting="' + cfg.label + '"]');
+            var displayName = labelInput ? labelInput.value : cfg.defaultLabel;
+            row.innerHTML = '<span class="nav-sort-handle">&#9776;</span>' +
+                '<span class="nav-sort-label">' + displayName + '</span>' +
+                '<input type="text" class="nav-sort-input" data-setting="' + cfg.label + '" name="' + cfg.label + '" value="' + displayName.replace(/"/g,'&quot;') + '" required>' +
+                (!cfg.enabled ? '<span class="nav-sort-disabled">(disabled)</span>' : '');
+            container.appendChild(row);
+        });
+        initDrag();
+        syncLabelInputs();
+    }
+
+    function syncLabelInputs() {
+        // Remove old standalone label inputs (they're now inside sortable rows)
+        container.querySelectorAll('.nav-sort-input').forEach(function(inp) {
+            var setting = inp.getAttribute('data-setting');
+            // Remove any duplicate outside the sortable
+            document.querySelectorAll('[data-setting="' + setting + '"]').forEach(function(el) {
+                if (el !== inp && !el.closest('#nav-sortable') && el.type !== 'hidden') el.remove();
+            });
+        });
+    }
+
+    function updateOrder() {
+        var items = container.querySelectorAll('.nav-sort-item');
+        var keys = [];
+        items.forEach(function(el){ keys.push(el.getAttribute('data-key')); });
+        orderInput.value = keys.join(',');
+    }
+
+    var _dragEl = null;
+    function initDrag() {
+        container.querySelectorAll('.nav-sort-item').forEach(function(el) {
+            el.addEventListener('dragstart', function(e) {
+                _dragEl = el;
+                el.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            el.addEventListener('dragend', function() {
+                el.classList.remove('dragging');
+                _dragEl = null;
+                container.querySelectorAll('.nav-sort-item').forEach(function(i){ i.classList.remove('drag-over'); });
+                updateOrder();
+            });
+            el.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                if (_dragEl && _dragEl !== el) {
+                    el.classList.add('drag-over');
+                    var rect = el.getBoundingClientRect();
+                    var mid = rect.top + rect.height / 2;
+                    if (e.clientY < mid) {
+                        container.insertBefore(_dragEl, el);
+                    } else {
+                        container.insertBefore(_dragEl, el.nextSibling);
+                    }
+                }
+            });
+            el.addEventListener('dragleave', function() { el.classList.remove('drag-over'); });
+        });
+    }
+
+    buildItems();
+})();
+
+// ── Category nav visibility toggle (designer) ──
+function czToggleCatNav(id, show) {
+    fetch('/{{ admin_slug }}/api/categories/' + id + '/toggle-nav', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show: show })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.ok) console.error('Toggle nav error:', d.error);
+        // Refresh preview
+        var frame = document.getElementById('preview-frame');
+        if (frame) frame.src = frame.src;
+    });
+}
 
 // ── Modal Color Picker ──
 var _cpTarget = null; // { swatch, textInput }
@@ -1263,5 +1374,40 @@ function saveCustomizer() {
     outline: none;
     border-color: var(--accent);
 }
+
+/* Nav sortable drag-to-reorder */
+.nav-sortable { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+.nav-sort-item {
+    display:flex; align-items:center; gap:8px;
+    padding:6px 10px; background:var(--bg-input); border:1px solid var(--border-input);
+    border-radius:6px; cursor:grab; user-select:none; transition:border-color .15s, opacity .15s;
+}
+.nav-sort-item.dragging { opacity:.4; }
+.nav-sort-item.drag-over { border-color:var(--accent); }
+.nav-sort-handle { font-size:14px; color:var(--text-tertiary); flex-shrink:0; cursor:grab; }
+.nav-sort-label { display:none; }
+.nav-sort-input {
+    flex:1; padding:4px 8px; font-size:13px; background:transparent;
+    border:1px solid transparent; border-radius:4px; color:var(--text-primary);
+    min-width:0;
+}
+.nav-sort-input:focus { outline:none; border-color:var(--accent); background:var(--bg-input); }
+.nav-sort-disabled { font-size:10px; color:var(--text-tertiary); flex-shrink:0; }
+
+/* Category visibility toggles */
+.cz-cat-toggles { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+.cz-cat-toggle-row { display:flex; align-items:center; gap:8px; }
+.cz-cat-name { font-size:13px; color:var(--text-primary); }
+.toggle-switch-sm { position:relative; display:inline-block; width:30px; height:16px; cursor:pointer; flex-shrink:0; }
+.toggle-switch-sm input { opacity:0; width:0; height:0; }
+.toggle-slider-sm {
+    position:absolute; inset:0; background:var(--border-input); border-radius:16px; transition:.2s;
+}
+.toggle-slider-sm:before {
+    content:''; position:absolute; height:12px; width:12px; left:2px; bottom:2px;
+    background:#fff; border-radius:50%; transition:.2s;
+}
+.toggle-switch-sm input:checked + .toggle-slider-sm { background:var(--success); }
+.toggle-switch-sm input:checked + .toggle-slider-sm:before { transform:translateX(14px); }
 </style>
 {% endblock content %}

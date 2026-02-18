@@ -9,6 +9,7 @@ pub struct Category {
     pub name: String,
     pub slug: String,
     pub r#type: String,
+    pub show_in_nav: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +26,7 @@ impl Category {
             name: row.get("name")?,
             slug: row.get("slug")?,
             r#type: row.get("type")?,
+            show_in_nav: row.get::<_, i64>("show_in_nav").unwrap_or(1) != 0,
         })
     }
 
@@ -178,6 +180,41 @@ impl Category {
         conn.execute("DELETE FROM categories WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    pub fn set_show_in_nav(pool: &DbPool, id: i64, show: bool) -> Result<(), String> {
+        let conn = pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE categories SET show_in_nav = ?1 WHERE id = ?2",
+            params![show as i64, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_nav_visible(pool: &DbPool, type_filter: Option<&str>) -> Vec<Self> {
+        let conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
+        let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match type_filter {
+            Some(t) => (
+                "SELECT * FROM categories WHERE (type = ?1 OR type = 'both') AND show_in_nav = 1 ORDER BY name".to_string(),
+                vec![Box::new(t.to_string())],
+            ),
+            None => (
+                "SELECT * FROM categories WHERE show_in_nav = 1 ORDER BY name".to_string(),
+                vec![],
+            ),
+        };
+        let mut stmt = match conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return vec![],
+        };
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        stmt.query_map(params_refs.as_slice(), Self::from_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
     }
 
     pub fn set_for_content(

@@ -386,6 +386,14 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         conn.execute_batch("ALTER TABLE design_templates ADD COLUMN grapesjs_data TEXT DEFAULT '';")?;
     }
 
+    // Add show_in_nav to categories if missing (default 1 = visible)
+    let has_show_in_nav = conn
+        .prepare("SELECT show_in_nav FROM categories LIMIT 0")
+        .is_ok();
+    if !has_show_in_nav {
+        conn.execute_batch("ALTER TABLE categories ADD COLUMN show_in_nav INTEGER NOT NULL DEFAULT 1;")?;
+    }
+
     Ok(())
 }
 
@@ -451,6 +459,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("blog_label", "journal"),
         ("portfolio_label", "experiences"),
         ("contact_label", "contact"),
+        ("nav_order", "portfolio,blog,contact"),
         ("copyright_text", ""),
         // Journal
         ("journal_enabled", "true"),

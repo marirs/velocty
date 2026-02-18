@@ -61,6 +61,7 @@ pub fn routes() -> Vec<rocket::Route> {
         categories::api_category_create,
         categories::category_update,
         categories::category_delete,
+        categories::api_category_toggle_nav,
         categories::tags_list,
         categories::tag_delete,
         designs::designs_list,

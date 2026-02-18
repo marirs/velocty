@@ -566,7 +566,7 @@ fn do_portfolio_grid(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
     let items = PortfolioItem::published(pool, per_page, offset);
     let total = PortfolioItem::count(pool, Some("published"));
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
-    let categories = Category::list(pool, Some("portfolio"));
+    let categories = Category::list_nav_visible(pool, Some("portfolio"));
     let settings = Setting::all(pool);
 
     let items_with_meta: Vec<serde_json::Value> = items
@@ -644,7 +644,7 @@ fn do_portfolio_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Opt
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
     let items = PortfolioItem::by_category(pool, slug, per_page, offset);
-    let categories = Category::list(pool, Some("portfolio"));
+    let categories = Category::list_nav_visible(pool, Some("portfolio"));
     let settings = Setting::all(pool);
 
     let items_with_meta: Vec<serde_json::Value> = items
@@ -679,7 +679,7 @@ fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
     let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
-    let categories = Category::list(pool, Some("portfolio"));
+    let categories = Category::list_nav_visible(pool, Some("portfolio"));
     let settings = Setting::all(pool);
 
     let conn = pool.get().ok()?;

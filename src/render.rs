@@ -79,18 +79,37 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     let contact_label = sg("contact_label", "catch up");
     let contact_enabled = sg("contact_page_enabled", "false") == "true";
 
+    // Build nav links in user-defined order (nav_order setting)
+    // Portfolio with categories_html is treated as a single unit
+    let nav_order_raw = sg("nav_order", "portfolio,blog,contact");
+    let nav_order: Vec<&str> = nav_order_raw.split(',').map(|s| s.trim()).collect();
+
     let mut nav_links = String::new();
-    if portfolio_in_nav {
-        nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
-            slug_url(&portfolio_slug, ""), html_escape(&portfolio_label)));
-    }
-    if blog_enabled {
-        nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
-            slug_url(&blog_slug, ""), html_escape(&blog_label)));
-    }
-    if contact_enabled {
-        nav_links.push_str(&format!("<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
-            html_escape(&contact_label)));
+    for key in &nav_order {
+        match *key {
+            "portfolio" => {
+                // categories_html replaces the portfolio nav-link in under_link/submenu modes
+                if !categories_html.is_empty() {
+                    nav_links.push_str(&categories_html);
+                } else if portfolio_in_nav {
+                    nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        slug_url(&portfolio_slug, ""), html_escape(&portfolio_label)));
+                }
+            }
+            "blog" => {
+                if blog_enabled {
+                    nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        slug_url(&blog_slug, ""), html_escape(&blog_label)));
+                }
+            }
+            "contact" => {
+                if contact_enabled {
+                    nav_links.push_str(&format!("<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
+                        html_escape(&contact_label)));
+                }
+            }
+            _ => {}
+        }
     }
 
     // ── Social & Sharing ──
@@ -221,7 +240,6 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{logo_html}}", &build_logo_html(&settings));
     html = html.replace("{{site_name}}", &html_escape(site_name));
     html = html.replace("{{tagline}}", &html_escape(site_tagline));
-    html = html.replace("{{categories_html}}", &categories_html);
     html = html.replace("{{categories_below_menu}}", &categories_below_menu);
     html = html.replace("{{nav_links}}", &nav_links);
     html = html.replace("{{share_sidebar}}", &share_sidebar);
@@ -296,7 +314,6 @@ pub fn render_legal_page(
         let tagline_on = sg("site_tagline_enabled", "true") != "false";
         let tagline = if tagline_on { sg("site_caption", "") } else { String::new() };
         html = html.replace("{{tagline}}", &html_escape(&tagline));
-        html = html.replace("{{categories_html}}", &build_categories_sidebar(&context, true));
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
@@ -2294,7 +2311,6 @@ pub const ONEGUY_SHELL_HTML: &str = r#"<!DOCTYPE html>
                     <p class="site-tagline">{{tagline}}</p>
                 </div>
                 <nav class="category-nav">
-                    {{categories_html}}
                     {{nav_links}}
                 </nav>
                 {{share_sidebar}}
@@ -2348,7 +2364,6 @@ pub const ONEGUY_TOPBAR_SHELL_HTML: &str = r#"<!DOCTYPE html>
             </div>
             <nav class="topbar-nav">
                 {{nav_links}}
-                {{categories_html}}
             </nav>
             <div class="topbar-right">
                 {{social_sidebar}}

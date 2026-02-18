@@ -41,6 +41,7 @@ pub fn categories_list(
                 "slug": c.slug,
                 "type": c.r#type,
                 "count": Category::count_items(pool, c.id),
+                "show_in_nav": c.show_in_nav,
             })
         })
         .collect();
@@ -177,6 +178,22 @@ pub fn category_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<Ad
     let _ = Category::delete(pool, id);
     AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("category"), Some(id), Some(&name), None, None);
     Redirect::to(format!("{}/categories", admin_base(slug)))
+}
+
+// ── POST: Category Nav Visibility Toggle ────────────────
+
+#[post("/api/categories/<id>/toggle-nav", format = "json", data = "<data>")]
+pub fn api_category_toggle_nav(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    id: i64,
+    data: Json<Value>,
+) -> Json<Value> {
+    let show = data.get("show").and_then(|v| v.as_bool()).unwrap_or(true);
+    match Category::set_show_in_nav(pool, id, show) {
+        Ok(()) => Json(json!({"ok": true, "show_in_nav": show})),
+        Err(e) => Json(json!({"ok": false, "error": e})),
+    }
 }
 
 // ── POST: Tag Delete ───────────────────────────────────
