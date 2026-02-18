@@ -6,7 +6,9 @@ pub mod webmaster;
 
 // Re-export commonly used functions
 pub use analytics::build_analytics_scripts;
+pub use jsonld::{build_portfolio_jsonld, build_post_jsonld};
 pub use meta::build_meta;
+pub use sitemap::generate_sitemap;
 pub use webmaster::build_webmaster_meta;
 
 fn html_escape(s: &str) -> String {

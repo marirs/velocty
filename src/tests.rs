@@ -2637,7 +2637,7 @@ fn render_topbar_submenu_no_duplicate_portfolio() {
         "submenu toggle should start closed"
     );
     // Portfolio should NOT appear as a separate nav-link
-    let nav_link_count = html.matches("class=\"nav-link\"").count();
+    let _nav_link_count = html.matches("class=\"nav-link\"").count();
     // Only blog (journal) should be a nav-link, not portfolio
     assert!(
         !html.contains("nav-link\">experiences</a>"),
