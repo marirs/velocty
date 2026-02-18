@@ -6,7 +6,7 @@
     <!-- Left panel -->
     <div class="customizer-panel">
         <div class="customizer-panel-header">
-            <a href="/{{ admin_slug }}/designer" class="btn btn-sm" title="Back" style="padding:4px 8px">
+            <a href="/{{ admin_slug }}/designer" class="btn btn-sm" title="Back" style="padding:4px 8px" onclick="localStorage.removeItem('cz_open_section')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             </a>
             <div style="flex:1;min-width:0">
@@ -26,7 +26,7 @@
         <div class="customizer-sections">
 
             <!-- ═══ LAYOUT ═══ -->
-            <div class="cz-section open">
+            <div class="cz-section">
                 <button class="cz-section-toggle" onclick="czToggle(this)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
                     <span>Layout</span>
@@ -715,15 +715,37 @@
 </div>
 
 <script>
-// ── Accordion: only one section open at a time ──
+// ── Accordion: only one section open at a time, persisted via localStorage ──
 function czToggle(btn) {
     var section = btn.parentElement;
     var wasOpen = section.classList.contains('open');
+    var sections = document.querySelectorAll('.cz-section');
     // Close all
-    document.querySelectorAll('.cz-section.open').forEach(function(s) { s.classList.remove('open'); });
+    sections.forEach(function(s) { s.classList.remove('open'); });
     // Toggle clicked
-    if (!wasOpen) section.classList.add('open');
+    if (!wasOpen) {
+        section.classList.add('open');
+        // Save index
+        for (var i = 0; i < sections.length; i++) {
+            if (sections[i] === section) {
+                localStorage.setItem('cz_open_section', i);
+                break;
+            }
+        }
+    } else {
+        localStorage.removeItem('cz_open_section');
+    }
 }
+// Restore open section on load
+(function() {
+    var idx = localStorage.getItem('cz_open_section');
+    var sections = document.querySelectorAll('.cz-section');
+    if (idx !== null && sections[parseInt(idx, 10)]) {
+        sections[parseInt(idx, 10)].classList.add('open');
+    } else if (sections.length) {
+        sections[0].classList.add('open');
+    }
+})();
 
 // ── Modal Color Picker ──
 var _cpTarget = null; // { swatch, textInput }
