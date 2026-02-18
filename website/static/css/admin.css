@@ -427,7 +427,7 @@ a:hover { color: var(--accent-hover); }
 .form-card h3 {
     font-size: 16px;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: #446D7F;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 16px;

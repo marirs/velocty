@@ -32,7 +32,7 @@
 <form method="post" action="/{{ admin_slug }}/settings/blog">
     <input type="hidden" name="_tab" value="journal">
     <div class="form-card">
-        <h3>Module</h3>
+        <h3>Page</h3>
         <label class="checkbox-item"><input type="checkbox" id="journal_enabled" name="journal_enabled" value="true" {% if settings.journal_enabled != "false" %}checked{% endif %}> Enable Journal</label>
         <span class="form-help">Enable Journaling on your site. <em>At least one of Journal or Portfolio has to be enabled for full function of Velocty.</em></span>
     </div>
@@ -91,7 +91,7 @@
 <form method="post" action="/{{ admin_slug }}/settings/portfolio">
     <input type="hidden" name="_tab" value="portfolio">
     <div class="form-card">
-        <h3>Module</h3>
+        <h3>Page</h3>
         <label class="checkbox-item"><input type="checkbox" id="portfolio_enabled" name="portfolio_enabled" value="true" {% if settings.portfolio_enabled == "true" %}checked{% endif %}> Enable Portfolio</label>
         <span class="form-help">Enable Portfolio on your site. <em>At least one of Journal or Portfolio has to be enabled for full function of Velocty.</em></span>
     </div>
