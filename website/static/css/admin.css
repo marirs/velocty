@@ -1107,6 +1107,24 @@ input[type="file"]::file-selector-button:hover {
 .tab:hover { color: var(--text-primary); background: var(--bg-card); }
 .tab.active { color: var(--accent); background: rgba(232,145,58,0.1); border-color: rgba(232,145,58,0.25); }
 
+.settings-sub-nav {
+    display: flex;
+    gap: 4px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.sub-tab {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 150ms;
+}
+.sub-tab:hover { color: var(--text-primary); background: var(--bg-card); }
+.sub-tab.active { color: var(--accent); background: rgba(232,145,58,0.1); border-color: rgba(232,145,58,0.25); }
+
 /* ── Pagination ────────────────────────────────────── */
 .pagination {
     display: flex;

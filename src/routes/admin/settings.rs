@@ -26,11 +26,23 @@ pub fn settings_page(
     if section == "users" {
         return Err(Redirect::to(format!("{}/users", admin_base(slug))));
     }
+    // Redirect old blog/portfolio URLs to the unified Pages tab
+    if section == "blog" {
+        return Err(Redirect::to(format!(
+            "{}/settings/pages#journal",
+            admin_base(slug)
+        )));
+    }
+    if section == "portfolio" {
+        return Err(Redirect::to(format!(
+            "{}/settings/pages#portfolio",
+            admin_base(slug)
+        )));
+    }
 
     let valid_sections = [
         "general",
-        "blog",
-        "portfolio",
+        "pages",
         "comments",
         "typography",
         "images",
@@ -55,7 +67,7 @@ pub fn settings_page(
     let section_label = match section {
         "general" => "Site".to_string(),
         "design" => "Visitors".to_string(),
-        "blog" => "Journal".to_string(),
+        "pages" => "Pages".to_string(),
         "images" => "Media".to_string(),
         other => {
             let mut c = other.chars();
@@ -441,11 +453,15 @@ pub fn settings_save(
             .filter(|t| !t.is_empty())
             .map(|t| format!("#{}", t))
             .unwrap_or_default();
+        let err_section = match section {
+            "blog" | "portfolio" => "pages",
+            _ => section,
+        };
         return Err(Flash::error(
             Redirect::to(format!(
                 "{}/settings/{}{}",
                 admin_base(slug),
-                section,
+                err_section,
                 tab_frag
             )),
             errors.join(" | "),
@@ -494,9 +510,6 @@ pub fn settings_save(
             "portfolio_enabled",
             "portfolio_enable_likes",
             "portfolio_image_protection",
-            "portfolio_fade_animation",
-            "portfolio_show_categories",
-            "portfolio_show_tags",
             "portfolio_lightbox_show_title",
             "portfolio_lightbox_show_tags",
             "portfolio_lightbox_nav",
@@ -615,11 +628,18 @@ pub fn settings_save(
         None,
     );
 
+    // blog/portfolio sections now live under the unified "pages" tab
+    let redirect_section = match section {
+        "blog" => "pages",
+        "portfolio" => "pages",
+        _ => section,
+    };
+
     Ok(Flash::success(
         Redirect::to(format!(
             "{}/settings/{}{}",
             admin_base(slug),
-            section,
+            redirect_section,
             tab_fragment
         )),
         "Settings saved successfully",

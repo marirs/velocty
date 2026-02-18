@@ -106,6 +106,15 @@
                         </select>
                     </div>
                     <div class="cz-field">
+                        <label>Portfolio Columns</label>
+                        <select name="portfolio_grid_columns" data-setting="portfolio_grid_columns">
+                            <option value="2" {% if settings.portfolio_grid_columns is defined and settings.portfolio_grid_columns == "2" %}selected{% endif %}>2</option>
+                            <option value="3" {% if not settings.portfolio_grid_columns is defined or settings.portfolio_grid_columns == "3" %}selected{% endif %}>3</option>
+                            <option value="4" {% if settings.portfolio_grid_columns is defined and settings.portfolio_grid_columns == "4" %}selected{% endif %}>4</option>
+                            <option value="5" {% if settings.portfolio_grid_columns is defined and settings.portfolio_grid_columns == "5" %}selected{% endif %}>5</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
                         <label>Portfolio Border Style</label>
                         <select name="portfolio_border_style" data-setting="portfolio_border_style">
                             <option value="none" {% if not settings.portfolio_border_style is defined or settings.portfolio_border_style == "none" %}selected{% endif %}>None</option>
@@ -149,7 +158,7 @@
                             <option value="page" {% if settings.portfolio_click_mode is defined and settings.portfolio_click_mode == "page" %}selected{% endif %}>Open Detail Page</option>
                         </select>
                     </div>
-                    {% if settings.portfolio_likes_enabled is defined and settings.portfolio_likes_enabled == "true" %}
+                    {% if settings.portfolio_enable_likes is defined and settings.portfolio_enable_likes == "true" %}
                     <div class="cz-field">
                         <label>Heart / Like Position</label>
                         <select name="portfolio_like_position" data-setting="portfolio_like_position">
@@ -166,6 +175,33 @@
                             <option value="fade" {% if not settings.portfolio_fade_animation is defined or settings.portfolio_fade_animation == "fade" or settings.portfolio_fade_animation == "true" %}selected{% endif %}>Fade In</option>
                             <option value="slide_up" {% if settings.portfolio_fade_animation is defined and settings.portfolio_fade_animation == "slide_up" %}selected{% endif %}>Slide Up</option>
                             <option value="none" {% if settings.portfolio_fade_animation is defined and (settings.portfolio_fade_animation == "none" or settings.portfolio_fade_animation == "false") %}selected{% endif %}>None</option>
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    {% if settings.journal_enabled != "false" %}
+                    <div class="cz-divider"></div>
+                    <div class="cz-field">
+                        <label>Journal Display</label>
+                        <select name="blog_display_type" data-setting="blog_display_type" onchange="czConditions()">
+                            <option value="grid" {% if settings.blog_display_type is defined and settings.blog_display_type == "grid" %}selected{% endif %}>Grid</option>
+                            <option value="masonry" {% if settings.blog_display_type is defined and settings.blog_display_type == "masonry" %}selected{% endif %}>Masonry</option>
+                            <option value="list" {% if not settings.blog_display_type is defined or settings.blog_display_type == "list" %}selected{% endif %}>List</option>
+                        </select>
+                    </div>
+                    <div class="cz-field" data-cz-show="blog_display_type=grid,blog_display_type=masonry">
+                        <label>Journal Columns</label>
+                        <select name="blog_grid_columns" data-setting="blog_grid_columns">
+                            <option value="2" {% if settings.blog_grid_columns is defined and settings.blog_grid_columns == "2" %}selected{% endif %}>2</option>
+                            <option value="3" {% if not settings.blog_grid_columns is defined or settings.blog_grid_columns == "3" %}selected{% endif %}>3</option>
+                            <option value="4" {% if settings.blog_grid_columns is defined and settings.blog_grid_columns == "4" %}selected{% endif %}>4</option>
+                        </select>
+                    </div>
+                    <div class="cz-field" data-cz-show="blog_display_type=list">
+                        <label>List Style</label>
+                        <select name="blog_list_style" data-setting="blog_list_style">
+                            <option value="compact" {% if not settings.blog_list_style is defined or settings.blog_list_style == "compact" %}selected{% endif %}>Compact</option>
+                            <option value="editorial" {% if settings.blog_list_style is defined and settings.blog_list_style == "editorial" %}selected{% endif %}>Editorial</option>
                         </select>
                     </div>
                     {% endif %}
@@ -1150,11 +1186,13 @@ updateFontDropdowns();
 function czConditions() {
     document.querySelectorAll('[data-cz-show]').forEach(function(el) {
         var cond = el.getAttribute('data-cz-show');
-        var parts = cond.split('=');
-        var field = document.querySelector('[data-setting="' + parts[0] + '"]');
-        if (field) {
-            el.style.display = (field.value === parts[1]) ? '' : 'none';
-        }
+        var clauses = cond.split(',');
+        var visible = clauses.some(function(c) {
+            var parts = c.split('=');
+            var field = document.querySelector('[data-setting="' + parts[0] + '"');
+            return field && field.value === parts[1];
+        });
+        el.style.display = visible ? '' : 'none';
     });
     // Show/hide header-type-specific options in dropdowns
     var headerType = document.querySelector('[data-setting="layout_header_type"]');

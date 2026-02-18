@@ -1,0 +1,189 @@
+{% extends "admin/base" %}
+
+{% block content %}
+<div class="page-header"><h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings › Pages</h2>{% include "admin/settings/_search" %}</div>
+
+<div class="settings-nav">
+    <a href="/{{ admin_slug }}/settings/general" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Site</a>
+    <a href="/{{ admin_slug }}/settings/design" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Visitors</a>
+    <a href="/{{ admin_slug }}/settings/pages" class="tab active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Pages</a>
+    <a href="/{{ admin_slug }}/settings/comments" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comments</a>
+    <a href="/{{ admin_slug }}/settings/typography" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>Typography</a>
+    <a href="/{{ admin_slug }}/settings/images" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Media</a>
+    <a href="/{{ admin_slug }}/settings/seo" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>SEO</a>
+    <a href="/{{ admin_slug }}/settings/social" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>Social</a>
+    <a href="/{{ admin_slug }}/settings/email" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Email</a>
+    <a href="/{{ admin_slug }}/settings/commerce" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Commerce</a>
+    <a href="/{{ admin_slug }}/settings/ai" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a2 2 0 0 1 0 4h-1v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-1H2a2 2 0 0 1 0-4h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>AI</a>
+    <a href="/{{ admin_slug }}/settings/security" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Security</a>
+    <a href="/{{ admin_slug }}/settings/tasks" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Tasks</a>
+</div>
+
+<!-- Sub-tabs for page types -->
+<div class="settings-sub-nav" style="margin-bottom:16px">
+    <a href="#journal" class="sub-tab active" data-subtab="journal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Journal</a>
+    <a href="#portfolio" class="sub-tab" data-subtab="portfolio"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Portfolio</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- JOURNAL SUB-TAB                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="subtab-panel" id="panel-journal">
+<form method="post" action="/{{ admin_slug }}/settings/blog">
+    <input type="hidden" name="_tab" value="journal">
+    <div class="form-card">
+        <h3>Module</h3>
+        <label class="checkbox-item"><input type="checkbox" id="journal_enabled" name="journal_enabled" value="true" {% if settings.journal_enabled != "false" %}checked{% endif %}> Enable Journal</label>
+        <span class="form-help">Enable Journaling on your site. <em>At least one of Journal or Portfolio has to be enabled for full function of Velocty.</em></span>
+    </div>
+
+    <fieldset id="journal-fields" {% if settings.journal_enabled == "false" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+    <div class="form-card">
+        <h3>URL</h3>
+        <div class="form-group">
+            <label for="blog_slug">Journal Slug</label>
+            <div style="display:flex;align-items:center;gap:4px">
+                <span class="text-muted" style="font-size:13px">{{ settings.site_url | default(value='yoursite.com') | trim_end_matches(pat='/') }}/</span>
+                <input type="text" id="blog_slug" name="blog_slug" value="{{ settings.blog_slug | default(value='journal') }}" style="width:140px" placeholder="journal">
+            </div>
+            <span class="form-help">The URL path for your journal listing page</span>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Display</h3>
+        <div class="form-group">
+            <label for="blog_posts_per_page">Posts Per Page</label>
+            <input type="number" id="blog_posts_per_page" name="blog_posts_per_page" value="{{ settings.blog_posts_per_page | default(value='10') }}" min="1" max="100">
+        </div>
+        <div class="form-group">
+            <label for="blog_excerpt_words">Excerpt Word Count</label>
+            <input type="number" id="blog_excerpt_words" name="blog_excerpt_words" value="{{ settings.blog_excerpt_words | default(value='40') }}" min="10" max="200">
+            <span class="form-help">Uses the post excerpt if available, otherwise auto-generates from post content.</span>
+        </div>
+        <div class="form-group">
+            <label for="blog_pagination_type">Pagination</label>
+            <select id="blog_pagination_type" name="blog_pagination_type">
+                <option value="classic" {% if settings.blog_pagination_type == "classic" %}selected{% endif %}>Classic (1, 2, 3…)</option>
+                <option value="load_more" {% if settings.blog_pagination_type == "load_more" %}selected{% endif %}>Load More button</option>
+                <option value="infinite" {% if settings.blog_pagination_type == "infinite" %}selected{% endif %}>Infinite scroll (AJAX)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Features</h3>
+        <label class="checkbox-item"><input type="checkbox" name="blog_show_author" value="true" {% if settings.blog_show_author == "true" %}checked{% endif %}> Show author name</label>
+        <label class="checkbox-item"><input type="checkbox" name="blog_show_date" value="true" {% if settings.blog_show_date == "true" %}checked{% endif %}> Show date</label>
+        <label class="checkbox-item"><input type="checkbox" name="blog_show_reading_time" value="true" {% if settings.blog_show_reading_time == "true" %}checked{% endif %}> Show reading time</label>
+        <label class="checkbox-item"><input type="checkbox" name="blog_featured_image_required" value="true" {% if settings.blog_featured_image_required == "true" %}checked{% endif %}> Require featured image</label>
+    </div>
+
+    </fieldset>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Journal <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- PORTFOLIO SUB-TAB                                      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="subtab-panel" id="panel-portfolio" style="display:none">
+<form method="post" action="/{{ admin_slug }}/settings/portfolio">
+    <input type="hidden" name="_tab" value="portfolio">
+    <div class="form-card">
+        <h3>Module</h3>
+        <label class="checkbox-item"><input type="checkbox" id="portfolio_enabled" name="portfolio_enabled" value="true" {% if settings.portfolio_enabled == "true" %}checked{% endif %}> Enable Portfolio</label>
+        <span class="form-help">Enable Portfolio on your site. <em>At least one of Journal or Portfolio has to be enabled for full function of Velocty.</em></span>
+    </div>
+
+    <fieldset id="portfolio-fields" {% if settings.portfolio_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+    <div class="form-card">
+        <h3>URL</h3>
+        <div class="form-group">
+            <label for="portfolio_slug">Portfolio Slug</label>
+            <div style="display:flex;align-items:center;gap:4px">
+                <span class="text-muted" style="font-size:13px">{{ settings.site_url | default(value='yoursite.com') | trim_end_matches(pat='/') }}/</span>
+                <input type="text" id="portfolio_slug" name="portfolio_slug" value="{{ settings.portfolio_slug | default(value='portfolio') }}" style="width:140px" placeholder="portfolio">
+            </div>
+            <span class="form-help">The URL path for your portfolio listing page</span>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Display</h3>
+        <div class="form-group">
+            <label for="portfolio_items_per_page">Items Per Page</label>
+            <input type="number" id="portfolio_items_per_page" name="portfolio_items_per_page" value="{{ settings.portfolio_items_per_page | default(value='12') }}" min="1">
+        </div>
+        <div class="form-group">
+            <label for="portfolio_pagination_type">Pagination</label>
+            <select id="portfolio_pagination_type" name="portfolio_pagination_type">
+                <option value="classic" {% if settings.portfolio_pagination_type == "classic" %}selected{% endif %}>Classic (1, 2, 3…)</option>
+                <option value="load_more" {% if settings.portfolio_pagination_type == "load_more" %}selected{% endif %}>Load More button</option>
+                <option value="infinite" {% if settings.portfolio_pagination_type == "infinite" %}selected{% endif %}>Infinite scroll (AJAX)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Lightbox</h3>
+        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_title" value="true" {% if settings.portfolio_lightbox_show_title == "true" %}checked{% endif %}> Show title in lightbox</label>
+        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_tags" value="true" {% if settings.portfolio_lightbox_show_tags == "true" %}checked{% endif %}> Show tags in lightbox</label>
+        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_nav" value="true" {% if settings.portfolio_lightbox_nav == "true" %}checked{% endif %}> Show prev/next navigation</label>
+        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_keyboard" value="true" {% if settings.portfolio_lightbox_keyboard == "true" %}checked{% endif %}> Keyboard navigation</label>
+    </div>
+
+    <div class="form-card">
+        <h3>Features</h3>
+        <label class="checkbox-item"><input type="checkbox" name="portfolio_enable_likes" value="true" {% if settings.portfolio_enable_likes == "true" %}checked{% endif %}> Enable heart/like</label>
+        <label class="checkbox-item"><input type="checkbox" name="portfolio_image_protection" value="true" {% if settings.portfolio_image_protection == "true" %}checked{% endif %}> Image protection (disable right-click)</label>
+    </div>
+
+    </fieldset>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Portfolio <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
+</div>
+
+{% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    var tabs = document.querySelectorAll('.sub-tab');
+    var panels = document.querySelectorAll('.subtab-panel');
+
+    function activate(id) {
+        tabs.forEach(function(t) { t.classList.toggle('active', t.dataset.subtab === id); });
+        panels.forEach(function(p) { p.style.display = p.id === 'panel-' + id ? '' : 'none'; });
+    }
+
+    // Activate from URL hash or default to journal
+    var hash = location.hash.replace('#', '');
+    if (hash === 'portfolio') activate('portfolio');
+    else activate('journal');
+
+    tabs.forEach(function(t) {
+        t.addEventListener('click', function(e) {
+            e.preventDefault();
+            var id = this.dataset.subtab;
+            activate(id);
+            history.replaceState(null, '', '#' + id);
+        });
+    });
+
+    // Module enable/disable toggles
+    var journalCb = document.getElementById('journal_enabled');
+    if (journalCb) {
+        journalCb.addEventListener('change', function() {
+            document.getElementById('journal-fields').disabled = !this.checked;
+        });
+    }
+    var portfolioCb = document.getElementById('portfolio_enabled');
+    if (portfolioCb) {
+        portfolioCb.addEventListener('change', function() {
+            document.getElementById('portfolio-fields').disabled = !this.checked;
+        });
+    }
+})();
+</script>
+{% endblock scripts %}
