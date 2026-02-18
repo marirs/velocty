@@ -539,10 +539,14 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
         .unwrap_or("");
 
     // Build collapsible category dropdown
+    // Always render the parent toggle — even when all categories are hidden,
+    // the portfolio label + "All" link should remain visible.
     let mut html = String::new();
 
-    // Portfolio categories as collapsible group
-    if !categories.is_empty() {
+    let show_all = settings.get("portfolio_show_all_categories").and_then(|v| v.as_str()).unwrap_or("true") == "true";
+    let has_children = !categories.is_empty() || show_all;
+
+    if has_children {
         let open_cls = if start_open { " open" } else { "" };
         html.push_str(&format!(
             "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
@@ -551,12 +555,14 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
             open_cls, html_escape(portfolio_label), open_cls
         ));
 
-        // "all" link
-        let all_active = if active_slug.is_empty() { " active" } else { "" };
-        html.push_str(&format!(
-            "<a href=\"{}\" class=\"cat-link{}\">All</a>\n",
-            slug_url(portfolio_slug, ""), all_active
-        ));
+        if show_all {
+            let all_label = settings.get("portfolio_all_categories_label").and_then(|v| v.as_str()).unwrap_or("All");
+            let all_active = if active_slug.is_empty() { " active" } else { "" };
+            html.push_str(&format!(
+                "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
+                slug_url(portfolio_slug, ""), all_active, html_escape(all_label)
+            ));
+        }
 
         for cat in categories {
             let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -570,6 +576,10 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
         }
 
         html.push_str("</div></div>\n");
+    } else {
+        // No categories and no "All" link — render portfolio as a plain nav link
+        html.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+            slug_url(portfolio_slug, ""), html_escape(portfolio_label)));
     }
 
     html
@@ -583,6 +593,7 @@ fn build_categories_page_top(context: &Value, portfolio_slug: &str, align: &str)
     };
     if categories.is_empty() { return String::new(); }
 
+    let settings = context.get("settings").cloned().unwrap_or_default();
     let active_slug = context
         .get("active_category")
         .and_then(|c| c.get("slug"))
@@ -592,11 +603,15 @@ fn build_categories_page_top(context: &Value, portfolio_slug: &str, align: &str)
     let align_cls = if align == "right" { " cats-right" } else { "" };
     let mut html = format!("<div class=\"categories-page-top{}\">", align_cls);
 
-    let all_active = if active_slug.is_empty() { " active" } else { "" };
-    html.push_str(&format!(
-        "<a href=\"{}\" class=\"cat-link{}\">All</a>",
-        slug_url(portfolio_slug, ""), all_active
-    ));
+    let show_all = settings.get("portfolio_show_all_categories").and_then(|v| v.as_str()).unwrap_or("true") == "true";
+    if show_all {
+        let all_label = settings.get("portfolio_all_categories_label").and_then(|v| v.as_str()).unwrap_or("All");
+        let all_active = if active_slug.is_empty() { " active" } else { "" };
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
+            slug_url(portfolio_slug, ""), all_active, html_escape(all_label)
+        ));
+    }
 
     for cat in categories {
         let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -621,6 +636,7 @@ fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String 
     };
     if categories.is_empty() { return String::new(); }
 
+    let settings = context.get("settings").cloned().unwrap_or_default();
     let active_slug = context
         .get("active_category")
         .and_then(|c| c.get("slug"))
@@ -629,11 +645,15 @@ fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String 
 
     let mut html = String::from("<div class=\"categories-below-menu\">");
 
-    let all_active = if active_slug.is_empty() { " active" } else { "" };
-    html.push_str(&format!(
-        "<a href=\"{}\" class=\"cat-link{}\">All</a>",
-        slug_url(portfolio_slug, ""), all_active
-    ));
+    let show_all = settings.get("portfolio_show_all_categories").and_then(|v| v.as_str()).unwrap_or("true") == "true";
+    if show_all {
+        let all_label = settings.get("portfolio_all_categories_label").and_then(|v| v.as_str()).unwrap_or("All");
+        let all_active = if active_slug.is_empty() { " active" } else { "" };
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
+            slug_url(portfolio_slug, ""), all_active, html_escape(all_label)
+        ));
+    }
 
     for cat in categories {
         let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");

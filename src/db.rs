@@ -615,6 +615,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("portfolio_show_title", "false"),
         ("portfolio_like_position", "image_bottom_right"),
         ("portfolio_nav_categories", "under_link"),
+        ("portfolio_show_all_categories", "true"),
+        ("portfolio_all_categories_label", "All"),
         ("nav_position", "below_logo"),
         // Site Identity (Customizer)
         ("site_name_display", "text"),

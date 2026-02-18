@@ -624,6 +624,17 @@
                             <option value="below_menu" data-topbar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "below_menu" %}selected{% endif %}>Below Main Menu</option>
                         </select>
                     </div>
+                    <div class="cz-field">
+                        <label>Show "All" Link</label>
+                        <select name="portfolio_show_all_categories" data-setting="portfolio_show_all_categories" onchange="czConditions()">
+                            <option value="true" {% if not settings.portfolio_show_all_categories is defined or settings.portfolio_show_all_categories == "true" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.portfolio_show_all_categories is defined and settings.portfolio_show_all_categories == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field" data-cz-show="portfolio_show_all_categories=true">
+                        <label>"All" Label</label>
+                        <input type="text" name="portfolio_all_categories_label" value="{{ settings.portfolio_all_categories_label | default(value='All') }}" data-setting="portfolio_all_categories_label">
+                    </div>
                     <div class="cz-field" data-cz-show="portfolio_nav_categories=page_top" id="page-top-align-field">
                         <label>Page Top Alignment</label>
                         <select name="portfolio_nav_categories_align" data-setting="portfolio_nav_categories_align">
@@ -632,7 +643,7 @@
                         </select>
                     </div>
 
-                    <div class="cz-sub-heading" style="margin-top:8px">Category Visibility</div>
+                    <div class="cz-sub-heading" style="margin-top:8px;color:#446D7F">Category Visibility</div>
                     <div class="cz-cat-toggles">
                         {% for cat in portfolio_categories %}
                         <div class="cz-cat-toggle-row">
