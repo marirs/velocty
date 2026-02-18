@@ -8,6 +8,7 @@ use crate::models::comment::{Comment, CommentForm};
 use crate::models::portfolio::PortfolioItem;
 use crate::models::settings::Setting;
 use crate::rate_limit::RateLimiter;
+use crate::security::auth::ClientIp;
 use crate::security::{self, auth};
 
 // ── Like / Unlike toggle ───────────────────────────────
@@ -18,10 +19,9 @@ pub struct LikeResponse {
     pub count: i64,
 }
 
-#[post("/like/<id>", format = "json", data = "<body>")]
-pub fn like_toggle(pool: &State<DbPool>, id: i64, body: Json<Value>) -> Json<LikeResponse> {
-    let ip = body.get("ip").and_then(|v| v.as_str()).unwrap_or("unknown");
-    let ip_hash = auth::hash_ip(ip);
+#[post("/like/<id>")]
+pub fn like_toggle(pool: &State<DbPool>, id: i64, client_ip: ClientIp) -> Json<LikeResponse> {
+    let ip_hash = auth::hash_ip(&client_ip.0);
 
     let conn = match pool.get() {
         Ok(c) => c,
@@ -67,9 +67,9 @@ pub fn like_toggle(pool: &State<DbPool>, id: i64, body: Json<Value>) -> Json<Lik
 
 // ── Check like status ──────────────────────────────────
 
-#[get("/like/<id>/status?<ip>")]
-pub fn like_status(pool: &State<DbPool>, id: i64, ip: &str) -> Json<LikeResponse> {
-    let ip_hash = auth::hash_ip(ip);
+#[get("/like/<id>/status")]
+pub fn like_status(pool: &State<DbPool>, id: i64, client_ip: ClientIp) -> Json<LikeResponse> {
+    let ip_hash = auth::hash_ip(&client_ip.0);
     let conn = match pool.get() {
         Ok(c) => c,
         Err(_) => {

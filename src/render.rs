@@ -1646,6 +1646,7 @@ fn render_portfolio_grid(context: &Value) -> String {
             .or_else(|| item.get("image_path").and_then(|v| v.as_str()))
             .unwrap_or("");
         let likes = item.get("likes").and_then(|v| v.as_i64()).unwrap_or(0);
+        let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
 
         let cats_data = entry
             .get("categories")
@@ -1736,12 +1737,13 @@ fn render_portfolio_grid(context: &Value) -> String {
         let item_url = slug_url(&portfolio_slug, slug);
         html.push_str(&format!(
             r#"<div class="{item_class}" data-categories="{cats_data}">
-    <a href="{item_url}" class="portfolio-link" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
+    <a href="{item_url}" class="portfolio-link" data-id="{item_id}" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
         <img src="/uploads/{image}" alt="{title}" loading="lazy">
     </a>"#,
             item_class = item_class_str,
             cats_data = cats_data,
             item_url = item_url,
+            item_id = item_id,
             title = html_escape(title),
             image = image,
             likes = likes,
@@ -2626,7 +2628,7 @@ const LIGHTBOX_JS: &str = r#"
                 (showLbShare ? '<div class="lb-share"></div>' : '') +
                 (showTitle ? '<div class="lb-title"></div>' : '') +
                 (showTags ? '<div class="lb-tags"></div>' : '') +
-                (showLikes ? '<div class="lb-likes" style="color:#fff;font-size:14px;margin-top:4px"></div>' : '') +
+                (showLikes ? '<div class="lb-likes" style="color:#fff;font-size:14px;margin-top:4px;cursor:pointer;user-select:none"></div>' : '') +
             '</div>';
         document.body.appendChild(overlay);
         img = overlay.querySelector('.lb-image');
@@ -2642,6 +2644,20 @@ const LIGHTBOX_JS: &str = r#"
         if (prevBtn) prevBtn.addEventListener('click', function() { navigate(-1); });
         if (nextBtn) nextBtn.addEventListener('click', function() { navigate(1); });
         overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+        if (likesEl) {
+            likesEl.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var lid = likesEl.dataset.itemId;
+                if (!lid) return;
+                fetch('/api/like/' + lid, { method: 'POST' }).then(function(r){return r.json()}).then(function(d){
+                    likesEl.innerHTML = '&#9829; ' + d.count;
+                    if (d.liked) likesEl.classList.add('liked');
+                    else likesEl.classList.remove('liked');
+                    var link = items[currentIndex];
+                    if (link) link.dataset.likes = d.count;
+                }).catch(function(){});
+            });
+        }
     }
 
     function open(index) {
@@ -2653,7 +2669,20 @@ const LIGHTBOX_JS: &str = r#"
         img.src = imgSrc;
         if (titleEl) titleEl.textContent = itemTitle;
         if (tagsEl) tagsEl.textContent = link.dataset.tags || '';
-        if (likesEl) { var lk = link.dataset.likes || '0'; likesEl.innerHTML = '&#9829; ' + lk; }
+        if (likesEl) {
+            var lk = link.dataset.likes || '0';
+            likesEl.innerHTML = '&#9829; ' + lk;
+            likesEl.classList.remove('liked');
+            var lid = link.dataset.id;
+            if (lid) {
+                likesEl.dataset.itemId = lid;
+                fetch('/api/like/' + lid + '/status').then(function(r){return r.json()}).then(function(d){
+                    likesEl.innerHTML = '&#9829; ' + d.count;
+                    if (d.liked) likesEl.classList.add('liked');
+                    else likesEl.classList.remove('liked');
+                }).catch(function(){});
+            }
+        }
         if (shareEl) {
             var shareUrl = encodeURIComponent(link.href || imgSrc);
             var shareTitle = encodeURIComponent(itemTitle);
@@ -2693,6 +2722,29 @@ const LIGHTBOX_JS: &str = r#"
     }
 
     } // end lightbox-only block
+
+    // ── Like button handler (portfolio single page + any .like-btn) ──
+    if (showLikes) {
+        document.querySelectorAll('.like-btn').forEach(function(btn) {
+            var lid = btn.dataset.id;
+            if (!lid) return;
+            // Check status on load
+            fetch('/api/like/' + lid + '/status').then(function(r){return r.json()}).then(function(d){
+                var countEl = btn.querySelector('.like-count');
+                if (countEl) countEl.textContent = d.count;
+                if (d.liked) btn.classList.add('liked');
+            }).catch(function(){});
+            // Click to toggle
+            btn.addEventListener('click', function() {
+                fetch('/api/like/' + lid, { method: 'POST' }).then(function(r){return r.json()}).then(function(d){
+                    var countEl = btn.querySelector('.like-count');
+                    if (countEl) countEl.textContent = d.count;
+                    if (d.liked) btn.classList.add('liked');
+                    else btn.classList.remove('liked');
+                }).catch(function(){});
+            });
+        });
+    }
 
     // Fade/slide animation via IntersectionObserver
     if (b.fadeAnimation && b.fadeAnimation !== 'false' && b.fadeAnimation !== 'none') {
@@ -3678,7 +3730,9 @@ body.boxed-mode {
     margin: 16px 0;
 }
 .portfolio-meta h1 { font-size: var(--font-size-h1); }
-.like-btn { cursor: pointer; font-size: 18px; }
+.like-btn { cursor: pointer; font-size: 18px; user-select: none; transition: color 0.2s; }
+.like-btn.liked { color: #e74c3c; }
+.lb-likes.liked { color: #e74c3c !important; }
 .portfolio-categories a {
     font-size: 12px;
     color: var(--color-text-secondary);
