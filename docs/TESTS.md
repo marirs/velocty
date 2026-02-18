@@ -1,6 +1,6 @@
 # Velocty — Test Coverage Report
 
-> **Last run:** 2026-02-16 | **Result:** 97 passed, 0 failed | **Duration:** 0.68s  
+> **Last run:** 2026-02-18 | **Result:** 157 passed, 0 failed | **Duration:** 1.21s  
 > **Command:** `cargo test`
 
 ---
@@ -31,7 +31,8 @@
 | `seo/sitemap.rs` | 2 | 2 | **100%** |
 | `seo/jsonld.rs` | 2 | 2 | **100%** |
 | `db.rs` | 4 | 3 | **75%** |
-| **TOTAL** | **179** | **168** | **94%** |
+| `render.rs` | 3 | 3 | **100%** |
+| **TOTAL** | **182** | **171** | **94%** |
 
 ### Not unit-testable (excluded from coverage)
 
@@ -45,7 +46,7 @@
 | `ai/*` | All providers make HTTP calls to external APIs |
 | `email/*` | All providers make HTTP/SMTP calls |
 | `security/firewall/*` | Rocket fairing middleware |
-| `render.rs` | Large HTML renderer with private helpers; public functions need full design context |
+| `render.rs` | Large HTML renderer; public `render_page` tested via settings-driven output assertions |
 | `health.rs`, `images.rs`, `boot.rs`, `tasks.rs` | System/filesystem operations |
 
 ---
@@ -284,6 +285,103 @@
 | 96 | `migrations_idempotent` | Run migrations 3 times | No errors on repeated runs | All succeed | ✅ Pass |
 | 97 | `all_tables_exist` | Query COUNT(*) on all 22 tables | All queries succeed | All tables queryable | ✅ Pass |
 
+### 26. Render: Category Filters (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 98 | `render_sidebar_under_link_has_toggle_open` | Sidebar + under_link categories | Toggle with "open" class | Present | ✅ Pass |
+| 99 | `render_sidebar_page_top_has_horizontal_cats` | Sidebar + page_top categories | Horizontal category row at page top | Present | ✅ Pass |
+| 100 | `render_sidebar_page_top_right_alignment` | page_top + right alignment | `text-align:right` on category row | Present | ✅ Pass |
+| 101 | `render_topbar_submenu_no_duplicate_portfolio` | Topbar + submenu categories | No duplicate portfolio nav-link | No duplicate | ✅ Pass |
+| 102 | `render_topbar_below_menu_has_category_row` | Topbar + below_menu categories | Category row below topbar | Present | ✅ Pass |
+| 103 | `render_hidden_categories_no_output` | Categories set to hidden | No category HTML in output | Absent | ✅ Pass |
+
+### 27. Render: Social Links (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 104 | `render_social_links_in_sidebar` | Social icons in sidebar position | Social links in sidebar HTML | Present | ✅ Pass |
+| 105 | `render_social_brand_colors` | Brand colors enabled | `brand-color` class on social links | Present | ✅ Pass |
+| 106 | `render_social_empty_when_no_urls` | No social URLs configured | No social links HTML | Absent | ✅ Pass |
+
+### 28. Render: Share Buttons (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 107 | `render_share_label_prepended` | Share label configured | Label text before share buttons | Present | ✅ Pass |
+| 108 | `render_share_buttons_rendered` | Share buttons enabled | Facebook/X/LinkedIn share links | Present | ✅ Pass |
+| 109 | `render_share_disabled_no_output` | Share buttons disabled | No share HTML | Absent | ✅ Pass |
+
+### 29. Render: Footer (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 110 | `render_footer_copyright_center` | Copyright center-aligned | Copyright in footer-center cell | Present | ✅ Pass |
+| 111 | `render_footer_copyright_right` | Copyright right-aligned | Copyright in footer-right cell | Present | ✅ Pass |
+| 112 | `render_footer_3_column_grid` | Copyright left + social right | 3-column footer grid | Present | ✅ Pass |
+
+### 30. Render: Layout (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 113 | `render_sidebar_layout_has_site_wrapper` | Sidebar layout | `site-wrapper` class present | Present | ✅ Pass |
+| 114 | `render_topbar_layout_has_topbar_shell` | Topbar layout | `topbar-layout` class present | Present | ✅ Pass |
+| 115 | `render_topbar_nav_right_class` | Topbar + nav right | `topbar-nav-right` class | Present | ✅ Pass |
+| 116 | `render_topbar_boxed_mode` | Topbar + boxed boundary | `layout-boxed` class | Present | ✅ Pass |
+| 117 | `render_topbar_hides_custom_sidebar` | Topbar layout | No custom sidebar HTML | Absent | ✅ Pass |
+| 118 | `render_sidebar_shows_custom_sidebar` | Sidebar + custom HTML | Custom sidebar content rendered | Present | ✅ Pass |
+| 119 | `render_sidebar_right_class` | Sidebar right position | `sidebar-right` class | Present | ✅ Pass |
+
+### 31. Render: Portfolio Item Display (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 120 | `render_portfolio_cats_false_no_visible_labels` | show_categories=false | No category labels in grid items | Absent | ✅ Pass |
+| 121 | `render_portfolio_tags_false_no_visible_labels` | show_tags=false | No tag labels in grid items | Absent | ✅ Pass |
+| 122 | `render_portfolio_cats_hover` | show_categories=hover | `item-meta-hover` class on categories | Present | ✅ Pass |
+| 123 | `render_portfolio_tags_hover` | show_tags=hover | `item-meta-hover` class on tags | Present | ✅ Pass |
+| 124 | `render_portfolio_cats_bottom_left` | show_categories=bottom_left | `item-meta-bottom_left` class | Present | ✅ Pass |
+| 125 | `render_portfolio_cats_bottom_right` | show_categories=bottom_right | `item-meta-bottom_right` class | Present | ✅ Pass |
+| 126 | `render_portfolio_cats_below_left` | show_categories=below_left | `item-meta-below_left` class | Present | ✅ Pass |
+| 127 | `render_portfolio_cats_below_right` | show_categories=below_right | `item-meta-below_right` class | Present | ✅ Pass |
+| 128 | `render_portfolio_tags_below_left` | show_tags=below_left | `item-meta-below_left` class on tags | Present | ✅ Pass |
+| 129 | `render_portfolio_tags_below_right` | show_tags=below_right | `item-meta-below_right` class on tags | Present | ✅ Pass |
+| 130 | `render_portfolio_legacy_true_normalizes_to_below_left` | show_categories=true (legacy) | Normalizes to `below_left` | Present | ✅ Pass |
+| 131 | `render_portfolio_overlay_outside_link_tag` | Overlay categories | Overlay div outside `<a>` tag | Correct DOM order | ✅ Pass |
+| 132 | `render_portfolio_mixed_cats_hover_tags_below` | cats=hover + tags=below_left | Both modes applied independently | Both present | ✅ Pass |
+
+### 32. Render: Journal (blog_list) Settings (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 133 | `render_blog_list_grid_display` | blog_display_type=grid | `blog-grid` class in output | Present | ✅ Pass |
+| 134 | `render_blog_list_masonry_display` | blog_display_type=masonry | `blog-masonry` class in output | Present | ✅ Pass |
+| 135 | `render_blog_list_default_list_display` | blog_display_type=list | `blog-list` class, no grid/masonry | Correct | ✅ Pass |
+| 136 | `render_blog_list_editorial_style` | list + blog_list_style=editorial | `blog-editorial` class | Present | ✅ Pass |
+| 137 | `render_blog_list_show_author` | blog_show_author=true | `blog-author` + author name in output | Present | ✅ Pass |
+| 138 | `render_blog_list_hide_author` | blog_show_author=false | No `blog-author` in output | Absent | ✅ Pass |
+| 139 | `render_blog_list_show_date` | blog_show_date=true | `<time>` element in output | Present | ✅ Pass |
+| 140 | `render_blog_list_hide_date` | blog_show_date=false | No `<time>` element | Absent | ✅ Pass |
+| 141 | `render_blog_list_show_reading_time` | blog_show_reading_time=true | "min read" in output | Present | ✅ Pass |
+| 142 | `render_blog_list_hide_reading_time` | blog_show_reading_time=false | No "min read" | Absent | ✅ Pass |
+| 143 | `render_blog_list_excerpt_truncation` | blog_excerpt_words=5 | Excerpt truncated to 5 words | Truncated | ✅ Pass |
+| 144 | `render_blog_list_pagination_load_more` | blog_pagination_type=load_more; 3 pages | `load-more-btn` element | Present | ✅ Pass |
+| 145 | `render_blog_list_pagination_infinite` | blog_pagination_type=infinite; 3 pages | `infinite-sentinel` element | Present | ✅ Pass |
+| 146 | `render_blog_list_pagination_classic` | blog_pagination_type=classic; 3 pages | Page number links, no sentinel | Correct | ✅ Pass |
+
+### 33. Render: Portfolio Lightbox & Feature Settings (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 147 | `render_portfolio_lightbox_data_attrs` | All 4 lightbox toggles=false | All `data-lb-*="false"` attrs | All false | ✅ Pass |
+| 148 | `render_portfolio_lightbox_defaults_true` | No lightbox settings (defaults) | All `data-lb-*="true"` attrs | All true | ✅ Pass |
+| 149 | `render_portfolio_image_protection_enabled` | portfolio_image_protection=true | `contextmenu` JS injected | Present | ✅ Pass |
+| 150 | `render_portfolio_image_protection_disabled` | portfolio_image_protection=false | No `contextmenu` JS | Absent | ✅ Pass |
+| 151 | `render_portfolio_likes_data_attr` | portfolio_enable_likes=true | `data-show-likes="true"` | Present | ✅ Pass |
+| 152 | `render_portfolio_likes_disabled` | portfolio_enable_likes=false | `data-show-likes="false"` | Present | ✅ Pass |
+| 153 | `render_portfolio_pagination_data_attr` | portfolio_pagination_type=load_more | `data-pagination-type="load_more"` | Present | ✅ Pass |
+| 154 | `render_portfolio_click_mode_data_attr` | portfolio_click_mode=detail | `data-click-mode="detail"` | Present | ✅ Pass |
+
 ---
 
 ## Running Tests
@@ -340,5 +438,13 @@ src/tests.rs
 ├── SEO Meta (3 tests)
 ├── SEO Sitemap + Robots (3 tests)
 ├── SEO JSON-LD (2 tests)
-└── DB Migrations (2 tests)
+├── DB Migrations (2 tests)
+├── Render: Category Filters (6 tests)
+├── Render: Social Links (3 tests)
+├── Render: Share Buttons (3 tests)
+├── Render: Footer (3 tests)
+├── Render: Layout (7 tests)
+├── Render: Portfolio Item Display (13 tests)
+├── Render: Journal Settings (14 tests)
+└── Render: Portfolio Lightbox & Features (8 tests)
 ```

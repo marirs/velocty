@@ -3433,3 +3433,430 @@ fn render_portfolio_mixed_cats_hover_tags_below() {
         "tags should be below_left"
     );
 }
+
+// ═══════════════════════════════════════════════════════════
+// Render: Journal (blog_list) Settings
+// ═══════════════════════════════════════════════════════════
+
+/// Helper: build a blog_list context with one post.
+fn render_blog_context(pool: &DbPool) -> serde_json::Value {
+    let settings = Setting::all(pool);
+    json!({
+        "settings": settings,
+        "posts": [
+            {
+                "title": "Hello World",
+                "slug": "hello-world",
+                "excerpt": "This is a test post with enough words to verify excerpt truncation behavior in the blog list rendering",
+                "published_at": "2026-01-15 10:00:00",
+                "featured_image": "hello.jpg",
+                "author_name": "Alice",
+                "word_count": 800
+            }
+        ],
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "blog_list",
+        "seo": "",
+    })
+}
+
+#[test]
+fn render_blog_list_grid_display() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_display_type", "grid")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-grid"),
+        "grid display type should produce blog-grid class"
+    );
+}
+
+#[test]
+fn render_blog_list_masonry_display() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_display_type", "masonry")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-masonry"),
+        "masonry display type should produce blog-masonry class"
+    );
+}
+
+#[test]
+fn render_blog_list_default_list_display() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_display_type", "list")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-list"),
+        "list display type should produce blog-list class"
+    );
+    assert!(
+        !body.contains("blog-grid"),
+        "list display should not have blog-grid"
+    );
+    assert!(
+        !body.contains("blog-masonry"),
+        "list display should not have blog-masonry"
+    );
+}
+
+#[test]
+fn render_blog_list_editorial_style() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("blog_display_type", "list"),
+            ("blog_list_style", "editorial"),
+        ],
+    );
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-editorial"),
+        "editorial list style should produce blog-editorial class"
+    );
+}
+
+#[test]
+fn render_blog_list_show_author() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_show_author", "true")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-author"),
+        "show_author=true should render author"
+    );
+    assert!(body.contains("Alice"), "author name should appear");
+}
+
+#[test]
+fn render_blog_list_hide_author() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_show_author", "false")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        !body.contains("blog-author"),
+        "show_author=false should hide author"
+    );
+}
+
+#[test]
+fn render_blog_list_show_date() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_show_date", "true")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("<time>"),
+        "show_date=true should render time element"
+    );
+}
+
+#[test]
+fn render_blog_list_hide_date() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_show_date", "false")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        !body.contains("<time>"),
+        "show_date=false should hide time element"
+    );
+}
+
+#[test]
+fn render_blog_list_show_reading_time() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_show_reading_time", "true")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("min read"),
+        "show_reading_time=true should render reading time"
+    );
+}
+
+#[test]
+fn render_blog_list_hide_reading_time() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_show_reading_time", "false")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        !body.contains("min read"),
+        "show_reading_time=false should hide reading time"
+    );
+}
+
+#[test]
+fn render_blog_list_excerpt_truncation() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_excerpt_words", "5")]);
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    // With 5 words, "This is a test post" should be the excerpt, not the full text
+    assert!(
+        !body.contains("truncation behavior"),
+        "excerpt should be truncated to 5 words"
+    );
+}
+
+#[test]
+fn render_blog_list_pagination_load_more() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_pagination_type", "load_more")]);
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "posts": [{"title":"A","slug":"a","excerpt":"","published_at":"","featured_image":"","author_name":"","word_count":0}],
+        "current_page": 1,
+        "total_pages": 3,
+        "page_type": "blog_list",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("load-more-btn"),
+        "load_more pagination should render load-more button"
+    );
+}
+
+#[test]
+fn render_blog_list_pagination_infinite() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_pagination_type", "infinite")]);
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "posts": [{"title":"A","slug":"a","excerpt":"","published_at":"","featured_image":"","author_name":"","word_count":0}],
+        "current_page": 1,
+        "total_pages": 3,
+        "page_type": "blog_list",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("infinite-sentinel"),
+        "infinite pagination should render sentinel div"
+    );
+}
+
+#[test]
+fn render_blog_list_pagination_classic() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_pagination_type", "classic")]);
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "posts": [{"title":"A","slug":"a","excerpt":"","published_at":"","featured_image":"","author_name":"","word_count":0}],
+        "current_page": 1,
+        "total_pages": 3,
+        "page_type": "blog_list",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("pagination"),
+        "classic pagination should render pagination div"
+    );
+    // Classic should have page number links, not load-more button element
+    assert!(
+        body.contains("page=2"),
+        "classic should have page links"
+    );
+    assert!(
+        !body.contains("id=\"infinite-sentinel\""),
+        "classic should not have infinite sentinel element"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render: Portfolio Lightbox & Feature Settings
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_portfolio_lightbox_data_attrs() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_lightbox_show_title", "false"),
+            ("portfolio_lightbox_show_tags", "false"),
+            ("portfolio_lightbox_nav", "false"),
+            ("portfolio_lightbox_keyboard", "false"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-lb-show-title=\"false\""),
+        "lightbox show_title should be false"
+    );
+    assert!(
+        html.contains("data-lb-show-tags=\"false\""),
+        "lightbox show_tags should be false"
+    );
+    assert!(
+        html.contains("data-lb-nav=\"false\""),
+        "lightbox nav should be false"
+    );
+    assert!(
+        html.contains("data-lb-keyboard=\"false\""),
+        "lightbox keyboard should be false"
+    );
+}
+
+#[test]
+fn render_portfolio_lightbox_defaults_true() {
+    let pool = test_pool();
+    set_settings(&pool, &[("portfolio_enabled", "true")]);
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-lb-show-title=\"true\""),
+        "lightbox show_title should default to true"
+    );
+    assert!(
+        html.contains("data-lb-show-tags=\"true\""),
+        "lightbox show_tags should default to true"
+    );
+    assert!(
+        html.contains("data-lb-nav=\"true\""),
+        "lightbox nav should default to true"
+    );
+    assert!(
+        html.contains("data-lb-keyboard=\"true\""),
+        "lightbox keyboard should default to true"
+    );
+}
+
+#[test]
+fn render_portfolio_image_protection_enabled() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_image_protection", "true"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("contextmenu"),
+        "image_protection=true should inject right-click prevention JS"
+    );
+}
+
+#[test]
+fn render_portfolio_image_protection_disabled() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_image_protection", "false"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        !html.contains("contextmenu"),
+        "image_protection=false should not inject right-click prevention JS"
+    );
+}
+
+#[test]
+fn render_portfolio_likes_data_attr() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_enable_likes", "true"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-show-likes=\"true\""),
+        "enable_likes=true should set data-show-likes=true"
+    );
+}
+
+#[test]
+fn render_portfolio_likes_disabled() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_enable_likes", "false"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-show-likes=\"false\""),
+        "enable_likes=false should set data-show-likes=false"
+    );
+}
+
+#[test]
+fn render_portfolio_pagination_data_attr() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_pagination_type", "load_more"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-pagination-type=\"load_more\""),
+        "pagination_type should appear as data attribute"
+    );
+}
+
+#[test]
+fn render_portfolio_click_mode_data_attr() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_click_mode", "detail"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-click-mode=\"detail\""),
+        "click_mode should appear as data attribute"
+    );
+}
