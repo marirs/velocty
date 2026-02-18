@@ -4,6 +4,12 @@
 <p align="center"><strong>CMS almost at the speed of light.</strong></p>
 
 <p align="center">
+  <a href="https://github.com/marirs/velocty/actions/workflows/ci.yml"><img src="https://github.com/marirs/velocty/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/marirs/velocty/actions/workflows/release.yml"><img src="https://github.com/marirs/velocty/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust&logoColor=white" alt="Rust"></a>
+</p>
+
+<p align="center">
   A purpose-built, blazing-fast content management system written in Rust.<br>
   Focused on blogging and portfolio/photography — no bloat, no plugin ecosystem, just what you need.
 </p>
