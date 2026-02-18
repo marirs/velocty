@@ -4,11 +4,8 @@ use dashmap::DashMap;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
-use rocket::State;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::db::DbPool;
 

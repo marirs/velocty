@@ -745,7 +745,7 @@
         <div class="customizer-panel-footer">
             <button type="button" class="btn btn-primary" style="width:100%" onclick="saveCustomizer()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Publish Changes <span style="font-size:11px;opacity:.5;margin-left:6px">&shortmid; &#8984;S</span>
+                Publish Changes <kbd style="font-size:10px;margin-left:8px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.15);color:rgba(255,255,255,.7);font-family:inherit;line-height:1">&#8984;S</kbd>
             </button>
         </div>
     </div>

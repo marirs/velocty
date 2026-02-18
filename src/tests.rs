@@ -3682,10 +3682,7 @@ fn render_blog_list_pagination_classic() {
         "classic pagination should render pagination div"
     );
     // Classic should have page number links, not load-more button element
-    assert!(
-        body.contains("page=2"),
-        "classic should have page links"
-    );
+    assert!(body.contains("page=2"), "classic should have page links");
     assert!(
         !body.contains("id=\"infinite-sentinel\""),
         "classic should not have infinite sentinel element"

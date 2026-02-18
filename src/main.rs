@@ -132,7 +132,8 @@ fn rocket() -> _ {
     eprintln!("Admin panel mounted at: {}", admin_mount);
     eprintln!("Dynamic routing enabled — blog/portfolio slugs and enabled flags read from cache at request time");
 
-    let rocket = rocket::build()
+    #[allow(unused_mut)]
+    let mut rocket = rocket::build()
         .manage(pool)
         .manage(AdminSlug(admin_slug))
         .manage(settings_cache)
