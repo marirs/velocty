@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Send email via SparkPost API (https://developers.sparkpost.com/api/transmissions/)
 pub fn send(
@@ -9,8 +9,14 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let api_key = settings.get("email_sparkpost_api_key").cloned().unwrap_or_default();
-    let region = settings.get("email_sparkpost_region").cloned().unwrap_or_else(|| "us".to_string());
+    let api_key = settings
+        .get("email_sparkpost_api_key")
+        .cloned()
+        .unwrap_or_default();
+    let region = settings
+        .get("email_sparkpost_region")
+        .cloned()
+        .unwrap_or_else(|| "us".to_string());
 
     if api_key.is_empty() {
         return Err("SparkPost API key not configured".into());

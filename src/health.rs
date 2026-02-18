@@ -121,7 +121,12 @@ pub fn read_db_backend() -> String {
     std::fs::read_to_string("velocty.toml")
         .ok()
         .and_then(|s| s.parse::<toml::Value>().ok())
-        .and_then(|v| v.get("database")?.get("backend")?.as_str().map(|s| s.to_string()))
+        .and_then(|v| {
+            v.get("database")?
+                .get("backend")?
+                .as_str()
+                .map(|s| s.to_string())
+        })
         .unwrap_or_else(|| "sqlite".to_string())
 }
 
@@ -130,7 +135,12 @@ fn read_mongo_uri() -> String {
     std::fs::read_to_string("velocty.toml")
         .ok()
         .and_then(|s| s.parse::<toml::Value>().ok())
-        .and_then(|v| v.get("database")?.get("uri")?.as_str().map(|s| s.to_string()))
+        .and_then(|v| {
+            v.get("database")?
+                .get("uri")?
+                .as_str()
+                .map(|s| s.to_string())
+        })
         .unwrap_or_else(|| "mongodb://localhost:27017".to_string())
 }
 
@@ -152,7 +162,10 @@ pub fn gather(pool: &DbPool) -> HealthReport {
 fn gather_disk(backend: &str) -> DiskInfo {
     let (total, free) = disk_space(".");
     let (db_size, wal_size) = if backend == "sqlite" {
-        (file_size("website/site/db/velocty.db"), file_size("website/site/db/velocty.db-wal"))
+        (
+            file_size("website/site/db/velocty.db"),
+            file_size("website/site/db/velocty.db-wal"),
+        )
     } else {
         (0, 0) // MongoDB DB is remote, no local file
     };
@@ -187,12 +200,18 @@ fn gather_db_sqlite(pool: &DbPool) -> DbInfo {
 
     let page_count = conn
         .as_ref()
-        .and_then(|c| c.query_row("PRAGMA page_count", [], |r| r.get::<_, u64>(0)).ok())
+        .and_then(|c| {
+            c.query_row("PRAGMA page_count", [], |r| r.get::<_, u64>(0))
+                .ok()
+        })
         .unwrap_or(0);
 
     let freelist_count = conn
         .as_ref()
-        .and_then(|c| c.query_row("PRAGMA freelist_count", [], |r| r.get::<_, u64>(0)).ok())
+        .and_then(|c| {
+            c.query_row("PRAGMA freelist_count", [], |r| r.get::<_, u64>(0))
+                .ok()
+        })
         .unwrap_or(0);
 
     let fragmentation_pct = if page_count > 0 {
@@ -203,14 +222,27 @@ fn gather_db_sqlite(pool: &DbPool) -> DbInfo {
 
     let integrity_ok = conn
         .as_ref()
-        .and_then(|c| c.query_row("PRAGMA integrity_check", [], |r| r.get::<_, String>(0)).ok())
+        .and_then(|c| {
+            c.query_row("PRAGMA integrity_check", [], |r| r.get::<_, String>(0))
+                .ok()
+        })
         .map(|s| s == "ok")
         .unwrap_or(false);
 
     let tables = [
-        "posts", "portfolio_items", "comments", "categories", "tags",
-        "settings", "sessions", "imports", "analytics_events",
-        "post_tags", "portfolio_tags", "post_categories", "portfolio_categories",
+        "posts",
+        "portfolio_items",
+        "comments",
+        "categories",
+        "tags",
+        "settings",
+        "sessions",
+        "imports",
+        "analytics_events",
+        "post_tags",
+        "portfolio_tags",
+        "post_categories",
+        "portfolio_categories",
     ];
     let mut table_counts = HashMap::new();
     if let Some(ref c) = conn {
@@ -297,7 +329,10 @@ fn mongo_ping(uri: &str) -> (bool, u64) {
     let host_part = after_creds.split('/').next().unwrap_or(after_creds);
     let first_host = host_part.split(',').next().unwrap_or(host_part);
     let (host, port) = if let Some(colon) = first_host.rfind(':') {
-        (first_host[..colon].to_string(), first_host[colon + 1..].parse::<u16>().unwrap_or(27017))
+        (
+            first_host[..colon].to_string(),
+            first_host[colon + 1..].parse::<u16>().unwrap_or(27017),
+        )
     } else {
         (first_host.to_string(), 27017)
     };
@@ -326,10 +361,14 @@ fn mongo_ping(uri: &str) -> (bool, u64) {
     // Build isMaster OP_MSG
     let bson_doc: Vec<u8> = {
         let mut doc = Vec::new();
-        doc.push(0x10); doc.extend_from_slice(b"isMaster\0"); doc.extend_from_slice(&1i32.to_le_bytes());
-        doc.push(0x02); doc.extend_from_slice(b"$db\0");
+        doc.push(0x10);
+        doc.extend_from_slice(b"isMaster\0");
+        doc.extend_from_slice(&1i32.to_le_bytes());
+        doc.push(0x02);
+        doc.extend_from_slice(b"$db\0");
         let db_val = b"admin\0";
-        doc.extend_from_slice(&(db_val.len() as i32).to_le_bytes()); doc.extend_from_slice(db_val);
+        doc.extend_from_slice(&(db_val.len() as i32).to_le_bytes());
+        doc.extend_from_slice(db_val);
         doc.push(0x00);
         let total = (4 + doc.len()) as i32;
         let mut full = total.to_le_bytes().to_vec();
@@ -410,10 +449,17 @@ fn gather_filesystem(backend: &str) -> Vec<FsCheck> {
                 false
             };
 
-            let (permissions, actual_mode, owner, group, uid, gid) = if exists {
+            let (permissions, actual_mode, owner, group, uid, _gid) = if exists {
                 get_path_info(path)
             } else {
-                ("-".to_string(), 0u32, "-".to_string(), "-".to_string(), u32::MAX, u32::MAX)
+                (
+                    "-".to_string(),
+                    0u32,
+                    "-".to_string(),
+                    "-".to_string(),
+                    u32::MAX,
+                    u32::MAX,
+                )
             };
 
             let recommended = format!("{:o}", recommended_mode);
@@ -424,15 +470,28 @@ fn gather_filesystem(backend: &str) -> Vec<FsCheck> {
             // Build warning message
             let mut warnings: Vec<String> = Vec::new();
             if exists && !perms_ok {
-                warnings.push(format!("Permissions are {} but should be {}. Run: chmod {} {}", permissions, recommended, recommended, p));
+                warnings.push(format!(
+                    "Permissions are {} but should be {}. Run: chmod {} {}",
+                    permissions, recommended, recommended, p
+                ));
             }
             if world_writable {
-                warnings.push(format!("World-writable ({}). Security risk! Run: chmod o-w {}", permissions, p));
+                warnings.push(format!(
+                    "World-writable ({}). Security risk! Run: chmod o-w {}",
+                    permissions, p
+                ));
             }
             if owned_by_root {
-                warnings.push(format!("Owned by root:{}. Should be owned by the application user.", group));
+                warnings.push(format!(
+                    "Owned by root:{}. Should be owned by the application user.",
+                    group
+                ));
             }
-            let warning = if warnings.is_empty() { None } else { Some(warnings.join(" ")) };
+            let warning = if warnings.is_empty() {
+                None
+            } else {
+                Some(warnings.join(" "))
+            };
 
             FsCheck {
                 path: p.to_string(),
@@ -463,13 +522,27 @@ fn get_path_info(path: &Path) -> (String, u32, String, String, u32, u32) {
             let group = resolve_groupname(gid);
             (format!("{:o}", mode), mode, owner, group, uid, gid)
         }
-        Err(_) => ("???".to_string(), 0, "???".to_string(), "???".to_string(), u32::MAX, u32::MAX),
+        Err(_) => (
+            "???".to_string(),
+            0,
+            "???".to_string(),
+            "???".to_string(),
+            u32::MAX,
+            u32::MAX,
+        ),
     }
 }
 
 #[cfg(not(unix))]
 fn get_path_info(_path: &Path) -> (String, u32, String, String, u32, u32) {
-    ("n/a".to_string(), 0, "n/a".to_string(), "n/a".to_string(), u32::MAX, u32::MAX)
+    (
+        "n/a".to_string(),
+        0,
+        "n/a".to_string(),
+        "n/a".to_string(),
+        u32::MAX,
+        u32::MAX,
+    )
 }
 
 #[cfg(unix)]
@@ -498,16 +571,24 @@ fn resolve_groupname(gid: u32) -> String {
 
 fn is_running_as_root() -> bool {
     #[cfg(unix)]
-    { unsafe { libc::geteuid() == 0 } }
+    {
+        unsafe { libc::geteuid() == 0 }
+    }
     #[cfg(not(unix))]
-    { false }
+    {
+        false
+    }
 }
 
 fn get_process_user() -> String {
     #[cfg(unix)]
-    { resolve_username(unsafe { libc::geteuid() }) }
+    {
+        resolve_username(unsafe { libc::geteuid() })
+    }
     #[cfg(not(unix))]
-    { "unknown".to_string() }
+    {
+        "unknown".to_string()
+    }
 }
 
 fn gather_content(pool: &DbPool) -> ContentStats {
@@ -529,9 +610,7 @@ fn gather_content(pool: &DbPool) -> ContentStats {
         }
     };
 
-    let count = |sql: &str| -> u64 {
-        conn.query_row(sql, [], |r| r.get(0)).unwrap_or(0)
-    };
+    let count = |sql: &str| -> u64 { conn.query_row(sql, [], |r| r.get(0)).unwrap_or(0) };
 
     ContentStats {
         posts_total: count("SELECT COUNT(*) FROM posts"),
@@ -562,9 +641,18 @@ pub fn run_vacuum(pool: &DbPool) -> ToolResult {
                     0.0
                 };
                 let detail = if reclaimed > 0 {
-                    format!("{} → {} ({:.1}% reclaimed)", human_bytes(old_size), human_bytes(new_size), pct)
+                    format!(
+                        "{} → {} ({:.1}% reclaimed)",
+                        human_bytes(old_size),
+                        human_bytes(new_size),
+                        pct
+                    )
                 } else {
-                    format!("{} → {} (already compact)", human_bytes(old_size), human_bytes(new_size))
+                    format!(
+                        "{} → {} (already compact)",
+                        human_bytes(old_size),
+                        human_bytes(new_size)
+                    )
                 };
                 ToolResult {
                     ok: true,
@@ -659,7 +747,10 @@ pub fn run_session_cleanup(pool: &DbPool) -> ToolResult {
                 )
                 .unwrap_or(0);
 
-            match conn.execute("DELETE FROM sessions WHERE expires_at < datetime('now')", []) {
+            match conn.execute(
+                "DELETE FROM sessions WHERE expires_at < datetime('now')",
+                [],
+            ) {
                 Ok(_) => ToolResult {
                     ok: true,
                     message: format!("Cleaned up {} expired session(s).", expired),
@@ -708,7 +799,7 @@ pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     if let Ok(mut stmt) = conn.prepare("SELECT featured_image FROM posts WHERE featured_image IS NOT NULL AND featured_image != ''") {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for row in rows.flatten() {
-                if let Some(name) = row.split('/').last() {
+                if let Some(name) = row.split('/').next_back() {
                     referenced.insert(name.to_string());
                 }
             }
@@ -716,10 +807,12 @@ pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     }
 
     // Portfolio images
-    if let Ok(mut stmt) = conn.prepare("SELECT image_path FROM portfolio_items WHERE image_path IS NOT NULL AND image_path != ''") {
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT image_path FROM portfolio_items WHERE image_path IS NOT NULL AND image_path != ''",
+    ) {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for row in rows.flatten() {
-                if let Some(name) = row.split('/').last() {
+                if let Some(name) = row.split('/').next_back() {
                     referenced.insert(name.to_string());
                 }
             }
@@ -734,7 +827,9 @@ pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
             }
         }
     }
-    if let Ok(mut stmt) = conn.prepare("SELECT description FROM portfolio_items WHERE description IS NOT NULL") {
+    if let Ok(mut stmt) =
+        conn.prepare("SELECT description FROM portfolio_items WHERE description IS NOT NULL")
+    {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for body in rows.flatten() {
                 extract_upload_refs(&body, &mut referenced);
@@ -743,10 +838,11 @@ pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     }
 
     // Settings (logo, favicon, etc.)
-    if let Ok(mut stmt) = conn.prepare("SELECT value FROM settings WHERE value LIKE '%/uploads/%'") {
+    if let Ok(mut stmt) = conn.prepare("SELECT value FROM settings WHERE value LIKE '%/uploads/%'")
+    {
         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
             for val in rows.flatten() {
-                if let Some(name) = val.split('/').last() {
+                if let Some(name) = val.split('/').next_back() {
                     referenced.insert(name.to_string());
                 }
             }
@@ -815,7 +911,11 @@ pub fn run_orphan_delete(pool: &DbPool, uploads_dir: &str) -> ToolResult {
         }
         ToolResult {
             ok: true,
-            message: format!("Deleted {} orphan file(s), freed {}.", deleted, human_bytes(freed)),
+            message: format!(
+                "Deleted {} orphan file(s), freed {}.",
+                deleted,
+                human_bytes(freed)
+            ),
             details: None,
         }
     } else {
@@ -901,7 +1001,10 @@ pub fn run_analytics_prune(pool: &DbPool, days: u64) -> ToolResult {
             ) {
                 Ok(_) => ToolResult {
                     ok: true,
-                    message: format!("Pruned {} analytics event(s) older than {} days.", count, days),
+                    message: format!(
+                        "Pruned {} analytics event(s) older than {} days.",
+                        count, days
+                    ),
                     details: None,
                 },
                 Err(e) => ToolResult {
@@ -1072,7 +1175,10 @@ pub fn export_content(pool: &DbPool) -> ToolResult {
             })
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
             .unwrap_or_default();
-        export.insert("post_categories".to_string(), serde_json::Value::Array(rels));
+        export.insert(
+            "post_categories".to_string(),
+            serde_json::Value::Array(rels),
+        );
     }
     if let Ok(mut stmt) = conn.prepare("SELECT portfolio_item_id, tag_id FROM portfolio_tags") {
         let rels: Vec<serde_json::Value> = stmt
@@ -1086,7 +1192,9 @@ pub fn export_content(pool: &DbPool) -> ToolResult {
             .unwrap_or_default();
         export.insert("portfolio_tags".to_string(), serde_json::Value::Array(rels));
     }
-    if let Ok(mut stmt) = conn.prepare("SELECT portfolio_item_id, category_id FROM portfolio_categories") {
+    if let Ok(mut stmt) =
+        conn.prepare("SELECT portfolio_item_id, category_id FROM portfolio_categories")
+    {
         let rels: Vec<serde_json::Value> = stmt
             .query_map([], |r| {
                 Ok(serde_json::json!({
@@ -1096,7 +1204,10 @@ pub fn export_content(pool: &DbPool) -> ToolResult {
             })
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
             .unwrap_or_default();
-        export.insert("portfolio_categories".to_string(), serde_json::Value::Array(rels));
+        export.insert(
+            "portfolio_categories".to_string(),
+            serde_json::Value::Array(rels),
+        );
     }
 
     // Export settings
@@ -1118,7 +1229,10 @@ pub fn export_content(pool: &DbPool) -> ToolResult {
     let export_name = format!("velocty_export_{}.json", timestamp);
     let export_path = format!("website/site/db/{}", export_name);
 
-    match std::fs::write(&export_path, serde_json::to_string_pretty(&json_data).unwrap_or_default()) {
+    match std::fs::write(
+        &export_path,
+        serde_json::to_string_pretty(&json_data).unwrap_or_default(),
+    ) {
         Ok(_) => ToolResult {
             ok: true,
             message: format!("Content exported as {}", export_name),
@@ -1147,8 +1261,8 @@ fn disk_space(path: &str) -> (u64, u64) {
         unsafe {
             let mut stat: libc::statvfs = std::mem::zeroed();
             if libc::statvfs(c_path.as_ptr(), &mut stat) == 0 {
-                let total = stat.f_blocks as u64 * stat.f_frsize as u64;
-                let free = stat.f_bavail as u64 * stat.f_frsize as u64;
+                let total = stat.f_blocks as u64 * stat.f_frsize;
+                let free = stat.f_bavail as u64 * stat.f_frsize;
                 return (total, free);
             }
         }
@@ -1162,7 +1276,9 @@ fn walk_uploads(path: &str) -> (u64, u64, u64, u64, u64) {
         return (0, 0, 0, 0, 0);
     }
 
-    let image_exts = ["jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "heic", "bmp", "ico"];
+    let image_exts = [
+        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "heic", "bmp", "ico",
+    ];
     let video_exts = ["mp4", "webm", "mov", "avi", "mkv"];
 
     let mut total: u64 = 0;
@@ -1207,7 +1323,16 @@ fn walk_uploads(path: &str) -> (u64, u64, u64, u64, u64) {
         }
     }
 
-    walk_recursive(dir, &image_exts, &video_exts, &mut total, &mut img, &mut vid, &mut other, &mut count);
+    walk_recursive(
+        dir,
+        &image_exts,
+        &video_exts,
+        &mut total,
+        &mut img,
+        &mut vid,
+        &mut other,
+        &mut count,
+    );
     (total, img, vid, other, count)
 }
 
@@ -1218,7 +1343,8 @@ fn get_rss_bytes() -> u64 {
         unsafe {
             let mut info: libc::mach_task_basic_info_data_t = mem::zeroed();
             let mut count = (mem::size_of::<libc::mach_task_basic_info_data_t>()
-                / mem::size_of::<libc::natural_t>()) as libc::mach_msg_type_number_t;
+                / mem::size_of::<libc::natural_t>())
+                as libc::mach_msg_type_number_t;
             let kr = libc::task_info(
                 libc::mach_task_self(),
                 libc::MACH_TASK_BASIC_INFO,
@@ -1269,7 +1395,7 @@ fn extract_upload_refs(html: &str, refs: &mut std::collections::HashSet<String>)
             break;
         }
         let end = html[start..]
-            .find(|c: char| c == '"' || c == '\'' || c == ')' || c == ' ' || c == '?' || c == '#')
+            .find(['"', '\'', ')', ' ', '?', '#'])
             .map(|i| start + i)
             .unwrap_or(html.len());
         let filename = &html[start..end];
@@ -1279,4 +1405,3 @@ fn extract_upload_refs(html: &str, refs: &mut std::collections::HashSet<String>)
         search_from = end;
     }
 }
-

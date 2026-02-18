@@ -4,10 +4,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::ai::{self, prompts, AiRequest};
-use crate::security::auth::EditorUser;
 use crate::db::DbPool;
 use crate::models::category::Category;
 use crate::models::tag::Tag;
+use crate::security::auth::EditorUser;
 
 use super::parse_json_from_text;
 
@@ -87,7 +87,9 @@ pub fn suggest_meta(
                     // Fallback: use raw text as meta description
                     let raw = resp.text.trim();
                     let desc = if raw.len() > 155 { &raw[..155] } else { raw };
-                    Json(json!({"ok": true, "provider": resp.provider, "meta_title": "", "meta_description": desc}))
+                    Json(
+                        json!({"ok": true, "provider": resp.provider, "meta_title": "", "meta_description": desc}),
+                    )
                 }
             }
         }
@@ -106,10 +108,7 @@ pub fn suggest_tags(
     let excerpt = body.content_excerpt.as_deref().unwrap_or("");
 
     // Get existing tags for context
-    let existing_tags: Vec<String> = Tag::list(pool)
-        .iter()
-        .map(|t| t.name.clone())
-        .collect();
+    let existing_tags: Vec<String> = Tag::list(pool).iter().map(|t| t.name.clone()).collect();
 
     let req = AiRequest {
         system: prompts::seo_system(),
@@ -136,10 +135,21 @@ pub fn suggest_tags(
                 }
                 None => {
                     // Fallback: split raw text by commas, newlines, or bullets
-                    let tags: Vec<String> = resp.text.lines()
+                    let tags: Vec<String> = resp
+                        .text
+                        .lines()
                         .flat_map(|l| l.split(','))
-                        .map(|t| t.trim().trim_matches('-').trim_matches('*').trim_matches('"').trim().to_string())
-                        .filter(|t| !t.is_empty() && t.len() < 50 && !t.to_lowercase().contains("tag"))
+                        .map(|t| {
+                            t.trim()
+                                .trim_matches('-')
+                                .trim_matches('*')
+                                .trim_matches('"')
+                                .trim()
+                                .to_string()
+                        })
+                        .filter(|t| {
+                            !t.is_empty() && t.len() < 50 && !t.to_lowercase().contains("tag")
+                        })
                         .take(8)
                         .collect();
                     Json(json!({"ok": true, "provider": resp.provider, "tags": tags}))
@@ -175,23 +185,21 @@ pub fn suggest_categories(
     };
 
     match ai::complete(pool, &req) {
-        Ok(resp) => {
-            match parse_json_from_text(&resp.text) {
-                Some(parsed) => {
-                    let categories = parsed
-                        .get("categories")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(String::from))
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default();
-                    Json(json!({"ok": true, "provider": resp.provider, "categories": categories}))
-                }
-                None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
+        Ok(resp) => match parse_json_from_text(&resp.text) {
+            Some(parsed) => {
+                let categories = parsed
+                    .get("categories")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                Json(json!({"ok": true, "provider": resp.provider, "categories": categories}))
             }
-        }
+            None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
+        },
         Err(e) => Json(json!({"ok": false, "error": e.to_string()})),
     }
 }
@@ -226,11 +234,25 @@ pub fn suggest_slug(
                 None => {
                     // Fallback: slugify the raw text
                     let raw = resp.text.trim().to_lowercase();
-                    let slug: String = raw.chars()
-                        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+                    let slug: String = raw
+                        .chars()
+                        .map(|c| {
+                            if c.is_alphanumeric() || c == '-' {
+                                c
+                            } else {
+                                '-'
+                            }
+                        })
                         .collect::<String>()
-                        .split('-').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("-");
-                    let slug = if slug.len() > 60 { slug[..60].trim_end_matches('-').to_string() } else { slug };
+                        .split('-')
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<_>>()
+                        .join("-");
+                    let slug = if slug.len() > 60 {
+                        slug[..60].trim_end_matches('-').to_string()
+                    } else {
+                        slug
+                    };
                     Json(json!({"ok": true, "provider": resp.provider, "slug": slug}))
                 }
             }
@@ -258,19 +280,17 @@ pub fn suggest_alt_text(
     };
 
     match ai::complete(pool, &req) {
-        Ok(resp) => {
-            match parse_json_from_text(&resp.text) {
-                Some(parsed) => {
-                    let alt_text = parsed
-                        .get("alt_text")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    Json(json!({"ok": true, "provider": resp.provider, "alt_text": alt_text}))
-                }
-                None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
+        Ok(resp) => match parse_json_from_text(&resp.text) {
+            Some(parsed) => {
+                let alt_text = parsed
+                    .get("alt_text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                Json(json!({"ok": true, "provider": resp.provider, "alt_text": alt_text}))
             }
-        }
+            None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
+        },
         Err(e) => Json(json!({"ok": false, "error": e.to_string()})),
     }
 }
@@ -295,11 +315,13 @@ pub fn suggest_title(
             image_base64: body.image_base64.clone(),
         };
         match ai::complete(pool, &img_req) {
-            Ok(resp) => {
-                parse_json_from_text(&resp.text)
-                    .and_then(|v| v.get("description").and_then(|d| d.as_str()).map(String::from))
-                    .unwrap_or(resp.text)
-            }
+            Ok(resp) => parse_json_from_text(&resp.text)
+                .and_then(|v| {
+                    v.get("description")
+                        .and_then(|d| d.as_str())
+                        .map(String::from)
+                })
+                .unwrap_or(resp.text),
             Err(e) => return Json(json!({"ok": false, "error": e.to_string()})),
         }
     } else {
@@ -327,14 +349,22 @@ pub fn suggest_title(
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
-                    Json(json!({"ok": true, "provider": resp.provider, "title": title, "description": effective_desc}))
+                    Json(
+                        json!({"ok": true, "provider": resp.provider, "title": title, "description": effective_desc}),
+                    )
                 }
                 None => {
                     // Fallback: use first line of raw text as title
                     let raw = resp.text.trim().trim_matches('"').trim_matches('\'');
                     let title = raw.lines().next().unwrap_or(raw).trim();
-                    let title = if title.len() > 100 { &title[..100] } else { title };
-                    Json(json!({"ok": true, "provider": resp.provider, "title": title, "description": effective_desc}))
+                    let title = if title.len() > 100 {
+                        &title[..100]
+                    } else {
+                        title
+                    };
+                    Json(
+                        json!({"ok": true, "provider": resp.provider, "title": title, "description": effective_desc}),
+                    )
                 }
             }
         }

@@ -9,12 +9,27 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let address = settings.get("email_gmail_address").cloned().unwrap_or_default();
-    let app_password = settings.get("email_gmail_app_password").cloned().unwrap_or_default();
+    let address = settings
+        .get("email_gmail_address")
+        .cloned()
+        .unwrap_or_default();
+    let app_password = settings
+        .get("email_gmail_app_password")
+        .cloned()
+        .unwrap_or_default();
 
     if address.is_empty() || app_password.is_empty() {
         return Err("Gmail address or app password not configured".into());
     }
 
-    send_smtp("smtp.gmail.com", 587, &address, &app_password, from, to, subject, body)
+    send_smtp(
+        "smtp.gmail.com",
+        587,
+        &address,
+        &app_password,
+        from,
+        to,
+        subject,
+        body,
+    )
 }

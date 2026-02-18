@@ -36,7 +36,9 @@ impl Design {
             id: row.get("id")?,
             name: row.get("name")?,
             slug: row.get::<_, Option<String>>("slug")?.unwrap_or_default(),
-            description: row.get::<_, Option<String>>("description")?.unwrap_or_default(),
+            description: row
+                .get::<_, Option<String>>("description")?
+                .unwrap_or_default(),
             layout_html: row.get("layout_html")?,
             style_css: row.get("style_css")?,
             thumbnail_path: row.get("thumbnail_path")?,
@@ -172,7 +174,9 @@ impl DesignTemplate {
             template_type: row.get("template_type")?,
             layout_html: row.get("layout_html")?,
             style_css: row.get("style_css")?,
-            grapesjs_data: row.get::<_, Option<String>>("grapesjs_data")?.unwrap_or_default(),
+            grapesjs_data: row
+                .get::<_, Option<String>>("grapesjs_data")?
+                .unwrap_or_default(),
             updated_at: row.get("updated_at")?,
         })
     }
@@ -182,9 +186,9 @@ impl DesignTemplate {
             Ok(c) => c,
             Err(_) => return vec![],
         };
-        let mut stmt = match conn.prepare(
-            "SELECT * FROM design_templates WHERE design_id = ?1 ORDER BY template_type",
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT * FROM design_templates WHERE design_id = ?1 ORDER BY template_type")
+        {
             Ok(s) => s,
             Err(_) => return vec![],
         };

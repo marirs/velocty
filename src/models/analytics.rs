@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use rusqlite::{params, Row};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::db::DbPool;

@@ -4,12 +4,12 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
 
-use crate::security::auth::AdminUser;
+use super::admin_base;
 use crate::db::DbPool;
 use crate::models::import::Import;
 use crate::models::settings::Setting;
+use crate::security::auth::AdminUser;
 use crate::AdminSlug;
-use super::admin_base;
 
 // ── Import ─────────────────────────────────────────────
 
@@ -58,27 +58,33 @@ pub async fn import_velocty(
 ) -> Flash<Redirect> {
     let bytes = match data.open(100.mebibytes()).into_bytes().await {
         Ok(b) if b.is_complete() => b.into_inner(),
-        _ => return Flash::error(
-            Redirect::to(format!("{}/import", admin_base(slug))),
-            "Failed to read upload data.",
-        ),
+        _ => {
+            return Flash::error(
+                Redirect::to(format!("{}/import", admin_base(slug))),
+                "Failed to read upload data.",
+            )
+        }
     };
 
     let json_str = String::from_utf8_lossy(&bytes).to_string();
     let export: serde_json::Value = match serde_json::from_str(&json_str) {
         Ok(v) => v,
-        Err(e) => return Flash::error(
-            Redirect::to(format!("{}/import", admin_base(slug))),
-            format!("Invalid JSON: {}", e),
-        ),
+        Err(e) => {
+            return Flash::error(
+                Redirect::to(format!("{}/import", admin_base(slug))),
+                format!("Invalid JSON: {}", e),
+            )
+        }
     };
 
     let conn = match pool.get() {
         Ok(c) => c,
-        Err(e) => return Flash::error(
-            Redirect::to(format!("{}/import", admin_base(slug))),
-            format!("DB error: {}", e),
-        ),
+        Err(e) => {
+            return Flash::error(
+                Redirect::to(format!("{}/import", admin_base(slug))),
+                format!("DB error: {}", e),
+            )
+        }
     };
 
     let mut imported_posts = 0u64;
@@ -124,10 +130,22 @@ pub async fn import_velocty(
             let slug_val = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
             let body = post.get("body").and_then(|v| v.as_str()).unwrap_or("");
             let excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
-            let featured_image = post.get("featured_image").and_then(|v| v.as_str()).unwrap_or("");
-            let status = post.get("status").and_then(|v| v.as_str()).unwrap_or("draft");
-            let created_at = post.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
-            let updated_at = post.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+            let featured_image = post
+                .get("featured_image")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let status = post
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("draft");
+            let created_at = post
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let updated_at = post
+                .get("updated_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if !title.is_empty() {
                 let _ = conn.execute(
                     "INSERT OR IGNORE INTO posts (title, slug, body, excerpt, featured_image, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -143,11 +161,26 @@ pub async fn import_velocty(
         for item in items {
             let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
             let slug_val = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-            let description = item.get("description").and_then(|v| v.as_str()).unwrap_or("");
-            let image_path = item.get("image_path").and_then(|v| v.as_str()).unwrap_or("");
-            let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("draft");
-            let created_at = item.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
-            let updated_at = item.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+            let description = item
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let image_path = item
+                .get("image_path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let status = item
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("draft");
+            let created_at = item
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let updated_at = item
+                .get("updated_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if !title.is_empty() {
                 let _ = conn.execute(
                     "INSERT OR IGNORE INTO portfolio_items (title, slug, description, image_path, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -162,11 +195,23 @@ pub async fn import_velocty(
     if let Some(comments) = export.get("comments").and_then(|v| v.as_array()) {
         for comment in comments {
             let post_id = comment.get("post_id").and_then(|v| v.as_i64()).unwrap_or(0);
-            let author_name = comment.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
-            let author_email = comment.get("author_email").and_then(|v| v.as_str()).unwrap_or("");
+            let author_name = comment
+                .get("author_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let author_email = comment
+                .get("author_email")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let body = comment.get("body").and_then(|v| v.as_str()).unwrap_or("");
-            let status = comment.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
-            let created_at = comment.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+            let status = comment
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("pending");
+            let created_at = comment
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if post_id > 0 && !body.is_empty() {
                 let _ = conn.execute(
                     "INSERT OR IGNORE INTO comments (post_id, author_name, author_email, body, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -178,7 +223,13 @@ pub async fn import_velocty(
     }
 
     // Import settings (skip sensitive ones)
-    let skip_keys = ["admin_password_hash", "setup_completed", "admin_slug", "admin_email", "session_secret"];
+    let skip_keys = [
+        "admin_password_hash",
+        "setup_completed",
+        "admin_slug",
+        "admin_email",
+        "session_secret",
+    ];
     if let Some(settings) = export.get("settings").and_then(|v| v.as_array()) {
         for setting in settings {
             let key = setting.get("key").and_then(|v| v.as_str()).unwrap_or("");
@@ -206,7 +257,11 @@ pub async fn import_velocty(
         Redirect::to(format!("{}/import", admin_base(slug))),
         format!(
             "Imported {} posts, {} portfolio items, {} comments, {} categories, {} tags.",
-            imported_posts, imported_portfolio, imported_comments, imported_categories, imported_tags
+            imported_posts,
+            imported_portfolio,
+            imported_comments,
+            imported_categories,
+            imported_tags
         ),
     )
 }

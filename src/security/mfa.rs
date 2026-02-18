@@ -15,14 +15,23 @@ fn build_totp(secret_b32: &str, issuer: &str, account: &str) -> Result<totp_rs::
     let secret_bytes = Secret::Encoded(secret_b32.to_string())
         .to_bytes()
         .map_err(|e| format!("Invalid secret: {}", e))?;
-    TOTP::new(Algorithm::SHA1, 6, 1, 30, secret_bytes, Some(issuer.to_string()), account.to_string())
-        .map_err(|e| format!("TOTP error: {}", e))
+    TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret_bytes,
+        Some(issuer.to_string()),
+        account.to_string(),
+    )
+    .map_err(|e| format!("TOTP error: {}", e))
 }
 
 /// Generate a QR code as a data URI (PNG base64) for the TOTP secret
 pub fn qr_data_uri(secret_b32: &str, issuer: &str, account: &str) -> Result<String, String> {
     let totp = build_totp(secret_b32, issuer, account)?;
-    totp.get_qr_base64().map_err(|e| format!("QR error: {}", e))
+    totp.get_qr_base64()
+        .map_err(|e| format!("QR error: {}", e))
         .map(|b64| format!("data:image/png;base64,{}", b64))
 }
 
@@ -62,12 +71,16 @@ pub fn set_pending_cookie(cookies: &CookieJar<'_>, pending_token: &str) {
 
 /// Get and clear the MFA pending cookie
 pub fn take_pending_cookie(cookies: &CookieJar<'_>) -> Option<String> {
-    let val = cookies.get_private(MFA_PENDING_COOKIE).map(|c| c.value().to_string());
+    let val = cookies
+        .get_private(MFA_PENDING_COOKIE)
+        .map(|c| c.value().to_string());
     cookies.remove_private(Cookie::from(MFA_PENDING_COOKIE));
     val
 }
 
 /// Get the MFA pending cookie without clearing it
 pub fn get_pending_cookie(cookies: &CookieJar<'_>) -> Option<String> {
-    cookies.get_private(MFA_PENDING_COOKIE).map(|c| c.value().to_string())
+    cookies
+        .get_private(MFA_PENDING_COOKIE)
+        .map(|c| c.value().to_string())
 }

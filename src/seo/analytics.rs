@@ -6,18 +6,16 @@ use super::html_escape;
 /// When cookie consent is enabled, scripts are gated behind consent with
 /// `type="text/plain" data-consent="analytics"`.
 pub fn build_analytics_scripts(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings
-            .get(key)
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-    };
+    let get = |key: &str| -> &str { settings.get(key).and_then(|v| v.as_str()).unwrap_or("") };
     let enabled = |key: &str| -> bool { get(key) == "true" };
 
     // When cookie consent is enabled, gate analytics behind consent
     let consent = enabled("cookie_consent_enabled");
     let (stag, stag_async) = if consent {
-        (r#"<script type="text/plain" data-consent="analytics""#, r#"<script type="text/plain" data-consent="analytics""#)
+        (
+            r#"<script type="text/plain" data-consent="analytics""#,
+            r#"<script type="text/plain" data-consent="analytics""#,
+        )
     } else {
         ("<script", "<script async")
     };
@@ -43,7 +41,11 @@ pub fn build_analytics_scripts(settings: &Value) -> String {
     if enabled("seo_plausible_enabled") {
         let domain = get("seo_plausible_domain");
         let host = get("seo_plausible_host");
-        let host = if host.is_empty() { "https://plausible.io" } else { host };
+        let host = if host.is_empty() {
+            "https://plausible.io"
+        } else {
+            host
+        };
         if !domain.is_empty() {
             scripts.push_str(&format!(
                 r#"{stag} defer data-domain="{domain}" src="{host}/js/script.js"></script>
@@ -113,7 +115,11 @@ pub fn build_analytics_scripts(settings: &Value) -> String {
     if enabled("seo_umami_enabled") {
         let website_id = get("seo_umami_website_id");
         let host = get("seo_umami_host");
-        let host = if host.is_empty() { "https://analytics.umami.is" } else { host };
+        let host = if host.is_empty() {
+            "https://analytics.umami.is"
+        } else {
+            host
+        };
         if !website_id.is_empty() {
             scripts.push_str(&format!(
                 r#"{stag} defer src="{host}/script.js" data-website-id="{id}"></script>

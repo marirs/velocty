@@ -6,10 +6,10 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::security::{auth, mfa};
 use crate::db::DbPool;
 use crate::models::settings::Setting;
 use crate::models::user::User;
+use crate::security::{auth, mfa};
 use crate::AdminSlug;
 
 use super::super::NoCacheTemplate;
@@ -26,13 +26,20 @@ fn pending_user_id(cookies: &CookieJar<'_>) -> Option<i64> {
 }
 
 #[get("/mfa")]
-pub fn mfa_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, cookies: &CookieJar<'_>) -> Result<NoCacheTemplate, Redirect> {
+pub fn mfa_page(
+    pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
+    cookies: &CookieJar<'_>,
+) -> Result<NoCacheTemplate, Redirect> {
     // Only show MFA page if there's a pending token with a valid user_id
     if pending_user_id(cookies).is_none() {
         return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
     let mut ctx: HashMap<String, String> = HashMap::new();
-    ctx.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    ctx.insert(
+        "admin_theme".to_string(),
+        Setting::get_or(pool, "admin_theme", "dark"),
+    );
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
     Ok(NoCacheTemplate(Template::render("admin/mfa", &ctx)))
 }
@@ -64,7 +71,8 @@ pub fn mfa_submit(
 
     // If TOTP failed, try recovery code
     if !valid {
-        let mut codes: Vec<String> = serde_json::from_str(&user.mfa_recovery_codes).unwrap_or_default();
+        let mut codes: Vec<String> =
+            serde_json::from_str(&user.mfa_recovery_codes).unwrap_or_default();
         let code_upper = code.to_uppercase();
         if let Some(pos) = codes.iter().position(|c| c == &code_upper) {
             codes.remove(pos);
@@ -76,7 +84,10 @@ pub fn mfa_submit(
 
     if !valid {
         let mut ctx = HashMap::new();
-        ctx.insert("error".to_string(), "Invalid code. Please try again.".to_string());
+        ctx.insert(
+            "error".to_string(),
+            "Invalid code. Please try again.".to_string(),
+        );
         ctx.insert("admin_theme".to_string(), theme);
         ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
         return Err(Template::render("admin/mfa", &ctx));

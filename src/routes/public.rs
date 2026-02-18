@@ -66,7 +66,19 @@ fn dispatch_root(
     // Skip reserved paths so admin, static files, API, etc. are never intercepted
     let admin_slug = cache.get_or("admin_slug", "admin");
     let first_segment = path.split('/').next().unwrap_or("");
-    let reserved = [admin_slug.as_str(), "static", "uploads", "api", "archives", "rss", "sitemap.xml", "robots.txt", "super", ".well-known", "favicon.ico"];
+    let reserved = [
+        admin_slug.as_str(),
+        "static",
+        "uploads",
+        "api",
+        "archives",
+        "rss",
+        "sitemap.xml",
+        "robots.txt",
+        "super",
+        ".well-known",
+        "favicon.ico",
+    ];
     if reserved.contains(&first_segment) {
         return None;
     }
@@ -99,8 +111,8 @@ fn strip_slug_prefix<'a>(path: &'a str, slug: &str) -> Option<&'a str> {
         return Some("");
     }
     if let Some(rest) = path.strip_prefix(slug) {
-        if rest.starts_with('/') {
-            return Some(&rest[1..]);
+        if let Some(stripped) = rest.strip_prefix('/') {
+            return Some(stripped);
         }
     }
     None
@@ -141,12 +153,16 @@ pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
     let conn = match pool.get() {
         Ok(c) => c,
         Err(_) => {
-            return RawHtml(render::render_page(pool, "archives", &json!({
-                "settings": settings,
-                "archives": [],
-                "page_type": "archives",
-                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-            })));
+            return RawHtml(render::render_page(
+                pool,
+                "archives",
+                &json!({
+                    "settings": settings,
+                    "archives": [],
+                    "page_type": "archives",
+                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+                }),
+            ));
         }
     };
 
@@ -158,12 +174,16 @@ pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
     ) {
         Ok(s) => s,
         Err(_) => {
-            return RawHtml(render::render_page(pool, "archives", &json!({
-                "settings": settings,
-                "archives": [],
-                "page_type": "archives",
-                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-            })));
+            return RawHtml(render::render_page(
+                pool,
+                "archives",
+                &json!({
+                    "settings": settings,
+                    "archives": [],
+                    "page_type": "archives",
+                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+                }),
+            ));
         }
     };
 
@@ -206,14 +226,18 @@ pub fn archives_month(
     let conn = match pool.get() {
         Ok(c) => c,
         Err(_) => {
-            return RawHtml(render::render_page(pool, "blog_list", &json!({
-                "settings": settings,
-                "posts": [],
-                "current_page": 1,
-                "total_pages": 1,
-                "page_type": "blog_list",
-                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-            })));
+            return RawHtml(render::render_page(
+                pool,
+                "blog_list",
+                &json!({
+                    "settings": settings,
+                    "posts": [],
+                    "current_page": 1,
+                    "total_pages": 1,
+                    "page_type": "blog_list",
+                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+                }),
+            ));
         }
     };
 
@@ -226,38 +250,39 @@ pub fn archives_month(
     ) {
         Ok(s) => s,
         Err(_) => {
-            return RawHtml(render::render_page(pool, "blog_list", &json!({
-                "settings": settings,
-                "posts": [],
-                "current_page": 1,
-                "total_pages": 1,
-                "page_type": "blog_list",
-                "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-            })));
+            return RawHtml(render::render_page(
+                pool,
+                "blog_list",
+                &json!({
+                    "settings": settings,
+                    "posts": [],
+                    "current_page": 1,
+                    "total_pages": 1,
+                    "page_type": "blog_list",
+                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+                }),
+            ));
         }
     };
 
     let posts: Vec<Post> = stmt
-        .query_map(
-            rusqlite::params![year, month, per_page, offset],
-            |row| {
-                Ok(Post {
-                    id: row.get("id")?,
-                    title: row.get("title")?,
-                    slug: row.get("slug")?,
-                    content_json: row.get("content_json")?,
-                    content_html: row.get("content_html")?,
-                    excerpt: row.get("excerpt")?,
-                    featured_image: row.get("featured_image")?,
-                    meta_title: row.get("meta_title")?,
-                    meta_description: row.get("meta_description")?,
-                    status: row.get("status")?,
-                    published_at: row.get("published_at")?,
-                    created_at: row.get("created_at")?,
-                    updated_at: row.get("updated_at")?,
-                })
-            },
-        )
+        .query_map(rusqlite::params![year, month, per_page, offset], |row| {
+            Ok(Post {
+                id: row.get("id")?,
+                title: row.get("title")?,
+                slug: row.get("slug")?,
+                content_json: row.get("content_json")?,
+                content_html: row.get("content_html")?,
+                excerpt: row.get("excerpt")?,
+                featured_image: row.get("featured_image")?,
+                meta_title: row.get("meta_title")?,
+                meta_description: row.get("meta_description")?,
+                status: row.get("status")?,
+                published_at: row.get("published_at")?,
+                created_at: row.get("created_at")?,
+                updated_at: row.get("updated_at")?,
+            })
+        })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
@@ -397,8 +422,14 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         vec![]
     };
 
-    let prev_post = post.published_at.as_ref().and_then(|pa| Post::prev_published(pool, pa));
-    let next_post = post.published_at.as_ref().and_then(|pa| Post::next_published(pool, pa));
+    let prev_post = post
+        .published_at
+        .as_ref()
+        .and_then(|pa| Post::prev_published(pool, pa));
+    let next_post = post
+        .published_at
+        .as_ref()
+        .and_then(|pa| Post::next_published(pool, pa));
 
     let mut context = json!({
         "settings": settings,
@@ -444,26 +475,23 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         .ok()?;
 
     let posts: Vec<Post> = stmt
-        .query_map(
-            rusqlite::params![category.id, per_page, offset],
-            |row| {
-                Ok(Post {
-                    id: row.get("id")?,
-                    title: row.get("title")?,
-                    slug: row.get("slug")?,
-                    content_json: row.get("content_json")?,
-                    content_html: row.get("content_html")?,
-                    excerpt: row.get("excerpt")?,
-                    featured_image: row.get("featured_image")?,
-                    meta_title: row.get("meta_title")?,
-                    meta_description: row.get("meta_description")?,
-                    status: row.get("status")?,
-                    published_at: row.get("published_at")?,
-                    created_at: row.get("created_at")?,
-                    updated_at: row.get("updated_at")?,
-                })
-            },
-        )
+        .query_map(rusqlite::params![category.id, per_page, offset], |row| {
+            Ok(Post {
+                id: row.get("id")?,
+                title: row.get("title")?,
+                slug: row.get("slug")?,
+                content_json: row.get("content_json")?,
+                content_html: row.get("content_html")?,
+                excerpt: row.get("excerpt")?,
+                featured_image: row.get("featured_image")?,
+                meta_title: row.get("meta_title")?,
+                meta_description: row.get("meta_description")?,
+                status: row.get("status")?,
+                published_at: row.get("published_at")?,
+                created_at: row.get("created_at")?,
+                updated_at: row.get("updated_at")?,
+            })
+        })
         .ok()?
         .filter_map(|r| r.ok())
         .collect();
@@ -510,26 +538,23 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
         .ok()?;
 
     let posts: Vec<Post> = stmt
-        .query_map(
-            rusqlite::params![tag.id, per_page, offset],
-            |row| {
-                Ok(Post {
-                    id: row.get("id")?,
-                    title: row.get("title")?,
-                    slug: row.get("slug")?,
-                    content_json: row.get("content_json")?,
-                    content_html: row.get("content_html")?,
-                    excerpt: row.get("excerpt")?,
-                    featured_image: row.get("featured_image")?,
-                    meta_title: row.get("meta_title")?,
-                    meta_description: row.get("meta_description")?,
-                    status: row.get("status")?,
-                    published_at: row.get("published_at")?,
-                    created_at: row.get("created_at")?,
-                    updated_at: row.get("updated_at")?,
-                })
-            },
-        )
+        .query_map(rusqlite::params![tag.id, per_page, offset], |row| {
+            Ok(Post {
+                id: row.get("id")?,
+                title: row.get("title")?,
+                slug: row.get("slug")?,
+                content_json: row.get("content_json")?,
+                content_html: row.get("content_html")?,
+                excerpt: row.get("excerpt")?,
+                featured_image: row.get("featured_image")?,
+                meta_title: row.get("meta_title")?,
+                meta_description: row.get("meta_description")?,
+                status: row.get("status")?,
+                published_at: row.get("published_at")?,
+                created_at: row.get("created_at")?,
+                updated_at: row.get("updated_at")?,
+            })
+        })
         .ok()?
         .filter_map(|r| r.ok())
         .collect();
@@ -613,10 +638,16 @@ fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
     };
 
     let any_commerce = [
-        "commerce_paypal_enabled", "commerce_stripe_enabled", "commerce_payoneer_enabled",
-        "commerce_2checkout_enabled", "commerce_square_enabled", "commerce_razorpay_enabled",
+        "commerce_paypal_enabled",
+        "commerce_stripe_enabled",
+        "commerce_payoneer_enabled",
+        "commerce_2checkout_enabled",
+        "commerce_square_enabled",
+        "commerce_razorpay_enabled",
         "commerce_mollie_enabled",
-    ].iter().any(|k| settings.get(*k).map(|v| v.as_str()) == Some("true"));
+    ]
+    .iter()
+    .any(|k| settings.get(*k).map(|v| v.as_str()) == Some("true"));
 
     let context = json!({
         "settings": settings,
@@ -635,10 +666,18 @@ fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         ),
     });
 
-    Some(RawHtml(render::render_page(pool, "portfolio_single", &context)))
+    Some(RawHtml(render::render_page(
+        pool,
+        "portfolio_single",
+        &context,
+    )))
 }
 
-fn do_portfolio_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtml<String>> {
+fn do_portfolio_by_category(
+    pool: &DbPool,
+    slug: &str,
+    page: Option<i64>,
+) -> Option<RawHtml<String>> {
     let category = Category::find_by_slug(pool, slug)?;
     let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
@@ -671,7 +710,11 @@ fn do_portfolio_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Opt
         "seo": seo::build_meta(pool, Some(&category.name), None, &format!("/portfolio/category/{}", slug)),
     });
 
-    Some(RawHtml(render::render_page(pool, "portfolio_grid", &context)))
+    Some(RawHtml(render::render_page(
+        pool,
+        "portfolio_grid",
+        &context,
+    )))
 }
 
 fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtml<String>> {
@@ -693,33 +736,36 @@ fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         .ok()?;
 
     let items: Vec<PortfolioItem> = stmt
-        .query_map(
-            rusqlite::params![tag.id, per_page, offset],
-            |row| {
-                let sell_raw: i64 = row.get("sell_enabled")?;
-                Ok(PortfolioItem {
-                    id: row.get("id")?,
-                    title: row.get("title")?,
-                    slug: row.get("slug")?,
-                    description_json: row.get("description_json")?,
-                    description_html: row.get("description_html")?,
-                    image_path: row.get("image_path")?,
-                    thumbnail_path: row.get("thumbnail_path")?,
-                    meta_title: row.get("meta_title")?,
-                    meta_description: row.get("meta_description")?,
-                    sell_enabled: sell_raw != 0,
-                    price: row.get("price")?,
-                    purchase_note: row.get::<_, Option<String>>("purchase_note")?.unwrap_or_default(),
-                    payment_provider: row.get::<_, Option<String>>("payment_provider")?.unwrap_or_default(),
-                    download_file_path: row.get::<_, Option<String>>("download_file_path")?.unwrap_or_default(),
-                    likes: row.get("likes")?,
-                    status: row.get("status")?,
-                    published_at: row.get("published_at")?,
-                    created_at: row.get("created_at")?,
-                    updated_at: row.get("updated_at")?,
-                })
-            },
-        )
+        .query_map(rusqlite::params![tag.id, per_page, offset], |row| {
+            let sell_raw: i64 = row.get("sell_enabled")?;
+            Ok(PortfolioItem {
+                id: row.get("id")?,
+                title: row.get("title")?,
+                slug: row.get("slug")?,
+                description_json: row.get("description_json")?,
+                description_html: row.get("description_html")?,
+                image_path: row.get("image_path")?,
+                thumbnail_path: row.get("thumbnail_path")?,
+                meta_title: row.get("meta_title")?,
+                meta_description: row.get("meta_description")?,
+                sell_enabled: sell_raw != 0,
+                price: row.get("price")?,
+                purchase_note: row
+                    .get::<_, Option<String>>("purchase_note")?
+                    .unwrap_or_default(),
+                payment_provider: row
+                    .get::<_, Option<String>>("payment_provider")?
+                    .unwrap_or_default(),
+                download_file_path: row
+                    .get::<_, Option<String>>("download_file_path")?
+                    .unwrap_or_default(),
+                likes: row.get("likes")?,
+                status: row.get("status")?,
+                published_at: row.get("published_at")?,
+                created_at: row.get("created_at")?,
+                updated_at: row.get("updated_at")?,
+            })
+        })
         .ok()?
         .filter_map(|r| r.ok())
         .collect();
@@ -759,5 +805,9 @@ fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         "seo": seo::build_meta(pool, Some(&tag.name), None, &format!("/portfolio/tag/{}", slug)),
     });
 
-    Some(RawHtml(render::render_page(pool, "portfolio_grid", &context)))
+    Some(RawHtml(render::render_page(
+        pool,
+        "portfolio_grid",
+        &context,
+    )))
 }

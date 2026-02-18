@@ -23,7 +23,9 @@ impl Fairing for AnalyticsFairing {
         let path = request.uri().path().to_string();
 
         // Skip admin routes, static files, and API endpoints
-        let admin_prefix = request.rocket().state::<AdminSlug>()
+        let admin_prefix = request
+            .rocket()
+            .state::<AdminSlug>()
             .map(|s| format!("/{}", s.0))
             .unwrap_or_else(|| "/admin".to_string());
         if path.starts_with(&admin_prefix)
@@ -47,10 +49,7 @@ impl Fairing for AnalyticsFairing {
 
         let ip_hash = hash_ip(&ip);
 
-        let referrer = request
-            .headers()
-            .get_one("Referer")
-            .map(|r| extract_domain(r));
+        let referrer = request.headers().get_one("Referer").map(extract_domain);
 
         let ua_string = request.headers().get_one("User-Agent").unwrap_or("");
         let (device_type, browser) = parse_user_agent(ua_string);

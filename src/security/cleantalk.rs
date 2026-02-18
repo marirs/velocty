@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 /// Check content for spam using CleanTalk API.
 /// https://cleantalk.org/help/api-check-message
@@ -11,7 +11,10 @@ pub fn check_spam(
     author: Option<&str>,
     author_email: Option<&str>,
 ) -> Result<bool, String> {
-    let api_key = settings.get("security_cleantalk_api_key").cloned().unwrap_or_default();
+    let api_key = settings
+        .get("security_cleantalk_api_key")
+        .cloned()
+        .unwrap_or_default();
     if api_key.is_empty() {
         return Err("CleanTalk API key not configured".into());
     }
@@ -54,7 +57,8 @@ pub fn check_spam(
     let allow = json.get("allow").and_then(|v| v.as_i64()).unwrap_or(1);
 
     if allow == 0 {
-        let comment = json.get("comment")
+        let comment = json
+            .get("comment")
             .and_then(|v| v.as_str())
             .unwrap_or("spam detected");
         log::warn!("CleanTalk flagged as spam: {}", comment);

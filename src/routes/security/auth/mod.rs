@@ -1,9 +1,9 @@
 pub mod login;
-pub mod mfa;
+pub mod logout;
 pub mod magic_link;
+pub mod mfa;
 pub mod password_reset;
 pub mod setup;
-pub mod logout;
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![

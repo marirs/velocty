@@ -6,12 +6,12 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::security::auth::AdminUser;
+use super::save_upload;
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
 use crate::models::settings::Setting;
+use crate::security::auth::AdminUser;
 use crate::AdminSlug;
-use super::save_upload;
 
 // ── Users Management ─────────────────────────────────────────
 
@@ -92,7 +92,17 @@ pub fn user_create(
 
     match User::create(pool, email, &hash, display_name, role) {
         Ok(id) => {
-            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "create", Some("user"), Some(id), Some(display_name), Some(role), None);
+            AuditEntry::log(
+                pool,
+                Some(_admin.user.id),
+                Some(&_admin.user.display_name),
+                "create",
+                Some("user"),
+                Some(id),
+                Some(display_name),
+                Some(role),
+                None,
+            );
             Json(json!({"success": true, "id": id}))
         }
         Err(e) => Json(json!({"success": false, "error": e})),
@@ -131,7 +141,9 @@ pub fn user_update(
         }
         // Prevent demoting the last admin
         if user.role == "admin" && role != "admin" && User::count_by_role(pool, "admin") <= 1 {
-            return Json(json!({"success": false, "error": "Cannot change role of the last admin"}));
+            return Json(
+                json!({"success": false, "error": "Cannot change role of the last admin"}),
+            );
         }
         if let Err(e) = User::update_role(pool, form.id, role) {
             return Json(json!({"success": false, "error": e}));
@@ -148,8 +160,18 @@ pub fn user_update(
     }
 
     // Update profile fields if provided
-    let email = form.email.as_deref().unwrap_or(&user.email).trim().to_string();
-    let display_name = form.display_name.as_deref().unwrap_or(&user.display_name).trim().to_string();
+    let email = form
+        .email
+        .as_deref()
+        .unwrap_or(&user.email)
+        .trim()
+        .to_string();
+    let display_name = form
+        .display_name
+        .as_deref()
+        .unwrap_or(&user.display_name)
+        .trim()
+        .to_string();
     if let Err(e) = User::update_profile(pool, form.id, &display_name, &email, &avatar) {
         return Json(json!({"success": false, "error": e}));
     }
@@ -167,7 +189,9 @@ pub fn user_update(
     if let Some(ref pw) = form.password {
         if !pw.is_empty() {
             if pw.len() < 8 {
-                return Json(json!({"success": false, "error": "Password must be at least 8 characters"}));
+                return Json(
+                    json!({"success": false, "error": "Password must be at least 8 characters"}),
+                );
             }
             let hash = match auth::hash_password(pw) {
                 Ok(h) => h,
@@ -213,7 +237,9 @@ pub async fn user_avatar_upload(
             }
             Json(json!({"success": true, "avatar": avatar_url}))
         }
-        None => Json(json!({"success": false, "error": "Upload failed. Ensure the file is a valid image."})),
+        None => Json(
+            json!({"success": false, "error": "Upload failed. Ensure the file is a valid image."}),
+        ),
     }
 }
 
@@ -238,10 +264,22 @@ pub fn user_lock(
             return Json(json!({"success": false, "error": "Cannot lock the last admin"}));
         }
     }
-    let target_name = User::get_by_id(pool, form.id).map(|u| u.display_name).unwrap_or_default();
+    let target_name = User::get_by_id(pool, form.id)
+        .map(|u| u.display_name)
+        .unwrap_or_default();
     match User::lock(pool, form.id) {
         Ok(_) => {
-            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "lock", Some("user"), Some(form.id), Some(&target_name), None, None);
+            AuditEntry::log(
+                pool,
+                Some(_admin.user.id),
+                Some(&_admin.user.display_name),
+                "lock",
+                Some("user"),
+                Some(form.id),
+                Some(&target_name),
+                None,
+                None,
+            );
             Json(json!({"success": true}))
         }
         Err(e) => Json(json!({"success": false, "error": e})),
@@ -256,10 +294,22 @@ pub fn user_unlock(
 ) -> Json<Value> {
     use crate::models::user::User;
 
-    let target_name = User::get_by_id(pool, form.id).map(|u| u.display_name).unwrap_or_default();
+    let target_name = User::get_by_id(pool, form.id)
+        .map(|u| u.display_name)
+        .unwrap_or_default();
     match User::unlock(pool, form.id) {
         Ok(_) => {
-            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "unlock", Some("user"), Some(form.id), Some(&target_name), None, None);
+            AuditEntry::log(
+                pool,
+                Some(_admin.user.id),
+                Some(&_admin.user.display_name),
+                "unlock",
+                Some("user"),
+                Some(form.id),
+                Some(&target_name),
+                None,
+                None,
+            );
             Json(json!({"success": true}))
         }
         Err(e) => Json(json!({"success": false, "error": e})),
@@ -296,7 +346,11 @@ pub fn user_reset_password(
     let pw = temp_pw.clone();
     std::thread::spawn(move || {
         if let Err(e) = password_reset::send_admin_reset_email(&pool_clone, &email, &pw) {
-            log::error!("Failed to send admin password reset email to {}: {}", email, e);
+            log::error!(
+                "Failed to send admin password reset email to {}: {}",
+                email,
+                e
+            );
         }
     });
 
@@ -319,10 +373,22 @@ pub fn user_delete(
             return Json(json!({"success": false, "error": "Cannot delete the last admin"}));
         }
     }
-    let target_name = User::get_by_id(pool, form.id).map(|u| u.display_name).unwrap_or_default();
+    let target_name = User::get_by_id(pool, form.id)
+        .map(|u| u.display_name)
+        .unwrap_or_default();
     match User::delete(pool, form.id) {
         Ok(_) => {
-            AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("user"), Some(form.id), Some(&target_name), None, None);
+            AuditEntry::log(
+                pool,
+                Some(_admin.user.id),
+                Some(&_admin.user.display_name),
+                "delete",
+                Some("user"),
+                Some(form.id),
+                Some(&target_name),
+                None,
+                None,
+            );
             Json(json!({"success": true}))
         }
         Err(e) => Json(json!({"success": false, "error": e})),
@@ -332,12 +398,7 @@ pub fn user_delete(
 // ── MFA Setup / Disable (per-user) ──────────────────────
 
 #[post("/mfa/setup", format = "json")]
-pub fn mfa_setup(
-    _admin: AdminUser,
-    pool: &State<DbPool>,
-) -> Json<Value> {
-    use crate::models::user::User;
-
+pub fn mfa_setup(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
     let site_name = Setting::get_or(pool, "site_name", "Velocty");
 
     let secret = crate::security::mfa::generate_secret();
@@ -419,9 +480,8 @@ pub fn mfa_disable(
 }
 
 #[get("/mfa/recovery-codes")]
-pub fn mfa_recovery_codes(
-    _admin: AdminUser,
-) -> Json<Value> {
-    let codes: Vec<String> = serde_json::from_str(&_admin.user.mfa_recovery_codes).unwrap_or_default();
+pub fn mfa_recovery_codes(_admin: AdminUser) -> Json<Value> {
+    let codes: Vec<String> =
+        serde_json::from_str(&_admin.user.mfa_recovery_codes).unwrap_or_default();
     Json(json!({ "ok": true, "codes": codes }))
 }

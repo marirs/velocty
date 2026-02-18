@@ -58,13 +58,11 @@ impl Category {
 
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match type_filter {
             Some(t) => (
-                "SELECT * FROM categories WHERE type = ?1 OR type = 'both' ORDER BY name".to_string(),
+                "SELECT * FROM categories WHERE type = ?1 OR type = 'both' ORDER BY name"
+                    .to_string(),
                 vec![Box::new(t.to_string())],
             ),
-            None => (
-                "SELECT * FROM categories ORDER BY name".to_string(),
-                vec![],
-            ),
+            None => ("SELECT * FROM categories ORDER BY name".to_string(), vec![]),
         };
 
         let mut stmt = match conn.prepare(&sql) {
@@ -80,7 +78,12 @@ impl Category {
             .unwrap_or_default()
     }
 
-    pub fn list_paginated(pool: &DbPool, type_filter: Option<&str>, limit: i64, offset: i64) -> Vec<Self> {
+    pub fn list_paginated(
+        pool: &DbPool,
+        type_filter: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Vec<Self> {
         let conn = match pool.get() {
             Ok(c) => c,
             Err(_) => return vec![],
@@ -99,7 +102,8 @@ impl Category {
             Ok(s) => s,
             Err(_) => return vec![],
         };
-        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
         stmt.query_map(params_refs.as_slice(), Self::from_row)
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
             .unwrap_or_default()
@@ -111,8 +115,16 @@ impl Category {
             Err(_) => return 0,
         };
         match type_filter {
-            Some(t) => conn.query_row("SELECT COUNT(*) FROM categories WHERE type = ?1 OR type = 'both'", params![t], |row| row.get(0)).unwrap_or(0),
-            None => conn.query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0)).unwrap_or(0),
+            Some(t) => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM categories WHERE type = ?1 OR type = 'both'",
+                    params![t],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+            None => conn
+                .query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))
+                .unwrap_or(0),
         }
     }
 
@@ -211,7 +223,8 @@ impl Category {
             Ok(s) => s,
             Err(_) => return vec![],
         };
-        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
         stmt.query_map(params_refs.as_slice(), Self::from_row)
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
             .unwrap_or_default()

@@ -25,9 +25,7 @@ const CRITICAL_TEMPLATES: &[&str] = &[
 ];
 
 /// Critical static assets
-const CRITICAL_STATIC: &[&str] = &[
-    "website/static/css/admin.css",
-];
+const CRITICAL_STATIC: &[&str] = &["website/static/css/admin.css"];
 
 /// Run all boot checks. Call this before Rocket launches.
 /// Creates missing directories, warns about missing files, and
@@ -66,7 +64,10 @@ pub fn run() {
     // ── 3. Critical static assets ──────────────────────
     for file in CRITICAL_STATIC {
         if !Path::new(file).exists() {
-            warn!("  Missing static asset: {} (admin UI will be unstyled)", file);
+            warn!(
+                "  Missing static asset: {} (admin UI will be unstyled)",
+                file
+            );
             warnings += 1;
         }
     }
@@ -86,20 +87,21 @@ pub fn run() {
     for dir in &template_subdirs {
         let path = Path::new(dir);
         if !path.exists() {
-            warn!("  Missing template directory: {} (some admin pages will 500)", dir);
+            warn!(
+                "  Missing template directory: {} (some admin pages will 500)",
+                dir
+            );
             warnings += 1;
         } else {
             // Check at least one .tera file exists in each
             let has_templates = fs::read_dir(path)
                 .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .any(|e| {
-                            e.path()
-                                .extension()
-                                .map(|ext| ext == "tera")
-                                .unwrap_or(false)
-                        })
+                    entries.filter_map(|e| e.ok()).any(|e| {
+                        e.path()
+                            .extension()
+                            .map(|ext| ext == "tera")
+                            .unwrap_or(false)
+                    })
                 })
                 .unwrap_or(false);
 
@@ -134,7 +136,10 @@ pub fn run() {
                 let _ = fs::remove_file(&test_file);
             }
             Err(e) => {
-                warn!("  Uploads directory not writable: {} (file uploads will fail)", e);
+                warn!(
+                    "  Uploads directory not writable: {} (file uploads will fail)",
+                    e
+                );
                 warnings += 1;
             }
         }

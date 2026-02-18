@@ -8,9 +8,18 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let api_key = settings.get("email_mailgun_api_key").cloned().unwrap_or_default();
-    let domain = settings.get("email_mailgun_domain").cloned().unwrap_or_default();
-    let region = settings.get("email_mailgun_region").cloned().unwrap_or_else(|| "us".to_string());
+    let api_key = settings
+        .get("email_mailgun_api_key")
+        .cloned()
+        .unwrap_or_default();
+    let domain = settings
+        .get("email_mailgun_domain")
+        .cloned()
+        .unwrap_or_default();
+    let region = settings
+        .get("email_mailgun_region")
+        .cloned()
+        .unwrap_or_else(|| "us".to_string());
 
     if api_key.is_empty() || domain.is_empty() {
         return Err("Mailgun API key or domain not configured".into());

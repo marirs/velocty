@@ -9,9 +9,18 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let access_key = settings.get("email_ses_access_key").cloned().unwrap_or_default();
-    let secret_key = settings.get("email_ses_secret_key").cloned().unwrap_or_default();
-    let region = settings.get("email_ses_region").cloned().unwrap_or_else(|| "us-east-1".to_string());
+    let access_key = settings
+        .get("email_ses_access_key")
+        .cloned()
+        .unwrap_or_default();
+    let secret_key = settings
+        .get("email_ses_secret_key")
+        .cloned()
+        .unwrap_or_default();
+    let region = settings
+        .get("email_ses_region")
+        .cloned()
+        .unwrap_or_else(|| "us-east-1".to_string());
 
     if access_key.is_empty() || secret_key.is_empty() {
         return Err("SES access key or secret key not configured".into());
@@ -41,7 +50,10 @@ pub fn send(
 
     let payload_hash = hex_sha256(form_body.as_bytes());
 
-    let canonical_headers = format!("content-type:application/x-www-form-urlencoded\nhost:{}\nx-amz-date:{}\n", host, timestamp);
+    let canonical_headers = format!(
+        "content-type:application/x-www-form-urlencoded\nhost:{}\nx-amz-date:{}\n",
+        host, timestamp
+    );
     let signed_headers = "content-type;host;x-amz-date";
 
     let canonical_request = format!(
@@ -52,11 +64,16 @@ pub fn send(
     let credential_scope = format!("{}/{}/ses/aws4_request", date_stamp, region);
     let string_to_sign = format!(
         "AWS4-HMAC-SHA256\n{}\n{}\n{}",
-        timestamp, credential_scope, hex_sha256(canonical_request.as_bytes())
+        timestamp,
+        credential_scope,
+        hex_sha256(canonical_request.as_bytes())
     );
 
     // Derive signing key
-    let k_date = hmac_sha256(format!("AWS4{}", secret_key).as_bytes(), date_stamp.as_bytes());
+    let k_date = hmac_sha256(
+        format!("AWS4{}", secret_key).as_bytes(),
+        date_stamp.as_bytes(),
+    );
     let k_region = hmac_sha256(&k_date, region.as_bytes());
     let k_service = hmac_sha256(&k_region, b"ses");
     let k_signing = hmac_sha256(&k_service, b"aws4_request");

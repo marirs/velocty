@@ -4,12 +4,7 @@ use super::html_escape;
 
 /// Build webmaster verification meta tags for all configured search engines.
 pub fn build_webmaster_meta(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings
-            .get(key)
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-    };
+    let get = |key: &str| -> &str { settings.get(key).and_then(|v| v.as_str()).unwrap_or("") };
 
     let mut meta = String::new();
     let verifications = [

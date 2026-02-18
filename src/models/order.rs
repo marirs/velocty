@@ -43,11 +43,15 @@ impl Order {
             id: row.get("id")?,
             portfolio_id: row.get("portfolio_id")?,
             buyer_email: row.get("buyer_email")?,
-            buyer_name: row.get::<_, Option<String>>("buyer_name")?.unwrap_or_default(),
+            buyer_name: row
+                .get::<_, Option<String>>("buyer_name")?
+                .unwrap_or_default(),
             amount: row.get("amount")?,
             currency: row.get("currency")?,
             provider: row.get("provider")?,
-            provider_order_id: row.get::<_, Option<String>>("provider_order_id")?.unwrap_or_default(),
+            provider_order_id: row
+                .get::<_, Option<String>>("provider_order_id")?
+                .unwrap_or_default(),
             status: row.get("status")?,
             created_at: row.get("created_at")?,
         })
@@ -55,7 +59,12 @@ impl Order {
 
     pub fn find_by_id(pool: &DbPool, id: i64) -> Option<Self> {
         let conn = pool.get().ok()?;
-        conn.query_row("SELECT * FROM orders WHERE id = ?1", params![id], Self::from_row).ok()
+        conn.query_row(
+            "SELECT * FROM orders WHERE id = ?1",
+            params![id],
+            Self::from_row,
+        )
+        .ok()
     }
 
     pub fn find_by_provider_order_id(pool: &DbPool, provider_order_id: &str) -> Option<Self> {
@@ -73,9 +82,9 @@ impl Order {
             Ok(c) => c,
             Err(_) => return vec![],
         };
-        let mut stmt = match conn.prepare(
-            "SELECT * FROM orders ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?1 OFFSET ?2")
+        {
             Ok(s) => s,
             Err(_) => return vec![],
         };
@@ -121,9 +130,9 @@ impl Order {
             Ok(c) => c,
             Err(_) => return vec![],
         };
-        let mut stmt = match conn.prepare(
-            "SELECT * FROM orders WHERE portfolio_id = ?1 ORDER BY created_at DESC",
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT * FROM orders WHERE portfolio_id = ?1 ORDER BY created_at DESC")
+        {
             Ok(s) => s,
             Err(_) => return vec![],
         };
@@ -211,7 +220,11 @@ impl Order {
         Ok(())
     }
 
-    pub fn update_provider_order_id(pool: &DbPool, id: i64, provider_order_id: &str) -> Result<(), String> {
+    pub fn update_provider_order_id(
+        pool: &DbPool,
+        id: i64,
+        provider_order_id: &str,
+    ) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
         conn.execute(
             "UPDATE orders SET provider_order_id = ?1 WHERE id = ?2",

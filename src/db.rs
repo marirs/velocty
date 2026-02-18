@@ -355,17 +355,13 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Add user_id to sessions if missing
-    let has_session_user_id: bool = conn
-        .prepare("SELECT user_id FROM sessions LIMIT 0")
-        .is_ok();
+    let has_session_user_id: bool = conn.prepare("SELECT user_id FROM sessions LIMIT 0").is_ok();
     if !has_session_user_id {
         conn.execute_batch("ALTER TABLE sessions ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
     }
 
     // Add user_id to posts if missing
-    let has_post_user_id: bool = conn
-        .prepare("SELECT user_id FROM posts LIMIT 0")
-        .is_ok();
+    let has_post_user_id: bool = conn.prepare("SELECT user_id FROM posts LIMIT 0").is_ok();
     if !has_post_user_id {
         conn.execute_batch("ALTER TABLE posts ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
     }
@@ -383,7 +379,9 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         .prepare("SELECT grapesjs_data FROM design_templates LIMIT 0")
         .is_ok();
     if !has_grapesjs_data {
-        conn.execute_batch("ALTER TABLE design_templates ADD COLUMN grapesjs_data TEXT DEFAULT '';")?;
+        conn.execute_batch(
+            "ALTER TABLE design_templates ADD COLUMN grapesjs_data TEXT DEFAULT '';",
+        )?;
     }
 
     // Add show_in_nav to categories if missing (default 1 = visible)
@@ -391,7 +389,9 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         .prepare("SELECT show_in_nav FROM categories LIMIT 0")
         .is_ok();
     if !has_show_in_nav {
-        conn.execute_batch("ALTER TABLE categories ADD COLUMN show_in_nav INTEGER NOT NULL DEFAULT 1;")?;
+        conn.execute_batch(
+            "ALTER TABLE categories ADD COLUMN show_in_nav INTEGER NOT NULL DEFAULT 1;",
+        )?;
     }
 
     Ok(())
@@ -794,8 +794,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Seed default design if none exists
-    let design_count: i64 =
-        conn.query_row("SELECT COUNT(*) FROM designs", [], |row| row.get(0))?;
+    let design_count: i64 = conn.query_row("SELECT COUNT(*) FROM designs", [], |row| row.get(0))?;
 
     if design_count == 0 {
         conn.execute(
@@ -814,7 +813,11 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             )
             .unwrap_or_else(|_| "ollama,openai,gemini,groq,cloudflare".to_string());
 
-        let mut providers: Vec<&str> = chain.split(',').map(|s| s.trim()).filter(|s| *s != "local" && !s.is_empty()).collect();
+        let mut providers: Vec<&str> = chain
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| *s != "local" && !s.is_empty())
+            .collect();
         if !providers.contains(&"groq") {
             // Insert groq before cloudflare, or at the end
             if let Some(pos) = providers.iter().position(|p| *p == "cloudflare") {
@@ -859,8 +862,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
 
     if admin_exists == 0 {
         // Default password: "admin" — user MUST change on first login
-        let hash = bcrypt::hash("admin", bcrypt::DEFAULT_COST)
-            .expect("Failed to hash default password");
+        let hash =
+            bcrypt::hash("admin", bcrypt::DEFAULT_COST).expect("Failed to hash default password");
         conn.execute(
             "INSERT INTO settings (key, value) VALUES ('admin_password_hash', ?1)",
             params![hash],
@@ -872,34 +875,58 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ── Auto-migrate settings-based admin into users table ──
-    let user_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM users",
-        [],
-        |row| row.get(0),
-    )?;
+    let user_count: i64 = conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
 
     if user_count == 0 {
         // Migrate existing admin from settings → users row #1
         let admin_email: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'admin_email'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'admin_email'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_default();
         let admin_hash: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'admin_password_hash'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'admin_password_hash'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_default();
         let admin_name: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'admin_display_name'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'admin_display_name'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_else(|_| "Admin".to_string());
         let admin_avatar: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'admin_avatar'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'admin_avatar'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_default();
         let mfa_enabled: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'mfa_enabled'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'mfa_enabled'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_else(|_| "false".to_string());
         let mfa_secret: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'mfa_secret'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'mfa_secret'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_default();
         let mfa_codes: String = conn
-            .query_row("SELECT value FROM settings WHERE key = 'mfa_recovery_codes'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'mfa_recovery_codes'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_else(|_| "[]".to_string());
 
         if !admin_email.is_empty() && !admin_hash.is_empty() {
@@ -915,7 +942,10 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             conn.execute_batch("UPDATE portfolio SET user_id = 1 WHERE user_id IS NULL;")?;
             conn.execute_batch("UPDATE sessions SET user_id = 1 WHERE user_id IS NULL;")?;
 
-            log::info!("Migrated admin '{}' from settings to users table (id=1)", admin_email);
+            log::info!(
+                "Migrated admin '{}' from settings to users table (id=1)",
+                admin_email
+            );
         }
     }
 
@@ -926,7 +956,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             [],
             |row| row.get::<_, i64>(0),
         )
-        .unwrap_or(0) > 0;
+        .unwrap_or(0)
+        > 0;
     if has_orphan_sessions {
         // Assign to first admin user
         let first_admin_id: Option<i64> = conn
@@ -949,9 +980,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute_batch("UPDATE users SET status = 'locked' WHERE status = 'suspended';")?;
 
     // Add slug column to designs if missing
-    let has_design_slug: bool = conn
-        .prepare("SELECT slug FROM designs LIMIT 0")
-        .is_ok();
+    let has_design_slug: bool = conn.prepare("SELECT slug FROM designs LIMIT 0").is_ok();
     if !has_design_slug {
         conn.execute_batch("ALTER TABLE designs ADD COLUMN slug TEXT NOT NULL DEFAULT '';")?;
     }

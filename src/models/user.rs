@@ -9,8 +9,8 @@ pub struct User {
     pub email: String,
     pub password_hash: String,
     pub display_name: String,
-    pub role: String,        // admin, editor, author, subscriber
-    pub status: String,      // active, suspended, locked
+    pub role: String,   // admin, editor, author, subscriber
+    pub status: String, // active, suspended, locked
     pub avatar: String,
     pub mfa_enabled: bool,
     pub mfa_secret: String,
@@ -33,7 +33,9 @@ impl User {
             avatar: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
             mfa_enabled: mfa_int != 0,
             mfa_secret: row.get::<_, Option<String>>(8)?.unwrap_or_default(),
-            mfa_recovery_codes: row.get::<_, Option<String>>(9)?.unwrap_or_else(|| "[]".to_string()),
+            mfa_recovery_codes: row
+                .get::<_, Option<String>>(9)?
+                .unwrap_or_else(|| "[]".to_string()),
             last_login_at: row.get(10)?,
             created_at: row.get(11)?,
             updated_at: row.get(12)?,
@@ -89,11 +91,17 @@ impl User {
         };
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match role {
             Some(r) => (
-                format!("SELECT {} FROM users WHERE role = ?1 ORDER BY id ASC LIMIT ?2 OFFSET ?3", Self::SELECT_COLS),
+                format!(
+                    "SELECT {} FROM users WHERE role = ?1 ORDER BY id ASC LIMIT ?2 OFFSET ?3",
+                    Self::SELECT_COLS
+                ),
                 vec![Box::new(r.to_string()), Box::new(limit), Box::new(offset)],
             ),
             None => (
-                format!("SELECT {} FROM users ORDER BY id ASC LIMIT ?1 OFFSET ?2", Self::SELECT_COLS),
+                format!(
+                    "SELECT {} FROM users ORDER BY id ASC LIMIT ?1 OFFSET ?2",
+                    Self::SELECT_COLS
+                ),
                 vec![Box::new(limit), Box::new(offset)],
             ),
         };
@@ -101,7 +109,8 @@ impl User {
             Ok(s) => s,
             Err(_) => return vec![],
         };
-        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
         stmt.query_map(params_refs.as_slice(), Self::from_row)
             .map(|rows| rows.filter_map(|r| r.ok()).collect())
             .unwrap_or_default()
@@ -113,12 +122,16 @@ impl User {
             Err(_) => return 0,
         };
         match role {
-            Some(r) => conn.query_row(
-                "SELECT COUNT(*) FROM users WHERE role = ?1",
-                params![r],
-                |row| row.get(0),
-            ).unwrap_or(0),
-            None => conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0)).unwrap_or(0),
+            Some(r) => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM users WHERE role = ?1",
+                    params![r],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+            None => conn
+                .query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
+                .unwrap_or(0),
         }
     }
 
@@ -272,10 +285,16 @@ impl User {
         conn.execute("DELETE FROM sessions WHERE user_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         // Nullify content ownership (don't delete their posts)
-        conn.execute("UPDATE posts SET user_id = NULL WHERE user_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("UPDATE portfolio SET user_id = NULL WHERE user_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE posts SET user_id = NULL WHERE user_id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE portfolio SET user_id = NULL WHERE user_id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
         // Delete user
         conn.execute("DELETE FROM users WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;

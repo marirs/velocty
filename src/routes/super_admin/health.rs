@@ -8,8 +8,8 @@ use rocket_dyn_templates::Template;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::site::{self, RegistryPool, SitePoolManager};
 use super::auth::is_super_authenticated;
+use crate::site::{self, RegistryPool, SitePoolManager};
 
 // ── Health ───────────────────────────────────────────────────
 
@@ -26,8 +26,14 @@ pub fn health_page(
     let report = crate::health::gather(pool);
     let sites = site::list_sites(registry);
     let mut ctx = HashMap::new();
-    ctx.insert("report".to_string(), serde_json::to_value(&report).unwrap_or_default());
-    ctx.insert("sites".to_string(), serde_json::to_value(&sites).unwrap_or_default());
+    ctx.insert(
+        "report".to_string(),
+        serde_json::to_value(&report).unwrap_or_default(),
+    );
+    ctx.insert(
+        "sites".to_string(),
+        serde_json::to_value(&sites).unwrap_or_default(),
+    );
     Ok(Template::render("super/health", &ctx))
 }
 
@@ -38,8 +44,8 @@ fn get_site_pool(
     pool_mgr: &SitePoolManager,
     site_id: i64,
 ) -> Result<crate::db::DbPool, String> {
-    let site = site::find_site_by_id(registry, site_id)
-        .ok_or_else(|| "Site not found".to_string())?;
+    let site =
+        site::find_site_by_id(registry, site_id).ok_or_else(|| "Site not found".to_string())?;
     pool_mgr.get_pool(&site.slug)
 }
 

@@ -4,10 +4,10 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
 use crate::models::settings::Setting;
+use crate::security::auth::AdminUser;
 use crate::AdminSlug;
 
 // ── Firewall Dashboard ─────────────────────────────────
@@ -44,8 +44,20 @@ pub fn firewall_dashboard(
     let audit_per_page: i64 = 50;
     let audit_current = audit_page.unwrap_or(1).max(1);
     let audit_offset = (audit_current - 1) * audit_per_page;
-    let audit_entries = AuditEntry::list(pool, audit_action.as_deref(), audit_entity.as_deref(), audit_user, audit_per_page, audit_offset);
-    let audit_total = AuditEntry::count(pool, audit_action.as_deref(), audit_entity.as_deref(), audit_user);
+    let audit_entries = AuditEntry::list(
+        pool,
+        audit_action.as_deref(),
+        audit_entity.as_deref(),
+        audit_user,
+        audit_per_page,
+        audit_offset,
+    );
+    let audit_total = AuditEntry::count(
+        pool,
+        audit_action.as_deref(),
+        audit_entity.as_deref(),
+        audit_user,
+    );
     let audit_total_pages = (audit_total as f64 / audit_per_page as f64).ceil() as i64;
     let audit_actions = AuditEntry::distinct_actions(pool);
     let audit_entity_types = AuditEntry::distinct_entity_types(pool);
@@ -96,11 +108,7 @@ pub struct BanForm {
 }
 
 #[post("/api/firewall/ban", format = "json", data = "<form>")]
-pub fn firewall_ban(
-    _admin: AdminUser,
-    pool: &State<DbPool>,
-    form: Json<BanForm>,
-) -> Json<Value> {
+pub fn firewall_ban(_admin: AdminUser, pool: &State<DbPool>, form: Json<BanForm>) -> Json<Value> {
     use crate::models::firewall::FwBan;
 
     let ip = form.ip.trim();
@@ -110,7 +118,15 @@ pub fn firewall_ban(
     let reason = form.reason.as_deref().unwrap_or("manual");
     let duration = form.duration.as_deref().unwrap_or("7d");
 
-    match FwBan::create_with_duration(pool, ip, reason, Some("Manual ban from admin"), duration, None, None) {
+    match FwBan::create_with_duration(
+        pool,
+        ip,
+        reason,
+        Some("Manual ban from admin"),
+        duration,
+        None,
+        None,
+    ) {
         Ok(id) => Json(json!({"success": true, "id": id})),
         Err(e) => Json(json!({"success": false, "error": e})),
     }

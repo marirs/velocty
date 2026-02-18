@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::result_large_err)]
+#![allow(deprecated)]
+
 #[macro_use]
 extern crate rocket;
 
@@ -8,13 +13,13 @@ mod ai;
 mod analytics;
 mod boot;
 mod db;
+mod email;
 mod health;
 mod images;
 mod rate_limit;
-mod email;
 mod render;
-mod security;
 mod rss;
+mod security;
 mod seo;
 mod typography;
 
@@ -30,9 +35,9 @@ mod site;
 #[cfg(test)]
 mod tests;
 
-use rocket::response::content::RawHtml;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
+use rocket::response::content::RawHtml;
 
 use models::settings::{Setting, SettingsCache};
 
@@ -45,16 +50,24 @@ pub struct NoCacheAdmin;
 #[rocket::async_trait]
 impl Fairing for NoCacheAdmin {
     fn info(&self) -> Info {
-        Info { name: "No-Cache Admin Pages", kind: Kind::Response }
+        Info {
+            name: "No-Cache Admin Pages",
+            kind: Kind::Response,
+        }
     }
 
     async fn on_response<'r>(&self, req: &'r rocket::Request<'_>, res: &mut rocket::Response<'r>) {
-        let slug = req.rocket().state::<AdminSlug>()
+        let slug = req
+            .rocket()
+            .state::<AdminSlug>()
             .map(|s| s.0.as_str())
             .unwrap_or("admin");
         let prefix = format!("/{}", slug);
         if req.uri().path().starts_with(&*prefix) {
-            res.set_header(Header::new("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"));
+            res.set_header(Header::new(
+                "Cache-Control",
+                "no-store, no-cache, must-revalidate, max-age=0",
+            ));
             res.set_header(Header::new("Pragma", "no-cache"));
         }
     }
@@ -63,19 +76,22 @@ impl Fairing for NoCacheAdmin {
 #[catch(404)]
 fn not_found(req: &rocket::Request<'_>) -> RawHtml<String> {
     // If the 404 is for an admin path (auth guard forwarded), redirect to login
-    let slug = req.rocket().state::<AdminSlug>()
+    let slug = req
+        .rocket()
+        .state::<AdminSlug>()
         .map(|s| s.0.as_str())
         .unwrap_or("admin");
     let admin_prefix = format!("/{}/", slug);
     let path = req.uri().path().as_str();
-    if path == &format!("/{}", slug) || path.starts_with(&admin_prefix) {
-        if !path.ends_with("/login") && !path.ends_with("/setup") {
-            let login_url = format!("/{}/login", slug);
-            return RawHtml(format!(
+    if (path == format!("/{}", slug) || path.starts_with(&admin_prefix))
+        && !path.ends_with("/login")
+        && !path.ends_with("/setup")
+    {
+        let login_url = format!("/{}/login", slug);
+        return RawHtml(format!(
                 "<html><head><meta http-equiv=\"refresh\" content=\"0;url={}\"></head><body></body></html>",
                 login_url
             ));
-        }
     }
 
     if let Some(pool) = req.rocket().state::<db::DbPool>() {
@@ -116,7 +132,7 @@ fn rocket() -> _ {
     eprintln!("Admin panel mounted at: {}", admin_mount);
     eprintln!("Dynamic routing enabled — blog/portfolio slugs and enabled flags read from cache at request time");
 
-    let mut rocket = rocket::build()
+    let rocket = rocket::build()
         .manage(pool)
         .manage(AdminSlug(admin_slug))
         .manage(settings_cache)
@@ -129,34 +145,13 @@ fn rocket() -> _ {
         .attach(tasks::BackgroundTasks)
         .mount("/static", FileServer::from("website/static"))
         .mount("/uploads", FileServer::from("website/site/uploads"))
-        .mount(
-            "/",
-            routes::public::root_routes(),
-        )
-        .mount(
-            &admin_mount,
-            routes::admin::routes(),
-        )
-        .mount(
-            &admin_api_mount,
-            routes::admin::api_routes(),
-        )
-        .mount(
-            &admin_api_mount,
-            routes::ai::routes(),
-        )
-        .mount(
-            "/api",
-            routes::api::routes(),
-        )
-        .mount(
-            "/",
-            routes::commerce::routes(),
-        )
-        .mount(
-            &admin_mount,
-            routes::security::routes(),
-        )
+        .mount("/", routes::public::root_routes())
+        .mount(&admin_mount, routes::admin::routes())
+        .mount(&admin_api_mount, routes::admin::api_routes())
+        .mount(&admin_api_mount, routes::ai::routes())
+        .mount("/api", routes::api::routes())
+        .mount("/", routes::commerce::routes())
+        .mount(&admin_mount, routes::security::routes())
         .register("/", catchers![not_found, server_error]);
 
     // Multi-site: initialize registry and mount super admin routes

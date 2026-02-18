@@ -73,9 +73,18 @@ pub fn generate_thumbnails(
     let img = image::open(&full_path).map_err(|e| e.to_string())?;
 
     let sizes = vec![
-        ("small", Setting::get_or(pool, "images_thumb_small", "150x150")),
-        ("medium", Setting::get_or(pool, "images_thumb_medium", "300x300")),
-        ("large", Setting::get_or(pool, "images_thumb_large", "1024x1024")),
+        (
+            "small",
+            Setting::get_or(pool, "images_thumb_small", "150x150"),
+        ),
+        (
+            "medium",
+            Setting::get_or(pool, "images_thumb_medium", "300x300"),
+        ),
+        (
+            "large",
+            Setting::get_or(pool, "images_thumb_large", "1024x1024"),
+        ),
     ];
 
     let mut results = Vec::new();

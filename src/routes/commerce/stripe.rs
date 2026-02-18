@@ -1,12 +1,12 @@
-use rocket::serde::json::Json;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
+use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::db::DbPool;
-use crate::models::order::{DownloadToken, Order};
+use crate::models::order::Order;
 use crate::models::portfolio::PortfolioItem;
 use crate::models::settings::Setting;
 use std::collections::HashMap;
@@ -20,11 +20,19 @@ pub struct RawBody(pub Vec<u8>);
 impl<'r> rocket::data::FromData<'r> for RawBody {
     type Error = std::io::Error;
 
-    async fn from_data(_req: &'r Request<'_>, data: rocket::data::Data<'r>) -> rocket::data::Outcome<'r, Self> {
+    async fn from_data(
+        _req: &'r Request<'_>,
+        data: rocket::data::Data<'r>,
+    ) -> rocket::data::Outcome<'r, Self> {
         use rocket::data::ToByteUnit;
         match data.open(1.mebibytes()).into_bytes().await {
-            Ok(bytes) if bytes.is_complete() => rocket::data::Outcome::Success(RawBody(bytes.into_inner())),
-            Ok(_) => rocket::data::Outcome::Error((Status::PayloadTooLarge, std::io::Error::new(std::io::ErrorKind::Other, "Payload too large"))),
+            Ok(bytes) if bytes.is_complete() => {
+                rocket::data::Outcome::Success(RawBody(bytes.into_inner()))
+            }
+            Ok(_) => rocket::data::Outcome::Error((
+                Status::PayloadTooLarge,
+                std::io::Error::other("Payload too large"),
+            )),
             Err(e) => rocket::data::Outcome::Error((Status::InternalServerError, e)),
         }
     }
@@ -53,20 +61,25 @@ pub struct StripeCreateRequest {
 }
 
 #[post("/api/checkout/stripe/create", format = "json", data = "<body>")]
-pub fn stripe_create_session(
-    pool: &State<DbPool>,
-    body: Json<StripeCreateRequest>,
-) -> Json<Value> {
+pub fn stripe_create_session(pool: &State<DbPool>, body: Json<StripeCreateRequest>) -> Json<Value> {
     let settings: HashMap<String, String> = Setting::all(pool);
     if settings.get("commerce_stripe_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "Stripe is not enabled" }));
     }
-    let secret_key = settings.get("stripe_secret_key").cloned().unwrap_or_default();
+    let secret_key = settings
+        .get("stripe_secret_key")
+        .cloned()
+        .unwrap_or_default();
     if secret_key.is_empty() {
         return Json(json!({ "ok": false, "error": "Stripe secret key not configured" }));
     }
 
-    let (order_id, price, cur) = match create_pending_order(pool, body.portfolio_id, "stripe", body.buyer_email.as_deref().unwrap_or("")) {
+    let (order_id, price, cur) = match create_pending_order(
+        pool,
+        body.portfolio_id,
+        "stripe",
+        body.buyer_email.as_deref().unwrap_or(""),
+    ) {
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
@@ -78,14 +91,24 @@ pub fn stripe_create_session(
 
     // Call Stripe API to create a Checkout Session
     let client = reqwest::blocking::Client::new();
-    let resp = client.post("https://api.stripe.com/v1/checkout/sessions")
+    let resp = client
+        .post("https://api.stripe.com/v1/checkout/sessions")
         .basic_auth(&secret_key, None::<&str>)
         .form(&[
             ("mode", "payment"),
-            ("success_url", &format!("{}/api/stripe/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={}", base, order_id)),
+            (
+                "success_url",
+                &format!(
+                    "{}/api/stripe/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={}",
+                    base, order_id
+                ),
+            ),
             ("cancel_url", &format!("{}/portfolio/{}", base, item.slug)),
             ("line_items[0][price_data][currency]", &cur.to_lowercase()),
-            ("line_items[0][price_data][unit_amount]", &format!("{}", (price * 100.0) as i64)),
+            (
+                "line_items[0][price_data][unit_amount]",
+                &format!("{}", (price * 100.0) as i64),
+            ),
             ("line_items[0][price_data][product_data][name]", &item.title),
             ("line_items[0][quantity]", "1"),
             ("metadata[order_id]", &order_id.to_string()),
@@ -98,9 +121,15 @@ pub fn stripe_create_session(
             if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
                 let session_id = body.get("id").and_then(|v| v.as_str()).unwrap_or("");
                 let _ = Order::update_provider_order_id(pool, order_id, session_id);
-                Json(json!({ "ok": true, "order_id": order_id, "checkout_url": url, "session_id": session_id }))
+                Json(
+                    json!({ "ok": true, "order_id": order_id, "checkout_url": url, "session_id": session_id }),
+                )
             } else {
-                let err = body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or("Stripe API error");
+                let err = body
+                    .get("error")
+                    .and_then(|e| e.get("message"))
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Stripe API error");
                 Json(json!({ "ok": false, "error": err }))
             }
         }
@@ -117,23 +146,36 @@ pub fn stripe_success(
     order_id: i64,
 ) -> rocket::response::Redirect {
     let settings: HashMap<String, String> = Setting::all(pool);
-    let secret_key = settings.get("stripe_secret_key").cloned().unwrap_or_default();
+    let secret_key = settings
+        .get("stripe_secret_key")
+        .cloned()
+        .unwrap_or_default();
     let base = site_url(&settings);
 
     // Verify session is paid
     let client = reqwest::blocking::Client::new();
-    let session_data = client.get(&format!("https://api.stripe.com/v1/checkout/sessions/{}", session_id))
+    let session_data = client
+        .get(format!(
+            "https://api.stripe.com/v1/checkout/sessions/{}",
+            session_id
+        ))
         .basic_auth(&secret_key, None::<&str>)
         .send()
         .ok()
         .and_then(|r| r.json::<Value>().ok());
 
-    let verified = session_data.as_ref()
-        .and_then(|v| v.get("payment_status").and_then(|s| s.as_str()).map(|s| s == "paid"))
+    let verified = session_data
+        .as_ref()
+        .and_then(|v| {
+            v.get("payment_status")
+                .and_then(|s| s.as_str())
+                .map(|s| s == "paid")
+        })
         .unwrap_or(false);
 
     if verified {
-        let buyer_email = session_data.as_ref()
+        let buyer_email = session_data
+            .as_ref()
             .and_then(|v| v.get("customer_details"))
             .and_then(|c| c.get("email"))
             .and_then(|e| e.as_str())
@@ -182,13 +224,12 @@ fn verify_stripe_signature(payload: &[u8], sig_header: &str, secret: &str) -> bo
 }
 
 #[post("/api/stripe/webhook", data = "<body>")]
-pub fn stripe_webhook(
-    pool: &State<DbPool>,
-    sig: StripeSignature,
-    body: RawBody,
-) -> Status {
+pub fn stripe_webhook(pool: &State<DbPool>, sig: StripeSignature, body: RawBody) -> Status {
     let settings: HashMap<String, String> = Setting::all(pool);
-    let webhook_secret = settings.get("stripe_webhook_secret").cloned().unwrap_or_default();
+    let webhook_secret = settings
+        .get("stripe_webhook_secret")
+        .cloned()
+        .unwrap_or_default();
 
     if webhook_secret.is_empty() {
         eprintln!("[stripe] Webhook secret not configured, rejecting");
@@ -214,14 +255,25 @@ pub fn stripe_webhook(
             None => return Status::BadRequest,
         };
 
-        let payment_status = session.get("payment_status").and_then(|s| s.as_str()).unwrap_or("");
+        let payment_status = session
+            .get("payment_status")
+            .and_then(|s| s.as_str())
+            .unwrap_or("");
         if payment_status != "paid" {
             return Status::Ok;
         }
 
-        let order_id_str = session.get("metadata").and_then(|m| m.get("order_id")).and_then(|o| o.as_str()).unwrap_or("");
+        let order_id_str = session
+            .get("metadata")
+            .and_then(|m| m.get("order_id"))
+            .and_then(|o| o.as_str())
+            .unwrap_or("");
         let session_id = session.get("id").and_then(|i| i.as_str()).unwrap_or("");
-        let buyer_email = session.get("customer_details").and_then(|c| c.get("email")).and_then(|e| e.as_str()).unwrap_or("");
+        let buyer_email = session
+            .get("customer_details")
+            .and_then(|c| c.get("email"))
+            .and_then(|e| e.as_str())
+            .unwrap_or("");
 
         if let Ok(order_id) = order_id_str.parse::<i64>() {
             let _ = finalize_order(pool, order_id, session_id, buyer_email, "");

@@ -2,9 +2,9 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
 
-use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::security::auth::AdminUser;
 use crate::AdminSlug;
 
 // ── Sales ──────────────────────────────────────────────
@@ -24,7 +24,10 @@ pub fn sales_dashboard(
     let completed_orders = Order::count_by_status(pool, "completed");
     let pending_orders = Order::count_by_status(pool, "pending");
     let recent_orders = Order::list(pool, 10, 0);
-    let currency = settings.get("commerce_currency").cloned().unwrap_or_else(|| "USD".to_string());
+    let currency = settings
+        .get("commerce_currency")
+        .cloned()
+        .unwrap_or_else(|| "USD".to_string());
 
     let context = json!({
         "page_title": "Sales Dashboard",
@@ -65,7 +68,10 @@ pub fn sales_orders(
     };
 
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
-    let currency = settings.get("commerce_currency").cloned().unwrap_or_else(|| "USD".to_string());
+    let currency = settings
+        .get("commerce_currency")
+        .cloned()
+        .unwrap_or_else(|| "USD".to_string());
 
     let context = json!({
         "page_title": "Orders",

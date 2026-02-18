@@ -2,7 +2,6 @@ use serde_json::Value;
 
 use crate::db::DbPool;
 use crate::models::design::Design;
-use crate::models::settings::Setting;
 use crate::seo;
 use crate::typography;
 
@@ -15,13 +14,22 @@ pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> Strin
 
 /// Unified renderer: uses the design's layout_html as the page shell,
 /// replaces {{placeholder}} tags with generated content from settings and context.
-fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, context: &Value) -> String {
+fn render_with_shell(
+    _pool: &DbPool,
+    design: &Design,
+    template_type: &str,
+    context: &Value,
+) -> String {
     let settings = context.get("settings").cloned().unwrap_or_default();
     let css_vars = typography::build_css_variables(&settings);
     let font_links = typography::build_font_links(&settings);
 
     let sg = |key: &str, def: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(def)
+            .to_string()
     };
 
     // ── Body content (page-type specific) ──
@@ -36,42 +44,71 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     };
 
     // ── Site identity ──
-    let site_name_raw = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
-    let site_name_display = settings.get("site_name_display").and_then(|v| v.as_str()).unwrap_or("text");
-    let site_name = if site_name_display == "none" || site_name_display == "logo" { "" } else { site_name_raw };
-    let tagline_enabled = settings.get("site_tagline_enabled").and_then(|v| v.as_str()).unwrap_or("true") != "false";
+    let site_name_raw = settings
+        .get("site_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Velocty");
+    let site_name_display = settings
+        .get("site_name_display")
+        .and_then(|v| v.as_str())
+        .unwrap_or("text");
+    let site_name = if site_name_display == "none" || site_name_display == "logo" {
+        ""
+    } else {
+        site_name_raw
+    };
+    let tagline_enabled = settings
+        .get("site_tagline_enabled")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        != "false";
     let site_tagline = if tagline_enabled {
-        settings.get("site_caption").and_then(|v| v.as_str()).unwrap_or("")
-    } else { "" };
+        settings
+            .get("site_caption")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+    } else {
+        ""
+    };
 
     // ── Navigation ──
     let nav_cats_mode = sg("portfolio_nav_categories", "under_link");
-    let header_type_early = sg("layout_header_type", "sidebar");
+    let _header_type_early = sg("layout_header_type", "sidebar");
     let portfolio_slug = sg("portfolio_slug", "portfolio");
     let portfolio_label = sg("portfolio_label", "experiences");
     let portfolio_enabled = sg("portfolio_enabled", "false") == "true";
 
     // categories_html: inline in nav (under_link for sidebar, submenu for topbar)
-    let categories_html = if portfolio_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
-        let start_open = nav_cats_mode == "under_link"; // sidebar under_link starts open, topbar submenu starts closed
-        build_categories_sidebar(context, start_open)
-    } else { String::new() };
+    let categories_html =
+        if portfolio_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
+            let start_open = nav_cats_mode == "under_link"; // sidebar under_link starts open, topbar submenu starts closed
+            build_categories_sidebar(context, start_open)
+        } else {
+            String::new()
+        };
 
     // categories_page_top: rendered at top of portfolio page content (sidebar only)
     let categories_page_top = if portfolio_enabled && nav_cats_mode == "page_top" {
         let align = sg("portfolio_nav_categories_align", "left");
         build_categories_page_top(context, &portfolio_slug, &align)
-    } else { String::new() };
+    } else {
+        String::new()
+    };
 
     // categories_below_menu: horizontal row below topbar nav (topbar only)
     let categories_below_menu = if portfolio_enabled && nav_cats_mode == "below_menu" {
         build_categories_below_menu(context, &portfolio_slug)
-    } else { String::new() };
+    } else {
+        String::new()
+    };
 
     // Portfolio nav-link: only show when categories don't replace it
     // under_link and submenu use the category toggle AS the portfolio link → skip nav-link
     // page_top, below_menu, hidden → show portfolio as normal nav-link
-    let portfolio_in_nav = portfolio_enabled && (nav_cats_mode == "hidden" || nav_cats_mode == "page_top" || nav_cats_mode == "below_menu");
+    let portfolio_in_nav = portfolio_enabled
+        && (nav_cats_mode == "hidden"
+            || nav_cats_mode == "page_top"
+            || nav_cats_mode == "below_menu");
 
     let blog_slug = sg("blog_slug", "journal");
     let blog_label = sg("blog_label", "journal");
@@ -92,20 +129,28 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
                 if !categories_html.is_empty() {
                     nav_links.push_str(&categories_html);
                 } else if portfolio_in_nav {
-                    nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
-                        slug_url(&portfolio_slug, ""), html_escape(&portfolio_label)));
+                    nav_links.push_str(&format!(
+                        "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        slug_url(&portfolio_slug, ""),
+                        html_escape(&portfolio_label)
+                    ));
                 }
             }
             "blog" => {
                 if blog_enabled {
-                    nav_links.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
-                        slug_url(&blog_slug, ""), html_escape(&blog_label)));
+                    nav_links.push_str(&format!(
+                        "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        slug_url(&blog_slug, ""),
+                        html_escape(&blog_label)
+                    ));
                 }
             }
             "contact" => {
                 if contact_enabled {
-                    nav_links.push_str(&format!("<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
-                        html_escape(&contact_label)));
+                    nav_links.push_str(&format!(
+                        "<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
+                        html_escape(&contact_label)
+                    ));
                 }
             }
             _ => {}
@@ -115,14 +160,24 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     // ── Social & Sharing ──
     let social_pos = sg("social_icons_position", "sidebar");
     let social_full = build_social_links(&settings);
-    let social_sidebar = if social_pos == "sidebar" || social_pos == "both" { social_full.clone() } else { String::new() };
-    let social_footer = if social_pos == "footer" || social_pos == "both" { build_social_links_inline(&settings) } else { String::new() };
+    let social_sidebar = if social_pos == "sidebar" || social_pos == "both" {
+        social_full.clone()
+    } else {
+        String::new()
+    };
+    let social_footer = if social_pos == "footer" || social_pos == "both" {
+        build_social_links_inline(&settings)
+    } else {
+        String::new()
+    };
 
     let share_pos = sg("share_icons_position", "below_content");
     let site_url = sg("site_url", "");
     let share_sidebar = if share_pos == "sidebar" && !site_url.is_empty() {
         build_share_buttons(&settings, &site_url, site_name_raw)
-    } else { String::new() };
+    } else {
+        String::new()
+    };
 
     // ── Footer ──
     let copyright_text = sg("copyright_text", "");
@@ -137,10 +192,14 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
         } else {
             let copyright_html = if has_copyright {
                 format!("<span class=\"footer-copyright\">{}</span>", copyright_text)
-            } else { String::new() };
+            } else {
+                String::new()
+            };
             let social_html = if has_social {
                 format!("<span class=\"footer-social\">{}</span>", social_footer)
-            } else { String::new() };
+            } else {
+                String::new()
+            };
 
             let mut left = String::new();
             let mut center = String::new();
@@ -177,16 +236,24 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     // ── Layout classes ──
     let body_class = {
         let mut cls = String::new();
-        if sg("layout_content_boundary", "full") == "boxed" { cls.push_str("boxed-mode"); }
+        if sg("layout_content_boundary", "full") == "boxed" {
+            cls.push_str("boxed-mode");
+        }
         cls
     };
     let wrapper_classes = {
         let mut cls = String::new();
-        if !is_topbar && sg("layout_sidebar_position", "left") == "right" { cls.push_str(" sidebar-right"); }
-        if sg("layout_content_boundary", "full") == "boxed" { cls.push_str(" layout-boxed"); }
+        if !is_topbar && sg("layout_sidebar_position", "left") == "right" {
+            cls.push_str(" sidebar-right");
+        }
+        if sg("layout_content_boundary", "full") == "boxed" {
+            cls.push_str(" layout-boxed");
+        }
         if is_topbar {
             let nav_pos = sg("nav_position", "below_logo");
-            if nav_pos == "right" { cls.push_str(" topbar-nav-right"); }
+            if nav_pos == "right" {
+                cls.push_str(" topbar-nav-right");
+            }
         }
         cls
     };
@@ -216,10 +283,16 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
 
     let image_protection_js = if sg("portfolio_image_protection", "false") == "true" {
         IMAGE_PROTECTION_JS
-    } else { "" };
+    } else {
+        ""
+    };
 
     // ── SEO ──
-    let seo_meta = context.get("seo").and_then(|s| s.as_str()).unwrap_or("").to_string();
+    let seo_meta = context
+        .get("seo")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string();
 
     // ── Replace placeholders in the shell ──
     let mut html = if is_topbar {
@@ -243,10 +316,18 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{categories_below_menu}}", &categories_below_menu);
     html = html.replace("{{nav_links}}", &nav_links);
     html = html.replace("{{share_sidebar}}", &share_sidebar);
-    let custom_sidebar = if is_topbar { String::new() } else { build_custom_sidebar_html(&settings) };
+    let custom_sidebar = if is_topbar {
+        String::new()
+    } else {
+        build_custom_sidebar_html(&settings)
+    };
     html = html.replace("{{custom_sidebar_html}}", &custom_sidebar);
     html = html.replace("{{social_sidebar}}", &social_sidebar);
-    let legal_links = if is_topbar { String::new() } else { build_footer_legal_links(&settings) };
+    let legal_links = if is_topbar {
+        String::new()
+    } else {
+        build_footer_legal_links(&settings)
+    };
     html = html.replace("{{footer_legal_links}}", &legal_links);
     let body_with_cats = if categories_page_top.is_empty() {
         body_html.clone()
@@ -258,8 +339,14 @@ fn render_with_shell(pool: &DbPool, design: &Design, template_type: &str, contex
     html = html.replace("{{back_to_top}}", &build_back_to_top(&settings));
     html = html.replace("{{lightbox_js}}", LIGHTBOX_JS);
     html = html.replace("{{image_protection_js}}", image_protection_js);
-    html = html.replace("{{analytics_scripts}}", &seo::build_analytics_scripts(&settings));
-    html = html.replace("{{cookie_consent}}", &build_cookie_consent_banner(&settings));
+    html = html.replace(
+        "{{analytics_scripts}}",
+        &seo::build_analytics_scripts(&settings),
+    );
+    html = html.replace(
+        "{{cookie_consent}}",
+        &build_cookie_consent_banner(&settings),
+    );
 
     html
 }
@@ -277,7 +364,12 @@ pub fn render_legal_page(
     let seo_html = format!(
         "<title>{} — {}</title>",
         html_escape(title),
-        html_escape(settings.get("site_name").map(|s| s.as_str()).unwrap_or("Velocty"))
+        html_escape(
+            settings
+                .get("site_name")
+                .map(|s| s.as_str())
+                .unwrap_or("Velocty")
+        )
     );
     let body = format!(r#"<div class="legal-content">{}</div>"#, html_body);
     let context = serde_json::json!({
@@ -292,7 +384,11 @@ pub fn render_legal_page(
         let css_vars = typography::build_css_variables(&settings_v);
         let font_links = typography::build_font_links(&settings_v);
         let sg = |key: &str, def: &str| -> String {
-            settings_v.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+            settings_v
+                .get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or(def)
+                .to_string()
         };
 
         let mut html = design.layout_html.clone();
@@ -309,23 +405,47 @@ pub fn render_legal_page(
         html = html.replace("{{logo_html}}", &build_logo_html(&settings_v));
         let site_name_display = sg("site_name_display", "text");
         let site_name_raw = sg("site_name", "Velocty");
-        let site_name = if site_name_display == "none" || site_name_display == "logo" { String::new() } else { site_name_raw };
+        let site_name = if site_name_display == "none" || site_name_display == "logo" {
+            String::new()
+        } else {
+            site_name_raw
+        };
         html = html.replace("{{site_name}}", &html_escape(&site_name));
         let tagline_on = sg("site_tagline_enabled", "true") != "false";
-        let tagline = if tagline_on { sg("site_caption", "") } else { String::new() };
+        let tagline = if tagline_on {
+            sg("site_caption", "")
+        } else {
+            String::new()
+        };
         html = html.replace("{{tagline}}", &html_escape(&tagline));
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
         html = html.replace("{{social_sidebar}}", &build_social_links(&settings_v));
-        html = html.replace("{{footer_legal_links}}", &build_footer_legal_links(&settings_v));
+        html = html.replace(
+            "{{footer_legal_links}}",
+            &build_footer_legal_links(&settings_v),
+        );
         html = html.replace("{{body_content}}", &body);
-        html = html.replace("{{footer_inner}}", &format!("<span class=\"footer-copyright\">&copy; {} {}</span>", chrono::Utc::now().format("%Y"), html_escape(&sg("site_name", "Velocty"))));
+        html = html.replace(
+            "{{footer_inner}}",
+            &format!(
+                "<span class=\"footer-copyright\">&copy; {} {}</span>",
+                chrono::Utc::now().format("%Y"),
+                html_escape(&sg("site_name", "Velocty"))
+            ),
+        );
         html = html.replace("{{back_to_top}}", &build_back_to_top(&settings_v));
         html = html.replace("{{lightbox_js}}", "");
         html = html.replace("{{image_protection_js}}", "");
-        html = html.replace("{{analytics_scripts}}", &seo::build_analytics_scripts(&settings_v));
-        html = html.replace("{{cookie_consent}}", &build_cookie_consent_banner(&settings_v));
+        html = html.replace(
+            "{{analytics_scripts}}",
+            &seo::build_analytics_scripts(&settings_v),
+        );
+        html = html.replace(
+            "{{cookie_consent}}",
+            &build_cookie_consent_banner(&settings_v),
+        );
         html
     };
     result
@@ -333,14 +453,25 @@ pub fn render_legal_page(
 
 /// Reusable comment display + form for blog and portfolio pages.
 /// Renders approved comments (threaded) and the submission form with captcha.
-fn build_comments_section(context: &Value, settings: &Value, content_id: i64, content_type: &str) -> String {
+fn build_comments_section(
+    context: &Value,
+    settings: &Value,
+    content_id: i64,
+    content_type: &str,
+) -> String {
     let mut html = String::new();
 
     // Render existing comments (threaded)
     if let Some(Value::Array(comments)) = context.get("comments") {
         // Separate top-level and replies
-        let top: Vec<&Value> = comments.iter().filter(|c| c.get("parent_id").and_then(|v| v.as_i64()).is_none()).collect();
-        let replies: Vec<&Value> = comments.iter().filter(|c| c.get("parent_id").and_then(|v| v.as_i64()).is_some()).collect();
+        let top: Vec<&Value> = comments
+            .iter()
+            .filter(|c| c.get("parent_id").and_then(|v| v.as_i64()).is_none())
+            .collect();
+        let replies: Vec<&Value> = comments
+            .iter()
+            .filter(|c| c.get("parent_id").and_then(|v| v.as_i64()).is_some())
+            .collect();
 
         if !comments.is_empty() {
             html.push_str(&format!(
@@ -356,22 +487,27 @@ fn build_comments_section(context: &Value, settings: &Value, content_id: i64, co
 
     // Comment form
     let sg = |key: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
     };
     let require_name = sg("comments_require_name") != "false";
     let require_email = sg("comments_require_email") == "true";
     let name_req = if require_name { " required" } else { "" };
     let email_req = if require_email { " required" } else { "" };
 
-    let (captcha_provider, captcha_site_key): (String, String) = if sg("security_recaptcha_enabled") == "true" {
-        ("recaptcha".into(), sg("security_recaptcha_site_key"))
-    } else if sg("security_turnstile_enabled") == "true" {
-        ("turnstile".into(), sg("security_turnstile_site_key"))
-    } else if sg("security_hcaptcha_enabled") == "true" {
-        ("hcaptcha".into(), sg("security_hcaptcha_site_key"))
-    } else {
-        (String::new(), String::new())
-    };
+    let (captcha_provider, captcha_site_key): (String, String) =
+        if sg("security_recaptcha_enabled") == "true" {
+            ("recaptcha".into(), sg("security_recaptcha_site_key"))
+        } else if sg("security_turnstile_enabled") == "true" {
+            ("turnstile".into(), sg("security_turnstile_site_key"))
+        } else if sg("security_hcaptcha_enabled") == "true" {
+            ("hcaptcha".into(), sg("security_hcaptcha_site_key"))
+        } else {
+            (String::new(), String::new())
+        };
     let mut captcha_html = String::new();
     let mut captcha_script = String::new();
     let mut captcha_get_token_js = "null".to_string();
@@ -379,25 +515,46 @@ fn build_comments_section(context: &Value, settings: &Value, content_id: i64, co
     if !captcha_provider.is_empty() && !captcha_site_key.is_empty() {
         match captcha_provider.as_str() {
             "recaptcha" => {
-                let version = settings.get("security_recaptcha_version").and_then(|v| v.as_str()).unwrap_or("v3");
+                let version = settings
+                    .get("security_recaptcha_version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("v3");
                 if version == "v3" {
-                    captcha_script = format!(r#"<script src="https://www.google.com/recaptcha/api.js?render={}"></script>"#, captcha_site_key);
-                    captcha_get_token_js = format!("function(){{return grecaptcha.execute('{}',{{action:'comment'}})}}", captcha_site_key);
+                    captcha_script = format!(
+                        r#"<script src="https://www.google.com/recaptcha/api.js?render={}"></script>"#,
+                        captcha_site_key
+                    );
+                    captcha_get_token_js = format!(
+                        "function(){{return grecaptcha.execute('{}',{{action:'comment'}})}}",
+                        captcha_site_key
+                    );
                 } else {
                     captcha_script = "https://www.google.com/recaptcha/api.js".to_string();
-                    captcha_html = format!(r#"<div class="g-recaptcha" data-sitekey="{}"></div>"#, captcha_site_key);
-                    captcha_get_token_js = "function(){return Promise.resolve(grecaptcha.getResponse())}".to_string();
+                    captcha_html = format!(
+                        r#"<div class="g-recaptcha" data-sitekey="{}"></div>"#,
+                        captcha_site_key
+                    );
+                    captcha_get_token_js =
+                        "function(){return Promise.resolve(grecaptcha.getResponse())}".to_string();
                 }
             }
             "turnstile" => {
-                captcha_script = "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string();
-                captcha_html = format!(r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#, captcha_site_key);
+                captcha_script =
+                    "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string();
+                captcha_html = format!(
+                    r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#,
+                    captcha_site_key
+                );
                 captcha_get_token_js = "function(){return Promise.resolve(document.querySelector('[name=cf-turnstile-response]').value)}".to_string();
             }
             "hcaptcha" => {
                 captcha_script = "https://js.hcaptcha.com/1/api.js".to_string();
-                captcha_html = format!(r#"<div class="h-captcha" data-sitekey="{}"></div>"#, captcha_site_key);
-                captcha_get_token_js = "function(){return Promise.resolve(hcaptcha.getResponse())}".to_string();
+                captcha_html = format!(
+                    r#"<div class="h-captcha" data-sitekey="{}"></div>"#,
+                    captcha_site_key
+                );
+                captcha_get_token_js =
+                    "function(){return Promise.resolve(hcaptcha.getResponse())}".to_string();
             }
             _ => {}
         }
@@ -496,11 +653,20 @@ fn build_comments_section(context: &Value, settings: &Value, content_id: i64, co
 /// Render a single comment and its nested replies recursively.
 fn render_comment(html: &mut String, comment: &Value, all_replies: &[&Value], depth: usize) {
     let id = comment.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-    let name = comment.get("author_name").and_then(|v| v.as_str()).unwrap_or("Anonymous");
+    let name = comment
+        .get("author_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Anonymous");
     let body = comment.get("body").and_then(|v| v.as_str()).unwrap_or("");
-    let cdate = comment.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
+    let cdate = comment
+        .get("created_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let indent = if depth > 0 {
-        format!(" style=\"margin-left:{}px;border-left:2px solid #e5e7eb;padding-left:12px\"", depth.min(3) * 24)
+        format!(
+            " style=\"margin-left:{}px;border-left:2px solid #e5e7eb;padding-left:12px\"",
+            depth.min(3) * 24
+        )
     } else {
         String::new()
     };
@@ -516,7 +682,10 @@ fn render_comment(html: &mut String, comment: &Value, all_replies: &[&Value], de
     ));
 
     // Render child replies
-    let children: Vec<&&Value> = all_replies.iter().filter(|r| r.get("parent_id").and_then(|v| v.as_i64()) == Some(id)).collect();
+    let children: Vec<&&Value> = all_replies
+        .iter()
+        .filter(|r| r.get("parent_id").and_then(|v| v.as_i64()) == Some(id))
+        .collect();
     for child in children {
         render_comment(html, child, all_replies, depth + 1);
     }
@@ -529,8 +698,14 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
     };
 
     let settings = context.get("settings").cloned().unwrap_or_default();
-    let portfolio_slug = settings.get("portfolio_slug").and_then(|v| v.as_str()).unwrap_or("portfolio");
-    let portfolio_label = settings.get("portfolio_label").and_then(|v| v.as_str()).unwrap_or("experiences");
+    let portfolio_slug = settings
+        .get("portfolio_slug")
+        .and_then(|v| v.as_str())
+        .unwrap_or("portfolio");
+    let portfolio_label = settings
+        .get("portfolio_label")
+        .and_then(|v| v.as_str())
+        .unwrap_or("experiences");
 
     let active_slug = context
         .get("active_category")
@@ -543,7 +718,11 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
     // the portfolio label + "All" link should remain visible.
     let mut html = String::new();
 
-    let show_all = settings.get("portfolio_show_all_categories").and_then(|v| v.as_str()).unwrap_or("true") == "true";
+    let show_all = settings
+        .get("portfolio_show_all_categories")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        == "true";
     let has_children = !categories.is_empty() || show_all;
 
     if has_children {
@@ -556,30 +735,46 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
         ));
 
         if show_all {
-            let all_label = settings.get("portfolio_all_categories_label").and_then(|v| v.as_str()).unwrap_or("All");
-            let all_active = if active_slug.is_empty() { " active" } else { "" };
+            let all_label = settings
+                .get("portfolio_all_categories_label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("All");
+            let all_active = if active_slug.is_empty() {
+                " active"
+            } else {
+                ""
+            };
             html.push_str(&format!(
                 "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
-                slug_url(portfolio_slug, ""), all_active, html_escape(all_label)
+                slug_url(portfolio_slug, ""),
+                all_active,
+                html_escape(all_label)
             ));
         }
 
         for cat in categories {
             let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-            if slug.is_empty() { continue; }
+            if slug.is_empty() {
+                continue;
+            }
             let active_class = if slug == active_slug { " active" } else { "" };
             html.push_str(&format!(
                 "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
-                slug_url(portfolio_slug, &format!("category/{}", slug)), active_class, html_escape(name)
+                slug_url(portfolio_slug, &format!("category/{}", slug)),
+                active_class,
+                html_escape(name)
             ));
         }
 
         html.push_str("</div></div>\n");
     } else {
         // No categories and no "All" link — render portfolio as a plain nav link
-        html.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n",
-            slug_url(portfolio_slug, ""), html_escape(portfolio_label)));
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+            slug_url(portfolio_slug, ""),
+            html_escape(portfolio_label)
+        ));
     }
 
     html
@@ -591,7 +786,9 @@ fn build_categories_page_top(context: &Value, portfolio_slug: &str, align: &str)
         Some(Value::Array(cats)) => cats,
         _ => return String::new(),
     };
-    if categories.is_empty() { return String::new(); }
+    if categories.is_empty() {
+        return String::new();
+    }
 
     let settings = context.get("settings").cloned().unwrap_or_default();
     let active_slug = context
@@ -603,24 +800,41 @@ fn build_categories_page_top(context: &Value, portfolio_slug: &str, align: &str)
     let align_cls = if align == "right" { " cats-right" } else { "" };
     let mut html = format!("<div class=\"categories-page-top{}\">", align_cls);
 
-    let show_all = settings.get("portfolio_show_all_categories").and_then(|v| v.as_str()).unwrap_or("true") == "true";
+    let show_all = settings
+        .get("portfolio_show_all_categories")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        == "true";
     if show_all {
-        let all_label = settings.get("portfolio_all_categories_label").and_then(|v| v.as_str()).unwrap_or("All");
-        let all_active = if active_slug.is_empty() { " active" } else { "" };
+        let all_label = settings
+            .get("portfolio_all_categories_label")
+            .and_then(|v| v.as_str())
+            .unwrap_or("All");
+        let all_active = if active_slug.is_empty() {
+            " active"
+        } else {
+            ""
+        };
         html.push_str(&format!(
             "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
-            slug_url(portfolio_slug, ""), all_active, html_escape(all_label)
+            slug_url(portfolio_slug, ""),
+            all_active,
+            html_escape(all_label)
         ));
     }
 
     for cat in categories {
         let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        if slug.is_empty() { continue; }
+        if slug.is_empty() {
+            continue;
+        }
         let active_class = if slug == active_slug { " active" } else { "" };
         html.push_str(&format!(
             "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
-            slug_url(portfolio_slug, &format!("category/{}", slug)), active_class, html_escape(name)
+            slug_url(portfolio_slug, &format!("category/{}", slug)),
+            active_class,
+            html_escape(name)
         ));
     }
 
@@ -634,7 +848,9 @@ fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String 
         Some(Value::Array(cats)) => cats,
         _ => return String::new(),
     };
-    if categories.is_empty() { return String::new(); }
+    if categories.is_empty() {
+        return String::new();
+    }
 
     let settings = context.get("settings").cloned().unwrap_or_default();
     let active_slug = context
@@ -645,24 +861,41 @@ fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String 
 
     let mut html = String::from("<div class=\"categories-below-menu\">");
 
-    let show_all = settings.get("portfolio_show_all_categories").and_then(|v| v.as_str()).unwrap_or("true") == "true";
+    let show_all = settings
+        .get("portfolio_show_all_categories")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        == "true";
     if show_all {
-        let all_label = settings.get("portfolio_all_categories_label").and_then(|v| v.as_str()).unwrap_or("All");
-        let all_active = if active_slug.is_empty() { " active" } else { "" };
+        let all_label = settings
+            .get("portfolio_all_categories_label")
+            .and_then(|v| v.as_str())
+            .unwrap_or("All");
+        let all_active = if active_slug.is_empty() {
+            " active"
+        } else {
+            ""
+        };
         html.push_str(&format!(
             "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
-            slug_url(portfolio_slug, ""), all_active, html_escape(all_label)
+            slug_url(portfolio_slug, ""),
+            all_active,
+            html_escape(all_label)
         ));
     }
 
     for cat in categories {
         let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        if slug.is_empty() { continue; }
+        if slug.is_empty() {
+            continue;
+        }
         let active_class = if slug == active_slug { " active" } else { "" };
         html.push_str(&format!(
             "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
-            slug_url(portfolio_slug, &format!("category/{}", slug)), active_class, html_escape(name)
+            slug_url(portfolio_slug, &format!("category/{}", slug)),
+            active_class,
+            html_escape(name)
         ));
     }
 
@@ -672,7 +905,11 @@ fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String 
 
 fn build_social_links(settings: &Value) -> String {
     let sg = |key: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
     };
 
     let brand_colors = sg("social_brand_colors") == "true";
@@ -680,48 +917,89 @@ fn build_social_links(settings: &Value) -> String {
     // (setting_key, platform_label, icon_svg, brand_color)
     // All icons use fill="currentColor" so color is controlled by the style attribute or CSS
     let platforms: &[(&str, &str, &str, &str)] = &[
-        ("social_instagram", "Instagram",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>"#,
-         "#E4405F"),
-        ("social_twitter", "X",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
-         "#000"),
-        ("social_facebook", "Facebook",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
-         "#1877F2"),
-        ("social_youtube", "YouTube",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>"#,
-         "#FF0000"),
-        ("social_tiktok", "TikTok",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>"#,
-         "#ff0050"),
-        ("social_linkedin", "LinkedIn",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
-         "#0A66C2"),
-        ("social_pinterest", "Pinterest",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641 0 12.017 0z"/></svg>"#,
-         "#BD081C"),
-        ("social_behance", "Behance",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168zM15.61 13.28c-.078-1.229-.996-2.28-2.34-2.28-1.258 0-2.205.906-2.405 2.28h4.745zM6.832 17.36c0-1.665-1.133-2.34-2.76-2.34H1.5v4.68h2.572c1.627 0 2.76-.675 2.76-2.34zM6.435 12c0-1.44-.96-2.16-2.394-2.16H1.5v4.32h2.541c1.434 0 2.394-.72 2.394-2.16zM0 8h4.5c2.58 0 4.32 1.26 4.32 3.6 0 1.44-.72 2.52-1.98 3.12 1.62.48 2.58 1.8 2.58 3.48 0 2.52-1.98 3.8-4.68 3.8H0V8z"/></svg>"#,
-         "#1769FF"),
-        ("social_dribbble", "Dribbble",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308a10.174 10.174 0 004.392-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4a10.15 10.15 0 006.29 2.166c1.42 0 2.77-.29 4.006-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702A10.13 10.13 0 0012 1.8c-.82 0-1.62.09-2.4.252zm10.14 3.2c-.21.29-1.9 2.49-5.69 4.02.24.49.47.985.68 1.485.075.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.35-6.37z"/></svg>"#,
-         "#EA4C89"),
-        ("social_github", "GitHub",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"#,
-         "#333"),
-        ("social_vimeo", "Vimeo",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197a315.065 315.065 0 003.501-3.123C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.263-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.011.01z"/></svg>"#,
-         "#1AB7EA"),
-        ("social_500px", "500px",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.439 9.01A2.994 2.994 0 004.449 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 015.949 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zm9.122-4.48A2.994 2.994 0 0013.571 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 0115.071 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zM12 2C6.478 2 2 6.478 2 12s4.478 10 10 10 10-4.478 10-10S17.522 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5z"/></svg>"#,
-         "#0099E5"),
+        (
+            "social_instagram",
+            "Instagram",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>"#,
+            "#E4405F",
+        ),
+        (
+            "social_twitter",
+            "X",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+            "#000",
+        ),
+        (
+            "social_facebook",
+            "Facebook",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
+            "#1877F2",
+        ),
+        (
+            "social_youtube",
+            "YouTube",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>"#,
+            "#FF0000",
+        ),
+        (
+            "social_tiktok",
+            "TikTok",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>"#,
+            "#ff0050",
+        ),
+        (
+            "social_linkedin",
+            "LinkedIn",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
+            "#0A66C2",
+        ),
+        (
+            "social_pinterest",
+            "Pinterest",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641 0 12.017 0z"/></svg>"#,
+            "#BD081C",
+        ),
+        (
+            "social_behance",
+            "Behance",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168zM15.61 13.28c-.078-1.229-.996-2.28-2.34-2.28-1.258 0-2.205.906-2.405 2.28h4.745zM6.832 17.36c0-1.665-1.133-2.34-2.76-2.34H1.5v4.68h2.572c1.627 0 2.76-.675 2.76-2.34zM6.435 12c0-1.44-.96-2.16-2.394-2.16H1.5v4.32h2.541c1.434 0 2.394-.72 2.394-2.16zM0 8h4.5c2.58 0 4.32 1.26 4.32 3.6 0 1.44-.72 2.52-1.98 3.12 1.62.48 2.58 1.8 2.58 3.48 0 2.52-1.98 3.8-4.68 3.8H0V8z"/></svg>"#,
+            "#1769FF",
+        ),
+        (
+            "social_dribbble",
+            "Dribbble",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308a10.174 10.174 0 004.392-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4a10.15 10.15 0 006.29 2.166c1.42 0 2.77-.29 4.006-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702A10.13 10.13 0 0012 1.8c-.82 0-1.62.09-2.4.252zm10.14 3.2c-.21.29-1.9 2.49-5.69 4.02.24.49.47.985.68 1.485.075.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.35-6.37z"/></svg>"#,
+            "#EA4C89",
+        ),
+        (
+            "social_github",
+            "GitHub",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"#,
+            "#333",
+        ),
+        (
+            "social_vimeo",
+            "Vimeo",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197a315.065 315.065 0 003.501-3.123C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.263-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.011.01z"/></svg>"#,
+            "#1AB7EA",
+        ),
+        (
+            "social_500px",
+            "500px",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.439 9.01A2.994 2.994 0 004.449 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 015.949 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zm9.122-4.48A2.994 2.994 0 0013.571 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 0115.071 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zM12 2C6.478 2 2 6.478 2 12s4.478 10 10 10 10-4.478 10-10S17.522 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5z"/></svg>"#,
+            "#0099E5",
+        ),
     ];
 
-    let collected: Vec<(String, String, &str, &str)> = platforms.iter()
+    let collected: Vec<(String, String, &str, &str)> = platforms
+        .iter()
         .filter_map(|&(key, label, icon, color)| {
             let url = sg(key);
-            if url.is_empty() { None } else { Some((label.to_string(), url, icon, color)) }
+            if url.is_empty() {
+                None
+            } else {
+                Some((label.to_string(), url, icon, color))
+            }
         })
         .collect();
 
@@ -731,10 +1009,17 @@ fn build_social_links(settings: &Value) -> String {
 
     let mut html = String::from("<div class=\"social-links\">");
     for (label, url, icon, color) in &collected {
-        let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
+        let style = if brand_colors {
+            format!(" style=\"color:{}\"", color)
+        } else {
+            String::new()
+        };
         html.push_str(&format!(
             "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" title=\"{}\"{}>{}</a>",
-            html_escape(url), html_escape(label), style, icon
+            html_escape(url),
+            html_escape(label),
+            style,
+            icon
         ));
     }
     html.push_str("</div>");
@@ -744,54 +1029,99 @@ fn build_social_links(settings: &Value) -> String {
 /// Build social links as bare <a> tags (no wrapper div) for footer flex layout.
 fn build_social_links_inline(settings: &Value) -> String {
     let sg = |key: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
     };
 
     let brand_colors = sg("social_brand_colors") == "true";
 
     let platforms: &[(&str, &str, &str, &str)] = &[
-        ("social_instagram", "Instagram",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>"#,
-         "#E4405F"),
-        ("social_twitter", "X",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
-         "#000"),
-        ("social_facebook", "Facebook",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
-         "#1877F2"),
-        ("social_youtube", "YouTube",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>"#,
-         "#FF0000"),
-        ("social_tiktok", "TikTok",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>"#,
-         "#ff0050"),
-        ("social_linkedin", "LinkedIn",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
-         "#0A66C2"),
-        ("social_pinterest", "Pinterest",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641 0 12.017 0z"/></svg>"#,
-         "#BD081C"),
-        ("social_behance", "Behance",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168zM15.61 13.28c-.078-1.229-.996-2.28-2.34-2.28-1.258 0-2.205.906-2.405 2.28h4.745zM6.832 17.36c0-1.665-1.133-2.34-2.76-2.34H1.5v4.68h2.572c1.627 0 2.76-.675 2.76-2.34zM6.435 12c0-1.44-.96-2.16-2.394-2.16H1.5v4.32h2.541c1.434 0 2.394-.72 2.394-2.16zM0 8h4.5c2.58 0 4.32 1.26 4.32 3.6 0 1.44-.72 2.52-1.98 3.12 1.62.48 2.58 1.8 2.58 3.48 0 2.52-1.98 3.8-4.68 3.8H0V8z"/></svg>"#,
-         "#1769FF"),
-        ("social_dribbble", "Dribbble",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308a10.174 10.174 0 004.392-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4a10.15 10.15 0 006.29 2.166c1.42 0 2.77-.29 4.006-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702A10.13 10.13 0 0012 1.8c-.82 0-1.62.09-2.4.252zm10.14 3.2c-.21.29-1.9 2.49-5.69 4.02.24.49.47.985.68 1.485.075.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.35-6.37z"/></svg>"#,
-         "#EA4C89"),
-        ("social_github", "GitHub",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"#,
-         "#333"),
-        ("social_vimeo", "Vimeo",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197a315.065 315.065 0 003.501-3.123C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.263-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.011.01z"/></svg>"#,
-         "#1AB7EA"),
-        ("social_500px", "500px",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.439 9.01A2.994 2.994 0 004.449 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 015.949 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zm9.122-4.48A2.994 2.994 0 0013.571 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 0115.071 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zM12 2C6.478 2 2 6.478 2 12s4.478 10 10 10 10-4.478 10-10S17.522 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5z"/></svg>"#,
-         "#0099E5"),
+        (
+            "social_instagram",
+            "Instagram",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>"#,
+            "#E4405F",
+        ),
+        (
+            "social_twitter",
+            "X",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+            "#000",
+        ),
+        (
+            "social_facebook",
+            "Facebook",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
+            "#1877F2",
+        ),
+        (
+            "social_youtube",
+            "YouTube",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>"#,
+            "#FF0000",
+        ),
+        (
+            "social_tiktok",
+            "TikTok",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>"#,
+            "#ff0050",
+        ),
+        (
+            "social_linkedin",
+            "LinkedIn",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
+            "#0A66C2",
+        ),
+        (
+            "social_pinterest",
+            "Pinterest",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641 0 12.017 0z"/></svg>"#,
+            "#BD081C",
+        ),
+        (
+            "social_behance",
+            "Behance",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 7h-7V5h7v2zm1.726 10c-.442 1.297-2.029 3-5.101 3-3.074 0-5.564-1.729-5.564-5.675 0-3.91 2.325-5.92 5.466-5.92 3.082 0 4.964 1.782 5.375 4.426.078.506.109 1.188.095 2.14H15.97c.13 3.211 3.483 3.312 4.588 2.029h3.168zM15.61 13.28c-.078-1.229-.996-2.28-2.34-2.28-1.258 0-2.205.906-2.405 2.28h4.745zM6.832 17.36c0-1.665-1.133-2.34-2.76-2.34H1.5v4.68h2.572c1.627 0 2.76-.675 2.76-2.34zM6.435 12c0-1.44-.96-2.16-2.394-2.16H1.5v4.32h2.541c1.434 0 2.394-.72 2.394-2.16zM0 8h4.5c2.58 0 4.32 1.26 4.32 3.6 0 1.44-.72 2.52-1.98 3.12 1.62.48 2.58 1.8 2.58 3.48 0 2.52-1.98 3.8-4.68 3.8H0V8z"/></svg>"#,
+            "#1769FF",
+        ),
+        (
+            "social_dribbble",
+            "Dribbble",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm10.12-10.358c-.35-.11-3.17-.953-6.384-.438 1.34 3.684 1.887 6.684 1.992 7.308a10.174 10.174 0 004.392-6.87zm-6.115 7.808c-.153-.9-.75-4.032-2.19-7.77l-.066.02c-5.79 2.015-7.86 6.025-8.04 6.4a10.15 10.15 0 006.29 2.166c1.42 0 2.77-.29 4.006-.816zm-11.62-2.58c.232-.4 3.045-5.055 8.332-6.765.135-.045.27-.084.405-.12-.26-.585-.54-1.167-.832-1.74C7.17 11.775 2.206 11.71 1.756 11.7l-.004.312c0 2.633.998 5.037 2.634 6.855zm-2.42-8.955c.46.008 4.683.026 9.477-1.248-1.698-3.018-3.53-5.558-3.8-5.928-2.868 1.35-5.01 3.99-5.676 7.17zM9.6 2.052c.282.38 2.145 2.914 3.822 6 3.645-1.365 5.19-3.44 5.373-3.702A10.13 10.13 0 0012 1.8c-.82 0-1.62.09-2.4.252zm10.14 3.2c-.21.29-1.9 2.49-5.69 4.02.24.49.47.985.68 1.485.075.18.15.36.22.53 3.41-.43 6.8.26 7.14.33-.02-2.42-.88-4.64-2.35-6.37z"/></svg>"#,
+            "#EA4C89",
+        ),
+        (
+            "social_github",
+            "GitHub",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"#,
+            "#333",
+        ),
+        (
+            "social_vimeo",
+            "Vimeo",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197a315.065 315.065 0 003.501-3.123C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.263-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.011.01z"/></svg>"#,
+            "#1AB7EA",
+        ),
+        (
+            "social_500px",
+            "500px",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7.439 9.01A2.994 2.994 0 004.449 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 015.949 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zm9.122-4.48A2.994 2.994 0 0013.571 12a2.994 2.994 0 002.99 2.99 2.994 2.994 0 002.99-2.99 2.994 2.994 0 00-2.99-2.99zm0 4.48A1.494 1.494 0 0115.071 12c0-.825.665-1.49 1.49-1.49s1.49.665 1.49 1.49-.665 1.49-1.49 1.49zM12 2C6.478 2 2 6.478 2 12s4.478 10 10 10 10-4.478 10-10S17.522 2 12 2zm0 18.5c-4.687 0-8.5-3.813-8.5-8.5S7.313 3.5 12 3.5s8.5 3.813 8.5 8.5-3.813 8.5-8.5 8.5z"/></svg>"#,
+            "#0099E5",
+        ),
     ];
 
-    let collected: Vec<(String, String, &str, &str)> = platforms.iter()
+    let collected: Vec<(String, String, &str, &str)> = platforms
+        .iter()
         .filter_map(|&(key, label, icon, color)| {
             let url = sg(key);
-            if url.is_empty() { None } else { Some((label.to_string(), url, icon, color)) }
+            if url.is_empty() {
+                None
+            } else {
+                Some((label.to_string(), url, icon, color))
+            }
         })
         .collect();
 
@@ -801,7 +1131,11 @@ fn build_social_links_inline(settings: &Value) -> String {
 
     let mut html = String::new();
     for (label, url, icon, color) in &collected {
-        let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
+        let style = if brand_colors {
+            format!(" style=\"color:{}\"", color)
+        } else {
+            String::new()
+        };
         html.push_str(&format!(
             "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" class=\"social-icon-footer\" title=\"{}\"{}>{}</a>",
             html_escape(url), html_escape(label), style, icon
@@ -814,7 +1148,11 @@ fn build_social_links_inline(settings: &Value) -> String {
 /// Renders icon-only links (no text). Respects social_brand_colors setting.
 fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> String {
     let sg = |key: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
     };
 
     if sg("share_enabled") != "true" {
@@ -828,25 +1166,42 @@ fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> St
     // (setting_key, label, share_url_template, icon_svg, brand_color)
     // All icons use fill="currentColor" — color controlled by style attr or CSS
     let platforms: &[(&str, &str, &str, &str, &str)] = &[
-        ("share_facebook", "Share on Facebook",
-         "https://www.facebook.com/sharer/sharer.php?u={url}",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
-         "#1877F2"),
-        ("share_x", "Share on X",
-         "https://x.com/intent/tweet?url={url}&text={title}",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
-         "#000"),
-        ("share_linkedin", "Share on LinkedIn",
-         "https://www.linkedin.com/sharing/share-offsite/?url={url}",
-         r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
-         "#0A66C2"),
+        (
+            "share_facebook",
+            "Share on Facebook",
+            "https://www.facebook.com/sharer/sharer.php?u={url}",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>"#,
+            "#1877F2",
+        ),
+        (
+            "share_x",
+            "Share on X",
+            "https://x.com/intent/tweet?url={url}&text={title}",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>"#,
+            "#000",
+        ),
+        (
+            "share_linkedin",
+            "Share on LinkedIn",
+            "https://www.linkedin.com/sharing/share-offsite/?url={url}",
+            r#"<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>"#,
+            "#0A66C2",
+        ),
     ];
 
     let mut icons = Vec::new();
     for &(key, label, url_tpl, icon, color) in platforms {
-        if sg(key) != "true" { continue; }
-        let href = url_tpl.replace("{url}", &encoded_url).replace("{title}", &encoded_title);
-        let style = if brand_colors { format!(" style=\"color:{}\"", color) } else { String::new() };
+        if sg(key) != "true" {
+            continue;
+        }
+        let href = url_tpl
+            .replace("{url}", &encoded_url)
+            .replace("{title}", &encoded_title);
+        let style = if brand_colors {
+            format!(" style=\"color:{}\"", color)
+        } else {
+            String::new()
+        };
         icons.push(format!(
             "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" class=\"share-icon\" title=\"{}\"{}>{}</a>",
             href, label, style, icon
@@ -859,9 +1214,18 @@ fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> St
 
     let share_label = sg("share_label");
     let label_html = if !share_label.is_empty() {
-        format!("<span class=\"share-label\">{}</span>", html_escape(&share_label))
-    } else { String::new() };
-    format!("<div class=\"share-icons\">{}{}</div>", label_html, icons.join("\n"))
+        format!(
+            "<span class=\"share-label\">{}</span>",
+            html_escape(&share_label)
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        "<div class=\"share-icons\">{}{}</div>",
+        label_html,
+        icons.join("\n")
+    )
 }
 
 /// Build a URL path from a slug prefix and an optional sub-path.
@@ -891,8 +1255,14 @@ fn build_favicon_link(settings: &Value) -> String {
 }
 
 fn build_logo_html(settings: &Value) -> String {
-    let display = settings.get("site_name_display").and_then(|v| v.as_str()).unwrap_or("text");
-    let logo = settings.get("site_logo").and_then(|v| v.as_str()).unwrap_or("");
+    let display = settings
+        .get("site_name_display")
+        .and_then(|v| v.as_str())
+        .unwrap_or("text");
+    let logo = settings
+        .get("site_logo")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     // In "none" mode, no logo image shown
     if display == "none" {
@@ -904,8 +1274,14 @@ fn build_logo_html(settings: &Value) -> String {
         return String::new();
     }
 
-    let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
-    let logo_width = settings.get("site_logo_width").and_then(|v| v.as_str()).unwrap_or("180px");
+    let site_name = settings
+        .get("site_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Velocty");
+    let logo_width = settings
+        .get("site_logo_width")
+        .and_then(|v| v.as_str())
+        .unwrap_or("180px");
     let width_style = if logo_width != "180px" && !logo_width.is_empty() {
         format!(" style=\"max-width:{}\"", html_escape(logo_width))
     } else {
@@ -920,26 +1296,36 @@ fn build_logo_html(settings: &Value) -> String {
 }
 
 fn build_custom_sidebar_html(settings: &Value) -> String {
-    let heading = settings.get("layout_sidebar_custom_heading").and_then(|v| v.as_str()).unwrap_or("");
-    let text = settings.get("layout_sidebar_custom_text").and_then(|v| v.as_str()).unwrap_or("");
+    let heading = settings
+        .get("layout_sidebar_custom_heading")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let text = settings
+        .get("layout_sidebar_custom_text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if heading.is_empty() && text.is_empty() {
         return String::new();
     }
     let mut html = String::from("<div class=\"sidebar-custom\">");
     if !heading.is_empty() {
-        html.push_str(&format!("<h3 class=\"sidebar-custom-heading\">{}</h3>", html_escape(heading)));
+        html.push_str(&format!(
+            "<h3 class=\"sidebar-custom-heading\">{}</h3>",
+            html_escape(heading)
+        ));
     }
     if !text.is_empty() {
-        html.push_str(&format!("<div class=\"sidebar-custom-text\">{}</div>", text));
+        html.push_str(&format!(
+            "<div class=\"sidebar-custom-text\">{}</div>",
+            text
+        ));
     }
     html.push_str("</div>");
     html
 }
 
 fn build_footer_legal_links(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("")
-    };
+    let get = |key: &str| -> &str { settings.get(key).and_then(|v| v.as_str()).unwrap_or("") };
     let privacy = get("privacy_policy_enabled") == "true";
     let terms = get("terms_of_use_enabled") == "true";
     if !privacy && !terms {
@@ -963,7 +1349,8 @@ fn build_back_to_top(settings: &Value) -> String {
     let enabled = settings
         .get("design_back_to_top")
         .and_then(|v| v.as_str())
-        .unwrap_or("false") == "true";
+        .unwrap_or("false")
+        == "true";
     if !enabled {
         return String::new();
     }
@@ -979,12 +1366,7 @@ btn.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'
 }
 
 fn build_cookie_consent_banner(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings
-            .get(key)
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-    };
+    let get = |key: &str| -> &str { settings.get(key).and_then(|v| v.as_str()).unwrap_or("") };
     if get("cookie_consent_enabled") != "true" {
         return String::new();
     }
@@ -992,7 +1374,11 @@ fn build_cookie_consent_banner(settings: &Value) -> String {
     let style = get("cookie_consent_style"); // minimal, modal, corner
     let position = get("cookie_consent_position"); // bottom, top
     let policy_url = get("cookie_consent_policy_url");
-    let policy_url = if policy_url.is_empty() { "/privacy" } else { policy_url };
+    let policy_url = if policy_url.is_empty() {
+        "/privacy"
+    } else {
+        policy_url
+    };
     let show_reject = get("cookie_consent_show_reject") == "true";
     let theme = get("cookie_consent_theme"); // auto, dark, light
 
@@ -1015,7 +1401,9 @@ fn build_cookie_consent_banner(settings: &Value) -> String {
     let link_color = text;
 
     let reject_btn = if show_reject {
-        format!(r#"<button id="cc-reject" style="padding:8px 20px;border-radius:6px;border:1px solid {border};font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:{text}">Reject All</button>"#)
+        format!(
+            r#"<button id="cc-reject" style="padding:8px 20px;border-radius:6px;border:1px solid {border};font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:{text}">Reject All</button>"#
+        )
     } else {
         String::new()
     };
@@ -1070,21 +1458,25 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
     )
 }
 
-
 fn format_date_iso8601(raw: &str, settings: &Value) -> String {
     let tz_name = settings
         .get("timezone")
         .and_then(|v| v.as_str())
         .unwrap_or("UTC");
 
-    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
-        .or_else(|_| chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S"));
+    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S").or_else(|_| {
+        chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S")
+    });
 
     match naive {
         Ok(ndt) => {
-            let utc_dt = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc);
+            let utc_dt =
+                chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc);
             if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
-                utc_dt.with_timezone(&tz).format("%Y-%m-%dT%H:%M:%S%:z").to_string()
+                utc_dt
+                    .with_timezone(&tz)
+                    .format("%Y-%m-%dT%H:%M:%S%:z")
+                    .to_string()
             } else {
                 utc_dt.format("%Y-%m-%dT%H:%M:%S+00:00").to_string()
             }
@@ -1104,13 +1496,15 @@ fn format_date(raw: &str, settings: &Value) -> String {
         .unwrap_or("UTC");
 
     // Try parsing common DB formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
-    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
-        .or_else(|_| chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S"));
+    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S").or_else(|_| {
+        chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S")
+    });
 
     match naive {
         Ok(ndt) => {
             // Try to apply timezone offset
-            let utc_dt = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc);
+            let utc_dt =
+                chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc);
             if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
                 utc_dt.with_timezone(&tz).format(fmt).to_string()
             } else {
@@ -1127,7 +1521,7 @@ fn truncate_words(text: &str, max_words: usize) -> String {
         text.to_string()
     } else {
         let mut result = words[..max_words].join(" ");
-        result.push_str("…");
+        result.push('…');
         result
     }
 }
@@ -1135,7 +1529,10 @@ fn truncate_words(text: &str, max_words: usize) -> String {
 fn build_pagination(current: i64, total: i64) -> String {
     let mut html = String::from(r#"<nav class="pagination">"#);
     if current > 1 {
-        html.push_str(&format!(r#"<a href="?page={}">&laquo; Prev</a>"#, current - 1));
+        html.push_str(&format!(
+            r#"<a href="?page={}">&laquo; Prev</a>"#,
+            current - 1
+        ));
     }
     for p in 1..=total {
         if p == current {
@@ -1145,7 +1542,10 @@ fn build_pagination(current: i64, total: i64) -> String {
         }
     }
     if current < total {
-        html.push_str(&format!(r#"<a href="?page={}">Next &raquo;</a>"#, current + 1));
+        html.push_str(&format!(
+            r#"<a href="?page={}">Next &raquo;</a>"#,
+            current + 1
+        ));
     }
     html.push_str("</nav>");
     html
@@ -1163,33 +1563,69 @@ fn render_portfolio_grid(context: &Value) -> String {
 
     let settings = context.get("settings").cloned().unwrap_or_default();
     let sg = |key: &str, def: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(def)
+            .to_string()
     };
     let display_type = sg("portfolio_display_type", "masonry");
     let show_tags_mode_raw = sg("portfolio_show_tags", "false");
-    let show_tags_mode = if show_tags_mode_raw == "true" { "below_left".to_string() } else { show_tags_mode_raw };
+    let show_tags_mode = if show_tags_mode_raw == "true" {
+        "below_left".to_string()
+    } else {
+        show_tags_mode_raw
+    };
     let show_tags = show_tags_mode != "false";
     let show_cats_mode_raw = sg("portfolio_show_categories", "false");
-    let show_cats_mode = if show_cats_mode_raw == "true" { "below_left".to_string() } else { show_cats_mode_raw };
+    let show_cats_mode = if show_cats_mode_raw == "true" {
+        "below_left".to_string()
+    } else {
+        show_cats_mode_raw
+    };
     let show_cats = show_cats_mode != "false";
     let _show_likes = sg("portfolio_enable_likes", "true") == "true";
     let fade_mode = sg("portfolio_fade_animation", "true");
     let fade_anim = fade_mode != "none" && fade_mode != "false";
-    let fade_class = if fade_mode == "slide_up" { "slide-up" } else if fade_anim { "fade-in" } else { "" };
+    let fade_class = if fade_mode == "slide_up" {
+        "slide-up"
+    } else if fade_anim {
+        "fade-in"
+    } else {
+        ""
+    };
     let border_style = sg("portfolio_border_style", "none");
     let show_title = sg("portfolio_show_title", "false") == "true";
 
-    let grid_class = if display_type == "grid" { "css-grid" } else { "masonry-grid" };
+    let grid_class = if display_type == "grid" {
+        "css-grid"
+    } else {
+        "masonry-grid"
+    };
     let border_class = match border_style.as_str() {
         "standard" => " border-standard",
         "polaroid" => " border-polaroid",
         _ => "",
     };
-    let item_class_str = format!("grid-item{}{}", if fade_class.is_empty() { String::new() } else { format!(" {}", fade_class) }, border_class);
+    let item_class_str = format!(
+        "grid-item{}{}",
+        if fade_class.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", fade_class)
+        },
+        border_class
+    );
 
     // Determine if we need overlay positioning on the link
-    let cats_is_overlay = matches!(show_cats_mode.as_str(), "hover" | "bottom_left" | "bottom_right");
-    let tags_is_overlay = matches!(show_tags_mode.as_str(), "hover" | "bottom_left" | "bottom_right");
+    let _cats_is_overlay = matches!(
+        show_cats_mode.as_str(),
+        "hover" | "bottom_left" | "bottom_right"
+    );
+    let _tags_is_overlay = matches!(
+        show_tags_mode.as_str(),
+        "hover" | "bottom_left" | "bottom_right"
+    );
     let cats_is_below = matches!(show_cats_mode.as_str(), "below_left" | "below_right");
     let tags_is_below = matches!(show_tags_mode.as_str(), "below_left" | "below_right");
 
@@ -1214,19 +1650,22 @@ fn render_portfolio_grid(context: &Value) -> String {
         let cats_data = entry
             .get("categories")
             .and_then(|c| c.as_array())
-            .map(|cats| cats
-                .iter()
-                .filter_map(|c| c.get("slug").and_then(|s| s.as_str()))
-                .collect::<Vec<_>>()
-                .join(" "))
+            .map(|cats| {
+                cats.iter()
+                    .filter_map(|c| c.get("slug").and_then(|s| s.as_str()))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
             .unwrap_or_default();
 
         let tag_data = if show_tags {
-            tags.map(|tl| tl.iter()
-                .filter_map(|t| t.get("name").and_then(|v| v.as_str()))
-                .collect::<Vec<_>>()
-                .join(", "))
-                .unwrap_or_default()
+            tags.map(|tl| {
+                tl.iter()
+                    .filter_map(|t| t.get("name").and_then(|v| v.as_str()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_default()
         } else {
             String::new()
         };
@@ -1236,37 +1675,63 @@ fn render_portfolio_grid(context: &Value) -> String {
             let cat_list = entry.get("categories").and_then(|c| c.as_array());
             if let Some(cats) = cat_list {
                 if !cats.is_empty() {
-                    let cat_strs: Vec<String> = cats.iter().filter_map(|c| {
-                        let name = c.get("name").and_then(|v| v.as_str())?;
-                        let cslug = c.get("slug").and_then(|v| v.as_str())?;
-                        Some(format!(
-                            "<a href=\"{}\">{}</a>",
-                            slug_url(&portfolio_slug, &format!("category/{}", cslug)),
-                            html_escape(name)
-                        ))
-                    }).collect();
-                    if !cat_strs.is_empty() { cat_strs.join(" · ") } else { String::new() }
-                } else { String::new() }
-            } else { String::new() }
-        } else { String::new() };
+                    let cat_strs: Vec<String> = cats
+                        .iter()
+                        .filter_map(|c| {
+                            let name = c.get("name").and_then(|v| v.as_str())?;
+                            let cslug = c.get("slug").and_then(|v| v.as_str())?;
+                            Some(format!(
+                                "<a href=\"{}\">{}</a>",
+                                slug_url(&portfolio_slug, &format!("category/{}", cslug)),
+                                html_escape(name)
+                            ))
+                        })
+                        .collect();
+                    if !cat_strs.is_empty() {
+                        cat_strs.join(" · ")
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
 
         // Build tag inner HTML (just the links, no wrapper div)
         let tags_inner = if show_tags {
             if let Some(tag_list) = tags {
                 if !tag_list.is_empty() {
-                    let tag_strs: Vec<String> = tag_list.iter().filter_map(|t| {
-                        let name = t.get("name").and_then(|v| v.as_str())?;
-                        let tslug = t.get("slug").and_then(|v| v.as_str())?;
-                        Some(format!(
-                            "<a href=\"{}\">{}</a>",
-                            slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
-                            html_escape(name)
-                        ))
-                    }).collect();
-                    if !tag_strs.is_empty() { tag_strs.join(" · ") } else { String::new() }
-                } else { String::new() }
-            } else { String::new() }
-        } else { String::new() };
+                    let tag_strs: Vec<String> = tag_list
+                        .iter()
+                        .filter_map(|t| {
+                            let name = t.get("name").and_then(|v| v.as_str())?;
+                            let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                            Some(format!(
+                                "<a href=\"{}\">{}</a>",
+                                slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
+                                html_escape(name)
+                            ))
+                        })
+                        .collect();
+                    if !tag_strs.is_empty() {
+                        tag_strs.join(" · ")
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
 
         let item_url = slug_url(&portfolio_slug, slug);
         html.push_str(&format!(
@@ -1290,26 +1755,44 @@ fn render_portfolio_grid(context: &Value) -> String {
             html.push_str("<div class=\"item-hover-overlay\">");
             html.push_str("<div class=\"item-hover-content\">");
             if cats_is_hover && !cats_inner.is_empty() {
-                html.push_str(&format!("<div class=\"item-categories item-meta-hover\">{}</div>", cats_inner));
+                html.push_str(&format!(
+                    "<div class=\"item-categories item-meta-hover\">{}</div>",
+                    cats_inner
+                ));
             }
             if tags_is_hover && !tags_inner.is_empty() {
-                html.push_str(&format!("<div class=\"item-tags item-meta-hover\">{}</div>", tags_inner));
+                html.push_str(&format!(
+                    "<div class=\"item-tags item-meta-hover\">{}</div>",
+                    tags_inner
+                ));
             }
             html.push_str("</div></div>");
         }
 
         // Corner overlays (bottom_left, bottom_right) — always visible, positioned in corners
         if show_cats_mode == "bottom_left" && !cats_inner.is_empty() {
-            html.push_str(&format!("<div class=\"item-categories item-meta-bottom_left\">{}</div>", cats_inner));
+            html.push_str(&format!(
+                "<div class=\"item-categories item-meta-bottom_left\">{}</div>",
+                cats_inner
+            ));
         }
         if show_cats_mode == "bottom_right" && !cats_inner.is_empty() {
-            html.push_str(&format!("<div class=\"item-categories item-meta-bottom_right\">{}</div>", cats_inner));
+            html.push_str(&format!(
+                "<div class=\"item-categories item-meta-bottom_right\">{}</div>",
+                cats_inner
+            ));
         }
         if show_tags_mode == "bottom_left" && !tags_inner.is_empty() {
-            html.push_str(&format!("<div class=\"item-tags item-meta-bottom_left\">{}</div>", tags_inner));
+            html.push_str(&format!(
+                "<div class=\"item-tags item-meta-bottom_left\">{}</div>",
+                tags_inner
+            ));
         }
         if show_tags_mode == "bottom_right" && !tags_inner.is_empty() {
-            html.push_str(&format!("<div class=\"item-tags item-meta-bottom_right\">{}</div>", tags_inner));
+            html.push_str(&format!(
+                "<div class=\"item-tags item-meta-bottom_right\">{}</div>",
+                tags_inner
+            ));
         }
 
         // Title below image
@@ -1322,14 +1805,18 @@ fn render_portfolio_grid(context: &Value) -> String {
 
         // Below-image categories
         if cats_is_below && !cats_inner.is_empty() {
-            html.push_str(&format!("<div class=\"item-categories item-meta-{}\">{}</div>",
-                show_cats_mode, cats_inner));
+            html.push_str(&format!(
+                "<div class=\"item-categories item-meta-{}\">{}</div>",
+                show_cats_mode, cats_inner
+            ));
         }
 
         // Below-image tags
         if tags_is_below && !tags_inner.is_empty() {
-            html.push_str(&format!("<div class=\"item-tags item-meta-{}\">{}</div>",
-                show_tags_mode, tags_inner));
+            html.push_str(&format!(
+                "<div class=\"item-tags item-meta-{}\">{}</div>",
+                show_tags_mode, tags_inner
+            ));
         }
 
         html.push_str("</div>\n");
@@ -1338,8 +1825,14 @@ fn render_portfolio_grid(context: &Value) -> String {
     html.push_str("</div>");
 
     // Pagination
-    let current_page = context.get("current_page").and_then(|v| v.as_i64()).unwrap_or(1);
-    let total_pages = context.get("total_pages").and_then(|v| v.as_i64()).unwrap_or(1);
+    let current_page = context
+        .get("current_page")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1);
+    let total_pages = context
+        .get("total_pages")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1);
     let pagination_type = sg("portfolio_pagination_type", "classic");
 
     if total_pages > 1 {
@@ -1357,7 +1850,8 @@ fn render_portfolio_grid(context: &Value) -> String {
                 html.push_str(&format!(
                     "<div id=\"infinite-sentinel\" data-page=\"{}\" data-total=\"{}\" \
                      style=\"height:1px\"></div>",
-                    current_page + 1, total_pages
+                    current_page + 1,
+                    total_pages
                 ));
             }
             _ => {
@@ -1378,7 +1872,11 @@ fn render_portfolio_single(context: &Value) -> String {
 
     let settings = context.get("settings").cloned().unwrap_or_default();
     let sg = |key: &str, def: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(def)
+            .to_string()
     };
     let show_likes = sg("portfolio_enable_likes", "true") == "true";
     let show_cats = sg("portfolio_show_categories", "false") != "false";
@@ -1386,7 +1884,10 @@ fn render_portfolio_single(context: &Value) -> String {
     let portfolio_slug = sg("portfolio_slug", "portfolio");
 
     let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-    let image = item.get("image_path").and_then(|v| v.as_str()).unwrap_or("");
+    let image = item
+        .get("image_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let desc = item
         .get("description_html")
         .and_then(|v| v.as_str())
@@ -1400,7 +1901,8 @@ fn render_portfolio_single(context: &Value) -> String {
     let like_html = if show_likes {
         format!(
             r#"<span class="like-btn" data-id="{}">♥ <span class="like-count">{}</span></span>"#,
-            item_id, format_likes(likes)
+            item_id,
+            format_likes(likes)
         )
     } else {
         String::new()
@@ -1467,7 +1969,8 @@ fn render_portfolio_single(context: &Value) -> String {
                         let tslug = t.get("slug").and_then(|v| v.as_str())?;
                         Some(format!(
                             "<a href=\"{}\">{}</a>",
-                            slug_url(&portfolio_slug, &format!("tag/{}", tslug)), html_escape(name)
+                            slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
+                            html_escape(name)
                         ))
                     })
                     .collect();
@@ -1478,7 +1981,10 @@ fn render_portfolio_single(context: &Value) -> String {
     }
 
     if !desc.is_empty() {
-        html.push_str(&format!(r#"<div class="portfolio-description">{}</div>"#, desc));
+        html.push_str(&format!(
+            r#"<div class="portfolio-description">{}</div>"#,
+            desc
+        ));
     }
 
     // Share buttons — below content (after description)
@@ -1487,30 +1993,65 @@ fn render_portfolio_single(context: &Value) -> String {
     }
 
     // Commerce: Buy / Download section
-    let commerce_enabled = context.get("commerce_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let commerce_enabled = context
+        .get("commerce_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     if commerce_enabled {
         let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let purchase_note = item.get("purchase_note").and_then(|v| v.as_str()).unwrap_or("");
-        let payment_provider = item.get("payment_provider").and_then(|v| v.as_str()).unwrap_or("");
+        let purchase_note = item
+            .get("purchase_note")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let payment_provider = item
+            .get("payment_provider")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
-        html.push_str(&build_commerce_html(price, purchase_note, item_id, &settings, payment_provider));
+        html.push_str(&build_commerce_html(
+            price,
+            purchase_note,
+            item_id,
+            &settings,
+            payment_provider,
+        ));
     }
 
     // Comments on portfolio (gated on comments_enabled flag from route)
-    let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let comments_on = context
+        .get("comments_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     if comments_on {
-        html.push_str(&build_comments_section(context, &settings, item_id, "portfolio"));
+        html.push_str(&build_comments_section(
+            context,
+            &settings,
+            item_id,
+            "portfolio",
+        ));
     }
 
     html.push_str("</article>");
 
     // JSON-LD structured data
     if settings.get("seo_structured_data").and_then(|v| v.as_str()) == Some("true") {
-        let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
-        let site_url = settings.get("site_url").and_then(|v| v.as_str()).unwrap_or("http://localhost:8000");
-        let portfolio_slug = settings.get("portfolio_slug").and_then(|v| v.as_str()).unwrap_or("portfolio");
+        let site_name = settings
+            .get("site_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Velocty");
+        let site_url = settings
+            .get("site_url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("http://localhost:8000");
+        let portfolio_slug = settings
+            .get("portfolio_slug")
+            .and_then(|v| v.as_str())
+            .unwrap_or("portfolio");
         let slug = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        let meta_desc = item.get("meta_description").and_then(|v| v.as_str()).unwrap_or("");
+        let meta_desc = item
+            .get("meta_description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         html.push_str(&format!(
             r#"<script type="application/ld+json">
 {{
@@ -1523,9 +2064,12 @@ fn render_portfolio_single(context: &Value) -> String {
     "publisher": {{ "@type": "Organization", "name": "{}" }}
 }}
 </script>"#,
-            html_escape(title), html_escape(meta_desc),
-            site_url, image,
-            site_url, slug_url(portfolio_slug, slug),
+            html_escape(title),
+            html_escape(meta_desc),
+            site_url,
+            image,
+            site_url,
+            slug_url(portfolio_slug, slug),
             html_escape(site_name),
         ));
     }
@@ -1541,7 +2085,11 @@ fn render_blog_list(context: &Value) -> String {
 
     let settings = context.get("settings").cloned().unwrap_or_default();
     let sg = |key: &str, def: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(def)
+            .to_string()
     };
     let display_type = sg("blog_display_type", "grid");
     let list_style = sg("blog_list_style", "compact");
@@ -1555,11 +2103,21 @@ fn render_blog_list(context: &Value) -> String {
     let container_class = match display_type.as_str() {
         "masonry" => "blog-list blog-masonry",
         "grid" => "blog-list blog-grid",
-        _ => if list_style == "editorial" { "blog-list blog-editorial" } else { "blog-list" },
+        _ => {
+            if list_style == "editorial" {
+                "blog-list blog-editorial"
+            } else {
+                "blog-list"
+            }
+        }
     };
 
     let blog_label = sg("blog_label", "journal");
-    let mut html = format!("<div class=\"{}\">\n<h1>{}</h1>", container_class, html_escape(&blog_label));
+    let mut html = format!(
+        "<div class=\"{}\">\n<h1>{}</h1>",
+        container_class,
+        html_escape(&blog_label)
+    );
 
     for post in posts {
         let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
@@ -1574,7 +2132,10 @@ fn render_blog_list(context: &Value) -> String {
             .get("featured_image")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let author = post.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
+        let author = post
+            .get("author_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let word_count = post.get("word_count").and_then(|v| v.as_i64()).unwrap_or(0);
 
         // Truncate excerpt to configured word count
@@ -1596,13 +2157,19 @@ fn render_blog_list(context: &Value) -> String {
         // Build meta line (author, date, reading time)
         let mut meta_parts: Vec<String> = Vec::new();
         if show_author && !author.is_empty() {
-            meta_parts.push(format!("<span class=\"blog-author\">{}</span>", html_escape(author)));
+            meta_parts.push(format!(
+                "<span class=\"blog-author\">{}</span>",
+                html_escape(author)
+            ));
         }
         if show_date && !date.is_empty() {
             meta_parts.push(format!("<time>{}</time>", date));
         }
         if show_reading_time && word_count > 0 {
-            meta_parts.push(format!("<span class=\"reading-time\">{} min read</span>", reading_time));
+            meta_parts.push(format!(
+                "<span class=\"reading-time\">{} min read</span>",
+                reading_time
+            ));
         }
         let meta_html = if !meta_parts.is_empty() {
             format!("<div class=\"blog-meta\">{}</div>", meta_parts.join(" · "))
@@ -1631,8 +2198,14 @@ fn render_blog_list(context: &Value) -> String {
     html.push_str("</div>");
 
     // Pagination
-    let current_page = context.get("current_page").and_then(|v| v.as_i64()).unwrap_or(1);
-    let total_pages = context.get("total_pages").and_then(|v| v.as_i64()).unwrap_or(1);
+    let current_page = context
+        .get("current_page")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1);
+    let total_pages = context
+        .get("total_pages")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1);
     let pagination_type = sg("blog_pagination_type", "classic");
 
     if total_pages > 1 {
@@ -1650,7 +2223,8 @@ fn render_blog_list(context: &Value) -> String {
                 html.push_str(&format!(
                     "<div id=\"infinite-sentinel\" data-page=\"{}\" data-total=\"{}\" \
                      style=\"height:1px\"></div>",
-                    current_page + 1, total_pages
+                    current_page + 1,
+                    total_pages
                 ));
             }
             _ => {
@@ -1669,7 +2243,11 @@ fn render_blog_single(context: &Value) -> String {
     };
     let settings = context.get("settings").cloned().unwrap_or_default();
     let sg = |key: &str, def: &str| -> String {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or(def).to_string()
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(def)
+            .to_string()
     };
     let show_author = sg("blog_show_author", "true") == "true";
     let show_date = sg("blog_show_date", "true") == "true";
@@ -1689,7 +2267,10 @@ fn render_blog_single(context: &Value) -> String {
         .get("featured_image")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let author = post.get("author_name").and_then(|v| v.as_str()).unwrap_or("");
+    let author = post
+        .get("author_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let word_count = post.get("word_count").and_then(|v| v.as_i64()).unwrap_or(0);
     let reading_time = ((word_count as f64) / 200.0).ceil().max(1.0) as i64;
 
@@ -1701,16 +2282,25 @@ fn render_blog_single(context: &Value) -> String {
     // Build meta line
     let mut meta_parts: Vec<String> = Vec::new();
     if show_author && !author.is_empty() {
-        meta_parts.push(format!("<span class=\"blog-author\">{}</span>", html_escape(author)));
+        meta_parts.push(format!(
+            "<span class=\"blog-author\">{}</span>",
+            html_escape(author)
+        ));
     }
     if show_date && !date.is_empty() {
         meta_parts.push(format!("<time>{}</time>", date));
     }
     if show_reading_time && word_count > 0 {
-        meta_parts.push(format!("<span class=\"reading-time\">{} min read</span>", reading_time));
+        meta_parts.push(format!(
+            "<span class=\"reading-time\">{} min read</span>",
+            reading_time
+        ));
     }
     if !meta_parts.is_empty() {
-        html.push_str(&format!("\n    <div class=\"blog-meta\">{}</div>", meta_parts.join(" · ")));
+        html.push_str(&format!(
+            "\n    <div class=\"blog-meta\">{}</div>",
+            meta_parts.join(" · ")
+        ));
     }
 
     let share_pos = sg("share_icons_position", "below_content");
@@ -1741,11 +2331,19 @@ fn render_blog_single(context: &Value) -> String {
     if let Some(Value::Array(tags)) = context.get("tags") {
         if !tags.is_empty() {
             html.push_str("<div class=\"post-tags\">");
-            let tag_strs: Vec<String> = tags.iter().filter_map(|t| {
-                let name = t.get("name").and_then(|v| v.as_str())?;
-                let tslug = t.get("slug").and_then(|v| v.as_str())?;
-                Some(format!("<a href=\"/{}/tag/{}\">{}</a>", blog_slug, tslug, html_escape(name)))
-            }).collect();
+            let tag_strs: Vec<String> = tags
+                .iter()
+                .filter_map(|t| {
+                    let name = t.get("name").and_then(|v| v.as_str())?;
+                    let tslug = t.get("slug").and_then(|v| v.as_str())?;
+                    Some(format!(
+                        "<a href=\"/{}/tag/{}\">{}</a>",
+                        blog_slug,
+                        tslug,
+                        html_escape(name)
+                    ))
+                })
+                .collect();
             html.push_str(&tag_strs.join(" "));
             html.push_str("</div>");
         }
@@ -1761,21 +2359,34 @@ fn render_blog_single(context: &Value) -> String {
     if let Some(prev) = context.get("prev_post") {
         let prev_title = prev.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let prev_slug = prev.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        nav_html.push_str(&format!("<a href=\"/{}/{}\">&larr; {}</a>", blog_slug, prev_slug, html_escape(prev_title)));
+        nav_html.push_str(&format!(
+            "<a href=\"/{}/{}\">&larr; {}</a>",
+            blog_slug,
+            prev_slug,
+            html_escape(prev_title)
+        ));
     } else {
         nav_html.push_str("<span></span>");
     }
     if let Some(next) = context.get("next_post") {
         let next_title = next.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let next_slug = next.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-        nav_html.push_str(&format!("<a href=\"/{}/{}\">{} &rarr;</a>", blog_slug, next_slug, html_escape(next_title)));
+        nav_html.push_str(&format!(
+            "<a href=\"/{}/{}\">{} &rarr;</a>",
+            blog_slug,
+            next_slug,
+            html_escape(next_title)
+        ));
     }
     if !nav_html.is_empty() {
         html.push_str(&format!("<nav class=\"post-nav\">{}</nav>", nav_html));
     }
 
     // Comments (gated on comments_enabled flag from route)
-    let comments_on = context.get("comments_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let comments_on = context
+        .get("comments_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     if comments_on {
         let post_id = post.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
         html.push_str(&build_comments_section(context, &settings, post_id, "post"));
@@ -1785,17 +2396,38 @@ fn render_blog_single(context: &Value) -> String {
 
     // JSON-LD structured data
     if settings.get("seo_structured_data").and_then(|v| v.as_str()) == Some("true") {
-        let site_name = settings.get("site_name").and_then(|v| v.as_str()).unwrap_or("Velocty");
-        let site_url = settings.get("site_url").and_then(|v| v.as_str()).unwrap_or("http://localhost:8000");
-        let blog_slug = settings.get("blog_slug").and_then(|v| v.as_str()).unwrap_or("journal");
+        let site_name = settings
+            .get("site_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Velocty");
+        let site_url = settings
+            .get("site_url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("http://localhost:8000");
+        let blog_slug = settings
+            .get("blog_slug")
+            .and_then(|v| v.as_str())
+            .unwrap_or("journal");
         let slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
         let headline = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
-        let desc = post.get("meta_description").and_then(|v| v.as_str()).unwrap_or("");
-        let raw_pub = post.get("published_at").and_then(|v| v.as_str()).unwrap_or("");
-        let raw_mod = post.get("updated_at").and_then(|v| v.as_str()).unwrap_or("");
+        let desc = post
+            .get("meta_description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let raw_pub = post
+            .get("published_at")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let raw_mod = post
+            .get("updated_at")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let published = format_date_iso8601(raw_pub, &settings);
         let modified = format_date_iso8601(raw_mod, &settings);
-        let image = post.get("featured_image").and_then(|v| v.as_str()).unwrap_or("");
+        let image = post
+            .get("featured_image")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let mut ld = format!(
             r#"<script type="application/ld+json">
 {{
@@ -1807,13 +2439,21 @@ fn render_blog_single(context: &Value) -> String {
     "datePublished": "{}",
     "dateModified": "{}",
     "publisher": {{ "@type": "Organization", "name": "{}" }}"#,
-            html_escape(headline), html_escape(desc),
-            site_url, blog_slug, slug,
-            published, modified,
+            html_escape(headline),
+            html_escape(desc),
+            site_url,
+            blog_slug,
+            slug,
+            published,
+            modified,
             html_escape(site_name),
         );
         if !image.is_empty() {
-            ld.push_str(&format!(r#", "image": "{}/uploads/{}""#, site_url, html_escape(image)));
+            ld.push_str(&format!(
+                r#", "image": "{}/uploads/{}""#,
+                site_url,
+                html_escape(image)
+            ));
         }
         ld.push_str("\n}\n</script>");
         html.push_str(&ld);
@@ -1833,9 +2473,13 @@ fn render_archives(context: &Value) -> String {
     }
 
     let settings = context.get("settings").cloned().unwrap_or_default();
-    let blog_slug = settings.get("blog_slug").and_then(|v| v.as_str()).unwrap_or("journal");
+    let _blog_slug = settings
+        .get("blog_slug")
+        .and_then(|v| v.as_str())
+        .unwrap_or("journal");
 
-    let mut html = String::from("<div class=\"blog-list\" style=\"padding:30px\"><h1>Archives</h1>");
+    let mut html =
+        String::from("<div class=\"blog-list\" style=\"padding:30px\"><h1>Archives</h1>");
 
     // Group by year
     let mut current_year = String::new();
@@ -1854,10 +2498,18 @@ fn render_archives(context: &Value) -> String {
 
         // Convert month number to name
         let month_name = match month {
-            "01" => "January", "02" => "February", "03" => "March",
-            "04" => "April", "05" => "May", "06" => "June",
-            "07" => "July", "08" => "August", "09" => "September",
-            "10" => "October", "11" => "November", "12" => "December",
+            "01" => "January",
+            "02" => "February",
+            "03" => "March",
+            "04" => "April",
+            "05" => "May",
+            "06" => "June",
+            "07" => "July",
+            "08" => "August",
+            "09" => "September",
+            "10" => "October",
+            "11" => "November",
+            "12" => "December",
             _ => month,
         };
 
@@ -3369,16 +4021,16 @@ fn build_commerce_html(
     settings: &Value,
     payment_provider: &str,
 ) -> String {
-    let gs = |key: &str| -> &str {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("")
-    };
-    let enabled = |key: &str| -> bool {
-        gs(key) == "true"
-    };
+    let gs = |key: &str| -> &str { settings.get(key).and_then(|v| v.as_str()).unwrap_or("") };
+    let enabled = |key: &str| -> bool { gs(key) == "true" };
 
     let currency = {
         let c = gs("commerce_currency");
-        if c.is_empty() { "USD" } else { c }
+        if c.is_empty() {
+            "USD"
+        } else {
+            c
+        }
     };
 
     // Determine which single provider to use for this item
@@ -3388,14 +4040,27 @@ fn build_commerce_html(
         // Fallback for legacy items: use first enabled provider
         let providers = [
             ("paypal", "commerce_paypal_enabled", "paypal_client_id"),
-            ("stripe", "commerce_stripe_enabled", "stripe_publishable_key"),
+            (
+                "stripe",
+                "commerce_stripe_enabled",
+                "stripe_publishable_key",
+            ),
             ("razorpay", "commerce_razorpay_enabled", "razorpay_key_id"),
             ("mollie", "commerce_mollie_enabled", "mollie_api_key"),
             ("square", "commerce_square_enabled", "square_access_token"),
-            ("2checkout", "commerce_2checkout_enabled", "twocheckout_merchant_code"),
-            ("payoneer", "commerce_payoneer_enabled", "payoneer_client_id"),
+            (
+                "2checkout",
+                "commerce_2checkout_enabled",
+                "twocheckout_merchant_code",
+            ),
+            (
+                "payoneer",
+                "commerce_payoneer_enabled",
+                "payoneer_client_id",
+            ),
         ];
-        providers.iter()
+        providers
+            .iter()
             .find(|(_, en, key)| enabled(en) && !gs(key).is_empty())
             .map(|(name, _, _)| name.to_string())
             .unwrap_or_default()
@@ -3478,7 +4143,9 @@ fn build_commerce_html(
     s.push_str(r#"<div id="commerce-processing" style="display:none;text-align:center;padding:20px"><p style="color:#888">Processing your purchase...</p></div>"#);
 
     // Success state
-    s.push_str(r#"<div id="commerce-success" style="display:none;text-align:center;padding:20px">"#);
+    s.push_str(
+        r#"<div id="commerce-success" style="display:none;text-align:center;padding:20px">"#,
+    );
     s.push_str(r#"<div style="font-size:32px;margin-bottom:8px">&#10004;</div>"#);
     s.push_str(r#"<h3 style="margin-bottom:8px">Purchase Complete!</h3>"#);
     s.push_str(r#"<p style="font-size:13px;color:#888;margin-bottom:16px">Check your email for the download link.</p>"#);
@@ -3506,14 +4173,19 @@ fn build_commerce_html(
     s.push_str("function _vSuccess(d){document.getElementById('commerce-processing').style.display='none';");
     s.push_str("if(!d.ok){alert(d.error||'Payment failed');document.getElementById('commerce-email-step').style.display='';return;}");
     s.push_str("document.getElementById('commerce-success').style.display='';");
-    s.push_str("document.getElementById('commerce-download-link').href='/download/'+d.download_token;");
+    s.push_str(
+        "document.getElementById('commerce-download-link').href='/download/'+d.download_token;",
+    );
     s.push_str("if(d.license_key){document.getElementById('commerce-license').style.display='';document.getElementById('commerce-license-key').textContent=d.license_key;}}\n");
 
     // Shared: show processing
     s.push_str("function _vProc(){document.getElementById('commerce-email-step').style.display='none';document.getElementById('commerce-processing').style.display='';}\n");
 
     // Redirect-based providers (Stripe, Mollie, Square, 2Checkout, Payoneer)
-    if matches!(provider.as_str(), "stripe" | "mollie" | "square" | "2checkout" | "payoneer") {
+    if matches!(
+        provider.as_str(),
+        "stripe" | "mollie" | "square" | "2checkout" | "payoneer"
+    ) {
         s.push_str("function commerceRedirect(provider){\n");
         s.push_str("var email=_vEmail();if(!email)return;\n_vProc();\n");
         s.push_str("fetch('/api/checkout/'+provider+'/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:_vItemId,buyer_email:email})})");
@@ -3540,7 +4212,9 @@ fn build_commerce_html(
         s.push_str("handler:function(resp){\n");
         s.push_str("fetch('/api/checkout/razorpay/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({");
         s.push_str("order_id:d.order_id,razorpay_order_id:resp.razorpay_order_id,razorpay_payment_id:resp.razorpay_payment_id,razorpay_signature:resp.razorpay_signature,buyer_email:email,buyer_name:''");
-        s.push_str("})}).then(function(r){return r.json()}).then(function(v){_vSuccess(v);});\n},\n");
+        s.push_str(
+            "})}).then(function(r){return r.json()}).then(function(v){_vSuccess(v);});\n},\n",
+        );
         s.push_str("modal:{ondismiss:function(){document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';}}\n");
         s.push_str("};\nnew Razorpay(opts).open();\n");
         s.push_str("}).catch(function(e){alert('Error: '+e.message);document.getElementById('commerce-processing').style.display='none';document.getElementById('commerce-email-step').style.display='';});\n}\n");
@@ -3551,7 +4225,11 @@ fn build_commerce_html(
         let pp_id = gs("paypal_client_id");
         let pp_cur = {
             let c = gs("paypal_currency");
-            if c.is_empty() { currency } else { c }
+            if c.is_empty() {
+                currency
+            } else {
+                c
+            }
         };
         s.push_str("</script>\n");
         s.push_str(&format!("<script src=\"https://www.paypal.com/sdk/js?client-id={}&currency={}\"></script>\n<script>\n", html_escape(pp_id), html_escape(pp_cur)));

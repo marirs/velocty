@@ -4,9 +4,9 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::security::auth::AdminUser;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
+use crate::security::auth::AdminUser;
 use crate::AdminSlug;
 
 // ── Health ─────────────────────────────────────────────────
@@ -71,7 +71,11 @@ pub struct AnalyticsPruneForm {
 }
 
 #[post("/health/analytics-prune", format = "json", data = "<body>")]
-pub fn health_analytics_prune(_admin: AdminUser, pool: &State<DbPool>, body: Json<AnalyticsPruneForm>) -> Json<Value> {
+pub fn health_analytics_prune(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<AnalyticsPruneForm>,
+) -> Json<Value> {
     let r = crate::health::run_analytics_prune(pool, body.days);
     json_tool_result(r)
 }
@@ -92,12 +96,19 @@ pub fn health_export_content(_admin: AdminUser, pool: &State<DbPool>) -> Json<Va
 pub fn health_mongo_ping(_admin: AdminUser) -> Json<Value> {
     let uri = crate::health::read_db_backend();
     if uri != "mongodb" {
-        return Json(json!({ "ok": false, "message": "Not using MongoDB backend.", "details": null }));
+        return Json(
+            json!({ "ok": false, "message": "Not using MongoDB backend.", "details": null }),
+        );
     }
     let mongo_uri = std::fs::read_to_string("velocty.toml")
         .ok()
         .and_then(|s| s.parse::<toml::Value>().ok())
-        .and_then(|v| v.get("database")?.get("uri")?.as_str().map(|s| s.to_string()))
+        .and_then(|v| {
+            v.get("database")?
+                .get("uri")?
+                .as_str()
+                .map(|s| s.to_string())
+        })
         .unwrap_or_else(|| "mongodb://localhost:27017".to_string());
 
     let start = std::time::Instant::now();
@@ -105,9 +116,13 @@ pub fn health_mongo_ping(_admin: AdminUser) -> Json<Value> {
     let latency = start.elapsed().as_millis();
 
     if report.0 {
-        Json(json!({ "ok": true, "message": format!("MongoDB is reachable. Latency: {} ms", report.1), "details": null }))
+        Json(
+            json!({ "ok": true, "message": format!("MongoDB is reachable. Latency: {} ms", report.1), "details": null }),
+        )
     } else {
-        Json(json!({ "ok": false, "message": format!("MongoDB unreachable ({}ms timeout)", latency), "details": null }))
+        Json(
+            json!({ "ok": false, "message": format!("MongoDB unreachable ({}ms timeout)", latency), "details": null }),
+        )
     }
 }
 

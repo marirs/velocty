@@ -10,7 +10,9 @@ use super::json_escape;
 fn format_iso8601(ndt: chrono::NaiveDateTime, tz_name: &str) -> String {
     let utc: DateTime<Utc> = DateTime::from_naive_utc_and_offset(ndt, Utc);
     if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
-        utc.with_timezone(&tz).format("%Y-%m-%dT%H:%M:%S%:z").to_string()
+        utc.with_timezone(&tz)
+            .format("%Y-%m-%dT%H:%M:%S%:z")
+            .to_string()
     } else {
         utc.format("%Y-%m-%dT%H:%M:%S+00:00").to_string()
     }

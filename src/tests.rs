@@ -4,25 +4,25 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use std::collections::HashMap;
 
-use crate::db::{DbPool, run_migrations, seed_defaults};
-use crate::models::settings::Setting;
-use crate::models::post::{Post, PostForm};
-use crate::models::portfolio::{PortfolioItem, PortfolioForm};
-use crate::models::category::{Category, CategoryForm};
-use crate::models::tag::{Tag, TagForm};
-use crate::models::comment::{Comment, CommentForm};
-use crate::models::user::User;
-use crate::models::order::{Order, DownloadToken, License};
-use crate::models::audit::AuditEntry;
-use crate::models::firewall::{FwBan, FwEvent};
-use crate::models::design::{Design, DesignTemplate};
+use crate::db::{run_migrations, seed_defaults, DbPool};
+use crate::license;
 use crate::models::analytics::PageView;
+use crate::models::audit::AuditEntry;
+use crate::models::category::{Category, CategoryForm};
+use crate::models::comment::{Comment, CommentForm};
+use crate::models::design::{Design, DesignTemplate};
+use crate::models::firewall::{FwBan, FwEvent};
 use crate::models::import::Import;
-use crate::security::auth;
-use crate::security::mfa;
+use crate::models::order::{DownloadToken, License, Order};
+use crate::models::portfolio::{PortfolioForm, PortfolioItem};
+use crate::models::post::{Post, PostForm};
+use crate::models::settings::Setting;
+use crate::models::tag::{Tag, TagForm};
+use crate::models::user::User;
 use crate::rate_limit::RateLimiter;
 use crate::rss;
-use crate::license;
+use crate::security::auth;
+use crate::security::mfa;
 use crate::seo;
 
 /// Atomic counter for unique shared-cache DB names so parallel tests don't collide.
@@ -53,7 +53,8 @@ fn test_pool() -> DbPool {
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_password_hash', ?1)",
             rusqlite::params![fast],
-        ).unwrap();
+        )
+        .unwrap();
     }
     seed_defaults(&pool).expect("Failed to seed defaults");
     pool
@@ -78,7 +79,10 @@ fn settings_set_and_get() {
 #[test]
 fn settings_get_or_default() {
     let pool = test_pool();
-    assert_eq!(Setting::get_or(&pool, "nonexistent", "fallback"), "fallback");
+    assert_eq!(
+        Setting::get_or(&pool, "nonexistent", "fallback"),
+        "fallback"
+    );
     Setting::set(&pool, "exists", "val").unwrap();
     assert_eq!(Setting::get_or(&pool, "exists", "fallback"), "val");
 }
@@ -184,7 +188,11 @@ fn post_crud() {
 fn post_list_and_pagination() {
     let pool = test_pool();
     for i in 0..5 {
-        Post::create(&pool, &make_post_form(&format!("Post {}", i), &format!("post-{}", i), "published")).unwrap();
+        Post::create(
+            &pool,
+            &make_post_form(&format!("Post {}", i), &format!("post-{}", i), "published"),
+        )
+        .unwrap();
     }
     Post::create(&pool, &make_post_form("Draft", "draft-1", "draft")).unwrap();
 
@@ -242,7 +250,8 @@ fn portfolio_crud() {
     let pool = test_pool();
 
     // Create
-    let id = PortfolioItem::create(&pool, &make_portfolio_form("Sunset", "sunset", "draft")).unwrap();
+    let id =
+        PortfolioItem::create(&pool, &make_portfolio_form("Sunset", "sunset", "draft")).unwrap();
     assert!(id > 0);
 
     // Read
@@ -285,9 +294,17 @@ fn portfolio_crud() {
 fn portfolio_list_and_published() {
     let pool = test_pool();
     for i in 0..4 {
-        PortfolioItem::create(&pool, &make_portfolio_form(&format!("Item {}", i), &format!("item-{}", i), "published")).unwrap();
+        PortfolioItem::create(
+            &pool,
+            &make_portfolio_form(&format!("Item {}", i), &format!("item-{}", i), "published"),
+        )
+        .unwrap();
     }
-    PortfolioItem::create(&pool, &make_portfolio_form("Draft Item", "draft-item", "draft")).unwrap();
+    PortfolioItem::create(
+        &pool,
+        &make_portfolio_form("Draft Item", "draft-item", "draft"),
+    )
+    .unwrap();
 
     assert_eq!(PortfolioItem::count(&pool, None), 5);
     assert_eq!(PortfolioItem::count(&pool, Some("published")), 4);
@@ -309,13 +326,20 @@ fn portfolio_update_status() {
     let pool = test_pool();
     let id = PortfolioItem::create(&pool, &make_portfolio_form("Test", "test", "draft")).unwrap();
     PortfolioItem::update_status(&pool, id, "published").unwrap();
-    assert_eq!(PortfolioItem::find_by_id(&pool, id).unwrap().status, "published");
+    assert_eq!(
+        PortfolioItem::find_by_id(&pool, id).unwrap().status,
+        "published"
+    );
 }
 
 #[test]
 fn portfolio_likes() {
     let pool = test_pool();
-    let id = PortfolioItem::create(&pool, &make_portfolio_form("Likeable", "likeable", "published")).unwrap();
+    let id = PortfolioItem::create(
+        &pool,
+        &make_portfolio_form("Likeable", "likeable", "published"),
+    )
+    .unwrap();
 
     let count = PortfolioItem::increment_likes(&pool, id).unwrap();
     assert_eq!(count, 1);
@@ -441,13 +465,28 @@ fn category_content_association() {
 #[test]
 fn tag_crud() {
     let pool = test_pool();
-    let id = Tag::create(&pool, &TagForm { name: "Rust".to_string(), slug: "rust".to_string() }).unwrap();
+    let id = Tag::create(
+        &pool,
+        &TagForm {
+            name: "Rust".to_string(),
+            slug: "rust".to_string(),
+        },
+    )
+    .unwrap();
     assert!(id > 0);
 
     let tag = Tag::find_by_id(&pool, id).unwrap();
     assert_eq!(tag.name, "Rust");
 
-    Tag::update(&pool, id, &TagForm { name: "Rust Lang".to_string(), slug: "rust-lang".to_string() }).unwrap();
+    Tag::update(
+        &pool,
+        id,
+        &TagForm {
+            name: "Rust Lang".to_string(),
+            slug: "rust-lang".to_string(),
+        },
+    )
+    .unwrap();
     let updated = Tag::find_by_id(&pool, id).unwrap();
     assert_eq!(updated.slug, "rust-lang");
 
@@ -459,8 +498,22 @@ fn tag_crud() {
 #[test]
 fn tag_content_association() {
     let pool = test_pool();
-    let t1 = Tag::create(&pool, &TagForm { name: "A".to_string(), slug: "a".to_string() }).unwrap();
-    let t2 = Tag::create(&pool, &TagForm { name: "B".to_string(), slug: "b".to_string() }).unwrap();
+    let t1 = Tag::create(
+        &pool,
+        &TagForm {
+            name: "A".to_string(),
+            slug: "a".to_string(),
+        },
+    )
+    .unwrap();
+    let t2 = Tag::create(
+        &pool,
+        &TagForm {
+            name: "B".to_string(),
+            slug: "b".to_string(),
+        },
+    )
+    .unwrap();
     let post_id = Post::create(&pool, &make_post_form("P", "p", "draft")).unwrap();
 
     Tag::set_for_content(&pool, post_id, "post", &[t1, t2]).unwrap();
@@ -484,29 +537,51 @@ fn tag_find_or_create() {
 #[test]
 fn tag_names_to_content_roundtrip_portfolio() {
     let pool = test_pool();
-    let item_id = PortfolioItem::create(&pool, &PortfolioForm {
-        title: "Test".to_string(), slug: "test".to_string(),
-        description_json: None, description_html: None,
-        image_path: "img.jpg".to_string(), thumbnail_path: None,
-        meta_title: None, meta_description: None,
-        sell_enabled: None, price: None, purchase_note: None,
-        payment_provider: None, download_file_path: None,
-        status: "published".to_string(), published_at: None,
-        category_ids: None, tag_ids: None,
-    }).unwrap();
+    let item_id = PortfolioItem::create(
+        &pool,
+        &PortfolioForm {
+            title: "Test".to_string(),
+            slug: "test".to_string(),
+            description_json: None,
+            description_html: None,
+            image_path: "img.jpg".to_string(),
+            thumbnail_path: None,
+            meta_title: None,
+            meta_description: None,
+            sell_enabled: None,
+            price: None,
+            purchase_note: None,
+            payment_provider: None,
+            download_file_path: None,
+            status: "published".to_string(),
+            published_at: None,
+            category_ids: None,
+            tag_ids: None,
+        },
+    )
+    .unwrap();
 
     // Simulate form submission with comma-separated tag names
-    let tag_names_str = "Aerial, Golden Hour, Aerial";  // includes duplicate
-    let tag_ids: Vec<i64> = tag_names_str.split(',').filter_map(|n| {
-        let n = n.trim();
-        if n.is_empty() { return None; }
-        Tag::find_or_create(&pool, n).ok()
-    }).collect();
+    let tag_names_str = "Aerial, Golden Hour, Aerial"; // includes duplicate
+    let tag_ids: Vec<i64> = tag_names_str
+        .split(',')
+        .filter_map(|n| {
+            let n = n.trim();
+            if n.is_empty() {
+                return None;
+            }
+            Tag::find_or_create(&pool, n).ok()
+        })
+        .collect();
     Tag::set_for_content(&pool, item_id, "portfolio", &tag_ids).unwrap();
 
     // Verify tags persisted and are retrievable
     let saved = Tag::for_content(&pool, item_id, "portfolio");
-    assert_eq!(saved.len(), 2, "should have 2 unique tags (duplicate ignored by find_or_create)");
+    assert_eq!(
+        saved.len(),
+        2,
+        "should have 2 unique tags (duplicate ignored by find_or_create)"
+    );
     let names: Vec<&str> = saved.iter().map(|t| t.name.as_str()).collect();
     assert!(names.contains(&"Aerial"), "should contain Aerial");
     assert!(names.contains(&"Golden Hour"), "should contain Golden Hour");
@@ -523,22 +598,32 @@ fn tag_names_to_content_roundtrip_post() {
     let post_id = Post::create(&pool, &make_post_form("Tag Test", "tag-test", "draft")).unwrap();
 
     let tag_names_str = "Rust, Web Dev";
-    let tag_ids: Vec<i64> = tag_names_str.split(',').filter_map(|n| {
-        let n = n.trim();
-        if n.is_empty() { return None; }
-        Tag::find_or_create(&pool, n).ok()
-    }).collect();
+    let tag_ids: Vec<i64> = tag_names_str
+        .split(',')
+        .filter_map(|n| {
+            let n = n.trim();
+            if n.is_empty() {
+                return None;
+            }
+            Tag::find_or_create(&pool, n).ok()
+        })
+        .collect();
     Tag::set_for_content(&pool, post_id, "post", &tag_ids).unwrap();
 
     let saved = Tag::for_content(&pool, post_id, "post");
     assert_eq!(saved.len(), 2);
 
     // Update: remove one tag
-    let tag_ids2: Vec<i64> = "Rust".split(',').filter_map(|n| {
-        let n = n.trim();
-        if n.is_empty() { return None; }
-        Tag::find_or_create(&pool, n).ok()
-    }).collect();
+    let tag_ids2: Vec<i64> = "Rust"
+        .split(',')
+        .filter_map(|n| {
+            let n = n.trim();
+            if n.is_empty() {
+                return None;
+            }
+            Tag::find_or_create(&pool, n).ok()
+        })
+        .collect();
     Tag::set_for_content(&pool, post_id, "post", &tag_ids2).unwrap();
 
     let saved2 = Tag::for_content(&pool, post_id, "post");
@@ -549,21 +634,34 @@ fn tag_names_to_content_roundtrip_post() {
 #[test]
 fn tag_names_empty_clears_all() {
     let pool = test_pool();
-    let post_id = Post::create(&pool, &make_post_form("Clear Test", "clear-test", "draft")).unwrap();
+    let post_id =
+        Post::create(&pool, &make_post_form("Clear Test", "clear-test", "draft")).unwrap();
 
     // Add tags
-    let tag_ids: Vec<i64> = vec![Tag::find_or_create(&pool, "A").unwrap(), Tag::find_or_create(&pool, "B").unwrap()];
+    let tag_ids: Vec<i64> = vec![
+        Tag::find_or_create(&pool, "A").unwrap(),
+        Tag::find_or_create(&pool, "B").unwrap(),
+    ];
     Tag::set_for_content(&pool, post_id, "post", &tag_ids).unwrap();
     assert_eq!(Tag::for_content(&pool, post_id, "post").len(), 2);
 
     // Simulate empty tag_names (user removed all pills)
-    let empty_ids: Vec<i64> = "".split(',').filter_map(|n| {
-        let n = n.trim();
-        if n.is_empty() { return None; }
-        Tag::find_or_create(&pool, n).ok()
-    }).collect();
+    let empty_ids: Vec<i64> = ""
+        .split(',')
+        .filter_map(|n| {
+            let n = n.trim();
+            if n.is_empty() {
+                return None;
+            }
+            Tag::find_or_create(&pool, n).ok()
+        })
+        .collect();
     Tag::set_for_content(&pool, post_id, "post", &empty_ids).unwrap();
-    assert_eq!(Tag::for_content(&pool, post_id, "post").len(), 0, "all tags should be cleared");
+    assert_eq!(
+        Tag::for_content(&pool, post_id, "post").len(),
+        0,
+        "all tags should be cleared"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -575,15 +673,19 @@ fn comment_crud() {
     let pool = test_pool();
     let post_id = Post::create(&pool, &make_post_form("P", "p", "published")).unwrap();
 
-    let cid = Comment::create(&pool, &CommentForm {
-        post_id,
-        content_type: Some("post".to_string()),
-        author_name: "Alice".to_string(),
-        author_email: Some("alice@test.com".to_string()),
-        body: "Great post!".to_string(),
-        honeypot: None,
-        parent_id: None,
-    }).unwrap();
+    let cid = Comment::create(
+        &pool,
+        &CommentForm {
+            post_id,
+            content_type: Some("post".to_string()),
+            author_name: "Alice".to_string(),
+            author_email: Some("alice@test.com".to_string()),
+            body: "Great post!".to_string(),
+            honeypot: None,
+            parent_id: None,
+        },
+    )
+    .unwrap();
 
     let c = Comment::find_by_id(&pool, cid).unwrap();
     assert_eq!(c.author_name, "Alice");
@@ -612,15 +714,18 @@ fn comment_honeypot_blocks_spam() {
     let pool = test_pool();
     let post_id = Post::create(&pool, &make_post_form("P", "p", "published")).unwrap();
 
-    let result = Comment::create(&pool, &CommentForm {
-        post_id,
-        content_type: None,
-        author_name: "Bot".to_string(),
-        author_email: None,
-        body: "spam".to_string(),
-        honeypot: Some("gotcha".to_string()),
-        parent_id: None,
-    });
+    let result = Comment::create(
+        &pool,
+        &CommentForm {
+            post_id,
+            content_type: None,
+            author_name: "Bot".to_string(),
+            author_email: None,
+            body: "spam".to_string(),
+            honeypot: Some("gotcha".to_string()),
+            parent_id: None,
+        },
+    );
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "Spam detected");
 }
@@ -630,25 +735,33 @@ fn comment_threaded_replies() {
     let pool = test_pool();
     let post_id = Post::create(&pool, &make_post_form("P", "p", "published")).unwrap();
 
-    let parent = Comment::create(&pool, &CommentForm {
-        post_id,
-        content_type: Some("post".to_string()),
-        author_name: "A".to_string(),
-        author_email: None,
-        body: "parent".to_string(),
-        honeypot: None,
-        parent_id: None,
-    }).unwrap();
+    let parent = Comment::create(
+        &pool,
+        &CommentForm {
+            post_id,
+            content_type: Some("post".to_string()),
+            author_name: "A".to_string(),
+            author_email: None,
+            body: "parent".to_string(),
+            honeypot: None,
+            parent_id: None,
+        },
+    )
+    .unwrap();
 
-    let child = Comment::create(&pool, &CommentForm {
-        post_id,
-        content_type: Some("post".to_string()),
-        author_name: "B".to_string(),
-        author_email: None,
-        body: "reply".to_string(),
-        honeypot: None,
-        parent_id: Some(parent),
-    }).unwrap();
+    let child = Comment::create(
+        &pool,
+        &CommentForm {
+            post_id,
+            content_type: Some("post".to_string()),
+            author_name: "B".to_string(),
+            author_email: None,
+            body: "reply".to_string(),
+            honeypot: None,
+            parent_id: Some(parent),
+        },
+    )
+    .unwrap();
 
     let c = Comment::find_by_id(&pool, child).unwrap();
     assert_eq!(c.parent_id, Some(parent));
@@ -752,7 +865,11 @@ fn user_delete_nullifies_content() {
     let pid = Post::create(&pool, &make_post_form("My Post", "my-post", "draft")).unwrap();
     {
         let conn = pool.get().unwrap();
-        conn.execute("UPDATE posts SET user_id = ?1 WHERE id = ?2", rusqlite::params![uid, pid]).unwrap();
+        conn.execute(
+            "UPDATE posts SET user_id = ?1 WHERE id = ?2",
+            rusqlite::params![uid, pid],
+        )
+        .unwrap();
     }
 
     User::delete(&pool, uid).unwrap();
@@ -832,7 +949,18 @@ fn order_crud() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
 
-    let oid = Order::create(&pool, pid, "buyer@test.com", "Buyer", 29.99, "USD", "paypal", "PP-123", "pending").unwrap();
+    let oid = Order::create(
+        &pool,
+        pid,
+        "buyer@test.com",
+        "Buyer",
+        29.99,
+        "USD",
+        "paypal",
+        "PP-123",
+        "pending",
+    )
+    .unwrap();
     assert!(oid > 0);
 
     let order = Order::find_by_id(&pool, oid).unwrap();
@@ -862,9 +990,34 @@ fn order_list_filters() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
 
-    Order::create(&pool, pid, "a@t.com", "A", 10.0, "USD", "stripe", "S1", "completed").unwrap();
-    Order::create(&pool, pid, "b@t.com", "B", 20.0, "USD", "paypal", "P1", "pending").unwrap();
-    Order::create(&pool, pid, "a@t.com", "A", 30.0, "USD", "stripe", "S2", "completed").unwrap();
+    Order::create(
+        &pool,
+        pid,
+        "a@t.com",
+        "A",
+        10.0,
+        "USD",
+        "stripe",
+        "S1",
+        "completed",
+    )
+    .unwrap();
+    Order::create(
+        &pool, pid, "b@t.com", "B", 20.0, "USD", "paypal", "P1", "pending",
+    )
+    .unwrap();
+    Order::create(
+        &pool,
+        pid,
+        "a@t.com",
+        "A",
+        30.0,
+        "USD",
+        "stripe",
+        "S2",
+        "completed",
+    )
+    .unwrap();
 
     assert_eq!(Order::list(&pool, 10, 0).len(), 3);
     assert_eq!(Order::list_by_status(&pool, "completed", 10, 0).len(), 2);
@@ -876,7 +1029,18 @@ fn order_list_filters() {
 fn download_token_lifecycle() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(&pool, pid, "b@t.com", "B", 10.0, "USD", "stripe", "", "completed").unwrap();
+    let oid = Order::create(
+        &pool,
+        pid,
+        "b@t.com",
+        "B",
+        10.0,
+        "USD",
+        "stripe",
+        "",
+        "completed",
+    )
+    .unwrap();
 
     let future = chrono::Utc::now().naive_utc() + chrono::Duration::hours(48);
     let tid = DownloadToken::create(&pool, oid, "tok-abc-123", 3, future).unwrap();
@@ -902,7 +1066,18 @@ fn download_token_lifecycle() {
 fn download_token_expired() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(&pool, pid, "b@t.com", "B", 10.0, "USD", "stripe", "", "completed").unwrap();
+    let oid = Order::create(
+        &pool,
+        pid,
+        "b@t.com",
+        "B",
+        10.0,
+        "USD",
+        "stripe",
+        "",
+        "completed",
+    )
+    .unwrap();
 
     let past = chrono::Utc::now().naive_utc() - chrono::Duration::hours(1);
     DownloadToken::create(&pool, oid, "expired-tok", 3, past).unwrap();
@@ -915,7 +1090,18 @@ fn download_token_expired() {
 fn license_crud() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(&pool, pid, "b@t.com", "B", 10.0, "USD", "stripe", "", "completed").unwrap();
+    let oid = Order::create(
+        &pool,
+        pid,
+        "b@t.com",
+        "B",
+        10.0,
+        "USD",
+        "stripe",
+        "",
+        "completed",
+    )
+    .unwrap();
 
     let lid = License::create(&pool, oid, "XXXX-YYYY-ZZZZ-1234").unwrap();
     assert!(lid > 0);
@@ -935,9 +1121,39 @@ fn license_crud() {
 fn audit_log_and_list() {
     let pool = test_pool();
 
-    AuditEntry::log(&pool, Some(1), Some("Admin"), "login", None, None, None, None, Some("1.2.3.4"));
-    AuditEntry::log(&pool, Some(1), Some("Admin"), "settings_change", Some("settings"), None, Some("general"), None, None);
-    AuditEntry::log(&pool, Some(2), Some("Editor"), "post_create", Some("post"), Some(1), Some("Hello"), None, None);
+    AuditEntry::log(
+        &pool,
+        Some(1),
+        Some("Admin"),
+        "login",
+        None,
+        None,
+        None,
+        None,
+        Some("1.2.3.4"),
+    );
+    AuditEntry::log(
+        &pool,
+        Some(1),
+        Some("Admin"),
+        "settings_change",
+        Some("settings"),
+        None,
+        Some("general"),
+        None,
+        None,
+    );
+    AuditEntry::log(
+        &pool,
+        Some(2),
+        Some("Editor"),
+        "post_create",
+        Some("post"),
+        Some(1),
+        Some("Hello"),
+        None,
+        None,
+    );
 
     // Count all
     assert_eq!(AuditEntry::count(&pool, None, None, None), 3);
@@ -970,13 +1186,24 @@ fn audit_log_and_list() {
 fn audit_cleanup() {
     let pool = test_pool();
     // Insert an entry and backdate it to 10 days ago
-    AuditEntry::log(&pool, Some(1), Some("A"), "test", None, None, None, None, None);
+    AuditEntry::log(
+        &pool,
+        Some(1),
+        Some("A"),
+        "test",
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
     {
         let conn = pool.get().unwrap();
         conn.execute(
             "UPDATE audit_log SET created_at = datetime('now', '-10 days')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     // Cleanup entries older than 5 days
@@ -996,7 +1223,16 @@ fn fw_ban_lifecycle() {
     assert!(!FwBan::is_banned(&pool, "10.0.0.1"));
 
     // Ban
-    let bid = FwBan::create(&pool, "10.0.0.1", "brute_force", Some("5 failed logins"), None, None, None).unwrap();
+    let bid = FwBan::create(
+        &pool,
+        "10.0.0.1",
+        "brute_force",
+        Some("5 failed logins"),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert!(bid > 0);
     assert!(FwBan::is_banned(&pool, "10.0.0.1"));
 
@@ -1021,7 +1257,8 @@ fn fw_ban_with_duration() {
     assert!(FwBan::is_banned(&pool, "10.0.0.2"));
 
     // Permanent ban
-    FwBan::create_with_duration(&pool, "10.0.0.3", "manual", None, "permanent", None, None).unwrap();
+    FwBan::create_with_duration(&pool, "10.0.0.3", "manual", None, "permanent", None, None)
+        .unwrap();
     assert!(FwBan::is_banned(&pool, "10.0.0.3"));
 }
 
@@ -1051,9 +1288,25 @@ fn fw_ban_unban_by_id() {
 fn fw_event_logging() {
     let pool = test_pool();
 
-    FwEvent::log(&pool, "10.0.0.1", "failed_login", Some("bad password"), None, Some("Mozilla/5.0"), Some("/admin/login"));
+    FwEvent::log(
+        &pool,
+        "10.0.0.1",
+        "failed_login",
+        Some("bad password"),
+        None,
+        Some("Mozilla/5.0"),
+        Some("/admin/login"),
+    );
     FwEvent::log(&pool, "10.0.0.1", "failed_login", None, None, None, None);
-    FwEvent::log(&pool, "10.0.0.2", "bot_detected", None, None, None, Some("/wp-admin"));
+    FwEvent::log(
+        &pool,
+        "10.0.0.2",
+        "bot_detected",
+        None,
+        None,
+        None,
+        Some("/wp-admin"),
+    );
 
     assert_eq!(FwEvent::count_all(&pool, None), 3);
     assert_eq!(FwEvent::count_all(&pool, Some("failed_login")), 2);
@@ -1185,10 +1438,24 @@ fn ip_hashing() {
 // We replicate the RESERVED_SLUGS list and is_reserved() here.
 
 const RESERVED_SLUGS: &[&str] = &[
-    "static", "uploads", "api", "super", "download", "feed",
-    "sitemap.xml", "robots.txt", "privacy", "terms", "archives",
-    "login", "logout", "setup", "mfa", "magic-link",
-    "forgot-password", "reset-password",
+    "static",
+    "uploads",
+    "api",
+    "super",
+    "download",
+    "feed",
+    "sitemap.xml",
+    "robots.txt",
+    "privacy",
+    "terms",
+    "archives",
+    "login",
+    "logout",
+    "setup",
+    "mfa",
+    "magic-link",
+    "forgot-password",
+    "reset-password",
 ];
 
 fn is_reserved(s: &str) -> bool {
@@ -1312,7 +1579,14 @@ fn user_list_paginated() {
     let pool = test_pool();
     let hash = fast_hash("p");
     for i in 0..5 {
-        User::create(&pool, &format!("u{}@t.com", i), &hash, &format!("U{}", i), "editor").unwrap();
+        User::create(
+            &pool,
+            &format!("u{}@t.com", i),
+            &hash,
+            &format!("U{}", i),
+            "editor",
+        )
+        .unwrap();
     }
     User::create(&pool, "admin@t.com", &hash, "Admin", "admin").unwrap();
 
@@ -1433,9 +1707,42 @@ fn design_template_upsert_and_get() {
 fn pageview_record_and_overview() {
     let pool = test_pool();
 
-    PageView::record(&pool, "/", "hash1", Some("US"), None, Some("https://google.com"), Some("Mozilla/5.0"), Some("desktop"), Some("Chrome")).unwrap();
-    PageView::record(&pool, "/blog/hello", "hash2", Some("UK"), None, None, None, Some("mobile"), Some("Safari")).unwrap();
-    PageView::record(&pool, "/portfolio/sunset", "hash1", Some("US"), None, None, None, Some("desktop"), Some("Chrome")).unwrap();
+    PageView::record(
+        &pool,
+        "/",
+        "hash1",
+        Some("US"),
+        None,
+        Some("https://google.com"),
+        Some("Mozilla/5.0"),
+        Some("desktop"),
+        Some("Chrome"),
+    )
+    .unwrap();
+    PageView::record(
+        &pool,
+        "/blog/hello",
+        "hash2",
+        Some("UK"),
+        None,
+        None,
+        None,
+        Some("mobile"),
+        Some("Safari"),
+    )
+    .unwrap();
+    PageView::record(
+        &pool,
+        "/portfolio/sunset",
+        "hash1",
+        Some("US"),
+        None,
+        None,
+        None,
+        Some("desktop"),
+        Some("Chrome"),
+    )
+    .unwrap();
 
     let from = "2020-01-01";
     let to = "2030-12-31";
@@ -1473,8 +1780,30 @@ fn pageview_geo_data() {
 #[test]
 fn pageview_top_referrers() {
     let pool = test_pool();
-    PageView::record(&pool, "/", "h1", None, None, Some("https://google.com"), None, None, None).unwrap();
-    PageView::record(&pool, "/", "h2", None, None, Some("https://google.com"), None, None, None).unwrap();
+    PageView::record(
+        &pool,
+        "/",
+        "h1",
+        None,
+        None,
+        Some("https://google.com"),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    PageView::record(
+        &pool,
+        "/",
+        "h2",
+        None,
+        None,
+        Some("https://google.com"),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     PageView::record(&pool, "/", "h3", None, None, None, None, None, None).unwrap();
 
     let refs = PageView::top_referrers(&pool, "2020-01-01", "2030-12-31", 10);
@@ -1487,7 +1816,18 @@ fn pageview_top_referrers() {
 fn pageview_stream_data() {
     let pool = test_pool();
     PageView::record(&pool, "/blog/a", "h1", None, None, None, None, None, None).unwrap();
-    PageView::record(&pool, "/portfolio/b", "h2", None, None, None, None, None, None).unwrap();
+    PageView::record(
+        &pool,
+        "/portfolio/b",
+        "h2",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     PageView::record(&pool, "/about", "h3", None, None, None, None, None, None).unwrap();
 
     let stream = PageView::stream_data(&pool, "2020-01-01", "2030-12-31");
@@ -1499,10 +1839,54 @@ fn pageview_stream_data() {
 #[test]
 fn pageview_top_portfolio() {
     let pool = test_pool();
-    PageView::record(&pool, "/portfolio/sunset", "h1", None, None, None, None, None, None).unwrap();
-    PageView::record(&pool, "/portfolio/sunset", "h2", None, None, None, None, None, None).unwrap();
-    PageView::record(&pool, "/portfolio/dawn", "h3", None, None, None, None, None, None).unwrap();
-    PageView::record(&pool, "/blog/unrelated", "h4", None, None, None, None, None, None).unwrap();
+    PageView::record(
+        &pool,
+        "/portfolio/sunset",
+        "h1",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    PageView::record(
+        &pool,
+        "/portfolio/sunset",
+        "h2",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    PageView::record(
+        &pool,
+        "/portfolio/dawn",
+        "h3",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    PageView::record(
+        &pool,
+        "/blog/unrelated",
+        "h4",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
 
     let top = PageView::top_portfolio(&pool, "2020-01-01", "2030-12-31", 10);
     assert_eq!(top.len(), 2);
@@ -1513,9 +1897,30 @@ fn pageview_top_portfolio() {
 #[test]
 fn pageview_tag_relations() {
     let pool = test_pool();
-    let t1 = Tag::create(&pool, &TagForm { name: "Rust".to_string(), slug: "rust".to_string() }).unwrap();
-    let t2 = Tag::create(&pool, &TagForm { name: "Web".to_string(), slug: "web".to_string() }).unwrap();
-    let t3 = Tag::create(&pool, &TagForm { name: "API".to_string(), slug: "api-tag".to_string() }).unwrap();
+    let t1 = Tag::create(
+        &pool,
+        &TagForm {
+            name: "Rust".to_string(),
+            slug: "rust".to_string(),
+        },
+    )
+    .unwrap();
+    let t2 = Tag::create(
+        &pool,
+        &TagForm {
+            name: "Web".to_string(),
+            slug: "web".to_string(),
+        },
+    )
+    .unwrap();
+    let t3 = Tag::create(
+        &pool,
+        &TagForm {
+            name: "API".to_string(),
+            slug: "api-tag".to_string(),
+        },
+    )
+    .unwrap();
 
     let p1 = Post::create(&pool, &make_post_form("P1", "p1", "published")).unwrap();
     let p2 = Post::create(&pool, &make_post_form("P2", "p2", "published")).unwrap();
@@ -1527,7 +1932,9 @@ fn pageview_tag_relations() {
     let relations = PageView::tag_relations(&pool);
     assert!(!relations.is_empty());
     // Rust-Web and Rust-API should appear
-    assert!(relations.iter().any(|r| r.source == "API" || r.target == "API"));
+    assert!(relations
+        .iter()
+        .any(|r| r.source == "API" || r.target == "API"));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1538,7 +1945,17 @@ fn pageview_tag_relations() {
 fn import_create_and_list() {
     let pool = test_pool();
 
-    let id = Import::create(&pool, "wordpress", Some("export.xml"), 10, 5, 3, 2, Some("All good")).unwrap();
+    let id = Import::create(
+        &pool,
+        "wordpress",
+        Some("export.xml"),
+        10,
+        5,
+        3,
+        2,
+        Some("All good"),
+    )
+    .unwrap();
     assert!(id > 0);
 
     let id2 = Import::create(&pool, "velocty", Some("backup.json"), 20, 0, 0, 0, None).unwrap();
@@ -1634,7 +2051,8 @@ fn fw_ban_expire_stale() {
             "SELECT COUNT(*) FROM fw_bans WHERE ip = '10.0.0.99' AND active = 1",
             [],
             |row| row.get(0),
-        ).unwrap()
+        )
+        .unwrap()
     };
     assert_eq!(active_before, 1);
 
@@ -1647,7 +2065,8 @@ fn fw_ban_expire_stale() {
             "SELECT COUNT(*) FROM fw_bans WHERE ip = '10.0.0.99' AND active = 1",
             [],
             |row| row.get(0),
-        ).unwrap()
+        )
+        .unwrap()
     };
     assert_eq!(active_after, 0);
 }
@@ -1661,9 +2080,34 @@ fn order_revenue_by_period() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
 
-    Order::create(&pool, pid, "a@t.com", "A", 50.0, "USD", "stripe", "S1", "completed").unwrap();
-    Order::create(&pool, pid, "b@t.com", "B", 30.0, "USD", "stripe", "S2", "completed").unwrap();
-    Order::create(&pool, pid, "c@t.com", "C", 20.0, "USD", "stripe", "S3", "pending").unwrap();
+    Order::create(
+        &pool,
+        pid,
+        "a@t.com",
+        "A",
+        50.0,
+        "USD",
+        "stripe",
+        "S1",
+        "completed",
+    )
+    .unwrap();
+    Order::create(
+        &pool,
+        pid,
+        "b@t.com",
+        "B",
+        30.0,
+        "USD",
+        "stripe",
+        "S2",
+        "completed",
+    )
+    .unwrap();
+    Order::create(
+        &pool, pid, "c@t.com", "C", 20.0, "USD", "stripe", "S3", "pending",
+    )
+    .unwrap();
 
     // Revenue for last 30 days (all orders are fresh)
     let rev = Order::revenue_by_period(&pool, 30);
@@ -1677,7 +2121,18 @@ fn order_revenue_by_period() {
 fn download_token_max_downloads_exhausted() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(&pool, pid, "b@t.com", "B", 10.0, "USD", "stripe", "", "completed").unwrap();
+    let oid = Order::create(
+        &pool,
+        pid,
+        "b@t.com",
+        "B",
+        10.0,
+        "USD",
+        "stripe",
+        "",
+        "completed",
+    )
+    .unwrap();
 
     let future = chrono::Utc::now().naive_utc() + chrono::Duration::hours(48);
     let tid = DownloadToken::create(&pool, oid, "tok-exhaust", 2, future).unwrap();
@@ -1818,7 +2273,12 @@ fn rss_feed_empty() {
 fn license_txt_generation() {
     let pool = test_pool();
     Setting::set(&pool, "admin_display_name", "John Doe").unwrap();
-    Setting::set(&pool, "downloads_license_template", "You may use this for personal and commercial projects.").unwrap();
+    Setting::set(
+        &pool,
+        "downloads_license_template",
+        "You may use this for personal and commercial projects.",
+    )
+    .unwrap();
 
     let txt = license::generate_license_txt(&pool, "Sunset Photo", "TXN-12345", "2026-01-15");
     assert!(txt.contains("License for: Sunset Photo"));
@@ -1960,7 +2420,8 @@ fn seo_jsonld_portfolio() {
     Setting::set(&pool, "site_url", "https://example.com").unwrap();
     Setting::set(&pool, "portfolio_slug", "gallery").unwrap();
 
-    let id = PortfolioItem::create(&pool, &make_portfolio_form("Sunset", "sunset", "published")).unwrap();
+    let id = PortfolioItem::create(&pool, &make_portfolio_form("Sunset", "sunset", "published"))
+        .unwrap();
     let item = PortfolioItem::find_by_id(&pool, id).unwrap();
 
     let ld = seo::build_portfolio_jsonld(&pool, &item);
@@ -1987,20 +2448,34 @@ fn all_tables_exist() {
     let pool = test_pool();
     let conn = pool.get().unwrap();
     let tables = [
-        "posts", "portfolio", "categories", "tags",
-        "content_categories", "content_tags", "comments",
-        "orders", "download_tokens", "licenses",
-        "designs", "design_templates", "settings", "imports",
-        "sessions", "page_views", "magic_links", "likes",
-        "users", "fw_bans", "fw_events", "audit_log",
+        "posts",
+        "portfolio",
+        "categories",
+        "tags",
+        "content_categories",
+        "content_tags",
+        "comments",
+        "orders",
+        "download_tokens",
+        "licenses",
+        "designs",
+        "design_templates",
+        "settings",
+        "imports",
+        "sessions",
+        "page_views",
+        "magic_links",
+        "likes",
+        "users",
+        "fw_bans",
+        "fw_events",
+        "audit_log",
     ];
     for table in &tables {
         let count: i64 = conn
-            .query_row(
-                &format!("SELECT COUNT(*) FROM {}", table),
-                [],
-                |row| row.get(0),
-            )
+            .query_row(&format!("SELECT COUNT(*) FROM {}", table), [], |row| {
+                row.get(0)
+            })
             .unwrap_or_else(|_| panic!("Table '{}' should exist", table));
         assert!(count >= 0, "Table '{}' query failed", table);
     }
@@ -2044,133 +2519,204 @@ fn render_context(pool: &DbPool) -> serde_json::Value {
 fn render_sidebar_under_link_has_toggle_open() {
     let pool = test_pool();
     Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("layout_header_type", "sidebar"),
-        ("portfolio_nav_categories", "under_link"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("portfolio_nav_categories", "under_link"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // Toggle should have "open" class (sidebar under_link starts open)
-    assert!(html.contains("nav-category-toggle open"), "under_link toggle should start open");
+    assert!(
+        html.contains("nav-category-toggle open"),
+        "under_link toggle should start open"
+    );
     // Subcategories div should also be open
-    assert!(html.contains("nav-subcategories open"), "under_link subcategories should start open");
+    assert!(
+        html.contains("nav-subcategories open"),
+        "under_link subcategories should start open"
+    );
     // "All" link present
     assert!(html.contains(">All</a>"), "should have 'All' category link");
     // Category link present
-    assert!(html.contains(">Flights</a>"), "should have 'Flights' category link");
+    assert!(
+        html.contains(">Flights</a>"),
+        "should have 'Flights' category link"
+    );
     // Portfolio should NOT appear as a separate nav-link (the toggle replaces it)
-    assert!(!html.contains("class=\"nav-link\">Experiences</a>"),
-        "under_link: portfolio should not be a separate nav-link");
+    assert!(
+        !html.contains("class=\"nav-link\">Experiences</a>"),
+        "under_link: portfolio should not be a separate nav-link"
+    );
 }
 
 #[test]
 fn render_sidebar_page_top_has_horizontal_cats() {
     let pool = test_pool();
     Category::create(&pool, &make_cat_form("Nature", "nature", "portfolio")).unwrap();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("layout_header_type", "sidebar"),
-        ("portfolio_nav_categories", "page_top"),
-        ("portfolio_nav_categories_align", "left"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("portfolio_nav_categories", "page_top"),
+            ("portfolio_nav_categories_align", "left"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // Page top categories div present
-    assert!(html.contains("categories-page-top"), "should have page-top categories");
+    assert!(
+        html.contains("categories-page-top"),
+        "should have page-top categories"
+    );
     // No right alignment class in the body HTML (not CSS)
     let body = body_html(&html);
-    assert!(!body.contains("cats-right"), "left align should not have cats-right class");
+    assert!(
+        !body.contains("cats-right"),
+        "left align should not have cats-right class"
+    );
     // Portfolio should appear as a normal nav-link
-    assert!(html.contains("class=\"nav-link\">experiences</a>") || html.contains("class=\"nav-link\">Experiences</a>"),
-        "page_top: portfolio should be a normal nav-link");
+    assert!(
+        html.contains("class=\"nav-link\">experiences</a>")
+            || html.contains("class=\"nav-link\">Experiences</a>"),
+        "page_top: portfolio should be a normal nav-link"
+    );
 }
 
 #[test]
 fn render_sidebar_page_top_right_alignment() {
     let pool = test_pool();
     Category::create(&pool, &make_cat_form("Travel", "travel", "portfolio")).unwrap();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("layout_header_type", "sidebar"),
-        ("portfolio_nav_categories", "page_top"),
-        ("portfolio_nav_categories_align", "right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("portfolio_nav_categories", "page_top"),
+            ("portfolio_nav_categories_align", "right"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("categories-page-top cats-right"), "right align should have cats-right class");
+    assert!(
+        html.contains("categories-page-top cats-right"),
+        "right align should have cats-right class"
+    );
 }
 
 #[test]
 fn render_topbar_submenu_no_duplicate_portfolio() {
     let pool = test_pool();
     Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("layout_header_type", "topbar"),
-        ("portfolio_nav_categories", "submenu"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("layout_header_type", "topbar"),
+            ("portfolio_nav_categories", "submenu"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // Should use topbar shell
-    assert!(html.contains("topbar-layout"), "should use topbar body class");
+    assert!(
+        html.contains("topbar-layout"),
+        "should use topbar body class"
+    );
     // Toggle should NOT have "open" class (topbar submenu starts closed)
-    assert!(!html.contains("nav-category-toggle open"), "submenu toggle should start closed");
+    assert!(
+        !html.contains("nav-category-toggle open"),
+        "submenu toggle should start closed"
+    );
     // Portfolio should NOT appear as a separate nav-link
     let nav_link_count = html.matches("class=\"nav-link\"").count();
     // Only blog (journal) should be a nav-link, not portfolio
-    assert!(!html.contains("nav-link\">experiences</a>"),
-        "submenu: portfolio should not be a separate nav-link");
+    assert!(
+        !html.contains("nav-link\">experiences</a>"),
+        "submenu: portfolio should not be a separate nav-link"
+    );
     // But the toggle should show the portfolio label
-    assert!(html.contains("<span>experiences</span>"), "submenu toggle should show portfolio label");
+    assert!(
+        html.contains("<span>experiences</span>"),
+        "submenu toggle should show portfolio label"
+    );
 }
 
 #[test]
 fn render_topbar_below_menu_has_category_row() {
     let pool = test_pool();
     Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("layout_header_type", "topbar"),
-        ("portfolio_nav_categories", "below_menu"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("layout_header_type", "topbar"),
+            ("portfolio_nav_categories", "below_menu"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // Below menu categories div present
-    assert!(html.contains("categories-below-menu"), "should have below-menu categories");
+    assert!(
+        html.contains("categories-below-menu"),
+        "should have below-menu categories"
+    );
     // Portfolio should appear as a normal nav-link
-    assert!(html.contains("nav-link\">experiences</a>"),
-        "below_menu: portfolio should be a normal nav-link");
+    assert!(
+        html.contains("nav-link\">experiences</a>"),
+        "below_menu: portfolio should be a normal nav-link"
+    );
     // All + Flights links in the below-menu div
     assert!(html.contains(">All</a>"), "below-menu should have All link");
-    assert!(html.contains(">Flights</a>"), "below-menu should have Flights link");
+    assert!(
+        html.contains(">Flights</a>"),
+        "below-menu should have Flights link"
+    );
 }
 
 #[test]
 fn render_hidden_categories_no_output() {
     let pool = test_pool();
     Category::create(&pool, &make_cat_form("Flights", "flights", "portfolio")).unwrap();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("layout_header_type", "sidebar"),
-        ("portfolio_nav_categories", "hidden"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("portfolio_nav_categories", "hidden"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // No category HTML at all (check body only, CSS has these class names)
     let body = body_html(&html);
-    assert!(!body.contains("class=\"nav-category-group"), "hidden: no category group");
-    assert!(!body.contains("class=\"categories-page-top"), "hidden: no page-top categories");
-    assert!(!body.contains("class=\"categories-below-menu"), "hidden: no below-menu categories");
+    assert!(
+        !body.contains("class=\"nav-category-group"),
+        "hidden: no category group"
+    );
+    assert!(
+        !body.contains("class=\"categories-page-top"),
+        "hidden: no page-top categories"
+    );
+    assert!(
+        !body.contains("class=\"categories-below-menu"),
+        "hidden: no below-menu categories"
+    );
     // Portfolio should appear as a normal nav-link
-    assert!(html.contains("nav-link\">experiences</a>"),
-        "hidden: portfolio should be a normal nav-link");
+    assert!(
+        html.contains("nav-link\">experiences</a>"),
+        "hidden: portfolio should be a normal nav-link"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2180,43 +2726,62 @@ fn render_hidden_categories_no_output() {
 #[test]
 fn render_social_links_in_sidebar() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("social_icons_position", "sidebar"),
-        ("social_instagram", "https://instagram.com/test"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("social_icons_position", "sidebar"),
+            ("social_instagram", "https://instagram.com/test"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("class=\"social-links\""), "should have social-links div");
-    assert!(html.contains("instagram.com/test"), "should have instagram link");
-    assert!(html.contains("title=\"Instagram\""), "should have Instagram title");
+    assert!(
+        html.contains("class=\"social-links\""),
+        "should have social-links div"
+    );
+    assert!(
+        html.contains("instagram.com/test"),
+        "should have instagram link"
+    );
+    assert!(
+        html.contains("title=\"Instagram\""),
+        "should have Instagram title"
+    );
 }
 
 #[test]
 fn render_social_brand_colors() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("social_icons_position", "sidebar"),
-        ("social_instagram", "https://instagram.com/test"),
-        ("social_brand_colors", "true"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("social_icons_position", "sidebar"),
+            ("social_instagram", "https://instagram.com/test"),
+            ("social_brand_colors", "true"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("style=\"color:#E4405F\""), "brand colors should add style attribute");
+    assert!(
+        html.contains("style=\"color:#E4405F\""),
+        "brand colors should add style attribute"
+    );
 }
 
 #[test]
 fn render_social_empty_when_no_urls() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("social_icons_position", "sidebar"),
-    ]);
+    set_settings(&pool, &[("social_icons_position", "sidebar")]);
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // social-links div should NOT appear (no URLs set)
-    assert!(!html.contains("class=\"social-links\""), "no social URLs = no social-links div");
+    assert!(
+        !html.contains("class=\"social-links\""),
+        "no social URLs = no social-links div"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2226,51 +2791,71 @@ fn render_social_empty_when_no_urls() {
 #[test]
 fn render_share_label_prepended() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("share_enabled", "true"),
-        ("share_facebook", "true"),
-        ("share_icons_position", "sidebar"),
-        ("share_label", "Share this:"),
-        ("site_url", "https://example.com"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("share_enabled", "true"),
+            ("share_facebook", "true"),
+            ("share_icons_position", "sidebar"),
+            ("share_label", "Share this:"),
+            ("site_url", "https://example.com"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("<span class=\"share-label\">Share this:</span>"),
-        "share label should be prepended before share icons");
-    assert!(html.contains("class=\"share-icons\""), "should have share-icons div");
+    assert!(
+        html.contains("<span class=\"share-label\">Share this:</span>"),
+        "share label should be prepended before share icons"
+    );
+    assert!(
+        html.contains("class=\"share-icons\""),
+        "should have share-icons div"
+    );
 }
 
 #[test]
 fn render_share_buttons_rendered() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("share_enabled", "true"),
-        ("share_facebook", "true"),
-        ("share_x", "true"),
-        ("share_icons_position", "sidebar"),
-        ("site_url", "https://example.com"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("share_enabled", "true"),
+            ("share_facebook", "true"),
+            ("share_x", "true"),
+            ("share_icons_position", "sidebar"),
+            ("site_url", "https://example.com"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("Share on Facebook"), "should have Facebook share link");
+    assert!(
+        html.contains("Share on Facebook"),
+        "should have Facebook share link"
+    );
     assert!(html.contains("Share on X"), "should have X share link");
 }
 
 #[test]
 fn render_share_disabled_no_output() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("share_enabled", "false"),
-        ("share_facebook", "true"),
-        ("share_icons_position", "sidebar"),
-        ("site_url", "https://example.com"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("share_enabled", "false"),
+            ("share_facebook", "true"),
+            ("share_icons_position", "sidebar"),
+            ("site_url", "https://example.com"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(!html.contains("class=\"share-icons\""), "share disabled = no share-icons div");
+    assert!(
+        !html.contains("class=\"share-icons\""),
+        "share disabled = no share-icons div"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2280,56 +2865,88 @@ fn render_share_disabled_no_output() {
 #[test]
 fn render_footer_copyright_center() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("copyright_text", "© 2026 Test"),
-        ("copyright_alignment", "center"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("copyright_text", "© 2026 Test"),
+            ("copyright_alignment", "center"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("footer-copyright"), "should have copyright span");
-    assert!(html.contains("© 2026 Test"), "should contain copyright text");
+    assert!(
+        html.contains("footer-copyright"),
+        "should have copyright span"
+    );
+    assert!(
+        html.contains("© 2026 Test"),
+        "should contain copyright text"
+    );
     // Center: copyright in center cell
-    assert!(html.contains("footer-cell footer-center\"><span class=\"footer-copyright\">"),
-        "center alignment: copyright should be in center cell");
+    assert!(
+        html.contains("footer-cell footer-center\"><span class=\"footer-copyright\">"),
+        "center alignment: copyright should be in center cell"
+    );
 }
 
 #[test]
 fn render_footer_copyright_right() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("copyright_text", "© 2026 Right"),
-        ("copyright_alignment", "right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("copyright_text", "© 2026 Right"),
+            ("copyright_alignment", "right"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("footer-cell footer-right\"><span class=\"footer-copyright\">"),
-        "right alignment: copyright should be in right cell");
+    assert!(
+        html.contains("footer-cell footer-right\"><span class=\"footer-copyright\">"),
+        "right alignment: copyright should be in right cell"
+    );
 }
 
 #[test]
 fn render_footer_3_column_grid() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("copyright_text", "© 2026"),
-        ("copyright_alignment", "left"),
-        ("social_icons_position", "footer"),
-        ("social_instagram", "https://instagram.com/test"),
-        ("footer_alignment", "right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("copyright_text", "© 2026"),
+            ("copyright_alignment", "left"),
+            ("social_icons_position", "footer"),
+            ("social_instagram", "https://instagram.com/test"),
+            ("footer_alignment", "right"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
     // Should have all 3 footer cells
-    assert!(html.contains("footer-cell footer-left"), "should have left cell");
-    assert!(html.contains("footer-cell footer-center"), "should have center cell");
-    assert!(html.contains("footer-cell footer-right"), "should have right cell");
+    assert!(
+        html.contains("footer-cell footer-left"),
+        "should have left cell"
+    );
+    assert!(
+        html.contains("footer-cell footer-center"),
+        "should have center cell"
+    );
+    assert!(
+        html.contains("footer-cell footer-right"),
+        "should have right cell"
+    );
     // Copyright in left, social in right
-    assert!(html.contains("footer-cell footer-left\"><span class=\"footer-copyright\">"),
-        "copyright should be in left cell");
-    assert!(html.contains("footer-cell footer-right\"><span class=\"footer-social\">"),
-        "social should be in right cell");
+    assert!(
+        html.contains("footer-cell footer-left\"><span class=\"footer-copyright\">"),
+        "copyright should be in left cell"
+    );
+    assert!(
+        html.contains("footer-cell footer-right\"><span class=\"footer-social\">"),
+        "social should be in right cell"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2339,102 +2956,158 @@ fn render_footer_3_column_grid() {
 #[test]
 fn render_sidebar_layout_has_site_wrapper() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "sidebar"),
-    ]);
+    set_settings(&pool, &[("layout_header_type", "sidebar")]);
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("class=\"site-wrapper"), "sidebar layout should have site-wrapper");
-    assert!(html.contains("<aside class=\"sidebar\">"), "sidebar layout should have aside.sidebar");
+    assert!(
+        html.contains("class=\"site-wrapper"),
+        "sidebar layout should have site-wrapper"
+    );
+    assert!(
+        html.contains("<aside class=\"sidebar\">"),
+        "sidebar layout should have aside.sidebar"
+    );
     // Check body class specifically, not CSS rules
-    assert!(!html.contains("class=\"topbar-layout"), "sidebar layout should not have topbar-layout body class");
+    assert!(
+        !html.contains("class=\"topbar-layout"),
+        "sidebar layout should not have topbar-layout body class"
+    );
 }
 
 #[test]
 fn render_topbar_layout_has_topbar_shell() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "topbar"),
-    ]);
+    set_settings(&pool, &[("layout_header_type", "topbar")]);
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("topbar-layout"), "topbar layout should have topbar-layout body class");
-    assert!(html.contains("<header class=\"topbar"), "topbar layout should have header.topbar");
-    assert!(html.contains("topbar-brand"), "topbar layout should have topbar-brand");
-    assert!(html.contains("topbar-hamburger"), "topbar layout should have hamburger button");
-    assert!(!html.contains("<aside class=\"sidebar\">"), "topbar layout should not have aside.sidebar");
+    assert!(
+        html.contains("topbar-layout"),
+        "topbar layout should have topbar-layout body class"
+    );
+    assert!(
+        html.contains("<header class=\"topbar"),
+        "topbar layout should have header.topbar"
+    );
+    assert!(
+        html.contains("topbar-brand"),
+        "topbar layout should have topbar-brand"
+    );
+    assert!(
+        html.contains("topbar-hamburger"),
+        "topbar layout should have hamburger button"
+    );
+    assert!(
+        !html.contains("<aside class=\"sidebar\">"),
+        "topbar layout should not have aside.sidebar"
+    );
 }
 
 #[test]
 fn render_topbar_nav_right_class() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "topbar"),
-        ("nav_position", "right"),
-    ]);
+    set_settings(
+        &pool,
+        &[("layout_header_type", "topbar"), ("nav_position", "right")],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("topbar-nav-right"), "nav_position=right should add topbar-nav-right class");
+    assert!(
+        html.contains("topbar-nav-right"),
+        "nav_position=right should add topbar-nav-right class"
+    );
 }
 
 #[test]
 fn render_topbar_boxed_mode() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "topbar"),
-        ("layout_content_boundary", "boxed"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("layout_header_type", "topbar"),
+            ("layout_content_boundary", "boxed"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("boxed-mode"), "boxed mode should add boxed-mode body class");
-    assert!(html.contains("layout-boxed"), "boxed mode should add layout-boxed class");
+    assert!(
+        html.contains("boxed-mode"),
+        "boxed mode should add boxed-mode body class"
+    );
+    assert!(
+        html.contains("layout-boxed"),
+        "boxed mode should add layout-boxed class"
+    );
 }
 
 #[test]
 fn render_topbar_hides_custom_sidebar() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "topbar"),
-        ("layout_sidebar_custom_heading", "About Me"),
-        ("layout_sidebar_custom_text", "Hello world"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("layout_header_type", "topbar"),
+            ("layout_sidebar_custom_heading", "About Me"),
+            ("layout_sidebar_custom_text", "Hello world"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(!html.contains("About Me"), "topbar should not show sidebar custom heading");
-    assert!(!html.contains("Hello world"), "topbar should not show sidebar custom text");
+    assert!(
+        !html.contains("About Me"),
+        "topbar should not show sidebar custom heading"
+    );
+    assert!(
+        !html.contains("Hello world"),
+        "topbar should not show sidebar custom text"
+    );
 }
 
 #[test]
 fn render_sidebar_shows_custom_sidebar() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "sidebar"),
-        ("layout_sidebar_custom_heading", "About Me"),
-        ("layout_sidebar_custom_text", "Hello world"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("layout_header_type", "sidebar"),
+            ("layout_sidebar_custom_heading", "About Me"),
+            ("layout_sidebar_custom_text", "Hello world"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("About Me"), "sidebar should show custom heading");
-    assert!(html.contains("Hello world"), "sidebar should show custom text");
+    assert!(
+        html.contains("About Me"),
+        "sidebar should show custom heading"
+    );
+    assert!(
+        html.contains("Hello world"),
+        "sidebar should show custom text"
+    );
 }
 
 #[test]
 fn render_sidebar_right_class() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("layout_header_type", "sidebar"),
-        ("layout_sidebar_position", "right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("layout_header_type", "sidebar"),
+            ("layout_sidebar_position", "right"),
+        ],
+    );
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
 
-    assert!(html.contains("sidebar-right"), "sidebar position=right should add sidebar-right class");
+    assert!(
+        html.contains("sidebar-right"),
+        "sidebar position=right should add sidebar-right class"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2479,25 +3152,37 @@ fn render_context_with_items(pool: &DbPool) -> serde_json::Value {
 #[test]
 fn render_portfolio_cats_false_no_visible_labels() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "false"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "false"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(!body.contains("class=\"item-categories"), "false: no category labels");
-    assert!(body.contains("data-categories=\"flights nature\""), "data-categories attr always present");
+    assert!(
+        !body.contains("class=\"item-categories"),
+        "false: no category labels"
+    );
+    assert!(
+        body.contains("data-categories=\"flights nature\""),
+        "data-categories attr always present"
+    );
 }
 
 #[test]
 fn render_portfolio_tags_false_no_visible_labels() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_tags", "false"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_tags", "false"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
@@ -2508,102 +3193,150 @@ fn render_portfolio_tags_false_no_visible_labels() {
 #[test]
 fn render_portfolio_cats_hover() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "hover"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "hover"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-hover"), "hover: category overlay class");
-    assert!(body.contains(">Flights</a>"), "hover: category name rendered");
+    assert!(
+        body.contains("item-categories item-meta-hover"),
+        "hover: category overlay class"
+    );
+    assert!(
+        body.contains(">Flights</a>"),
+        "hover: category name rendered"
+    );
 }
 
 #[test]
 fn render_portfolio_tags_hover() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_tags", "hover"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_tags", "hover"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-tags item-meta-hover"), "hover: tag overlay class");
+    assert!(
+        body.contains("item-tags item-meta-hover"),
+        "hover: tag overlay class"
+    );
     assert!(body.contains(">Aerial</a>"), "hover: tag name rendered");
 }
 
 #[test]
 fn render_portfolio_cats_bottom_left() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "bottom_left"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "bottom_left"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-bottom_left"), "bottom_left overlay class");
+    assert!(
+        body.contains("item-categories item-meta-bottom_left"),
+        "bottom_left overlay class"
+    );
 }
 
 #[test]
 fn render_portfolio_cats_bottom_right() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "bottom_right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "bottom_right"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-bottom_right"), "bottom_right overlay class");
+    assert!(
+        body.contains("item-categories item-meta-bottom_right"),
+        "bottom_right overlay class"
+    );
 }
 
 #[test]
 fn render_portfolio_cats_below_left() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "below_left"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "below_left"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-below_left"), "below_left class");
-    assert!(body.contains(">Flights</a>"), "below_left: category name rendered");
+    assert!(
+        body.contains("item-categories item-meta-below_left"),
+        "below_left class"
+    );
+    assert!(
+        body.contains(">Flights</a>"),
+        "below_left: category name rendered"
+    );
 }
 
 #[test]
 fn render_portfolio_cats_below_right() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "below_right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "below_right"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-below_right"), "below_right class");
+    assert!(
+        body.contains("item-categories item-meta-below_right"),
+        "below_right class"
+    );
 }
 
 #[test]
 fn render_portfolio_tags_below_left() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_tags", "below_left"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_tags", "below_left"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-tags item-meta-below_left"), "below_left tag class");
+    assert!(
+        body.contains("item-tags item-meta-below_left"),
+        "below_left tag class"
+    );
     assert!(body.contains(">Aerial</a>"), "below_left: tag name");
     assert!(body.contains(">Golden Hour</a>"), "below_left: second tag");
 }
@@ -2611,42 +3344,58 @@ fn render_portfolio_tags_below_left() {
 #[test]
 fn render_portfolio_tags_below_right() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_tags", "below_right"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_tags", "below_right"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-tags item-meta-below_right"), "below_right tag class");
+    assert!(
+        body.contains("item-tags item-meta-below_right"),
+        "below_right tag class"
+    );
 }
 
 #[test]
 fn render_portfolio_legacy_true_normalizes_to_below_left() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "true"),
-        ("portfolio_show_tags", "true"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "true"),
+            ("portfolio_show_tags", "true"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-below_left"),
-        "legacy true normalizes to below_left for categories");
-    assert!(body.contains("item-tags item-meta-below_left"),
-        "legacy true normalizes to below_left for tags");
+    assert!(
+        body.contains("item-categories item-meta-below_left"),
+        "legacy true normalizes to below_left for categories"
+    );
+    assert!(
+        body.contains("item-tags item-meta-below_left"),
+        "legacy true normalizes to below_left for tags"
+    );
 }
 
 #[test]
 fn render_portfolio_overlay_outside_link_tag() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "hover"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "hover"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
@@ -2654,21 +3403,33 @@ fn render_portfolio_overlay_outside_link_tag() {
     // Overlay div should be AFTER </a>, not inside it
     let link_end = body.find("</a>").unwrap_or(0);
     let cats_pos = body.find("item-categories item-meta-hover").unwrap_or(0);
-    assert!(cats_pos > link_end, "overlay should be outside the <a> tag (after </a>)");
+    assert!(
+        cats_pos > link_end,
+        "overlay should be outside the <a> tag (after </a>)"
+    );
 }
 
 #[test]
 fn render_portfolio_mixed_cats_hover_tags_below() {
     let pool = test_pool();
-    set_settings(&pool, &[
-        ("portfolio_enabled", "true"),
-        ("portfolio_show_categories", "hover"),
-        ("portfolio_show_tags", "below_left"),
-    ]);
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_categories", "hover"),
+            ("portfolio_show_tags", "below_left"),
+        ],
+    );
     let ctx = render_context_with_items(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     let body = body_html(&html);
 
-    assert!(body.contains("item-categories item-meta-hover"), "cats should be hover overlay");
-    assert!(body.contains("item-tags item-meta-below_left"), "tags should be below_left");
+    assert!(
+        body.contains("item-categories item-meta-hover"),
+        "cats should be hover overlay"
+    );
+    assert!(
+        body.contains("item-tags item-meta-below_left"),
+        "tags should be below_left"
+    );
 }

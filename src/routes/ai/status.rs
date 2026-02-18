@@ -3,8 +3,8 @@ use rocket::State;
 use serde_json::{json, Value};
 
 use crate::ai;
-use crate::security::auth::EditorUser;
 use crate::db::DbPool;
+use crate::security::auth::EditorUser;
 
 // ── Status Check ──────────────────────────────────────
 

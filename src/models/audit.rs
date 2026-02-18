@@ -72,11 +72,16 @@ impl AuditEntry {
             idx += 1;
         }
 
-        sql.push_str(&format!(" ORDER BY created_at DESC LIMIT ?{} OFFSET ?{}", idx, idx + 1));
+        sql.push_str(&format!(
+            " ORDER BY created_at DESC LIMIT ?{} OFFSET ?{}",
+            idx,
+            idx + 1
+        ));
         params_vec.push(Box::new(limit));
         params_vec.push(Box::new(offset));
 
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
 
         conn.prepare(&sql)
             .and_then(|mut stmt| {
@@ -130,7 +135,8 @@ impl AuditEntry {
             let _ = idx + 1;
         }
 
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
 
         conn.query_row(&sql, param_refs.as_slice(), |row| row.get(0))
             .unwrap_or(0)

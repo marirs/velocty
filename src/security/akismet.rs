@@ -12,7 +12,10 @@ pub fn check_spam(
     author_email: Option<&str>,
     comment_type: Option<&str>,
 ) -> Result<bool, String> {
-    let api_key = settings.get("security_akismet_api_key").cloned().unwrap_or_default();
+    let api_key = settings
+        .get("security_akismet_api_key")
+        .cloned()
+        .unwrap_or_default();
     if api_key.is_empty() {
         return Err("Akismet API key not configured".into());
     }
@@ -24,7 +27,10 @@ pub fn check_spam(
         ("user_ip", user_ip.to_string()),
         ("user_agent", user_agent.to_string()),
         ("comment_content", content.to_string()),
-        ("comment_type", comment_type.unwrap_or("comment").to_string()),
+        (
+            "comment_type",
+            comment_type.unwrap_or("comment").to_string(),
+        ),
     ];
     if let Some(name) = author {
         params.push(("comment_author", name.to_string()));

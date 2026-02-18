@@ -1,12 +1,9 @@
-use std::collections::HashMap;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 use super::{AiError, AiRequest, AiResponse};
 
-pub fn call(
-    settings: &HashMap<String, String>,
-    req: &AiRequest,
-) -> Result<AiResponse, AiError> {
+pub fn call(settings: &HashMap<String, String>, req: &AiRequest) -> Result<AiResponse, AiError> {
     let account_id = settings
         .get("ai_cloudflare_account_id")
         .cloned()
@@ -17,7 +14,9 @@ pub fn call(
         .unwrap_or_default();
 
     if account_id.is_empty() || api_token.is_empty() {
-        return Err(AiError("Cloudflare account ID or API token not configured".into()));
+        return Err(AiError(
+            "Cloudflare account ID or API token not configured".into(),
+        ));
     }
 
     let model = settings
@@ -55,7 +54,10 @@ pub fn call(
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().unwrap_or_default();
-        return Err(AiError(format!("Cloudflare AI returned {}: {}", status, text)));
+        return Err(AiError(format!(
+            "Cloudflare AI returned {}: {}",
+            status, text
+        )));
     }
 
     let json: Value = resp

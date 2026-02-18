@@ -39,7 +39,7 @@ impl Comment {
             body: row.get("body")?,
             status: row.get("status")?,
             parent_id: row.get("parent_id").ok(),
-            created_at: row.get("created_at")?
+            created_at: row.get("created_at")?,
         })
     }
 
@@ -156,5 +156,4 @@ impl Comment {
             .map_err(|e| e.to_string())?;
         Ok(())
     }
-
 }

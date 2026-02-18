@@ -5,10 +5,10 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
 
-use crate::security::auth;
 use crate::db::DbPool;
 use crate::models::settings::Setting;
 use crate::models::user::User;
+use crate::security::auth;
 use crate::AdminSlug;
 
 use super::super::NoCacheTemplate;
@@ -48,7 +48,10 @@ pub struct SetupForm {
 }
 
 #[get("/setup")]
-pub fn setup_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Result<NoCacheTemplate, Redirect> {
+pub fn setup_page(
+    pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
+) -> Result<NoCacheTemplate, Redirect> {
     if !needs_setup(pool) {
         return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
@@ -89,10 +92,16 @@ pub fn setup_submit(
             mongo_uri: form.mongo_uri.clone().unwrap_or_default(),
             mongo_db_name: form.mongo_db_name.clone().unwrap_or_default(),
             mongo_auth_enabled: form.mongo_auth_enabled.clone().unwrap_or_default(),
-            mongo_auth_mechanism: form.mongo_auth_mechanism.clone().unwrap_or_else(|| "scram_sha256".to_string()),
+            mongo_auth_mechanism: form
+                .mongo_auth_mechanism
+                .clone()
+                .unwrap_or_else(|| "scram_sha256".to_string()),
             mongo_username: form.mongo_username.clone().unwrap_or_default(),
             mongo_password: form.mongo_password.clone().unwrap_or_default(),
-            mongo_auth_db: form.mongo_auth_db.clone().unwrap_or_else(|| "admin".to_string()),
+            mongo_auth_db: form
+                .mongo_auth_db
+                .clone()
+                .unwrap_or_else(|| "admin".to_string()),
         };
         Template::render("admin/setup", &ctx)
     };
@@ -112,14 +121,35 @@ pub fn setup_submit(
         }
         // Validate auth fields if auth is enabled
         if form.mongo_auth_enabled.as_deref() == Some("true") {
-            let mech = form.mongo_auth_mechanism.as_deref().unwrap_or("scram_sha256");
+            let mech = form
+                .mongo_auth_mechanism
+                .as_deref()
+                .unwrap_or("scram_sha256");
             // X.509 and AWS don't require username/password
             if mech != "x509" && mech != "aws" {
-                if form.mongo_username.as_deref().unwrap_or("").trim().is_empty() {
-                    return Err(make_err("MongoDB username is required for the selected auth mechanism.", &form));
+                if form
+                    .mongo_username
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(make_err(
+                        "MongoDB username is required for the selected auth mechanism.",
+                        &form,
+                    ));
                 }
-                if form.mongo_password.as_deref().unwrap_or("").trim().is_empty() {
-                    return Err(make_err("MongoDB password is required for the selected auth mechanism.", &form));
+                if form
+                    .mongo_password
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(make_err(
+                        "MongoDB password is required for the selected auth mechanism.",
+                        &form,
+                    ));
                 }
             }
         }
@@ -136,20 +166,33 @@ pub fn setup_submit(
         return Err(make_err("Passwords do not match.", &form));
     }
     if form.accept_terms.as_deref() != Some("true") {
-        return Err(make_err("You must accept the Terms of Use and Privacy Policy.", &form));
+        return Err(make_err(
+            "You must accept the Terms of Use and Privacy Policy.",
+            &form,
+        ));
     }
 
     // Write velocty.toml with DB backend choice
     let toml_content = if form.db_backend == "mongodb" {
         let mut toml = format!(
             "[database]\nbackend = \"mongodb\"\nuri = \"{}\"\nname = \"{}\"\n",
-            form.mongo_uri.as_deref().unwrap_or("mongodb://localhost:27017").trim(),
+            form.mongo_uri
+                .as_deref()
+                .unwrap_or("mongodb://localhost:27017")
+                .trim(),
             form.mongo_db_name.as_deref().unwrap_or("velocty").trim(),
         );
         if form.mongo_auth_enabled.as_deref() == Some("true") {
-            let mech = form.mongo_auth_mechanism.as_deref().unwrap_or("scram_sha256").trim();
+            let mech = form
+                .mongo_auth_mechanism
+                .as_deref()
+                .unwrap_or("scram_sha256")
+                .trim();
             let auth_db = form.mongo_auth_db.as_deref().unwrap_or("admin").trim();
-            toml.push_str(&format!("\n[database.auth]\nmechanism = \"{}\"\nauth_db = \"{}\"\n", mech, auth_db));
+            toml.push_str(&format!(
+                "\n[database.auth]\nmechanism = \"{}\"\nauth_db = \"{}\"\n",
+                mech, auth_db
+            ));
             let user = form.mongo_username.as_deref().unwrap_or("").trim();
             let pass = form.mongo_password.as_deref().unwrap_or("").trim();
             if !user.is_empty() {
@@ -174,7 +217,12 @@ pub fn setup_submit(
     // Create admin user in users table
     match User::create(pool, form.admin_email.trim(), &hash, "Admin", "admin") {
         Ok(_) => {}
-        Err(e) => return Err(make_err(&format!("Failed to create admin user: {}", e), &form)),
+        Err(e) => {
+            return Err(make_err(
+                &format!("Failed to create admin user: {}", e),
+                &form,
+            ))
+        }
     }
 
     // Also keep admin_email in settings for backward compat and display
@@ -360,13 +408,19 @@ pub fn test_mongo_connection(body: Json<TestMongoForm>) -> Json<TestMongoResult>
             } else {
                 Json(TestMongoResult {
                     ok: false,
-                    message: format!("Server at {} responded but doesn't appear to be MongoDB (opcode: {})", addr, resp_op),
+                    message: format!(
+                        "Server at {} responded but doesn't appear to be MongoDB (opcode: {})",
+                        addr, resp_op
+                    ),
                 })
             }
         }
         Err(e) => Json(TestMongoResult {
             ok: false,
-            message: format!("Server at {} accepted connection but didn't respond: {}", addr, e),
+            message: format!(
+                "Server at {} accepted connection but didn't respond: {}",
+                addr, e
+            ),
         }),
     }
 }

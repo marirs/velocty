@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Send email via Resend API (https://resend.com/docs/api-reference/emails/send-email)
 pub fn send(
@@ -9,7 +9,10 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let api_key = settings.get("email_resend_api_key").cloned().unwrap_or_default();
+    let api_key = settings
+        .get("email_resend_api_key")
+        .cloned()
+        .unwrap_or_default();
     if api_key.is_empty() {
         return Err("Resend API key not configured".into());
     }

@@ -161,10 +161,18 @@ pub fn import_wxr(pool: &DbPool, xml_content: &str) -> Result<WpImportResult, St
                     // Process the item
                     match item_post_type.as_str() {
                         "post" => {
-                            match import_post(pool, &item_title, &item_slug, &item_content,
-                                &item_excerpt, &item_status, &item_date,
-                                &item_categories, &item_tags, &item_comments)
-                            {
+                            match import_post(
+                                pool,
+                                &item_title,
+                                &item_slug,
+                                &item_content,
+                                &item_excerpt,
+                                &item_status,
+                                &item_date,
+                                &item_categories,
+                                &item_tags,
+                                &item_comments,
+                            ) {
                                 Ok(_) => {
                                     result.posts_imported += 1;
                                     result.comments_imported += item_comments.len() as i64;
@@ -172,13 +180,18 @@ pub fn import_wxr(pool: &DbPool, xml_content: &str) -> Result<WpImportResult, St
                                 }
                                 Err(e) => {
                                     result.skipped += 1;
-                                    result.log.push(format!("Skipped post '{}': {}", item_title, e));
+                                    result
+                                        .log
+                                        .push(format!("Skipped post '{}': {}", item_title, e));
                                 }
                             }
                         }
                         "portfolio" => {
                             // Portfolio items — import as portfolio if possible
-                            result.log.push(format!("Skipped portfolio '{}': portfolio import not yet implemented", item_title));
+                            result.log.push(format!(
+                                "Skipped portfolio '{}': portfolio import not yet implemented",
+                                item_title
+                            ));
                             result.skipped += 1;
                         }
                         "page" | "attachment" | "nav_menu_item" | "revision" => {

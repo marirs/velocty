@@ -1,13 +1,13 @@
-pub mod gmail;
-pub mod smtp;
-pub mod resend;
-pub mod ses;
-pub mod postmark;
 pub mod brevo;
-pub mod sendpulse;
+pub mod gmail;
 pub mod mailgun;
-pub mod moosend;
 pub mod mandrill;
+pub mod moosend;
+pub mod postmark;
+pub mod resend;
+pub mod sendpulse;
+pub mod ses;
+pub mod smtp;
 pub mod sparkpost;
 
 use std::collections::HashMap;
@@ -31,11 +31,17 @@ pub fn send_purchase_email(
     currency: &str,
 ) {
     let settings = Setting::all(pool);
-    let site_name = settings.get("site_name").cloned().unwrap_or_else(|| "Velocty".to_string());
+    let site_name = settings
+        .get("site_name")
+        .cloned()
+        .unwrap_or_else(|| "Velocty".to_string());
     let from_email = get_from_email(&settings);
 
     if from_email.is_none() {
-        eprintln!("[email] No email provider configured, skipping purchase email to {}", buyer_email);
+        eprintln!(
+            "[email] No email provider configured, skipping purchase email to {}",
+            buyer_email
+        );
         return;
     }
     let from = from_email.unwrap();
@@ -65,7 +71,10 @@ pub fn send_purchase_email(
     let subject = format!("Your purchase: {} — {}", item_title, site_name);
 
     if let Err(e) = send_via_provider(&settings, &from, buyer_email, &subject, &body) {
-        eprintln!("[email] Failed to send purchase email to {}: {}", buyer_email, e);
+        eprintln!(
+            "[email] Failed to send purchase email to {}: {}",
+            buyer_email, e
+        );
     } else {
         eprintln!("[email] Purchase email sent to {}", buyer_email);
     }
@@ -74,27 +83,45 @@ pub fn send_purchase_email(
 /// Determine the "from" email address from configured providers.
 fn get_from_email(settings: &HashMap<String, String>) -> Option<String> {
     // Use explicit from address if configured
-    let from_addr = settings.get("email_from_address").cloned().unwrap_or_default();
+    let from_addr = settings
+        .get("email_from_address")
+        .cloned()
+        .unwrap_or_default();
     if !from_addr.is_empty() {
         return Some(from_addr);
     }
 
     // Check providers in priority order
     if settings.get("email_gmail_enabled").map(|v| v.as_str()) == Some("true") {
-        return settings.get("email_gmail_address").cloned().filter(|s| !s.is_empty());
+        return settings
+            .get("email_gmail_address")
+            .cloned()
+            .filter(|s| !s.is_empty());
     }
     if settings.get("email_smtp_enabled").map(|v| v.as_str()) == Some("true") {
-        return settings.get("email_smtp_username").cloned().filter(|s| !s.is_empty());
+        return settings
+            .get("email_smtp_username")
+            .cloned()
+            .filter(|s| !s.is_empty());
     }
     // For API-based providers, use admin_email as from
     let api_providers = [
-        "email_resend_enabled", "email_ses_enabled", "email_postmark_enabled",
-        "email_brevo_enabled", "email_sendpulse_enabled", "email_mailgun_enabled",
-        "email_moosend_enabled", "email_mandrill_enabled", "email_sparkpost_enabled",
+        "email_resend_enabled",
+        "email_ses_enabled",
+        "email_postmark_enabled",
+        "email_brevo_enabled",
+        "email_sendpulse_enabled",
+        "email_mailgun_enabled",
+        "email_moosend_enabled",
+        "email_mandrill_enabled",
+        "email_sparkpost_enabled",
     ];
     for provider in &api_providers {
         if settings.get(*provider).map(|v| v.as_str()) == Some("true") {
-            return settings.get("admin_email").cloned().filter(|s| !s.is_empty());
+            return settings
+                .get("admin_email")
+                .cloned()
+                .filter(|s| !s.is_empty());
         }
     }
     None
@@ -108,14 +135,22 @@ pub fn send_via_provider(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let failover_enabled = settings.get("email_failover_enabled").map(|v| v.as_str()) == Some("true");
+    let failover_enabled =
+        settings.get("email_failover_enabled").map(|v| v.as_str()) == Some("true");
 
     let chain_str = settings
         .get("email_failover_chain")
         .cloned()
-        .unwrap_or_else(|| "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp".to_string());
+        .unwrap_or_else(|| {
+            "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp"
+                .to_string()
+        });
 
-    let chain: Vec<&str> = chain_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let chain: Vec<&str> = chain_str
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
 
     let mut last_error = String::new();
 
@@ -159,7 +194,10 @@ pub fn send_via_provider(
     if last_error.is_empty() {
         Err("No email provider configured or enabled".into())
     } else {
-        Err(format!("All email providers failed. Last error: {}", last_error))
+        Err(format!(
+            "All email providers failed. Last error: {}",
+            last_error
+        ))
     }
 }
 
@@ -175,8 +213,13 @@ pub fn send_smtp(
     body: &str,
 ) -> Result<(), String> {
     let email = Message::builder()
-        .from(from.parse().map_err(|e| format!("Invalid from address: {}", e))?)
-        .to(to.parse().map_err(|e| format!("Invalid to address: {}", e))?)
+        .from(
+            from.parse()
+                .map_err(|e| format!("Invalid from address: {}", e))?,
+        )
+        .to(to
+            .parse()
+            .map_err(|e| format!("Invalid to address: {}", e))?)
         .subject(subject)
         .header(ContentType::TEXT_PLAIN)
         .body(body.to_string())
@@ -190,6 +233,8 @@ pub fn send_smtp(
         .credentials(creds)
         .build();
 
-    mailer.send(&email).map_err(|e| format!("SMTP send error: {}", e))?;
+    mailer
+        .send(&email)
+        .map_err(|e| format!("SMTP send error: {}", e))?;
     Ok(())
 }

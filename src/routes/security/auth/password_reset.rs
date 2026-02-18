@@ -12,8 +12,6 @@ use crate::rate_limit::RateLimiter;
 use crate::security::{auth, password_reset};
 use crate::AdminSlug;
 
-use super::login::inject_captcha_context;
-
 #[derive(Debug, FromForm, Deserialize)]
 pub struct ForgotForm {
     pub email: String,
@@ -28,12 +26,12 @@ pub struct ResetForm {
 
 /// GET /forgot-password — show the forgot password form
 #[get("/forgot-password")]
-pub fn forgot_password_page(
-    pool: &State<DbPool>,
-    admin_slug: &State<AdminSlug>,
-) -> Template {
+pub fn forgot_password_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>) -> Template {
     let mut ctx: HashMap<String, String> = HashMap::new();
-    ctx.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    ctx.insert(
+        "admin_theme".to_string(),
+        Setting::get_or(pool, "admin_theme", "dark"),
+    );
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
     Template::render("admin/forgot_password", &ctx)
 }
@@ -55,14 +53,18 @@ pub fn forgot_password_submit(
     // Rate limit: 3 requests per 15 minutes per IP
     let rate_key = format!("pw_reset:{}", client_ip.0);
     if !limiter.check_and_record(&rate_key, 3, std::time::Duration::from_secs(15 * 60)) {
-        ctx.insert("error".to_string(), "Too many requests. Please try again in 15 minutes.".to_string());
+        ctx.insert(
+            "error".to_string(),
+            "Too many requests. Please try again in 15 minutes.".to_string(),
+        );
         return Template::render("admin/forgot_password", &ctx);
     }
 
     // Always show success to prevent email enumeration
     ctx.insert(
         "success".to_string(),
-        "If that email is registered, a password reset link has been sent. Check your inbox.".to_string(),
+        "If that email is registered, a password reset link has been sent. Check your inbox."
+            .to_string(),
     );
 
     // Only actually send if the email matches a known user
@@ -92,7 +94,10 @@ pub fn reset_password_page(
     admin_slug: &State<AdminSlug>,
 ) -> Template {
     let mut ctx: HashMap<String, String> = HashMap::new();
-    ctx.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    ctx.insert(
+        "admin_theme".to_string(),
+        Setting::get_or(pool, "admin_theme", "dark"),
+    );
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
     ctx.insert("token".to_string(), token.to_string());
     Template::render("admin/reset_password", &ctx)
@@ -117,7 +122,10 @@ pub fn reset_password_submit(
     };
 
     if form.password.len() < 8 {
-        return Err(make_err("Password must be at least 8 characters.", &form.token));
+        return Err(make_err(
+            "Password must be at least 8 characters.",
+            &form.token,
+        ));
     }
     if form.password != form.confirm_password {
         return Err(make_err("Passwords do not match.", &form.token));

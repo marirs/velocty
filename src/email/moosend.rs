@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Send email via Moosend API (https://moosendapp.docs.apiary.io/)
 /// Moosend uses a transactional email endpoint with API key auth.
@@ -10,7 +10,10 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let api_key = settings.get("email_moosend_api_key").cloned().unwrap_or_default();
+    let api_key = settings
+        .get("email_moosend_api_key")
+        .cloned()
+        .unwrap_or_default();
     if api_key.is_empty() {
         return Err("Moosend API key not configured".into());
     }

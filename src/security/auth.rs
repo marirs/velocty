@@ -176,7 +176,12 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 
 // ── Session management ──
 
-pub fn create_session(pool: &DbPool, user_id: i64, ip: Option<&str>, ua: Option<&str>) -> Result<String, String> {
+pub fn create_session(
+    pool: &DbPool,
+    user_id: i64,
+    ip: Option<&str>,
+    ua: Option<&str>,
+) -> Result<String, String> {
     let conn = pool.get().map_err(|e| e.to_string())?;
 
     let expiry_hours = Setting::get_i64(pool, "session_expiry_hours").max(1);

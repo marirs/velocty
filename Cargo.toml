@@ -73,13 +73,13 @@ url = "2"
 libc = "0.2"
 
 # HTTP client (payment provider APIs)
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
 hmac = "0.12"
 md-5 = "0.10"
 base64 = "0.22"
 
 # Email
-lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport", "builder"] }
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
 
 # ZIP (design import/export)
 zip = "2"

@@ -1,10 +1,10 @@
-pub mod paypal;
-pub mod stripe;
-pub mod razorpay;
 pub mod mollie;
-pub mod square;
-pub mod twocheckout;
 pub mod payoneer;
+pub mod paypal;
+pub mod razorpay;
+pub mod square;
+pub mod stripe;
+pub mod twocheckout;
 
 use rocket::serde::json::Json;
 use rocket::State;
@@ -21,12 +21,18 @@ use std::collections::HashMap;
 
 /// Helper: get base URL for webhooks/redirects
 pub fn site_url(settings: &HashMap<String, String>) -> String {
-    settings.get("site_url").cloned().unwrap_or_else(|| "http://localhost:8000".to_string())
+    settings
+        .get("site_url")
+        .cloned()
+        .unwrap_or_else(|| "http://localhost:8000".to_string())
 }
 
 /// Helper: get currency
 pub fn currency(settings: &HashMap<String, String>) -> String {
-    settings.get("commerce_currency").cloned().unwrap_or_else(|| "USD".to_string())
+    settings
+        .get("commerce_currency")
+        .cloned()
+        .unwrap_or_else(|| "USD".to_string())
 }
 
 /// Generate a secure random token for downloads
@@ -50,7 +56,9 @@ pub fn generate_license_key() -> String {
     let mut seed = ts as u64;
     let mut parts = Vec::new();
     for _ in 0..4 {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let chunk = format!("{:04X}", (seed >> 32) & 0xFFFF);
         parts.push(chunk);
     }
@@ -83,8 +91,14 @@ pub fn finalize_order(
     }
 
     let settings: HashMap<String, String> = Setting::all(pool);
-    let max_downloads: i64 = settings.get("downloads_max_per_purchase").and_then(|v| v.parse().ok()).unwrap_or(3);
-    let expiry_hours: i64 = settings.get("downloads_expiry_hours").and_then(|v| v.parse().ok()).unwrap_or(48);
+    let max_downloads: i64 = settings
+        .get("downloads_max_per_purchase")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3);
+    let expiry_hours: i64 = settings
+        .get("downloads_expiry_hours")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(48);
 
     let token = generate_token();
     let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::hours(expiry_hours);
@@ -102,13 +116,25 @@ pub fn finalize_order(
         let pool = pool.clone();
         let email = buyer_email.to_string();
         let title = item.as_ref().map(|i| i.title.clone()).unwrap_or_default();
-        let note = item.as_ref().map(|i| i.purchase_note.clone()).unwrap_or_default();
+        let note = item
+            .as_ref()
+            .map(|i| i.purchase_note.clone())
+            .unwrap_or_default();
         let lk = license_key.clone();
         let amt = order.amount;
         let cur = cur.clone();
         let dl = download_url.clone();
         move || {
-            crate::email::send_purchase_email(&pool, &email, &title, &note, &dl, Some(&lk), amt, &cur);
+            crate::email::send_purchase_email(
+                &pool,
+                &email,
+                &title,
+                &note,
+                &dl,
+                Some(&lk),
+                amt,
+                &cur,
+            );
         }
     });
 
@@ -131,38 +157,53 @@ pub fn create_pending_order(
     let item = PortfolioItem::find_by_id(pool, portfolio_id)
         .filter(|i| i.sell_enabled)
         .ok_or("Item not available for purchase")?;
-    let price = item.price.filter(|&p| p > 0.0).ok_or("Item has no price set")?;
+    let price = item
+        .price
+        .filter(|&p| p > 0.0)
+        .ok_or("Item has no price set")?;
     let settings: HashMap<String, String> = Setting::all(pool);
     let cur = currency(&settings);
-    let order_id = Order::create(pool, item.id, buyer_email, "", price, &cur, provider, "", "pending")?;
+    let order_id = Order::create(
+        pool,
+        item.id,
+        buyer_email,
+        "",
+        price,
+        &cur,
+        provider,
+        "",
+        "pending",
+    )?;
     Ok((order_id, price, cur))
 }
 
 /// Simple URL encoding for query parameters
 pub fn urlencoding(s: &str) -> String {
-    s.chars().map(|c| match c {
-        'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-        ' ' => "+".to_string(),
-        _ => format!("%{:02X}", c as u8),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            ' ' => "+".to_string(),
+            _ => format!("%{:02X}", c as u8),
+        })
+        .collect()
 }
 
 // ── Download page: Validate token and show download UI ─
 
 #[get("/download/<token>")]
-pub fn download_page(
-    pool: &State<DbPool>,
-    token: &str,
-) -> rocket_dyn_templates::Template {
+pub fn download_page(pool: &State<DbPool>, token: &str) -> rocket_dyn_templates::Template {
     let settings: HashMap<String, String> = Setting::all(pool);
 
     let dl_token = match DownloadToken::find_by_token(pool, token) {
         Some(t) => t,
         None => {
-            return rocket_dyn_templates::Template::render("download", json!({
-                "error": "Invalid download link",
-                "settings": &settings,
-            }));
+            return rocket_dyn_templates::Template::render(
+                "download",
+                json!({
+                    "error": "Invalid download link",
+                    "settings": &settings,
+                }),
+            );
         }
     };
 
@@ -172,48 +213,60 @@ pub fn download_page(
         } else {
             "Download link has expired"
         };
-        return rocket_dyn_templates::Template::render("download", json!({
-            "error": reason,
-            "expired": true,
-            "settings": &settings,
-        }));
+        return rocket_dyn_templates::Template::render(
+            "download",
+            json!({
+                "error": reason,
+                "expired": true,
+                "settings": &settings,
+            }),
+        );
     }
 
     let order = match Order::find_by_id(pool, dl_token.order_id) {
         Some(o) if o.status == "completed" => o,
         _ => {
-            return rocket_dyn_templates::Template::render("download", json!({
-                "error": "Order not found or not completed",
-                "settings": &settings,
-            }));
+            return rocket_dyn_templates::Template::render(
+                "download",
+                json!({
+                    "error": "Order not found or not completed",
+                    "settings": &settings,
+                }),
+            );
         }
     };
 
     let item = match PortfolioItem::find_by_id(pool, order.portfolio_id) {
         Some(i) => i,
         None => {
-            return rocket_dyn_templates::Template::render("download", json!({
-                "error": "Item not found",
-                "settings": &settings,
-            }));
+            return rocket_dyn_templates::Template::render(
+                "download",
+                json!({
+                    "error": "Item not found",
+                    "settings": &settings,
+                }),
+            );
         }
     };
 
     let license = License::find_by_order(pool, order.id);
 
-    rocket_dyn_templates::Template::render("download", json!({
-        "settings": &settings,
-        "item_title": item.title,
-        "item_slug": item.slug,
-        "image_path": item.image_path,
-        "purchase_note": item.purchase_note,
-        "license_key": license.map(|l| l.license_key),
-        "downloads_used": dl_token.downloads_used,
-        "max_downloads": dl_token.max_downloads,
-        "downloads_remaining": dl_token.max_downloads - dl_token.downloads_used,
-        "token": token,
-        "buyer_email": order.buyer_email,
-    }))
+    rocket_dyn_templates::Template::render(
+        "download",
+        json!({
+            "settings": &settings,
+            "item_title": item.title,
+            "item_slug": item.slug,
+            "image_path": item.image_path,
+            "purchase_note": item.purchase_note,
+            "license_key": license.map(|l| l.license_key),
+            "downloads_used": dl_token.downloads_used,
+            "max_downloads": dl_token.max_downloads,
+            "downloads_remaining": dl_token.max_downloads - dl_token.downloads_used,
+            "token": token,
+            "buyer_email": order.buyer_email,
+        }),
+    )
 }
 
 // ── Actual file download (increments count) ────────────
@@ -225,11 +278,17 @@ pub fn download_file(
 ) -> Result<rocket::response::Redirect, Json<Value>> {
     let dl_token = match DownloadToken::find_by_token(pool, token) {
         Some(t) => t,
-        None => return Err(Json(json!({ "ok": false, "error": "Invalid download link" }))),
+        None => {
+            return Err(Json(
+                json!({ "ok": false, "error": "Invalid download link" }),
+            ))
+        }
     };
 
     if !dl_token.is_valid() {
-        return Err(Json(json!({ "ok": false, "error": "Download expired or limit reached" })));
+        return Err(Json(
+            json!({ "ok": false, "error": "Download expired or limit reached" }),
+        ));
     }
 
     let order = match Order::find_by_id(pool, dl_token.order_id) {
@@ -263,10 +322,7 @@ pub struct CheckPurchaseRequest {
 }
 
 #[post("/api/checkout/check", format = "json", data = "<body>")]
-pub fn check_purchase(
-    pool: &State<DbPool>,
-    body: Json<CheckPurchaseRequest>,
-) -> Json<Value> {
+pub fn check_purchase(pool: &State<DbPool>, body: Json<CheckPurchaseRequest>) -> Json<Value> {
     let conn = match pool.get() {
         Ok(c) => c,
         Err(_) => return Json(json!({ "ok": false, "purchased": false })),
@@ -315,7 +371,13 @@ pub fn generic_capture_order(
     pool: &State<DbPool>,
     body: Json<GenericCaptureRequest>,
 ) -> Json<Value> {
-    match finalize_order(pool, body.order_id, &body.provider_order_id, &body.buyer_email, body.buyer_name.as_deref().unwrap_or("")) {
+    match finalize_order(
+        pool,
+        body.order_id,
+        &body.provider_order_id,
+        &body.buyer_email,
+        body.buyer_name.as_deref().unwrap_or(""),
+    ) {
         Ok(v) => Json(v),
         Err(e) => Json(json!({ "ok": false, "error": e })),
     }

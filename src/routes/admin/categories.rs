@@ -5,14 +5,14 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::{json, Value};
 
-use crate::security::auth::EditorUser;
+use super::admin_base;
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
 use crate::models::category::{Category, CategoryForm};
 use crate::models::settings::Setting;
 use crate::models::tag::Tag;
+use crate::security::auth::EditorUser;
 use crate::AdminSlug;
-use super::admin_base;
 
 // ── Categories ─────────────────────────────────────────
 
@@ -63,7 +63,12 @@ pub fn categories_list(
 // ── Tags ───────────────────────────────────────────────
 
 #[get("/tags?<page>")]
-pub fn tags_list(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, page: Option<i64>) -> Template {
+pub fn tags_list(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    page: Option<i64>,
+) -> Template {
     let per_page = 20i64;
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
@@ -135,13 +140,29 @@ pub fn api_category_create(
     pool: &State<DbPool>,
     data: Json<Value>,
 ) -> Json<Value> {
-    let name = data.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
-    let cat_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("post").to_string();
+    let name = data
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let cat_type = data
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("post")
+        .to_string();
     if name.is_empty() {
         return Json(json!({"ok": false, "error": "Name is required"}));
     }
     let cat_slug = slug::slugify(&name);
-    match Category::create(pool, &CategoryForm { name: name.clone(), slug: cat_slug, r#type: cat_type }) {
+    match Category::create(
+        pool,
+        &CategoryForm {
+            name: name.clone(),
+            slug: cat_slug,
+            r#type: cat_type,
+        },
+    ) {
         Ok(id) => Json(json!({"ok": true, "id": id, "name": name})),
         Err(e) => Json(json!({"ok": false, "error": e})),
     }
@@ -173,10 +194,27 @@ pub fn category_update(
 }
 
 #[post("/categories/<id>/delete")]
-pub fn category_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
-    let name = Category::find_by_id(pool, id).map(|c| c.name).unwrap_or_default();
+pub fn category_delete(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    id: i64,
+) -> Redirect {
+    let name = Category::find_by_id(pool, id)
+        .map(|c| c.name)
+        .unwrap_or_default();
     let _ = Category::delete(pool, id);
-    AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("category"), Some(id), Some(&name), None, None);
+    AuditEntry::log(
+        pool,
+        Some(_admin.user.id),
+        Some(&_admin.user.display_name),
+        "delete",
+        Some("category"),
+        Some(id),
+        Some(&name),
+        None,
+        None,
+    );
     Redirect::to(format!("{}/categories", admin_base(slug)))
 }
 
@@ -199,7 +237,12 @@ pub fn api_category_toggle_nav(
 // ── POST: Tag Delete ───────────────────────────────────
 
 #[post("/tags/<id>/delete")]
-pub fn tag_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn tag_delete(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    id: i64,
+) -> Redirect {
     let _ = Tag::delete(pool, id);
     Redirect::to(format!("{}/tags", admin_base(slug)))
 }

@@ -111,11 +111,7 @@ pub fn send_admin_reset_email(
         .cloned()
         .unwrap_or_else(|| "admin".to_string());
 
-    let login_url = format!(
-        "{}/{}/login",
-        site_url.trim_end_matches('/'),
-        admin_slug
-    );
+    let login_url = format!("{}/{}/login", site_url.trim_end_matches('/'), admin_slug);
 
     let subject = format!("Your password has been reset — {}", site_name);
     let body = format!(
@@ -129,8 +125,7 @@ pub fn send_admin_reset_email(
         site_name, temp_password, login_url, site_name
     );
 
-    let from_email = get_from_email(&settings)
-        .ok_or("No email provider configured.")?;
+    let from_email = get_from_email(&settings).ok_or("No email provider configured.")?;
 
     crate::email::send_via_provider(&settings, &from_email, email, &subject, &body)
 }
@@ -146,7 +141,9 @@ pub fn generate_temp_password() -> String {
     let chars: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     let mut password = String::with_capacity(12);
     for _ in 0..12 {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let idx = ((seed >> 32) as usize) % chars.len();
         password.push(chars[idx] as char);
     }

@@ -63,9 +63,15 @@ impl PortfolioItem {
             meta_description: row.get("meta_description")?,
             sell_enabled: sell_raw != 0,
             price: row.get("price")?,
-            purchase_note: row.get::<_, Option<String>>("purchase_note")?.unwrap_or_default(),
-            payment_provider: row.get::<_, Option<String>>("payment_provider")?.unwrap_or_default(),
-            download_file_path: row.get::<_, Option<String>>("download_file_path")?.unwrap_or_default(),
+            purchase_note: row
+                .get::<_, Option<String>>("purchase_note")?
+                .unwrap_or_default(),
+            payment_provider: row
+                .get::<_, Option<String>>("payment_provider")?
+                .unwrap_or_default(),
+            download_file_path: row
+                .get::<_, Option<String>>("download_file_path")?
+                .unwrap_or_default(),
             likes: row.get("likes")?,
             status: row.get("status")?,
             published_at: row.get("published_at")?,
@@ -257,10 +263,16 @@ impl PortfolioItem {
 
     pub fn delete(pool: &DbPool, id: i64) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM content_categories WHERE content_id = ?1 AND content_type = 'portfolio'", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM content_tags WHERE content_id = ?1 AND content_type = 'portfolio'", params![id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM content_categories WHERE content_id = ?1 AND content_type = 'portfolio'",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM content_tags WHERE content_id = ?1 AND content_type = 'portfolio'",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM likes WHERE portfolio_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM portfolio WHERE id = ?1", params![id])

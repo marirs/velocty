@@ -1,6 +1,6 @@
-pub mod suggest;
 pub mod generate;
 pub mod status;
+pub mod suggest;
 
 use serde_json::{json, Value};
 
@@ -16,9 +16,7 @@ pub fn parse_json_from_text(text: &str) -> Option<Value> {
     }
 
     // Try to find JSON within markdown code fences
-    let stripped = text
-        .replace("```json", "")
-        .replace("```", "");
+    let stripped = text.replace("```json", "").replace("```", "");
     if let Ok(v) = serde_json::from_str::<Value>(stripped.trim()) {
         return Some(v);
     }
@@ -63,8 +61,13 @@ pub fn parse_json_from_text(text: &str) -> Option<Value> {
         let clean = text.trim().trim_matches('"').trim_matches('\'');
         // If it looks like a slug (lowercase, hyphens, no spaces)
         let slug_candidate = clean.split_whitespace().last().unwrap_or(clean);
-        if slug_candidate.contains('-') && !slug_candidate.contains(' ') && slug_candidate.len() < 100 {
-            return Some(json!({"slug": slug_candidate.trim_matches('"').trim_matches('.').to_lowercase()}));
+        if slug_candidate.contains('-')
+            && !slug_candidate.contains(' ')
+            && slug_candidate.len() < 100
+        {
+            return Some(
+                json!({"slug": slug_candidate.trim_matches('"').trim_matches('.').to_lowercase()}),
+            );
         }
     }
     // For title suggestions
@@ -84,11 +87,29 @@ pub fn parse_json_from_text(text: &str) -> Option<Value> {
         let mut meta_desc = String::new();
         for line in text.lines() {
             let l = line.trim().to_lowercase();
-            if l.starts_with("title") || l.starts_with("meta title") || l.starts_with("meta_title") {
-                meta_title = line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().trim_matches('"').to_string();
+            if l.starts_with("title") || l.starts_with("meta title") || l.starts_with("meta_title")
+            {
+                meta_title = line
+                    .split(':')
+                    .skip(1)
+                    .collect::<Vec<_>>()
+                    .join(":")
+                    .trim()
+                    .trim_matches('"')
+                    .to_string();
             }
-            if l.starts_with("description") || l.starts_with("meta description") || l.starts_with("meta_description") {
-                meta_desc = line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().trim_matches('"').to_string();
+            if l.starts_with("description")
+                || l.starts_with("meta description")
+                || l.starts_with("meta_description")
+            {
+                meta_desc = line
+                    .split(':')
+                    .skip(1)
+                    .collect::<Vec<_>>()
+                    .join(":")
+                    .trim()
+                    .trim_matches('"')
+                    .to_string();
             }
         }
         if !meta_title.is_empty() || !meta_desc.is_empty() {
@@ -104,14 +125,29 @@ pub fn parse_json_from_text(text: &str) -> Option<Value> {
             if l.to_lowercase().starts_with("tag") && l.contains(':') {
                 let after_colon = l.split(':').skip(1).collect::<Vec<_>>().join(":");
                 for t in after_colon.split(',') {
-                    let t = t.trim().trim_matches('"').trim_matches('\'').trim_matches('[').trim_matches(']').trim();
-                    if !t.is_empty() && t.len() < 50 { tags.push(t.to_string()); }
+                    let t = t
+                        .trim()
+                        .trim_matches('"')
+                        .trim_matches('\'')
+                        .trim_matches('[')
+                        .trim_matches(']')
+                        .trim();
+                    if !t.is_empty() && t.len() < 50 {
+                        tags.push(t.to_string());
+                    }
                 }
                 continue;
             }
             // Bulleted items
-            let stripped = l.trim_start_matches('-').trim_start_matches('*').trim_start_matches("• ").trim();
-            if !stripped.is_empty() && stripped.len() < 50 && !stripped.to_lowercase().starts_with("tag") {
+            let stripped = l
+                .trim_start_matches('-')
+                .trim_start_matches('*')
+                .trim_start_matches("• ")
+                .trim();
+            if !stripped.is_empty()
+                && stripped.len() < 50
+                && !stripped.to_lowercase().starts_with("tag")
+            {
                 tags.push(stripped.trim_matches('"').to_string());
             }
         }
@@ -120,7 +156,10 @@ pub fn parse_json_from_text(text: &str) -> Option<Value> {
         }
     }
 
-    log::warn!("Failed to parse AI response as JSON: {}", &text[..text.len().min(300)]);
+    log::warn!(
+        "Failed to parse AI response as JSON: {}",
+        &text[..text.len().min(300)]
+    );
     None
 }
 

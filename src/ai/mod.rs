@@ -1,12 +1,12 @@
+pub mod cloudflare;
+pub mod gemini;
+pub mod groq;
 pub mod ollama;
 pub mod openai;
-pub mod gemini;
-pub mod cloudflare;
-pub mod groq;
 pub mod prompts;
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::db::DbPool;
 use crate::models::settings::Setting;
@@ -73,7 +73,10 @@ impl Provider {
     }
 
     fn supports_vision(&self) -> bool {
-        matches!(self, Self::OpenAi | Self::Gemini | Self::Ollama | Self::Groq)
+        matches!(
+            self,
+            Self::OpenAi | Self::Gemini | Self::Ollama | Self::Groq
+        )
     }
 }
 
@@ -89,11 +92,13 @@ pub fn complete(pool: &DbPool, req: &AiRequest) -> Result<AiResponse, AiError> {
 
     let chain: Vec<Provider> = chain_str
         .split(',')
-        .filter_map(|s| Provider::from_str(s))
+        .filter_map(Provider::from_str)
         .collect();
 
     if chain.is_empty() {
-        return Err(AiError("No AI providers configured in failover chain".into()));
+        return Err(AiError(
+            "No AI providers configured in failover chain".into(),
+        ));
     }
 
     let mut last_error = String::new();
@@ -130,15 +135,23 @@ pub fn is_enabled(pool: &DbPool) -> bool {
     let settings: HashMap<String, String> = Setting::all(pool);
     ["ollama", "openai", "gemini", "cloudflare", "groq"]
         .iter()
-        .any(|p| settings.get(&format!("ai_{}_enabled", p)).map(|v| v.as_str()) == Some("true"))
+        .any(|p| {
+            settings
+                .get(&format!("ai_{}_enabled", p))
+                .map(|v| v.as_str())
+                == Some("true")
+        })
 }
 
 /// Check if any vision-capable provider is enabled (Ollama, OpenAI, Gemini, Groq)
 pub fn has_vision_provider(pool: &DbPool) -> bool {
     let settings: HashMap<String, String> = Setting::all(pool);
-    ["ollama", "openai", "gemini", "groq"]
-        .iter()
-        .any(|p| settings.get(&format!("ai_{}_enabled", p)).map(|v| v.as_str()) == Some("true"))
+    ["ollama", "openai", "gemini", "groq"].iter().any(|p| {
+        settings
+            .get(&format!("ai_{}_enabled", p))
+            .map(|v| v.as_str())
+            == Some("true")
+    })
 }
 
 /// Check which suggestion features are enabled

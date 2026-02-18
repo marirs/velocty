@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Send email via Mandrill (Mailchimp Transactional) API
 /// https://mailchimp.com/developer/transactional/api/messages/send-new-message/
@@ -10,7 +10,10 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let api_key = settings.get("email_mandrill_api_key").cloned().unwrap_or_default();
+    let api_key = settings
+        .get("email_mandrill_api_key")
+        .cloned()
+        .unwrap_or_default();
     if api_key.is_empty() {
         return Err("Mandrill API key not configured".into());
     }
@@ -52,7 +55,10 @@ pub fn send(
         if let Some(first) = arr.first() {
             let status = first.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if status == "rejected" || status == "invalid" {
-                let reason = first.get("reject_reason").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let reason = first
+                    .get("reject_reason")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
                 return Err(format!("Mandrill rejected email: {}", reason));
             }
         }

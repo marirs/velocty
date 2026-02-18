@@ -1,6 +1,6 @@
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::{Orbit, Rocket};
 use rocket::tokio;
+use rocket::{Orbit, Rocket};
 use std::sync::Arc;
 use std::time::Duration;
 

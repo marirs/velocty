@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Send email via SendPulse SMTP API
 /// https://sendpulse.com/integrations/api/smtp
@@ -11,8 +11,14 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let client_id = settings.get("email_sendpulse_client_id").cloned().unwrap_or_default();
-    let client_secret = settings.get("email_sendpulse_client_secret").cloned().unwrap_or_default();
+    let client_id = settings
+        .get("email_sendpulse_client_id")
+        .cloned()
+        .unwrap_or_default();
+    let client_secret = settings
+        .get("email_sendpulse_client_secret")
+        .cloned()
+        .unwrap_or_default();
 
     if client_id.is_empty() || client_secret.is_empty() {
         return Err("SendPulse client ID or client secret not configured".into());

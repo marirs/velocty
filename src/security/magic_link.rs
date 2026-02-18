@@ -54,11 +54,25 @@ pub fn verify_token(pool: &DbPool, token: &str) -> Result<String, String> {
 /// Send a magic link email to the admin.
 pub fn send_magic_link_email(pool: &DbPool, email: &str, token: &str) -> Result<(), String> {
     let settings = Setting::all(pool);
-    let site_url = settings.get("site_url").cloned().unwrap_or_else(|| "http://localhost:8000".to_string());
-    let site_name = settings.get("site_name").cloned().unwrap_or_else(|| "Velocty".to_string());
-    let admin_slug = settings.get("admin_slug").cloned().unwrap_or_else(|| "admin".to_string());
+    let site_url = settings
+        .get("site_url")
+        .cloned()
+        .unwrap_or_else(|| "http://localhost:8000".to_string());
+    let site_name = settings
+        .get("site_name")
+        .cloned()
+        .unwrap_or_else(|| "Velocty".to_string());
+    let admin_slug = settings
+        .get("admin_slug")
+        .cloned()
+        .unwrap_or_else(|| "admin".to_string());
 
-    let link = format!("{}/{}/magic-link/verify?token={}", site_url.trim_end_matches('/'), admin_slug, token);
+    let link = format!(
+        "{}/{}/magic-link/verify?token={}",
+        site_url.trim_end_matches('/'),
+        admin_slug,
+        token
+    );
 
     let subject = format!("Sign in to {} — Magic Link", site_name);
     let body = format!(
@@ -80,24 +94,42 @@ pub fn send_magic_link_email(pool: &DbPool, email: &str, token: &str) -> Result<
 
 /// Determine the "from" email address (mirrors email module logic)
 fn get_from_email(settings: &std::collections::HashMap<String, String>) -> Option<String> {
-    let from_addr = settings.get("email_from_address").cloned().unwrap_or_default();
+    let from_addr = settings
+        .get("email_from_address")
+        .cloned()
+        .unwrap_or_default();
     if !from_addr.is_empty() {
         return Some(from_addr);
     }
     if settings.get("email_gmail_enabled").map(|v| v.as_str()) == Some("true") {
-        return settings.get("email_gmail_address").cloned().filter(|s| !s.is_empty());
+        return settings
+            .get("email_gmail_address")
+            .cloned()
+            .filter(|s| !s.is_empty());
     }
     if settings.get("email_smtp_enabled").map(|v| v.as_str()) == Some("true") {
-        return settings.get("email_smtp_username").cloned().filter(|s| !s.is_empty());
+        return settings
+            .get("email_smtp_username")
+            .cloned()
+            .filter(|s| !s.is_empty());
     }
     let api_providers = [
-        "email_resend_enabled", "email_ses_enabled", "email_postmark_enabled",
-        "email_brevo_enabled", "email_sendpulse_enabled", "email_mailgun_enabled",
-        "email_moosend_enabled", "email_mandrill_enabled", "email_sparkpost_enabled",
+        "email_resend_enabled",
+        "email_ses_enabled",
+        "email_postmark_enabled",
+        "email_brevo_enabled",
+        "email_sendpulse_enabled",
+        "email_mailgun_enabled",
+        "email_moosend_enabled",
+        "email_mandrill_enabled",
+        "email_sparkpost_enabled",
     ];
     for provider in &api_providers {
         if settings.get(*provider).map(|v| v.as_str()) == Some("true") {
-            return settings.get("admin_email").cloned().filter(|s| !s.is_empty());
+            return settings
+                .get("admin_email")
+                .cloned()
+                .filter(|s| !s.is_empty());
         }
     }
     None
@@ -107,7 +139,10 @@ fn get_from_email(settings: &std::collections::HashMap<String, String>) -> Optio
 pub fn cleanup_expired(pool: &DbPool) -> Result<(), String> {
     let conn = pool.get().map_err(|e| e.to_string())?;
     let now = Utc::now().naive_utc();
-    conn.execute("DELETE FROM magic_links WHERE expires_at < ?1", params![now])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM magic_links WHERE expires_at < ?1",
+        params![now],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }

@@ -23,7 +23,7 @@ impl RateLimiter {
         let now = Instant::now();
         let cutoff = now - window;
 
-        let attempts = map.entry(key.to_string()).or_insert_with(Vec::new);
+        let attempts = map.entry(key.to_string()).or_default();
 
         // Prune old entries outside the window
         attempts.retain(|t| *t > cutoff);
@@ -42,7 +42,7 @@ impl RateLimiter {
         let now = Instant::now();
         let cutoff = now - window;
 
-        let attempts = map.entry(key.to_string()).or_insert_with(Vec::new);
+        let attempts = map.entry(key.to_string()).or_default();
         attempts.retain(|t| *t > cutoff);
 
         max_attempts.saturating_sub(attempts.len() as u64)

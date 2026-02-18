@@ -1,16 +1,10 @@
-use std::collections::HashMap;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 use super::{AiError, AiRequest, AiResponse};
 
-pub fn call(
-    settings: &HashMap<String, String>,
-    req: &AiRequest,
-) -> Result<AiResponse, AiError> {
-    let api_key = settings
-        .get("ai_groq_api_key")
-        .cloned()
-        .unwrap_or_default();
+pub fn call(settings: &HashMap<String, String>, req: &AiRequest) -> Result<AiResponse, AiError> {
+    let api_key = settings.get("ai_groq_api_key").cloned().unwrap_or_default();
     if api_key.is_empty() {
         return Err(AiError("Groq API key not configured".into()));
     }

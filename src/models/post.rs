@@ -58,8 +58,12 @@ impl Post {
 
     pub fn find_by_id(pool: &DbPool, id: i64) -> Option<Self> {
         let conn = pool.get().ok()?;
-        conn.query_row("SELECT * FROM posts WHERE id = ?1", params![id], Self::from_row)
-            .ok()
+        conn.query_row(
+            "SELECT * FROM posts WHERE id = ?1",
+            params![id],
+            Self::from_row,
+        )
+        .ok()
     }
 
     pub fn find_by_slug(pool: &DbPool, slug: &str) -> Option<Self> {
@@ -82,11 +86,7 @@ impl Post {
             Some(s) => (
                 "SELECT * FROM posts WHERE status = ?1 ORDER BY created_at DESC LIMIT ?2 OFFSET ?3"
                     .to_string(),
-                vec![
-                    Box::new(s.to_string()),
-                    Box::new(limit),
-                    Box::new(offset),
-                ],
+                vec![Box::new(s.to_string()), Box::new(limit), Box::new(offset)],
             ),
             None => (
                 "SELECT * FROM posts ORDER BY created_at DESC LIMIT ?1 OFFSET ?2".to_string(),
@@ -194,12 +194,21 @@ impl Post {
 
     pub fn delete(pool: &DbPool, id: i64) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM content_categories WHERE content_id = ?1 AND content_type = 'post'", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM content_tags WHERE content_id = ?1 AND content_type = 'post'", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM comments WHERE post_id = ?1 AND content_type = 'post'", params![id])
-            .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM content_categories WHERE content_id = ?1 AND content_type = 'post'",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM content_tags WHERE content_id = ?1 AND content_type = 'post'",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM comments WHERE post_id = ?1 AND content_type = 'post'",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM posts WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Ok(())

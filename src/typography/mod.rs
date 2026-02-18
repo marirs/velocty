@@ -24,15 +24,39 @@ pub fn build_css_variables(settings: &Value) -> String {
     // Resolve per-element font: use specific if set, else fallback
     let resolve = |key: &str, fallback: &str| -> String {
         let v = get(key, "");
-        if v.is_empty() { fallback.to_string() } else { v }
+        if v.is_empty() {
+            fallback.to_string()
+        } else {
+            v
+        }
     };
 
     // Per-element fonts: use primary if sitewide, else use specific or fallback to primary
-    let font_body = if sitewide { font_primary.clone() } else { resolve("font_body", &font_primary) };
-    let font_headings = if sitewide { font_heading.clone() } else { resolve("font_headings", &font_heading) };
-    let font_nav = if sitewide { font_primary.clone() } else { resolve("font_navigation", &font_primary) };
-    let font_buttons = if sitewide { font_primary.clone() } else { resolve("font_buttons", &font_primary) };
-    let font_captions = if sitewide { font_primary.clone() } else { resolve("font_captions", &font_primary) };
+    let font_body = if sitewide {
+        font_primary.clone()
+    } else {
+        resolve("font_body", &font_primary)
+    };
+    let font_headings = if sitewide {
+        font_heading.clone()
+    } else {
+        resolve("font_headings", &font_heading)
+    };
+    let font_nav = if sitewide {
+        font_primary.clone()
+    } else {
+        resolve("font_navigation", &font_primary)
+    };
+    let font_buttons = if sitewide {
+        font_primary.clone()
+    } else {
+        resolve("font_buttons", &font_primary)
+    };
+    let font_captions = if sitewide {
+        font_primary.clone()
+    } else {
+        resolve("font_captions", &font_primary)
+    };
 
     // New per-element fonts (always resolve, fallback to primary/heading)
     let font_logo = resolve("font_logo", &font_primary);
@@ -163,12 +187,48 @@ pub fn build_css_variables(settings: &Value) -> String {
         text_transform = text_transform,
         text_direction = text_direction,
         text_alignment = text_alignment,
-        sidebar_direction = if get("layout_sidebar_position", "left") == "right" { "row-reverse" } else { "row" },
-        margin_top = { let v = get("layout_margin_top", "0"); if v == "0" { "0".to_string() } else { format!("{}px", v.trim_end_matches("px")) } },
-        margin_bottom = { let v = get("layout_margin_bottom", "0"); if v == "0" { "0".to_string() } else { format!("{}px", v.trim_end_matches("px")) } },
-        margin_left = { let v = get("layout_margin_left", "0"); if v == "0" { "0".to_string() } else { format!("{}px", v.trim_end_matches("px")) } },
-        margin_right = { let v = get("layout_margin_right", "0"); if v == "0" { "0".to_string() } else { format!("{}px", v.trim_end_matches("px")) } },
-        content_max_width = if get("layout_content_boundary", "full") == "boxed" { "1200px" } else { "none" },
+        sidebar_direction = if get("layout_sidebar_position", "left") == "right" {
+            "row-reverse"
+        } else {
+            "row"
+        },
+        margin_top = {
+            let v = get("layout_margin_top", "0");
+            if v == "0" {
+                "0".to_string()
+            } else {
+                format!("{}px", v.trim_end_matches("px"))
+            }
+        },
+        margin_bottom = {
+            let v = get("layout_margin_bottom", "0");
+            if v == "0" {
+                "0".to_string()
+            } else {
+                format!("{}px", v.trim_end_matches("px"))
+            }
+        },
+        margin_left = {
+            let v = get("layout_margin_left", "0");
+            if v == "0" {
+                "0".to_string()
+            } else {
+                format!("{}px", v.trim_end_matches("px"))
+            }
+        },
+        margin_right = {
+            let v = get("layout_margin_right", "0");
+            if v == "0" {
+                "0".to_string()
+            } else {
+                format!("{}px", v.trim_end_matches("px"))
+            }
+        },
+        content_max_width = if get("layout_content_boundary", "full") == "boxed" {
+            "1200px"
+        } else {
+            "none"
+        },
         grid_cols = get("portfolio_grid_columns", "3"),
         blog_grid_cols = get("blog_grid_columns", "3"),
         lb_border = get("portfolio_lightbox_border_color", "#D4A017"),
@@ -180,9 +240,7 @@ pub fn build_css_variables(settings: &Value) -> String {
 
 /// Build the font loading HTML tags (Google Fonts, Adobe Fonts, custom @font-face).
 pub fn build_font_links(settings: &Value) -> String {
-    let get = |key: &str| -> &str {
-        settings.get(key).and_then(|v| v.as_str()).unwrap_or("")
-    };
+    let get = |key: &str| -> &str { settings.get(key).and_then(|v| v.as_str()).unwrap_or("") };
 
     let google_enabled = get("font_google_enabled") == "true";
     let adobe_enabled = get("font_adobe_enabled") == "true";
@@ -210,22 +268,41 @@ pub fn build_font_links(settings: &Value) -> String {
         maybe_add(font_heading);
 
         if !sitewide {
-            for key in &["font_body", "font_headings", "font_navigation", "font_buttons", "font_captions"] {
+            for key in &[
+                "font_body",
+                "font_headings",
+                "font_navigation",
+                "font_buttons",
+                "font_captions",
+            ] {
                 maybe_add(get(key));
             }
         }
 
         // Always load per-element fonts if set (these are independent of sitewide toggle)
-        for key in &["font_logo", "font_subheading", "font_blockquote", "font_list",
-                      "font_footer", "font_lightbox_title", "font_categories", "font_tags"] {
+        for key in &[
+            "font_logo",
+            "font_subheading",
+            "font_blockquote",
+            "font_list",
+            "font_footer",
+            "font_lightbox_title",
+            "font_categories",
+            "font_tags",
+        ] {
             maybe_add(get(key));
         }
 
         if !families.is_empty() {
-            html.push_str(r#"    <link rel="preconnect" href="https://fonts.googleapis.com">
+            html.push_str(
+                r#"    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-"#);
-            let params: Vec<String> = families.iter().map(|f| format!("family={}:wght@300;400;500;600;700", f)).collect();
+"#,
+            );
+            let params: Vec<String> = families
+                .iter()
+                .map(|f| format!("family={}:wght@300;400;500;600;700", f))
+                .collect();
             html.push_str(&format!(
                 r#"    <link href="https://fonts.googleapis.com/css2?{}&display=swap" rel="stylesheet">
 "#,

@@ -4,8 +4,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::ai::{self, prompts, AiRequest};
-use crate::security::auth::EditorUser;
 use crate::db::DbPool;
+use crate::security::auth::EditorUser;
 
 use super::parse_json_from_text;
 
@@ -47,19 +47,17 @@ pub fn generate_post(
     };
 
     match ai::complete(pool, &req) {
-        Ok(resp) => {
-            match parse_json_from_text(&resp.text) {
-                Some(parsed) => Json(json!({
-                    "ok": true,
-                    "provider": resp.provider,
-                    "title": parsed.get("title").and_then(|v| v.as_str()).unwrap_or(""),
-                    "content_html": parsed.get("content_html").and_then(|v| v.as_str()).unwrap_or(""),
-                    "excerpt": parsed.get("excerpt").and_then(|v| v.as_str()).unwrap_or(""),
-                    "tags": parsed.get("tags").and_then(|v| v.as_array()).cloned().unwrap_or_default(),
-                })),
-                None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
-            }
-        }
+        Ok(resp) => match parse_json_from_text(&resp.text) {
+            Some(parsed) => Json(json!({
+                "ok": true,
+                "provider": resp.provider,
+                "title": parsed.get("title").and_then(|v| v.as_str()).unwrap_or(""),
+                "content_html": parsed.get("content_html").and_then(|v| v.as_str()).unwrap_or(""),
+                "excerpt": parsed.get("excerpt").and_then(|v| v.as_str()).unwrap_or(""),
+                "tags": parsed.get("tags").and_then(|v| v.as_array()).cloned().unwrap_or_default(),
+            })),
+            None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
+        },
         Err(e) => Json(json!({"ok": false, "error": e.to_string()})),
     }
 }
@@ -120,19 +118,17 @@ pub fn describe_image(
     };
 
     match ai::complete(pool, &req) {
-        Ok(resp) => {
-            match parse_json_from_text(&resp.text) {
-                Some(parsed) => {
-                    let description = parsed
-                        .get("description")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(&resp.text)
-                        .to_string();
-                    Json(json!({"ok": true, "provider": resp.provider, "description": description}))
-                }
-                None => Json(json!({"ok": true, "provider": resp.provider, "description": resp.text})),
+        Ok(resp) => match parse_json_from_text(&resp.text) {
+            Some(parsed) => {
+                let description = parsed
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&resp.text)
+                    .to_string();
+                Json(json!({"ok": true, "provider": resp.provider, "description": description}))
             }
-        }
+            None => Json(json!({"ok": true, "provider": resp.provider, "description": resp.text})),
+        },
         Err(e) => Json(json!({"ok": false, "error": e.to_string()})),
     }
 }

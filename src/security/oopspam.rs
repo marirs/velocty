@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 /// Check content for spam using OOPSpam API.
 /// https://www.oopspam.com/docs/#check-for-spam
@@ -9,7 +9,10 @@ pub fn check_spam(
     content: &str,
     author_email: Option<&str>,
 ) -> Result<bool, String> {
-    let api_key = settings.get("security_oopspam_api_key").cloned().unwrap_or_default();
+    let api_key = settings
+        .get("security_oopspam_api_key")
+        .cloned()
+        .unwrap_or_default();
     if api_key.is_empty() {
         return Err("OOPSpam API key not configured".into());
     }
@@ -52,7 +55,8 @@ pub fn check_spam(
     let score = json.get("Score").and_then(|v| v.as_i64()).unwrap_or(0);
 
     if score >= 3 {
-        let details = json.get("Details")
+        let details = json
+            .get("Details")
             .and_then(|v| v.as_object())
             .map(|obj| format!("{:?}", obj))
             .unwrap_or_default();

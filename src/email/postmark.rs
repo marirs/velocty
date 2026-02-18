@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Send email via Postmark API (https://postmarkapp.com/developer/api/email-api)
 pub fn send(
@@ -9,7 +9,10 @@ pub fn send(
     subject: &str,
     body: &str,
 ) -> Result<(), String> {
-    let server_token = settings.get("email_postmark_server_token").cloned().unwrap_or_default();
+    let server_token = settings
+        .get("email_postmark_server_token")
+        .cloned()
+        .unwrap_or_default();
     if server_token.is_empty() {
         return Err("Postmark server token not configured".into());
     }

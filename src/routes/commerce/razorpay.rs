@@ -24,16 +24,28 @@ pub fn razorpay_create_order(
     body: Json<RazorpayCreateRequest>,
 ) -> Json<Value> {
     let settings: HashMap<String, String> = Setting::all(pool);
-    if settings.get("commerce_razorpay_enabled").map(|v| v.as_str()) != Some("true") {
+    if settings
+        .get("commerce_razorpay_enabled")
+        .map(|v| v.as_str())
+        != Some("true")
+    {
         return Json(json!({ "ok": false, "error": "Razorpay is not enabled" }));
     }
     let key_id = settings.get("razorpay_key_id").cloned().unwrap_or_default();
-    let key_secret = settings.get("razorpay_key_secret").cloned().unwrap_or_default();
+    let key_secret = settings
+        .get("razorpay_key_secret")
+        .cloned()
+        .unwrap_or_default();
     if key_id.is_empty() || key_secret.is_empty() {
         return Json(json!({ "ok": false, "error": "Razorpay credentials not configured" }));
     }
 
-    let (order_id, price, cur) = match create_pending_order(pool, body.portfolio_id, "razorpay", body.buyer_email.as_deref().unwrap_or("")) {
+    let (order_id, price, cur) = match create_pending_order(
+        pool,
+        body.portfolio_id,
+        "razorpay",
+        body.buyer_email.as_deref().unwrap_or(""),
+    ) {
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
@@ -42,7 +54,8 @@ pub fn razorpay_create_order(
     let amount_minor = (price * 100.0) as i64;
 
     let client = reqwest::blocking::Client::new();
-    let resp = client.post("https://api.razorpay.com/v1/orders")
+    let resp = client
+        .post("https://api.razorpay.com/v1/orders")
         .basic_auth(&key_id, Some(&key_secret))
         .json(&json!({
             "amount": amount_minor,
@@ -66,7 +79,11 @@ pub fn razorpay_create_order(
                     "currency": cur,
                 }))
             } else {
-                let err = body.get("error").and_then(|e| e.get("description")).and_then(|m| m.as_str()).unwrap_or("Razorpay API error");
+                let err = body
+                    .get("error")
+                    .and_then(|e| e.get("description"))
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Razorpay API error");
                 Json(json!({ "ok": false, "error": err }))
             }
         }
@@ -87,12 +104,12 @@ pub struct RazorpayVerifyRequest {
 }
 
 #[post("/api/checkout/razorpay/verify", format = "json", data = "<body>")]
-pub fn razorpay_verify(
-    pool: &State<DbPool>,
-    body: Json<RazorpayVerifyRequest>,
-) -> Json<Value> {
+pub fn razorpay_verify(pool: &State<DbPool>, body: Json<RazorpayVerifyRequest>) -> Json<Value> {
     let settings: HashMap<String, String> = Setting::all(pool);
-    let key_secret = settings.get("razorpay_key_secret").cloned().unwrap_or_default();
+    let key_secret = settings
+        .get("razorpay_key_secret")
+        .cloned()
+        .unwrap_or_default();
 
     // Verify HMAC-SHA256 signature: sha256(razorpay_order_id + "|" + razorpay_payment_id)
     use hmac::{Hmac, Mac};
@@ -109,7 +126,13 @@ pub fn razorpay_verify(
         return Json(json!({ "ok": false, "error": "Invalid payment signature" }));
     }
 
-    match finalize_order(pool, body.order_id, &body.razorpay_payment_id, &body.buyer_email, body.buyer_name.as_deref().unwrap_or("")) {
+    match finalize_order(
+        pool,
+        body.order_id,
+        &body.razorpay_payment_id,
+        &body.buyer_email,
+        body.buyer_name.as_deref().unwrap_or(""),
+    ) {
         Ok(v) => Json(v),
         Err(e) => Json(json!({ "ok": false, "error": e })),
     }

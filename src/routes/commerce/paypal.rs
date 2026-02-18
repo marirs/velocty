@@ -9,7 +9,7 @@ use crate::models::portfolio::PortfolioItem;
 use crate::models::settings::Setting;
 use std::collections::HashMap;
 
-use super::{create_pending_order, currency, finalize_order};
+use super::{currency, finalize_order};
 
 // ── PayPal: Create Order ───────────────────────────────
 
@@ -19,10 +19,7 @@ pub struct PaypalCreateRequest {
 }
 
 #[post("/api/checkout/paypal/create", format = "json", data = "<body>")]
-pub fn paypal_create_order(
-    pool: &State<DbPool>,
-    body: Json<PaypalCreateRequest>,
-) -> Json<Value> {
+pub fn paypal_create_order(pool: &State<DbPool>, body: Json<PaypalCreateRequest>) -> Json<Value> {
     let settings: HashMap<String, String> = Setting::all(pool);
 
     if settings.get("commerce_paypal_enabled").map(|v| v.as_str()) != Some("true") {
@@ -42,9 +39,8 @@ pub fn paypal_create_order(
     let cur = currency(&settings);
 
     // Create a pending order in our DB
-    let order_id = match Order::create(
-        pool, item.id, "", "", price, &cur, "paypal", "", "pending",
-    ) {
+    let order_id = match Order::create(pool, item.id, "", "", price, &cur, "paypal", "", "pending")
+    {
         Ok(id) => id,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
@@ -70,15 +66,18 @@ pub struct PaypalCaptureRequest {
 }
 
 #[post("/api/checkout/paypal/capture", format = "json", data = "<body>")]
-pub fn paypal_capture_order(
-    pool: &State<DbPool>,
-    body: Json<PaypalCaptureRequest>,
-) -> Json<Value> {
+pub fn paypal_capture_order(pool: &State<DbPool>, body: Json<PaypalCaptureRequest>) -> Json<Value> {
     let settings: HashMap<String, String> = Setting::all(pool);
     if settings.get("commerce_paypal_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "PayPal is not enabled" }));
     }
-    match finalize_order(pool, body.order_id, &body.paypal_order_id, &body.buyer_email, body.buyer_name.as_deref().unwrap_or("")) {
+    match finalize_order(
+        pool,
+        body.order_id,
+        &body.paypal_order_id,
+        &body.buyer_email,
+        body.buyer_name.as_deref().unwrap_or(""),
+    ) {
         Ok(v) => Json(v),
         Err(e) => Json(json!({ "ok": false, "error": e })),
     }

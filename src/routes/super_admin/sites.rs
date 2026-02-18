@@ -7,8 +7,8 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use std::collections::HashMap;
 
-use crate::site::{self, RegistryPool};
 use super::auth::is_super_authenticated;
+use crate::site::{self, RegistryPool};
 
 // ── Create Site ──────────────────────────────────────────────
 
@@ -50,7 +50,10 @@ pub fn new_site_submit(
         Ok(_site) => Ok(Redirect::to("/super/")),
         Err(_e) => {
             let mut ctx = HashMap::new();
-            ctx.insert("error", "Failed to create site. Hostname may already exist.");
+            ctx.insert(
+                "error",
+                "Failed to create site. Hostname may already exist.",
+            );
             Err(Template::render("super/site_new", &ctx))
         }
     }
@@ -74,7 +77,10 @@ pub fn edit_site_page(
     };
 
     let mut ctx = HashMap::new();
-    ctx.insert("site".to_string(), serde_json::to_value(&site).unwrap_or_default());
+    ctx.insert(
+        "site".to_string(),
+        serde_json::to_value(&site).unwrap_or_default(),
+    );
     Ok(Template::render("super/site_edit", &ctx))
 }
 
@@ -101,11 +107,7 @@ pub fn edit_site_submit(
 // ── Delete Site ──────────────────────────────────────────────
 
 #[post("/sites/<id>/delete")]
-pub fn delete_site(
-    id: i64,
-    registry: &State<RegistryPool>,
-    cookies: &CookieJar<'_>,
-) -> Redirect {
+pub fn delete_site(id: i64, registry: &State<RegistryPool>, cookies: &CookieJar<'_>) -> Redirect {
     if !is_super_authenticated(registry, cookies) {
         return Redirect::to("/super/login");
     }

@@ -27,8 +27,12 @@ impl Tag {
 
     pub fn find_by_id(pool: &DbPool, id: i64) -> Option<Self> {
         let conn = pool.get().ok()?;
-        conn.query_row("SELECT * FROM tags WHERE id = ?1", params![id], Self::from_row)
-            .ok()
+        conn.query_row(
+            "SELECT * FROM tags WHERE id = ?1",
+            params![id],
+            Self::from_row,
+        )
+        .ok()
     }
 
     pub fn find_by_slug(pool: &DbPool, slug: &str) -> Option<Self> {
@@ -74,7 +78,8 @@ impl Tag {
             Ok(c) => c,
             Err(_) => return 0,
         };
-        conn.query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0)).unwrap_or(0)
+        conn.query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))
+            .unwrap_or(0)
     }
 
     pub fn for_content(pool: &DbPool, content_id: i64, content_type: &str) -> Vec<Self> {

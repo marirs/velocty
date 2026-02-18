@@ -1,6 +1,6 @@
-use rocket::serde::json::Json;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
+use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -11,8 +11,8 @@ use crate::models::portfolio::PortfolioItem;
 use crate::models::settings::Setting;
 use std::collections::HashMap;
 
-use super::{create_pending_order, finalize_order, site_url};
 use super::stripe::RawBody;
+use super::{create_pending_order, finalize_order, site_url};
 
 /// Extract Square webhook signature header
 pub struct SquareSignature(pub String);
@@ -37,23 +37,35 @@ pub struct SquareCreateRequest {
 }
 
 #[post("/api/checkout/square/create", format = "json", data = "<body>")]
-pub fn square_create_payment(
-    pool: &State<DbPool>,
-    body: Json<SquareCreateRequest>,
-) -> Json<Value> {
+pub fn square_create_payment(pool: &State<DbPool>, body: Json<SquareCreateRequest>) -> Json<Value> {
     let settings: HashMap<String, String> = Setting::all(pool);
     if settings.get("commerce_square_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "Square is not enabled" }));
     }
-    let access_token = settings.get("square_access_token").cloned().unwrap_or_default();
-    let location_id = settings.get("square_location_id").cloned().unwrap_or_default();
+    let access_token = settings
+        .get("square_access_token")
+        .cloned()
+        .unwrap_or_default();
+    let location_id = settings
+        .get("square_location_id")
+        .cloned()
+        .unwrap_or_default();
     if access_token.is_empty() || location_id.is_empty() {
         return Json(json!({ "ok": false, "error": "Square credentials not configured" }));
     }
     let is_sandbox = settings.get("square_mode").map(|v| v.as_str()) != Some("live");
-    let api_base = if is_sandbox { "https://connect.squareupsandbox.com" } else { "https://connect.squareup.com" };
+    let api_base = if is_sandbox {
+        "https://connect.squareupsandbox.com"
+    } else {
+        "https://connect.squareup.com"
+    };
 
-    let (order_id, price, cur) = match create_pending_order(pool, body.portfolio_id, "square", body.buyer_email.as_deref().unwrap_or("")) {
+    let (order_id, price, cur) = match create_pending_order(
+        pool,
+        body.portfolio_id,
+        "square",
+        body.buyer_email.as_deref().unwrap_or(""),
+    ) {
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
@@ -65,7 +77,8 @@ pub fn square_create_payment(
     let amount_minor = (price * 100.0) as i64;
 
     let client = reqwest::blocking::Client::new();
-    let resp = client.post(&format!("{}/v2/online-checkout/payment-links", api_base))
+    let resp = client
+        .post(format!("{}/v2/online-checkout/payment-links", api_base))
         .bearer_auth(&access_token)
         .json(&json!({
             "idempotency_key": format!("velocty_{}", order_id),
@@ -84,13 +97,26 @@ pub fn square_create_payment(
     match resp {
         Ok(r) => {
             let body: Value = r.json().unwrap_or_default();
-            let url = body.get("payment_link").and_then(|l| l.get("url")).and_then(|u| u.as_str());
-            let sq_id = body.get("payment_link").and_then(|l| l.get("id")).and_then(|i| i.as_str()).unwrap_or("");
+            let url = body
+                .get("payment_link")
+                .and_then(|l| l.get("url"))
+                .and_then(|u| u.as_str());
+            let sq_id = body
+                .get("payment_link")
+                .and_then(|l| l.get("id"))
+                .and_then(|i| i.as_str())
+                .unwrap_or("");
             if let Some(checkout_url) = url {
                 let _ = Order::update_provider_order_id(pool, order_id, sq_id);
                 Json(json!({ "ok": true, "order_id": order_id, "checkout_url": checkout_url }))
             } else {
-                let errors = body.get("errors").and_then(|e| e.as_array()).and_then(|a| a.first()).and_then(|e| e.get("detail")).and_then(|d| d.as_str()).unwrap_or("Square API error");
+                let errors = body
+                    .get("errors")
+                    .and_then(|e| e.as_array())
+                    .and_then(|a| a.first())
+                    .and_then(|e| e.get("detail"))
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("Square API error");
                 Json(json!({ "ok": false, "error": errors }))
             }
         }
@@ -101,15 +127,18 @@ pub fn square_create_payment(
 // ── Square: Return redirect ─────────────────────────────
 
 #[get("/api/square/return?<order_id>")]
-pub fn square_return(
-    pool: &State<DbPool>,
-    order_id: i64,
-) -> rocket::response::Redirect {
+pub fn square_return(pool: &State<DbPool>, order_id: i64) -> rocket::response::Redirect {
     let settings: HashMap<String, String> = Setting::all(pool);
     let base = site_url(&settings);
     if let Some(order) = Order::find_by_id(pool, order_id) {
         if order.status == "pending" {
-            if let Ok(result) = finalize_order(pool, order_id, &order.provider_order_id, &order.buyer_email, "") {
+            if let Ok(result) = finalize_order(
+                pool,
+                order_id,
+                &order.provider_order_id,
+                &order.buyer_email,
+                "",
+            ) {
                 if let Some(token) = result.get("download_token").and_then(|t| t.as_str()) {
                     return rocket::response::Redirect::to(format!("/download/{}", token));
                 }
@@ -126,7 +155,12 @@ pub fn square_return(
 // ── Square: Webhook (payment confirmation) ──────────────
 
 /// Verify Square webhook signature: HMAC-SHA256(webhook_url + body) with signature key
-fn verify_square_signature(webhook_url: &str, payload: &[u8], signature: &str, signature_key: &str) -> bool {
+fn verify_square_signature(
+    webhook_url: &str,
+    payload: &[u8],
+    signature: &str,
+    signature_key: &str,
+) -> bool {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     type HmacSha256 = Hmac<Sha256>;
@@ -138,27 +172,26 @@ fn verify_square_signature(webhook_url: &str, payload: &[u8], signature: &str, s
     mac.update(webhook_url.as_bytes());
     mac.update(payload);
 
-    use base64::{Engine, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine};
     let expected = STANDARD.encode(mac.finalize().into_bytes());
     expected == signature
 }
 
 #[post("/api/square/webhook", data = "<body>")]
-pub fn square_webhook(
-    pool: &State<DbPool>,
-    sig: SquareSignature,
-    body: RawBody,
-) -> Status {
+pub fn square_webhook(pool: &State<DbPool>, sig: SquareSignature, body: RawBody) -> Status {
     let settings: HashMap<String, String> = Setting::all(pool);
-    let signature_key = settings.get("square_webhook_signature_key").cloned().unwrap_or_default();
+    let signature_key = settings
+        .get("square_webhook_signature_key")
+        .cloned()
+        .unwrap_or_default();
     let base = site_url(&settings);
     let webhook_url = format!("{}/api/square/webhook", base);
 
-    if !signature_key.is_empty() {
-        if !verify_square_signature(&webhook_url, &body.0, &sig.0, &signature_key) {
-            eprintln!("[square] Invalid webhook signature");
-            return Status::BadRequest;
-        }
+    if !signature_key.is_empty()
+        && !verify_square_signature(&webhook_url, &body.0, &sig.0, &signature_key)
+    {
+        eprintln!("[square] Invalid webhook signature");
+        return Status::BadRequest;
     }
 
     let event: Value = match serde_json::from_slice(&body.0) {
@@ -168,7 +201,11 @@ pub fn square_webhook(
 
     let event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("");
     if event_type == "payment.completed" {
-        let payment = match event.get("data").and_then(|d| d.get("object")).and_then(|o| o.get("payment")) {
+        let payment = match event
+            .get("data")
+            .and_then(|d| d.get("object"))
+            .and_then(|o| o.get("payment"))
+        {
             Some(p) => p,
             None => return Status::Ok,
         };
@@ -176,7 +213,10 @@ pub fn square_webhook(
         let note = payment.get("note").and_then(|n| n.as_str()).unwrap_or("");
         // note format: "Order #123"
         let order_id_str = note.strip_prefix("Order #").unwrap_or("");
-        let buyer_email = payment.get("buyer_email_address").and_then(|e| e.as_str()).unwrap_or("");
+        let buyer_email = payment
+            .get("buyer_email_address")
+            .and_then(|e| e.as_str())
+            .unwrap_or("");
         let sq_payment_id = payment.get("id").and_then(|i| i.as_str()).unwrap_or("");
 
         if let Ok(oid) = order_id_str.parse::<i64>() {

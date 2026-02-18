@@ -11,7 +11,10 @@ pub struct NoCacheTemplate(pub Template);
 impl<'r> Responder<'r, 'static> for NoCacheTemplate {
     fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
         let mut resp = self.0.respond_to(req)?;
-        resp.set_header(Header::new("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"));
+        resp.set_header(Header::new(
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate, max-age=0",
+        ));
         resp.set_header(Header::new("Pragma", "no-cache"));
         Ok(resp)
     }

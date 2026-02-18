@@ -3,12 +3,12 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
 
-use crate::security::auth::EditorUser;
+use super::admin_base;
 use crate::db::DbPool;
 use crate::models::comment::Comment;
 use crate::models::settings::Setting;
+use crate::security::auth::EditorUser;
 use crate::AdminSlug;
-use super::admin_base;
 
 // ── Comments ───────────────────────────────────────────
 
@@ -47,19 +47,34 @@ pub fn comments_list(
 }
 
 #[post("/comments/<id>/approve")]
-pub fn comment_approve(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn comment_approve(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    id: i64,
+) -> Redirect {
     let _ = Comment::update_status(pool, id, "approved");
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/spam")]
-pub fn comment_spam(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn comment_spam(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    id: i64,
+) -> Redirect {
     let _ = Comment::update_status(pool, id, "spam");
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/delete")]
-pub fn comment_delete(_admin: EditorUser, pool: &State<DbPool>, slug: &State<AdminSlug>, id: i64) -> Redirect {
+pub fn comment_delete(
+    _admin: EditorUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    id: i64,
+) -> Redirect {
     let _ = Comment::delete(pool, id);
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }

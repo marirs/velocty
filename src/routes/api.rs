@@ -3,12 +3,12 @@ use rocket::State;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::security::{self, auth};
 use crate::db::DbPool;
 use crate::models::comment::{Comment, CommentForm};
 use crate::models::portfolio::PortfolioItem;
 use crate::models::settings::Setting;
 use crate::rate_limit::RateLimiter;
+use crate::security::{self, auth};
 
 // ── Like / Unlike toggle ───────────────────────────────
 
@@ -19,11 +19,7 @@ pub struct LikeResponse {
 }
 
 #[post("/like/<id>", format = "json", data = "<body>")]
-pub fn like_toggle(
-    pool: &State<DbPool>,
-    id: i64,
-    body: Json<Value>,
-) -> Json<LikeResponse> {
+pub fn like_toggle(pool: &State<DbPool>, id: i64, body: Json<Value>) -> Json<LikeResponse> {
     let ip = body.get("ip").and_then(|v| v.as_str()).unwrap_or("unknown");
     let ip_hash = auth::hash_ip(ip);
 
@@ -65,10 +61,7 @@ pub fn like_toggle(
             rusqlite::params![id, ip_hash],
         );
         let count = PortfolioItem::increment_likes(pool, id).unwrap_or(0);
-        Json(LikeResponse {
-            liked: true,
-            count,
-        })
+        Json(LikeResponse { liked: true, count })
     }
 }
 
@@ -138,12 +131,16 @@ pub fn comment_submit(
     match ct {
         "post" => {
             if !Setting::get_bool(pool, "comments_on_blog") {
-                return Json(json!({"success": false, "error": "Comments are disabled for blog posts"}));
+                return Json(
+                    json!({"success": false, "error": "Comments are disabled for blog posts"}),
+                );
             }
         }
         "portfolio" => {
             if !Setting::get_bool(pool, "comments_on_portfolio") {
-                return Json(json!({"success": false, "error": "Comments are disabled for portfolio items"}));
+                return Json(
+                    json!({"success": false, "error": "Comments are disabled for portfolio items"}),
+                );
             }
         }
         _ => {}
@@ -153,10 +150,10 @@ pub fn comment_submit(
     if Setting::get_bool(pool, "comments_require_name") && form.author_name.trim().is_empty() {
         return Json(json!({"success": false, "error": "Name is required"}));
     }
-    if Setting::get_bool(pool, "comments_require_email") {
-        if form.author_email.as_deref().unwrap_or("").trim().is_empty() {
-            return Json(json!({"success": false, "error": "Email is required"}));
-        }
+    if Setting::get_bool(pool, "comments_require_email")
+        && form.author_email.as_deref().unwrap_or("").trim().is_empty()
+    {
+        return Json(json!({"success": false, "error": "Email is required"}));
     }
 
     // Rate limit by author email or name
@@ -176,7 +173,9 @@ pub fn comment_submit(
     // Captcha verification
     if let Some(ref token) = form.captcha_token {
         match security::verify_captcha(pool, token, form.ip.as_deref()) {
-            Ok(false) => return Json(json!({"success": false, "error": "Captcha verification failed"})),
+            Ok(false) => {
+                return Json(json!({"success": false, "error": "Captcha verification failed"}))
+            }
             Err(e) => log::warn!("Captcha error (allowing): {}", e),
             _ => {}
         }
@@ -187,8 +186,18 @@ pub fn comment_submit(
     // Spam detection
     let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
     let user_ip = form.ip.as_deref().unwrap_or("unknown");
-    match security::check_spam(pool, &site_url, user_ip, "", &form.body, Some(&form.author_name), form.author_email.as_deref()) {
-        Ok(true) => return Json(json!({"success": false, "error": "Your comment was flagged as spam"})),
+    match security::check_spam(
+        pool,
+        &site_url,
+        user_ip,
+        "",
+        &form.body,
+        Some(&form.author_name),
+        form.author_email.as_deref(),
+    ) {
+        Ok(true) => {
+            return Json(json!({"success": false, "error": "Your comment was flagged as spam"}))
+        }
         Err(e) => log::warn!("Spam check error (allowing): {}", e),
         _ => {}
     }

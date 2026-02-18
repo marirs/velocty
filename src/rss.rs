@@ -22,13 +22,16 @@ pub fn generate_feed(pool: &DbPool) -> String {
     let format_rfc2822 = |ndt: chrono::NaiveDateTime| -> String {
         let utc: DateTime<Utc> = DateTime::from_naive_utc_and_offset(ndt, Utc);
         if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
-            utc.with_timezone(&tz).format("%a, %d %b %Y %H:%M:%S %z").to_string()
+            utc.with_timezone(&tz)
+                .format("%a, %d %b %Y %H:%M:%S %z")
+                .to_string()
         } else {
             utc.format("%a, %d %b %Y %H:%M:%S +0000").to_string()
         }
     };
 
-    let last_build = posts.first()
+    let last_build = posts
+        .first()
         .and_then(|p| p.published_at)
         .map(|d| format!("    <lastBuildDate>{}</lastBuildDate>\n", format_rfc2822(d)))
         .unwrap_or_default();
@@ -50,10 +53,7 @@ pub fn generate_feed(pool: &DbPool) -> String {
     );
 
     for post in &posts {
-        let pub_date = post
-            .published_at
-            .map(|d| format_rfc2822(d))
-            .unwrap_or_default();
+        let pub_date = post.published_at.map(&format_rfc2822).unwrap_or_default();
 
         let excerpt = post.excerpt.as_deref().unwrap_or("");
 

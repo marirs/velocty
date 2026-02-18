@@ -1,20 +1,14 @@
-use std::collections::HashMap;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 use super::{AiError, AiRequest, AiResponse};
 
-pub fn call(
-    settings: &HashMap<String, String>,
-    req: &AiRequest,
-) -> Result<AiResponse, AiError> {
+pub fn call(settings: &HashMap<String, String>, req: &AiRequest) -> Result<AiResponse, AiError> {
     let base_url = settings
         .get("ai_ollama_url")
         .cloned()
         .unwrap_or_else(|| "http://localhost:11434".to_string());
-    let model = settings
-        .get("ai_ollama_model")
-        .cloned()
-        .unwrap_or_default();
+    let model = settings.get("ai_ollama_model").cloned().unwrap_or_default();
 
     if model.is_empty() {
         return Err(AiError("Ollama model not configured".into()));

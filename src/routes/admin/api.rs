@@ -2,13 +2,13 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde_json::Value;
 
-use crate::security::auth::EditorUser;
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
 use crate::models::portfolio::PortfolioItem;
 use crate::models::post::Post;
 use crate::models::settings::Setting;
 use crate::models::tag::Tag;
+use crate::security::auth::EditorUser;
 
 #[get("/stats/overview?<from>&<to>")]
 pub fn stats_overview(
@@ -112,11 +112,7 @@ pub fn stats_tags(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
 }
 
 #[post("/theme", data = "<body>")]
-pub fn set_theme(
-    _admin: EditorUser,
-    pool: &State<DbPool>,
-    body: Json<Value>,
-) -> Json<Value> {
+pub fn set_theme(_admin: EditorUser, pool: &State<DbPool>, body: Json<Value>) -> Json<Value> {
     let theme = body.get("theme").and_then(|v| v.as_str()).unwrap_or("dark");
     let theme = if theme == "light" { "light" } else { "dark" };
     let _ = Setting::set(pool, "admin_theme", theme);
@@ -190,7 +186,9 @@ fn seo_check_item(
     if exc.is_empty() {
         checks.push(serde_json::json!({"check": "Excerpt", "status": "warn", "message": "No excerpt set. Auto-generated excerpts may not be ideal."}));
     } else {
-        checks.push(serde_json::json!({"check": "Excerpt", "status": "pass", "message": "Excerpt is set."}));
+        checks.push(
+            serde_json::json!({"check": "Excerpt", "status": "pass", "message": "Excerpt is set."}),
+        );
         score += 1;
     }
 
@@ -225,7 +223,8 @@ fn seo_check_item(
 
     // 8. Image alt text in content (check for <img without alt)
     if html.contains("<img") {
-        let missing_alt = html.contains("alt=\"\"") || (html.contains("<img") && !html.contains("alt="));
+        let missing_alt =
+            html.contains("alt=\"\"") || (html.contains("<img") && !html.contains("alt="));
         if missing_alt {
             checks.push(serde_json::json!({"check": "Image Alt Text", "status": "warn", "message": "Some images may be missing alt text. Alt text improves accessibility and SEO."}));
         } else {
@@ -271,11 +270,7 @@ fn seo_check_item(
 }
 
 #[get("/seo-check/post/<id>")]
-pub fn seo_check_post(
-    _admin: EditorUser,
-    pool: &State<DbPool>,
-    id: i64,
-) -> Json<Value> {
+pub fn seo_check_post(_admin: EditorUser, pool: &State<DbPool>, id: i64) -> Json<Value> {
     let post = match Post::find_by_id(pool, id) {
         Some(p) => p,
         None => return Json(serde_json::json!({"error": "Post not found"})),
@@ -296,11 +291,7 @@ pub fn seo_check_post(
 }
 
 #[get("/seo-check/portfolio/<id>")]
-pub fn seo_check_portfolio(
-    _admin: EditorUser,
-    pool: &State<DbPool>,
-    id: i64,
-) -> Json<Value> {
+pub fn seo_check_portfolio(_admin: EditorUser, pool: &State<DbPool>, id: i64) -> Json<Value> {
     let item = match PortfolioItem::find_by_id(pool, id) {
         Some(i) => i,
         None => return Json(serde_json::json!({"error": "Portfolio item not found"})),

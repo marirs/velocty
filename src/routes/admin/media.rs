@@ -6,13 +6,13 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::{json, Value};
 
-use crate::security::auth::{AdminUser, AuthorUser, EditorUser};
+use super::admin_base;
+use super::save_upload;
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
 use crate::models::settings::Setting;
+use crate::security::auth::{AdminUser, AuthorUser, EditorUser};
 use crate::AdminSlug;
-use super::admin_base;
-use super::save_upload;
 
 // ── Media Library ───────────────────────────────────────
 
@@ -47,8 +47,16 @@ pub fn media_library(
             if !path.is_file() {
                 continue;
             }
-            let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-            let ext = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
+            let name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            let ext = path
+                .extension()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
             let meta = std::fs::metadata(&path).ok();
             let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
             let modified = meta
@@ -59,14 +67,30 @@ pub fn media_library(
                     dt.format("%Y-%m-%d %H:%M").to_string()
                 })
                 .unwrap_or_default();
-            let is_image = matches!(ext.as_str(), "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico" | "heic" | "heif");
+            let is_image = matches!(
+                ext.as_str(),
+                "jpg"
+                    | "jpeg"
+                    | "png"
+                    | "gif"
+                    | "webp"
+                    | "svg"
+                    | "bmp"
+                    | "tiff"
+                    | "ico"
+                    | "heic"
+                    | "heif"
+            );
             let media_type = match ext.as_str() {
-                "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico" | "heic" | "heif" => "image",
+                "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico"
+                | "heic" | "heif" => "image",
                 "mp4" | "webm" | "mov" | "avi" | "mkv" | "ogv" => "video",
                 "mp3" | "wav" | "ogg" | "flac" | "aac" | "m4a" => "audio",
-                "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "csv" | "rtf" | "md" => "document",
+                "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "csv"
+                | "rtf" | "md" => "document",
                 _ => "other",
-            }.to_string();
+            }
+            .to_string();
             let size_human = if size >= 1_048_576 {
                 format!("{:.1} MB", size as f64 / 1_048_576.0)
             } else if size >= 1024 {
@@ -137,7 +161,17 @@ pub fn media_delete(
     let path = std::path::Path::new("website/site/uploads").join(filename);
     if path.is_file() {
         let _ = std::fs::remove_file(&path);
-        AuditEntry::log(pool, Some(_admin.user.id), Some(&_admin.user.display_name), "delete", Some("media"), None, Some(filename), None, None);
+        AuditEntry::log(
+            pool,
+            Some(_admin.user.id),
+            Some(&_admin.user.display_name),
+            "delete",
+            Some("media"),
+            None,
+            Some(filename),
+            None,
+            None,
+        );
     }
     Redirect::to(format!("{}/media", admin_base(slug)))
 }
@@ -150,10 +184,7 @@ pub struct ImageUploadForm<'f> {
 }
 
 #[post("/upload/image", data = "<form>")]
-pub async fn upload_image(
-    _admin: AuthorUser,
-    mut form: Form<ImageUploadForm<'_>>,
-) -> Json<Value> {
+pub async fn upload_image(_admin: AuthorUser, mut form: Form<ImageUploadForm<'_>>) -> Json<Value> {
     match save_upload(&mut form.file, "editor").await {
         Some(filename) => Json(json!({ "location": format!("/uploads/{}", filename) })),
         None => Json(json!({ "error": "Upload failed" })),
@@ -179,16 +210,29 @@ pub async fn upload_font(
         return Json(json!({ "error": "Font name is required" }));
     }
 
-    let raw_name = form.file.raw_name()
+    let raw_name = form
+        .file
+        .raw_name()
         .map(|n| n.dangerous_unsafe_unsanitized_raw().to_string())
         .unwrap_or_default();
-    let ext = raw_name.rsplit('.').next().unwrap_or("woff2").to_lowercase();
+    let ext = raw_name
+        .rsplit('.')
+        .next()
+        .unwrap_or("woff2")
+        .to_lowercase();
     let valid_exts = ["woff2", "woff", "ttf", "otf"];
     if !valid_exts.contains(&ext.as_str()) {
-        return Json(json!({ "error": "Invalid font file type. Use .woff2, .woff, .ttf, or .otf" }));
+        return Json(
+            json!({ "error": "Invalid font file type. Use .woff2, .woff, .ttf, or .otf" }),
+        );
     }
 
-    let filename = format!("{}_{}.{}", font_name.to_lowercase().replace(' ', "-"), uuid::Uuid::new_v4(), ext);
+    let filename = format!(
+        "{}_{}.{}",
+        font_name.to_lowercase().replace(' ', "-"),
+        uuid::Uuid::new_v4(),
+        ext
+    );
     let fonts_dir = std::path::Path::new("website/site/uploads/fonts");
     let _ = std::fs::create_dir_all(fonts_dir);
     let dest = fonts_dir.join(&filename);

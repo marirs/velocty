@@ -17,7 +17,9 @@ use crate::db::DbPool;
 pub struct RegistryPool(pub DbPool);
 
 impl RegistryPool {
-    pub fn get(&self) -> Result<r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>, r2d2::Error> {
+    pub fn get(
+        &self,
+    ) -> Result<r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>, r2d2::Error> {
         self.0.get()
     }
 }
@@ -100,7 +102,11 @@ pub fn init_registry() -> Result<RegistryPool, String> {
 /// Detect a single-site installation at `website/site/` and migrate it
 /// into the multi-site `website/sites/<uuid>/` layout, registering it
 /// in the central registry with the given hostname.
-pub fn migrate_single_to_multi(registry: &RegistryPool, hostname: &str, display_name: &str) -> Result<(), String> {
+pub fn migrate_single_to_multi(
+    registry: &RegistryPool,
+    hostname: &str,
+    display_name: &str,
+) -> Result<(), String> {
     use std::fs;
     use std::path::Path;
 
@@ -121,9 +127,8 @@ pub fn migrate_single_to_multi(registry: &RegistryPool, hostname: &str, display_
 
     // Move the entire website/site/ directory to website/sites/<uuid>/
     fs::create_dir_all("website/sites").map_err(|e| e.to_string())?;
-    fs::rename("website/site", &dest).map_err(|e| {
-        format!("Failed to move website/site → {}: {}", dest, e)
-    })?;
+    fs::rename("website/site", &dest)
+        .map_err(|e| format!("Failed to move website/site → {}: {}", dest, e))?;
 
     // Register in the central registry
     let conn = registry.get().map_err(|e| e.to_string())?;
@@ -133,7 +138,11 @@ pub fn migrate_single_to_multi(registry: &RegistryPool, hostname: &str, display_
     )
     .map_err(|e| e.to_string())?;
 
-    log::info!("Single-site migrated to multi-site as '{}' (slug: {})", hostname, slug);
+    log::info!(
+        "Single-site migrated to multi-site as '{}' (slug: {})",
+        hostname,
+        slug
+    );
     Ok(())
 }
 
@@ -212,21 +221,17 @@ pub fn find_site_by_hostname(pool: &RegistryPool, hostname: &str) -> Option<Site
 
 pub fn find_site_by_id(pool: &RegistryPool, id: i64) -> Option<Site> {
     let conn = pool.get().ok()?;
-    conn.query_row(
-        "SELECT * FROM sites WHERE id = ?1",
-        params![id],
-        |row| {
-            Ok(Site {
-                id: row.get("id")?,
-                slug: row.get("slug")?,
-                hostname: row.get("hostname")?,
-                display_name: row.get("display_name")?,
-                status: row.get("status")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-            })
-        },
-    )
+    conn.query_row("SELECT * FROM sites WHERE id = ?1", params![id], |row| {
+        Ok(Site {
+            id: row.get("id")?,
+            slug: row.get("slug")?,
+            hostname: row.get("hostname")?,
+            display_name: row.get("display_name")?,
+            status: row.get("status")?,
+            created_at: row.get("created_at")?,
+            updated_at: row.get("updated_at")?,
+        })
+    })
     .ok()
 }
 
@@ -372,8 +377,11 @@ pub fn validate_super_session(pool: &RegistryPool, token: &str) -> bool {
 
 pub fn destroy_super_session(pool: &RegistryPool, token: &str) -> Result<(), String> {
     let conn = pool.get().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM super_sessions WHERE token = ?1", params![token])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM super_sessions WHERE token = ?1",
+        params![token],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 

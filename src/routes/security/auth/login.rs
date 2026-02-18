@@ -6,13 +6,13 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::security::{self, auth, mfa};
 use crate::db::DbPool;
 use crate::models::audit::AuditEntry;
 use crate::models::firewall::{FwBan, FwEvent};
 use crate::models::settings::Setting;
 use crate::models::user::User;
 use crate::rate_limit::RateLimiter;
+use crate::security::{self, auth, mfa};
 use crate::AdminSlug;
 
 #[derive(Debug, FromForm, Deserialize)]
@@ -28,7 +28,11 @@ pub fn needs_setup(pool: &DbPool) -> bool {
 }
 
 #[get("/login?<reset>")]
-pub fn login_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, reset: Option<&str>) -> Result<Template, Redirect> {
+pub fn login_page(
+    pool: &State<DbPool>,
+    admin_slug: &State<AdminSlug>,
+    reset: Option<&str>,
+) -> Result<Template, Redirect> {
     if needs_setup(pool) {
         return Err(Redirect::to(format!("/{}/setup", admin_slug.0)));
     }
@@ -37,7 +41,10 @@ pub fn login_page(pool: &State<DbPool>, admin_slug: &State<AdminSlug>, reset: Op
         return Err(Redirect::to(format!("/{}/magic-link", admin_slug.0)));
     }
     let mut context: HashMap<String, String> = HashMap::new();
-    context.insert("admin_theme".to_string(), Setting::get_or(pool, "admin_theme", "dark"));
+    context.insert(
+        "admin_theme".to_string(),
+        Setting::get_or(pool, "admin_theme", "dark"),
+    );
     context.insert("admin_slug".to_string(), admin_slug.0.clone());
     if reset == Some("success") {
         context.insert("reset_success".to_string(), "true".to_string());
@@ -72,14 +79,24 @@ pub fn login_submit(
 
     // Check rate limit before processing
     if !limiter.check_and_record(&rate_key, max_attempts, window) {
-        return Err(make_err("Too many login attempts. Please try again in 15 minutes.", &theme, pool, &admin_slug.0));
+        return Err(make_err(
+            "Too many login attempts. Please try again in 15 minutes.",
+            &theme,
+            pool,
+            &admin_slug.0,
+        ));
     }
 
     // Verify login captcha
     let captcha_token = form.captcha_token.as_deref().unwrap_or("");
     match security::verify_login_captcha(pool, captcha_token, None) {
         Ok(false) => {
-            return Err(make_err("Captcha verification failed. Please try again.", &theme, pool, &admin_slug.0));
+            return Err(make_err(
+                "Captcha verification failed. Please try again.",
+                &theme,
+                pool,
+                &admin_slug.0,
+            ));
         }
         Err(e) => log::warn!("Login captcha error (allowing): {}", e),
         _ => {}
@@ -93,10 +110,26 @@ pub fn login_submit(
             if Setting::get_or(pool, "firewall_enabled", "false") == "true"
                 && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
             {
-                FwEvent::log(pool, ip, "failed_login", Some(&format!("Unknown user: {}", form.email)), None, None, Some("login"));
+                FwEvent::log(
+                    pool,
+                    ip,
+                    "failed_login",
+                    Some(&format!("Unknown user: {}", form.email)),
+                    None,
+                    None,
+                    Some("login"),
+                );
                 if Setting::get_or(pool, "fw_ban_unknown_users", "false") == "true" {
                     let dur = Setting::get_or(pool, "fw_unknown_user_ban_duration", "24h");
-                    let _ = FwBan::create_with_duration(pool, ip, "unknown_user", Some(&format!("Login attempt with unknown user: {}", form.email)), &dur, None, None);
+                    let _ = FwBan::create_with_duration(
+                        pool,
+                        ip,
+                        "unknown_user",
+                        Some(&format!("Login attempt with unknown user: {}", form.email)),
+                        &dur,
+                        None,
+                        None,
+                    );
                 }
             }
             return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));
@@ -105,12 +138,22 @@ pub fn login_submit(
 
     // Check account status
     if !user.is_active() {
-        return Err(make_err("This account is suspended or locked. Contact an administrator.", &theme, pool, &admin_slug.0));
+        return Err(make_err(
+            "This account is suspended or locked. Contact an administrator.",
+            &theme,
+            pool,
+            &admin_slug.0,
+        ));
     }
 
     // Check role — subscribers cannot log into admin
     if user.role == "subscriber" {
-        return Err(make_err("Your account does not have admin panel access.", &theme, pool, &admin_slug.0));
+        return Err(make_err(
+            "Your account does not have admin panel access.",
+            &theme,
+            pool,
+            &admin_slug.0,
+        ));
     }
 
     // Verify password
@@ -119,16 +162,43 @@ pub fn login_submit(
         if Setting::get_or(pool, "firewall_enabled", "false") == "true"
             && Setting::get_or(pool, "fw_failed_login_tracking", "true") == "true"
         {
-            FwEvent::log(pool, ip, "failed_login", Some("Wrong password"), None, None, Some("login"));
+            FwEvent::log(
+                pool,
+                ip,
+                "failed_login",
+                Some("Wrong password"),
+                None,
+                None,
+                Some("login"),
+            );
             let threshold: i64 = Setting::get_or(pool, "fw_failed_login_ban_threshold", "5")
-                .parse().unwrap_or(5);
+                .parse()
+                .unwrap_or(5);
             let count = FwEvent::count_for_ip_since(pool, ip, "failed_login", 15);
             if count >= threshold {
                 let dur = Setting::get_or(pool, "fw_failed_login_ban_duration", "1h");
-                let _ = FwBan::create_with_duration(pool, ip, "failed_login", Some("Too many failed login attempts"), &dur, None, None);
+                let _ = FwBan::create_with_duration(
+                    pool,
+                    ip,
+                    "failed_login",
+                    Some("Too many failed login attempts"),
+                    &dur,
+                    None,
+                    None,
+                );
             }
         }
-        AuditEntry::log(pool, Some(user.id), Some(&user.display_name), "login_failed", Some("user"), Some(user.id), Some(&user.email), Some("Wrong password"), Some(ip));
+        AuditEntry::log(
+            pool,
+            Some(user.id),
+            Some(&user.display_name),
+            "login_failed",
+            Some("user"),
+            Some(user.id),
+            Some(&user.email),
+            Some("Wrong password"),
+            Some(ip),
+        );
         return Err(make_err("Invalid credentials", &theme, pool, &admin_slug.0));
     }
 
@@ -145,10 +215,25 @@ pub fn login_submit(
     match auth::create_session(pool, user.id, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
-            AuditEntry::log(pool, Some(user.id), Some(&user.display_name), "login", Some("user"), Some(user.id), Some(&user.email), None, Some(ip));
+            AuditEntry::log(
+                pool,
+                Some(user.id),
+                Some(&user.display_name),
+                "login",
+                Some("user"),
+                Some(user.id),
+                Some(&user.email),
+                None,
+                Some(ip),
+            );
             Ok(Redirect::to(format!("/{}", admin_slug.0)))
         }
-        Err(_) => Err(make_err("Session creation failed", &theme, pool, &admin_slug.0)),
+        Err(_) => Err(make_err(
+            "Session creation failed",
+            &theme,
+            pool,
+            &admin_slug.0,
+        )),
     }
 }
 

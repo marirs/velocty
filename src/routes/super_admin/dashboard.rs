@@ -6,8 +6,8 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use std::collections::HashMap;
 
-use crate::site::{self, RegistryPool};
 use super::auth::is_super_authenticated;
+use crate::site::{self, RegistryPool};
 
 // ── Dashboard ────────────────────────────────────────────────
 
@@ -22,7 +22,10 @@ pub fn dashboard(
 
     let sites = site::list_sites(registry);
     let mut ctx = HashMap::new();
-    ctx.insert("sites".to_string(), serde_json::to_value(&sites).unwrap_or_default());
+    ctx.insert(
+        "sites".to_string(),
+        serde_json::to_value(&sites).unwrap_or_default(),
+    );
     Ok(Template::render("super/dashboard", &ctx))
 }
 

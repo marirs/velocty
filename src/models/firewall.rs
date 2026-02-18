@@ -98,7 +98,15 @@ impl FwBan {
         user_agent: Option<&str>,
     ) -> Result<i64, String> {
         let expires = duration_to_expiry(duration);
-        Self::create(pool, ip, reason, detail, expires.as_deref(), country, user_agent)
+        Self::create(
+            pool,
+            ip,
+            reason,
+            detail,
+            expires.as_deref(),
+            country,
+            user_agent,
+        )
     }
 
     /// Unban an IP (deactivate all active bans)
@@ -114,11 +122,8 @@ impl FwBan {
     /// Unban by ID
     pub fn unban_by_id(pool: &DbPool, id: i64) -> Result<usize, String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
-        conn.execute(
-            "UPDATE fw_bans SET active = 0 WHERE id = ?1",
-            params![id],
-        )
-        .map_err(|e| e.to_string())
+        conn.execute("UPDATE fw_bans SET active = 0 WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())
     }
 
     /// List active bans
@@ -161,9 +166,9 @@ impl FwBan {
             Ok(c) => c,
             Err(_) => return vec![],
         };
-        let mut stmt = match conn.prepare(
-            "SELECT * FROM fw_bans ORDER BY banned_at DESC LIMIT ?1 OFFSET ?2",
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT * FROM fw_bans ORDER BY banned_at DESC LIMIT ?1 OFFSET ?2")
+        {
             Ok(s) => s,
             Err(_) => return vec![],
         };
@@ -225,7 +230,12 @@ impl FwEvent {
     }
 
     /// Recent events with optional type filter
-    pub fn recent(pool: &DbPool, event_type: Option<&str>, limit: i64, offset: i64) -> Vec<FwEvent> {
+    pub fn recent(
+        pool: &DbPool,
+        event_type: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Vec<FwEvent> {
         let conn = match pool.get() {
             Ok(c) => c,
             Err(_) => return vec![],
@@ -241,9 +251,9 @@ impl FwEvent {
                 .map(|rows| rows.filter_map(|r| r.ok()).collect())
                 .unwrap_or_default()
         } else {
-            let mut stmt = match conn.prepare(
-                "SELECT * FROM fw_events ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
-            ) {
+            let mut stmt = match conn
+                .prepare("SELECT * FROM fw_events ORDER BY created_at DESC LIMIT ?1 OFFSET ?2")
+            {
                 Ok(s) => s,
                 Err(_) => return vec![],
             };
@@ -260,12 +270,16 @@ impl FwEvent {
             Err(_) => return 0,
         };
         match event_type {
-            Some(et) => conn.query_row(
-                "SELECT COUNT(*) FROM fw_events WHERE event_type = ?1",
-                params![et],
-                |row| row.get(0),
-            ).unwrap_or(0),
-            None => conn.query_row("SELECT COUNT(*) FROM fw_events", [], |row| row.get(0)).unwrap_or(0),
+            Some(et) => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM fw_events WHERE event_type = ?1",
+                    params![et],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+            None => conn
+                .query_row("SELECT COUNT(*) FROM fw_events", [], |row| row.get(0))
+                .unwrap_or(0),
         }
     }
 

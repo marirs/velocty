@@ -33,7 +33,11 @@ impl SettingsCache {
     }
 
     pub fn all(&self) -> HashMap<String, String> {
-        self.inner.read().ok().map(|r| r.clone()).unwrap_or_default()
+        self.inner
+            .read()
+            .ok()
+            .map(|r| r.clone())
+            .unwrap_or_default()
     }
 }
 
