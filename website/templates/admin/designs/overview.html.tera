@@ -608,7 +608,7 @@
                     {% if settings.portfolio_enabled == "true" %}
                     <div class="cz-field">
                         <label>Portfolio Label</label>
-                        <input type="text" name="portfolio_label" value="{{ settings.portfolio_label | default(value='experiences') }}" data-setting="portfolio_label">
+                        <input type="text" name="portfolio_label" value="{{ settings.portfolio_label | default(value='experiences') }}" data-setting="portfolio_label" required>
                     </div>
                     <div class="cz-field">
                         <label>Portfolio Category Filters</label>
@@ -630,13 +630,13 @@
                     {% endif %}
                     {% if settings.journal_enabled != "false" %}
                     <div class="cz-field">
-                        <label>Blog Label</label>
-                        <input type="text" name="blog_label" value="{{ settings.blog_label | default(value='journal') }}" data-setting="blog_label">
+                        <label>Journal Label</label>
+                        <input type="text" name="blog_label" value="{{ settings.blog_label | default(value='journal') }}" data-setting="blog_label" required>
                     </div>
                     {% endif %}
                     <div class="cz-field">
                         <label>Contact Label</label>
-                        <input type="text" name="contact_label" value="{{ settings.contact_label | default(value='contact') }}" data-setting="contact_label">
+                        <input type="text" name="contact_label" value="{{ settings.contact_label | default(value='contact') }}" data-setting="contact_label" required>
                     </div>
                 </div>
             </div>
@@ -1070,6 +1070,20 @@ document.addEventListener('keydown', function(e) {
 
 // ── Save ──
 function saveCustomizer() {
+    var required = document.querySelectorAll('[data-setting][required]');
+    for (var i = 0; i < required.length; i++) {
+        if (!required[i].value.trim()) {
+            required[i].focus();
+            var section = required[i].closest('.cz-section');
+            if (section && !section.classList.contains('open')) {
+                document.querySelectorAll('.cz-section.open').forEach(function(s) { s.classList.remove('open'); });
+                section.classList.add('open');
+            }
+            required[i].style.borderColor = 'var(--danger)';
+            setTimeout(function(el){ el.style.borderColor = ''; }.bind(null, required[i]), 3000);
+            return;
+        }
+    }
     var fields = document.querySelectorAll('[data-setting]');
     var formData = new FormData();
     fields.forEach(function(f) {
