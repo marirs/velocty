@@ -47,15 +47,6 @@
         </div>
     </div>
 
-    <div class="form-card">
-        <h3>License</h3>
-        <div class="form-group">
-            <label for="paypal_license_text">License Agreement Text</label>
-            <textarea id="paypal_license_text" name="paypal_license_text" rows="8" placeholder="Enter the license agreement text that buyers must agree to before purchasing...">{{ settings.paypal_license_text | default(value='') }}</textarea>
-            <span class="form-help">This text is shown to buyers during checkout and included in download emails.</span>
-        </div>
-    </div>
-
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}

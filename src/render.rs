@@ -270,15 +270,19 @@ fn render_with_shell(
     let lb_show_tags = sg("portfolio_lightbox_show_tags", "true");
     let lb_nav = sg("portfolio_lightbox_nav", "true");
     let lb_keyboard = sg("portfolio_lightbox_keyboard", "true");
+    let lb_buy = sg("commerce_lightbox_buy", "true");
+    let lb_buy_pos = sg("commerce_lightbox_buy_position", "bottom");
+    let commerce_cur = sg("commerce_currency", "USD");
 
     let data_attrs = format!(
-        "data-click-mode=\"{click_mode}\" data-show-likes=\"{show_likes}\" data-show-categories=\"{show_cats}\" data-show-tags=\"{show_tags}\" data-fade-animation=\"{fade_anim}\" data-display-type=\"{display_type}\" data-pagination-type=\"{pagination_type}\" data-lb-show-title=\"{lb_show_title}\" data-lb-show-tags=\"{lb_show_tags}\" data-lb-nav=\"{lb_nav}\" data-lb-keyboard=\"{lb_keyboard}\" data-share-position=\"{share_pos}\" data-site-url=\"{site_url}\"",
+        "data-click-mode=\"{click_mode}\" data-show-likes=\"{show_likes}\" data-show-categories=\"{show_cats}\" data-show-tags=\"{show_tags}\" data-fade-animation=\"{fade_anim}\" data-display-type=\"{display_type}\" data-pagination-type=\"{pagination_type}\" data-lb-show-title=\"{lb_show_title}\" data-lb-show-tags=\"{lb_show_tags}\" data-lb-nav=\"{lb_nav}\" data-lb-keyboard=\"{lb_keyboard}\" data-share-position=\"{share_pos}\" data-site-url=\"{site_url}\" data-lb-buy=\"{lb_buy}\" data-lb-buy-position=\"{lb_buy_pos}\" data-commerce-currency=\"{commerce_cur}\"",
         click_mode = click_mode, show_likes = show_likes, show_cats = show_cats,
         show_tags = show_tags, fade_anim = fade_anim, display_type = display_type,
         pagination_type = pagination_type, lb_show_title = lb_show_title,
         lb_show_tags = lb_show_tags, lb_nav = lb_nav, lb_keyboard = lb_keyboard,
         share_pos = sg("share_icons_position", "below_content"),
         site_url = sg("site_url", ""),
+        lb_buy = lb_buy, lb_buy_pos = lb_buy_pos, commerce_cur = commerce_cur,
     );
 
     let image_protection_js = if sg("portfolio_image_protection", "false") == "true" {
@@ -1596,6 +1600,12 @@ fn render_portfolio_grid(context: &Value) -> String {
     };
     let border_style = sg("portfolio_border_style", "none");
     let show_title = sg("portfolio_show_title", "false") == "true";
+    let show_price = sg("commerce_show_price", "true") == "true";
+    let price_position = sg("commerce_price_position", "top_right");
+    let commerce_currency = {
+        let c = sg("commerce_currency", "USD");
+        if c.is_empty() { "USD".to_string() } else { c }
+    };
 
     let grid_class = if display_type == "grid" {
         "css-grid"
@@ -1647,6 +1657,11 @@ fn render_portfolio_grid(context: &Value) -> String {
             .unwrap_or("");
         let likes = item.get("likes").and_then(|v| v.as_i64()).unwrap_or(0);
         let item_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let item_price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let item_sell = item
+            .get("sell_enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         let cats_data = entry
             .get("categories")
@@ -1735,10 +1750,28 @@ fn render_portfolio_grid(context: &Value) -> String {
         };
 
         let item_url = slug_url(&portfolio_slug, slug);
+        // Price badge HTML (overlay positions: inside the <a> tag)
+        let price_badge_overlay = if show_price && item_sell && item_price > 0.0
+            && price_position != "below_title"
+        {
+            let pos_style = match price_position.as_str() {
+                "top_left" => "position:absolute;top:8px;left:8px",
+                "bottom_left" => "position:absolute;bottom:8px;left:8px",
+                _ => "position:absolute;top:8px;right:8px", // top_right default
+            };
+            format!(
+                r#"<span class="price-badge" style="{};background:rgba(0,0,0,.75);color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:700;z-index:2">{} {:.2}</span>"#,
+                pos_style, html_escape(&commerce_currency), item_price
+            )
+        } else {
+            String::new()
+        };
+
         html.push_str(&format!(
-            r#"<div class="{item_class}" data-categories="{cats_data}">
-    <a href="{item_url}" class="portfolio-link" data-id="{item_id}" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}">
+            r#"<div class="{item_class}" data-categories="{cats_data}" data-price="{price}" data-sell="{sell}">
+    <a href="{item_url}" class="portfolio-link" data-id="{item_id}" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}" style="position:relative;display:block">
         <img src="/uploads/{image}" alt="{title}" loading="lazy">
+        {price_badge}
     </a>"#,
             item_class = item_class_str,
             cats_data = cats_data,
@@ -1748,6 +1781,9 @@ fn render_portfolio_grid(context: &Value) -> String {
             image = image,
             likes = likes,
             tag_data = html_escape(&tag_data),
+            price = item_price,
+            sell = item_sell,
+            price_badge = price_badge_overlay,
         ));
 
         // Hover overlay: shared container with dimmed background, centered content
@@ -1802,6 +1838,14 @@ fn render_portfolio_grid(context: &Value) -> String {
             html.push_str(&format!(
                 r#"<div class="item-title">{}</div>"#,
                 html_escape(title)
+            ));
+        }
+
+        // Price badge: below_title position
+        if show_price && item_sell && item_price > 0.0 && price_position == "below_title" {
+            html.push_str(&format!(
+                r#"<div class="price-badge-below" style="font-size:13px;font-weight:700;color:#333;padding:4px 0">{} {:.2}</div>"#,
+                html_escape(&commerce_currency), item_price
             ));
         }
 
@@ -1926,21 +1970,59 @@ fn render_portfolio_single(context: &Value) -> String {
         String::new()
     };
 
-    let mut html = format!(
-        r#"<article class="portfolio-single">
-    <div class="portfolio-image">
+    // Pre-build commerce HTML so we can place it at the right position
+    let commerce_enabled = context
+        .get("commerce_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let commerce_html = if commerce_enabled {
+        let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let purchase_note = item
+            .get("purchase_note")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let payment_provider = item
+            .get("payment_provider")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        build_commerce_html(price, purchase_note, item_id, &settings, payment_provider)
+    } else {
+        String::new()
+    };
+    let commerce_pos = sg("commerce_button_position", "below_description");
+    let is_sidebar_commerce = commerce_pos == "sidebar_right" && !commerce_html.is_empty();
+
+    let mut html = String::from(r#"<article class="portfolio-single">"#);
+
+    // Sidebar layout: wrap image+content in a flex row with commerce on the right
+    if is_sidebar_commerce {
+        html.push_str(r#"<div class="portfolio-single-row" style="display:flex;gap:32px;align-items:flex-start">"#);
+        html.push_str(r#"<div class="portfolio-single-main" style="flex:1;min-width:0">"#);
+    }
+
+    html.push_str(&format!(
+        r#"<div class="portfolio-image">
         <img src="/uploads/{image}" alt="{title}">
     </div>
-    {share_below_image}
-    <div class="portfolio-meta">
+    {share_below_image}"#,
+        image = image,
+        title = html_escape(title),
+        share_below_image = share_below_image,
+    ));
+
+    // Commerce: below_image position
+    if commerce_pos == "below_image" && !commerce_html.is_empty() {
+        html.push_str(&commerce_html);
+    }
+
+    html.push_str(&format!(
+        r#"<div class="portfolio-meta">
         <h1>{title}</h1>
         {like_html}
     </div>"#,
-        image = image,
         title = html_escape(title),
         like_html = like_html,
-        share_below_image = share_below_image,
-    );
+    ));
 
     if show_cats {
         if let Some(cats) = categories {
@@ -1994,29 +2076,18 @@ fn render_portfolio_single(context: &Value) -> String {
         html.push_str(&build_share_buttons(&settings, &page_url, title));
     }
 
-    // Commerce: Buy / Download section
-    let commerce_enabled = context
-        .get("commerce_enabled")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    if commerce_enabled {
-        let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let purchase_note = item
-            .get("purchase_note")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let payment_provider = item
-            .get("payment_provider")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+    // Commerce: below_description position (default)
+    if commerce_pos == "below_description" && !commerce_html.is_empty() {
+        html.push_str(&commerce_html);
+    }
 
-        html.push_str(&build_commerce_html(
-            price,
-            purchase_note,
-            item_id,
-            &settings,
-            payment_provider,
-        ));
+    // Close sidebar layout main column and add commerce sidebar
+    if is_sidebar_commerce {
+        html.push_str("</div>"); // end portfolio-single-main
+        html.push_str(r#"<div class="portfolio-single-sidebar" style="width:340px;flex-shrink:0">"#);
+        html.push_str(&commerce_html);
+        html.push_str("</div>"); // end portfolio-single-sidebar
+        html.push_str("</div>"); // end portfolio-single-row
     }
 
     // Comments on portfolio (gated on comments_enabled flag from route)
@@ -2608,34 +2679,42 @@ const LIGHTBOX_JS: &str = r#"
     const sharePos = b.sharePosition || 'below_content';
     const siteUrl = b.siteUrl || '';
     const showLbShare = sharePos === 'below_image' && siteUrl;
+    const lbBuy = b.lbBuy !== 'false';
+    const lbBuyPos = b.lbBuyPosition || 'bottom';
+    const commerceCur = b.commerceCurrency || 'USD';
 
     // Lightbox setup — only when click mode is lightbox
     if (mode === 'lightbox') {
 
     const links = document.querySelectorAll('.portfolio-link');
-    let overlay, img, titleEl, tagsEl, likesEl, shareEl, closeBtn, prevBtn, nextBtn;
+    let overlay, img, titleEl, tagsEl, likesEl, shareEl, buyEl, closeBtn, prevBtn, nextBtn;
     let currentIndex = 0;
     const items = Array.from(links);
 
     function createOverlay() {
         overlay = document.createElement('div');
         overlay.className = 'lightbox-overlay';
+        var buyHtml = lbBuy ? '<div class="lb-buy" style="margin-top:8px"></div>' : '';
+        var contentClass = lbBuyPos === 'sidebar' && lbBuy ? 'lb-content lb-content-sidebar' : 'lb-content';
         overlay.innerHTML =
             '<button class="lb-close">&times;</button>' +
             (showNav ? '<button class="lb-prev">&lsaquo;</button><button class="lb-next">&rsaquo;</button>' : '') +
-            '<div class="lb-content">' +
+            '<div class="' + contentClass + '">' +
                 '<img class="lb-image" src="" alt="">' +
                 (showLbShare ? '<div class="lb-share"></div>' : '') +
                 (showTitle ? '<div class="lb-title"></div>' : '') +
                 (showTags ? '<div class="lb-tags"></div>' : '') +
                 (showLikes ? '<div class="lb-likes" style="color:#fff;font-size:14px;margin-top:4px;cursor:pointer;user-select:none"></div>' : '') +
-            '</div>';
+                (lbBuyPos === 'bottom' ? buyHtml : '') +
+            '</div>' +
+            (lbBuyPos === 'sidebar' ? '<div class="lb-sidebar">' + buyHtml + '</div>' : '');
         document.body.appendChild(overlay);
         img = overlay.querySelector('.lb-image');
         titleEl = overlay.querySelector('.lb-title');
         tagsEl = overlay.querySelector('.lb-tags');
         likesEl = overlay.querySelector('.lb-likes');
         shareEl = overlay.querySelector('.lb-share');
+        buyEl = overlay.querySelector('.lb-buy');
         closeBtn = overlay.querySelector('.lb-close');
         prevBtn = overlay.querySelector('.lb-prev');
         nextBtn = overlay.querySelector('.lb-next');
@@ -2681,6 +2760,18 @@ const LIGHTBOX_JS: &str = r#"
                     if (d.liked) likesEl.classList.add('liked');
                     else likesEl.classList.remove('liked');
                 }).catch(function(){});
+            }
+        }
+        if (buyEl) {
+            var gridItem = link.closest('.grid-item');
+            var sell = gridItem ? gridItem.dataset.sell : 'false';
+            var price = gridItem ? parseFloat(gridItem.dataset.price || '0') : 0;
+            if (sell === 'true' && price > 0) {
+                buyEl.innerHTML = '<a href="' + link.href + '" class="lb-buy-btn" style="display:inline-block;padding:10px 20px;background:#E8913A;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">' + commerceCur + ' ' + price.toFixed(2) + ' &mdash; Buy</a>';
+                buyEl.style.display = '';
+            } else {
+                buyEl.innerHTML = '';
+                buyEl.style.display = 'none';
             }
         }
         if (shareEl) {
@@ -2945,6 +3036,13 @@ h6 { font-size: var(--font-size-h6); }
 .lb-prev:hover, .lb-next:hover { opacity: 1; }
 .lb-prev { left: 8px; }
 .lb-next { right: 8px; }
+
+/* Lightbox buy button */
+.lb-buy { text-align: center; }
+.lb-buy-btn { transition: opacity .2s; }
+.lb-buy-btn:hover { opacity: .85; }
+.lb-sidebar { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); width: 200px; text-align: center; }
+.lb-content-sidebar { max-width: 65vw; }
 
 /* ── Share Icons ── */
 .share-icons {
@@ -4124,10 +4222,49 @@ fn build_commerce_html(
         return String::new();
     }
 
-    let btn_style = "display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:center";
+    // Designer settings
+    let btn_alignment = {
+        let a = gs("commerce_button_alignment");
+        if a.is_empty() { "full_width" } else { a }
+    };
+    let btn_radius = {
+        let r = gs("commerce_button_radius");
+        match r {
+            "square" => "0",
+            "pill" => "999px",
+            _ => "8px", // "rounded" default
+        }
+    };
+    let custom_color = gs("commerce_button_color");
+    let custom_label = gs("commerce_button_label");
+
+    let width_style = if btn_alignment == "full_width" {
+        "display:block;width:100%"
+    } else {
+        "display:inline-block"
+    };
+    let align_style = match btn_alignment {
+        "left" => "text-align:left",
+        "right" => "text-align:right",
+        "center" => "text-align:center",
+        _ => "", // full_width needs no text-align
+    };
+    let btn_style = format!(
+        "{};padding:12px 24px;border:none;border-radius:{};font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;text-align:center",
+        width_style, btn_radius
+    );
+
+    let btn_position = {
+        let p = gs("commerce_button_position");
+        if p.is_empty() { "below_description" } else { p }
+    };
 
     let mut s = String::new();
-    s.push_str(r#"<div class="commerce-section" style="margin-top:32px;padding:24px;border-radius:12px;border:1px solid #e0e0e0">"#);
+    s.push_str(&format!(
+        r#"<div class="commerce-section" data-position="{}" style="margin-top:32px;padding:24px;border-radius:12px;border:1px solid #e0e0e0{}">"#,
+        btn_position,
+        if !align_style.is_empty() { format!(";{}", align_style) } else { String::new() }
+    ));
 
     // Price row
     s.push_str(r#"<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><span style="font-size:28px;font-weight:700">"#);
@@ -4152,43 +4289,24 @@ fn build_commerce_html(
         "paypal" => {
             s.push_str(r#"<div id="paypal-button-container" style="min-height:45px"></div>"#);
         }
-        "stripe" => {
+        _ => {
+            // All non-PayPal providers use HTML buttons with customizable styling
+            let (default_bg, default_label, btn_id, onclick) = match provider.as_str() {
+                "stripe" => ("#635BFF", "Pay with Stripe", "stripe-buy-btn", "commerceRedirect('stripe')"),
+                "razorpay" => ("#072654", "Pay with Razorpay", "razorpay-buy-btn", "commerceRazorpay()"),
+                "mollie" => ("#0a0a0a", "Pay with Mollie", "mollie-buy-btn", "commerceRedirect('mollie')"),
+                "square" => ("#006AFF", "Pay with Square", "square-buy-btn", "commerceRedirect('square')"),
+                "2checkout" => ("#F36F21", "Pay with 2Checkout", "2co-buy-btn", "commerceRedirect('2checkout')"),
+                "payoneer" => ("#FF6C00", "Pay with Payoneer", "payoneer-buy-btn", "commerceRedirect('payoneer')"),
+                _ => return String::new(),
+            };
+            let bg = if custom_color.is_empty() { default_bg } else { custom_color };
+            let label = if custom_label.is_empty() { default_label } else { custom_label };
             s.push_str(&format!(
-                r#"<button type="button" id="stripe-buy-btn" style="{};background:#635BFF;color:#fff" onclick="commerceRedirect('stripe')">Pay with Stripe</button>"#,
-                btn_style
+                r#"<button type="button" id="{}" style="{};background:{};color:#fff" onclick="{}">{}</button>"#,
+                btn_id, btn_style, bg, onclick, html_escape(label)
             ));
         }
-        "razorpay" => {
-            s.push_str(&format!(
-                r#"<button type="button" id="razorpay-buy-btn" style="{};background:#072654;color:#fff" onclick="commerceRazorpay()">Pay with Razorpay</button>"#,
-                btn_style
-            ));
-        }
-        "mollie" => {
-            s.push_str(&format!(
-                r#"<button type="button" id="mollie-buy-btn" style="{};background:#0a0a0a;color:#fff" onclick="commerceRedirect('mollie')">Pay with Mollie</button>"#,
-                btn_style
-            ));
-        }
-        "square" => {
-            s.push_str(&format!(
-                r#"<button type="button" id="square-buy-btn" style="{};background:#006AFF;color:#fff" onclick="commerceRedirect('square')">Pay with Square</button>"#,
-                btn_style
-            ));
-        }
-        "2checkout" => {
-            s.push_str(&format!(
-                r#"<button type="button" id="2co-buy-btn" style="{};background:#F36F21;color:#fff" onclick="commerceRedirect('2checkout')">Pay with 2Checkout</button>"#,
-                btn_style
-            ));
-        }
-        "payoneer" => {
-            s.push_str(&format!(
-                r#"<button type="button" id="payoneer-buy-btn" style="{};background:#FF6C00;color:#fff" onclick="commerceRedirect('payoneer')">Pay with Payoneer</button>"#,
-                btn_style
-            ));
-        }
-        _ => {}
     }
 
     s.push_str("</div>"); // end commerce-email-step
@@ -4287,8 +4405,11 @@ fn build_commerce_html(
         };
         s.push_str("</script>\n");
         s.push_str(&format!("<script src=\"https://www.paypal.com/sdk/js?client-id={}&currency={}\"></script>\n<script>\n", html_escape(pp_id), html_escape(pp_cur)));
+        let pp_color = { let c = gs("paypal_button_color"); if c.is_empty() { "gold" } else { c } };
+        let pp_shape = { let c = gs("paypal_button_shape"); if c.is_empty() { "rect" } else { c } };
+        let pp_label = { let c = gs("paypal_button_label"); if c.is_empty() { "pay" } else { c } };
         s.push_str("paypal.Buttons({\n");
-        s.push_str("style:{layout:'vertical',shape:'rect',label:'pay'},\n");
+        s.push_str(&format!("style:{{layout:'vertical',color:'{}',shape:'{}',label:'{}'}},\n", pp_color, pp_shape, pp_label));
         s.push_str("createOrder:function(){\n");
         s.push_str("var email=_vEmail();if(!email)return;\n");
         s.push_str("return fetch('/api/checkout/paypal/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:_vItemId})}).then(function(r){return r.json()}).then(function(d){if(!d.ok){alert(d.error||'Failed');return;}window._vOid=d.order_id;return d.order_id.toString();});\n");

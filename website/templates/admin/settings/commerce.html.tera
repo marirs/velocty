@@ -78,16 +78,6 @@
                 <label for="paypal_currency">Currency</label>
                 <input type="text" id="paypal_currency" name="paypal_currency" value="{{ settings.paypal_currency | default(value='USD') }}" placeholder="USD">
             </div>
-            <div class="form-group">
-                <label for="paypal_button_color">Button Color</label>
-                <select id="paypal_button_color" name="paypal_button_color">
-                    <option value="gold" {% if settings.paypal_button_color == "gold" %}selected{% endif %}>Gold</option>
-                    <option value="blue" {% if settings.paypal_button_color == "blue" %}selected{% endif %}>Blue</option>
-                    <option value="silver" {% if settings.paypal_button_color == "silver" %}selected{% endif %}>Silver</option>
-                    <option value="white" {% if settings.paypal_button_color == "white" %}selected{% endif %}>White</option>
-                    <option value="black" {% if settings.paypal_button_color == "black" %}selected{% endif %}>Black</option>
-                </select>
-            </div>
         </div>
 
     </fieldset>

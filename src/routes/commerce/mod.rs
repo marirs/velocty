@@ -313,6 +313,54 @@ pub fn download_file(
     Ok(rocket::response::Redirect::to(file_url))
 }
 
+// ── License download (serves license.txt) ───────────────
+
+#[get("/download/<token>/license")]
+pub fn download_license(
+    pool: &State<DbPool>,
+    token: &str,
+) -> Result<(rocket::http::ContentType, String), Json<Value>> {
+    let dl_token = DownloadToken::find_by_token(pool, token)
+        .ok_or_else(|| Json(json!({ "ok": false, "error": "Invalid download link" })))?;
+
+    let order = Order::find_by_id(pool, dl_token.order_id)
+        .filter(|o| o.status == "completed")
+        .ok_or_else(|| Json(json!({ "ok": false, "error": "Order not found" })))?;
+
+    let item = PortfolioItem::find_by_id(pool, order.portfolio_id)
+        .ok_or_else(|| Json(json!({ "ok": false, "error": "Item not found" })))?;
+
+    let license = License::find_by_order(pool, order.id);
+
+    let settings: HashMap<String, String> = Setting::all(pool);
+    let site_name = settings
+        .get("site_name")
+        .cloned()
+        .unwrap_or_else(|| "Velocty".to_string());
+    let license_template = settings
+        .get("downloads_license_template")
+        .cloned()
+        .unwrap_or_default();
+
+    let mut txt = String::new();
+    txt.push_str(&format!("License for: {}\n", item.title));
+    txt.push_str(&format!("Purchased from: {}\n", site_name));
+    let txn_id = if order.provider_order_id.is_empty() {
+        format!("ORD-{}", order.id)
+    } else {
+        order.provider_order_id.clone()
+    };
+    txt.push_str(&format!("Transaction: {}\n", txn_id));
+    txt.push_str(&format!("Date: {}\n", order.created_at));
+    if let Some(ref lic) = license {
+        txt.push_str(&format!("License Key: {}\n", lic.license_key));
+    }
+    txt.push_str("\n---\n\n");
+    txt.push_str(&license_template);
+
+    Ok((rocket::http::ContentType::Plain, txt))
+}
+
 // ── Check purchase status (for public page) ────────────
 
 #[derive(Deserialize)]
@@ -409,6 +457,7 @@ pub fn routes() -> Vec<rocket::Route> {
         generic_capture_order,
         download_page,
         download_file,
+        download_license,
         check_purchase,
     ]
 }

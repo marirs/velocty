@@ -739,6 +739,128 @@
                 </div>
             </div>
 
+            <!-- ═══ COMMERCE ═══ -->
+            {% if settings.commerce_paypal_enabled == "true" or settings.commerce_stripe_enabled == "true" or settings.commerce_razorpay_enabled == "true" or settings.commerce_mollie_enabled == "true" or settings.commerce_square_enabled == "true" or settings.commerce_2checkout_enabled == "true" or settings.commerce_payoneer_enabled == "true" %}
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <span>Commerce</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-sub-heading">Buy Button</div>
+                    <div class="cz-field">
+                        <label>Position</label>
+                        <select name="commerce_button_position" data-setting="commerce_button_position">
+                            <option value="below_description" {% if not settings.commerce_button_position is defined or settings.commerce_button_position == "below_description" %}selected{% endif %}>Below Description</option>
+                            <option value="below_image" {% if settings.commerce_button_position is defined and settings.commerce_button_position == "below_image" %}selected{% endif %}>Below Image</option>
+                            <option value="sidebar_right" {% if settings.commerce_button_position is defined and settings.commerce_button_position == "sidebar_right" %}selected{% endif %}>Sidebar Right</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Alignment</label>
+                        <select name="commerce_button_alignment" data-setting="commerce_button_alignment">
+                            <option value="full_width" {% if not settings.commerce_button_alignment is defined or settings.commerce_button_alignment == "full_width" %}selected{% endif %}>Full Width</option>
+                            <option value="left" {% if settings.commerce_button_alignment is defined and settings.commerce_button_alignment == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if settings.commerce_button_alignment is defined and settings.commerce_button_alignment == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.commerce_button_alignment is defined and settings.commerce_button_alignment == "right" %}selected{% endif %}>Right</option>
+                        </select>
+                    </div>
+
+                    {% if settings.commerce_paypal_enabled == "true" %}
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">PayPal Button</div>
+                    <div class="cz-field">
+                        <label>Color</label>
+                        <select name="paypal_button_color" data-setting="paypal_button_color">
+                            <option value="gold" {% if not settings.paypal_button_color is defined or settings.paypal_button_color == "gold" %}selected{% endif %}>Gold</option>
+                            <option value="blue" {% if settings.paypal_button_color is defined and settings.paypal_button_color == "blue" %}selected{% endif %}>Blue</option>
+                            <option value="silver" {% if settings.paypal_button_color is defined and settings.paypal_button_color == "silver" %}selected{% endif %}>Silver</option>
+                            <option value="white" {% if settings.paypal_button_color is defined and settings.paypal_button_color == "white" %}selected{% endif %}>White</option>
+                            <option value="black" {% if settings.paypal_button_color is defined and settings.paypal_button_color == "black" %}selected{% endif %}>Black</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Shape</label>
+                        <select name="paypal_button_shape" data-setting="paypal_button_shape">
+                            <option value="rect" {% if not settings.paypal_button_shape is defined or settings.paypal_button_shape == "rect" %}selected{% endif %}>Rectangle</option>
+                            <option value="pill" {% if settings.paypal_button_shape is defined and settings.paypal_button_shape == "pill" %}selected{% endif %}>Pill</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Label</label>
+                        <select name="paypal_button_label" data-setting="paypal_button_label">
+                            <option value="pay" {% if not settings.paypal_button_label is defined or settings.paypal_button_label == "pay" %}selected{% endif %}>Pay</option>
+                            <option value="buynow" {% if settings.paypal_button_label is defined and settings.paypal_button_label == "buynow" %}selected{% endif %}>Buy Now</option>
+                            <option value="checkout" {% if settings.paypal_button_label is defined and settings.paypal_button_label == "checkout" %}selected{% endif %}>Checkout</option>
+                            <option value="paypal" {% if settings.paypal_button_label is defined and settings.paypal_button_label == "paypal" %}selected{% endif %}>PayPal</option>
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    {% if settings.commerce_stripe_enabled == "true" or settings.commerce_razorpay_enabled == "true" or settings.commerce_mollie_enabled == "true" or settings.commerce_square_enabled == "true" or settings.commerce_2checkout_enabled == "true" or settings.commerce_payoneer_enabled == "true" %}
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Button Style</div>
+                    <div class="cz-field">
+                        <label>Color</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.commerce_button_color | default(value='') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="commerce_button_color" value="{{ settings.commerce_button_color | default(value='') }}" data-setting="commerce_button_color" class="cz-color-text" oninput="czSyncFromHex(this)" placeholder="Provider default">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Shape</label>
+                        <select name="commerce_button_radius" data-setting="commerce_button_radius">
+                            <option value="rounded" {% if not settings.commerce_button_radius is defined or settings.commerce_button_radius == "rounded" %}selected{% endif %}>Rounded</option>
+                            <option value="square" {% if settings.commerce_button_radius is defined and settings.commerce_button_radius == "square" %}selected{% endif %}>Square</option>
+                            <option value="pill" {% if settings.commerce_button_radius is defined and settings.commerce_button_radius == "pill" %}selected{% endif %}>Pill</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Button Label</label>
+                        <input type="text" name="commerce_button_label" value="{{ settings.commerce_button_label | default(value='') }}" data-setting="commerce_button_label" placeholder="e.g. Buy Now (default: Pay with Provider)">
+                    </div>
+                    {% endif %}
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Price Badge (Grid)</div>
+                    <div class="cz-field">
+                        <label>Show Price on Grid</label>
+                        <select name="commerce_show_price" data-setting="commerce_show_price">
+                            <option value="true" {% if not settings.commerce_show_price is defined or settings.commerce_show_price == "true" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.commerce_show_price is defined and settings.commerce_show_price == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Price Position</label>
+                        <select name="commerce_price_position" data-setting="commerce_price_position">
+                            <option value="top_right" {% if not settings.commerce_price_position is defined or settings.commerce_price_position == "top_right" %}selected{% endif %}>Top Right</option>
+                            <option value="top_left" {% if settings.commerce_price_position is defined and settings.commerce_price_position == "top_left" %}selected{% endif %}>Top Left</option>
+                            <option value="bottom_left" {% if settings.commerce_price_position is defined and settings.commerce_price_position == "bottom_left" %}selected{% endif %}>Bottom Left</option>
+                            <option value="below_title" {% if settings.commerce_price_position is defined and settings.commerce_price_position == "below_title" %}selected{% endif %}>Below Title</option>
+                        </select>
+                    </div>
+
+                    <div class="cz-divider"></div>
+                    <div class="cz-sub-heading">Lightbox</div>
+                    <div class="cz-field">
+                        <label>Show Buy in Lightbox</label>
+                        <select name="commerce_lightbox_buy" data-setting="commerce_lightbox_buy">
+                            <option value="true" {% if not settings.commerce_lightbox_buy is defined or settings.commerce_lightbox_buy == "true" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.commerce_lightbox_buy is defined and settings.commerce_lightbox_buy == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Lightbox Buy Position</label>
+                        <select name="commerce_lightbox_buy_position" data-setting="commerce_lightbox_buy_position">
+                            <option value="bottom" {% if not settings.commerce_lightbox_buy_position is defined or settings.commerce_lightbox_buy_position == "bottom" %}selected{% endif %}>Bottom</option>
+                            <option value="sidebar" {% if settings.commerce_lightbox_buy_position is defined and settings.commerce_lightbox_buy_position == "sidebar" %}selected{% endif %}>Sidebar</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
         </div>
 
         <!-- Publish button -->

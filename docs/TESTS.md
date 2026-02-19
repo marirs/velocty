@@ -1,6 +1,6 @@
 # Velocty — Test Coverage Report
 
-> **Last run:** 2026-02-18 | **Result:** 157 passed, 0 failed | **Duration:** 1.21s  
+> **Last run:** 2026-02-19 | **Result:** 179 passed, 0 failed | **Duration:** 1.39s  
 > **Command:** `cargo test`
 
 ---
@@ -382,6 +382,38 @@
 | 153 | `render_portfolio_pagination_data_attr` | portfolio_pagination_type=load_more | `data-pagination-type="load_more"` | Present | ✅ Pass |
 | 154 | `render_portfolio_click_mode_data_attr` | portfolio_click_mode=detail | `data-click-mode="detail"` | Present | ✅ Pass |
 
+### 34. Render: Commerce Settings (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 155 | `render_commerce_button_custom_color` | commerce_button_color=#FF0000 + Stripe | `background:#FF0000` overrides Stripe default | Present | ✅ Pass |
+| 156 | `render_commerce_button_default_stripe_color` | No custom color + Stripe | `background:#635BFF` (Stripe default) | Present | ✅ Pass |
+| 157 | `render_commerce_button_custom_label` | commerce_button_label="Purchase Now" | Custom label shown; default absent | Correct | ✅ Pass |
+| 158 | `render_commerce_button_radius_pill` | commerce_button_radius=pill | `border-radius:999px` | Present | ✅ Pass |
+| 159 | `render_commerce_button_radius_square` | commerce_button_radius=square | `border-radius:0` | Present | ✅ Pass |
+| 160 | `render_commerce_button_alignment_center` | commerce_button_alignment=center | `text-align:center` + `display:inline-block` | Both present | ✅ Pass |
+| 161 | `render_commerce_paypal_sdk_style` | PayPal color=blue, shape=pill, label=buynow | All 3 values in `paypal.Buttons({style:...})` | Present | ✅ Pass |
+| 162 | `render_commerce_position_below_image` | commerce_button_position=below_image | Commerce section between image and meta | Correct order | ✅ Pass |
+| 163 | `render_commerce_position_below_description` | commerce_button_position=below_description | Commerce section after description | Correct order | ✅ Pass |
+| 164 | `render_commerce_position_sidebar_right` | commerce_button_position=sidebar_right | Flex row layout with sidebar column | Both classes present | ✅ Pass |
+| 165 | `render_commerce_price_badge_top_right` | commerce_show_price=true, position=top_right | `price-badge` with `top:8px;right:8px` + "USD 19.99" | Present | ✅ Pass |
+| 166 | `render_commerce_price_badge_top_left` | commerce_price_position=top_left | `top:8px;left:8px` | Present | ✅ Pass |
+| 167 | `render_commerce_price_badge_below_title` | commerce_price_position=below_title | `price-badge-below` class | Present | ✅ Pass |
+| 168 | `render_commerce_price_badge_hidden` | commerce_show_price=false | No `price-badge` in output | Absent | ✅ Pass |
+| 169 | `render_commerce_lightbox_buy_data_attrs` | lightbox_buy=true, position=sidebar, currency=EUR | All 3 data attributes present | Present | ✅ Pass |
+| 170 | `render_commerce_lightbox_buy_disabled` | commerce_lightbox_buy=false | `data-lb-buy="false"` | Present | ✅ Pass |
+| 171 | `render_commerce_grid_item_data_attrs` | Grid item with price=19.99, sell_enabled=true | `data-price` and `data-sell` attributes | Present | ✅ Pass |
+
+### 35. License Default & Generation (`db.rs`, `routes/commerce/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 172 | `license_default_text_seeded` | Check `downloads_license_template` after seed_defaults | Contains all sections: GRANT, PERMITTED USES, RESTRICTIONS, ATTRIBUTION, WARRANTY, TERMINATION, Licensor/Licensee | All present | ✅ Pass |
+| 173 | `license_default_not_personal_only` | Verify license allows commercial use | No "personal only" language; contains "Commercial use in a single end product" | Correct | ✅ Pass |
+| 174 | `license_paypal_legacy_key_empty` | Check `paypal_license_text` is deprecated/empty | Empty string | Empty | ✅ Pass |
+| 175 | `license_text_generation_header` | Build license .txt with header fields | Contains: License for, Purchased from, Transaction, Date, License Key, separator, body | All present | ✅ Pass |
+| 176 | `license_text_generation_no_provider_order_id` | Empty provider_order_id falls back to ORD-{id} | `"ORD-42"` | `"ORD-42"` | ✅ Pass |
+
 ---
 
 ## Running Tests
@@ -446,5 +478,6 @@ src/tests.rs
 ├── Render: Layout (7 tests)
 ├── Render: Portfolio Item Display (13 tests)
 ├── Render: Journal Settings (14 tests)
-└── Render: Portfolio Lightbox & Features (8 tests)
-```
+├── Render: Portfolio Lightbox & Features (8 tests)
+├── Render: Commerce Settings (17 tests)
+└── License Default & Generation (5 tests)

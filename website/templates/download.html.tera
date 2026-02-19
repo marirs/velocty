@@ -24,6 +24,16 @@
         .error-msg{font-size:15px;color:#ef4444;margin-bottom:20px}
         .back-link{display:inline-block;margin-top:16px;font-size:13px;color:#777;text-decoration:none}
         .back-link:hover{color:#333}
+        .dl-dropdown{position:relative;display:inline-block}
+        .dl-dropdown-btn{display:flex;align-items:center;gap:0}
+        .dl-dropdown-btn .dl-main{border-radius:10px 0 0 10px;padding:12px 24px 12px 32px}
+        .dl-dropdown-btn .dl-toggle{border-radius:0 10px 10px 0;padding:12px 14px;border-left:1px solid rgba(255,255,255,.25);cursor:pointer;background:#E8913A;color:#fff;font-size:13px;border:none;border-left:1px solid rgba(255,255,255,.25)}
+        .dl-dropdown-btn .dl-toggle:hover{background:#D07A2F}
+        .dl-menu{display:none;position:absolute;top:100%;left:0;right:0;margin-top:6px;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);overflow:hidden;z-index:10}
+        .dl-menu.open{display:block}
+        .dl-menu a{display:block;padding:12px 18px;text-decoration:none;color:#333;font-size:14px;font-weight:500;transition:background .15s}
+        .dl-menu a:hover{background:#f5f5f5}
+        .dl-menu a svg{vertical-align:-2px;margin-right:8px}
     </style>
 </head>
 <body>
@@ -57,7 +67,22 @@
         <p class="dl-info">{{ downloads_remaining }} download{% if downloads_remaining != 1 %}s{% endif %} remaining</p>
 
         {% if downloads_remaining > 0 %}
-        <a href="/download/{{ token }}/file" class="btn btn-primary">Download File</a>
+        <div class="dl-dropdown">
+            <div class="dl-dropdown-btn">
+                <a href="/download/{{ token }}/file" class="btn btn-primary dl-main">Download File</a>
+                <button type="button" class="dl-toggle" onclick="this.parentElement.nextElementSibling.classList.toggle('open')" aria-label="More download options">▾</button>
+            </div>
+            <div class="dl-menu">
+                <a href="/download/{{ token }}/file">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download File
+                </a>
+                <a href="/download/{{ token }}/license">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    Download License
+                </a>
+            </div>
+        </div>
         {% else %}
         <span class="btn btn-disabled">Download Limit Reached</span>
         {% endif %}
@@ -66,5 +91,12 @@
         <a href="/" class="back-link">← Back to site</a>
         {% endif %}
     </div>
+    <script>
+    document.addEventListener('click', function(e) {
+        document.querySelectorAll('.dl-menu.open').forEach(function(m) {
+            if (!m.parentElement.contains(e.target)) m.classList.remove('open');
+        });
+    });
+    </script>
 </body>
 </html>

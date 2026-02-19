@@ -394,6 +394,36 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
+    // Fix downloads_license_template: replace short/incorrect text with the full default license.
+    // Also clear the deprecated paypal_license_text key.
+    {
+        let current: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'downloads_license_template'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or_default();
+        let needs_reset = current.is_empty()
+            || current.contains("personal use only")
+            || current.contains("personal use.")
+            || current.contains("non-commercial purposes only")
+            || (!current.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT")
+                && current.len() < 200);
+        if needs_reset {
+            let license = "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis license is granted by the website owner (\"Licensor\") to the purchaser (\"Licensee\").\n\n1. GRANT OF LICENSE\nThe Licensor grants the Licensee a non-exclusive, non-transferable, worldwide license to use the purchased digital file (\"Work\") subject to the terms below.\n\n2. PERMITTED USES\n- Personal use (prints, wallpapers, personal projects)\n- Commercial use in a single end product (website, marketing material, publication)\n- Social media use with credit to the Licensor\n\n3. RESTRICTIONS\n- The Work may NOT be resold, sublicensed, or redistributed as-is\n- The Work may NOT be used in on-demand print services (POD) without a separate license\n- The Work may NOT be included in any competing stock/download service\n- The Work may NOT be used to train AI or machine learning models\n\n4. ATTRIBUTION\nAttribution is appreciated but not required for personal or commercial use.\n\n5. WARRANTY\nThe Work is provided \"as is\" without warranty of any kind. The Licensor is not liable for any damages arising from the use of the Work.\n\n6. TERMINATION\nThis license is effective until terminated. It terminates automatically if the Licensee breaches any terms. Upon termination, the Licensee must destroy all copies of the Work.\n\nBy downloading the Work, the Licensee agrees to these terms.";
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES ('downloads_license_template', ?1)",
+                rusqlite::params![license],
+            )?;
+        }
+        // Clear deprecated paypal_license_text
+        conn.execute(
+            "UPDATE settings SET value = '' WHERE key = 'paypal_license_text' AND value != ''",
+            [],
+        )?;
+    }
+
     Ok(())
 }
 
@@ -648,7 +678,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("paypal_mode", "sandbox"),
         ("paypal_client_id", ""),
         ("paypal_secret", ""),
-        ("paypal_license_text", "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nBy purchasing and downloading digital content from this website, you agree to the following terms:\n\n1. GRANT OF LICENSE\nUpon completed payment, the Seller grants the Buyer a non-exclusive, non-transferable, revocable license to download and use the purchased digital file(s) for personal, non-commercial purposes only.\n\n2. PERMITTED USE\n- Personal use (e.g., desktop wallpaper, personal prints, personal social media with credit)\n- One (1) personal print per purchased image\n\n3. RESTRICTIONS\nThe Buyer may NOT:\n- Resell, redistribute, sublicense, or share the file(s) with third parties\n- Use the file(s) for commercial purposes without a separate commercial license\n- Claim ownership or authorship of the file(s)\n- Use the file(s) in any defamatory, illegal, or misleading context\n- Remove or alter any embedded metadata or watermarks\n\n4. INTELLECTUAL PROPERTY\nAll intellectual property rights in the digital content remain with the Seller. This license does not transfer ownership of the content.\n\n5. DELIVERY & REFUNDS\nDigital files are delivered electronically. Due to the nature of digital goods, all sales are final. No refunds will be issued once the download link has been accessed.\n\n6. DOWNLOAD LIMITS\nEach purchase includes a limited number of downloads within a specified time period. Expired or exhausted download links will not be renewed without a new purchase.\n\n7. LIABILITY\nThe digital content is provided \"as is\" without warranty of any kind. The Seller is not liable for any damages arising from the use of the purchased content.\n\n8. TERMINATION\nThis license is effective until terminated. The Seller may terminate this license at any time if the Buyer breaches any of these terms. Upon termination, the Buyer must destroy all copies of the downloaded content.\n\nBy completing your purchase, you acknowledge that you have read, understood, and agree to be bound by these terms."),
+        ("paypal_license_text", ""),
         ("paypal_email", ""),
         ("paypal_currency", "USD"),
         ("paypal_button_color", "gold"),
@@ -679,7 +709,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("commerce_currency", "USD"),
         ("downloads_max_per_purchase", "3"),
         ("downloads_expiry_hours", "48"),
-        ("downloads_license_template", "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis license is granted by Oneguy (\"Licensor\") to the purchaser (\"Licensee\").\n\n1. GRANT OF LICENSE\nThe Licensor grants the Licensee a non-exclusive, non-transferable, worldwide license to use the purchased digital file (\"Work\") subject to the terms below.\n\n2. PERMITTED USES\n- Personal use (prints, wallpapers, personal projects)\n- Commercial use in a single end product (website, marketing material, publication)\n- Social media use with credit to the Licensor\n\n3. RESTRICTIONS\n- The Work may NOT be resold, sublicensed, or redistributed as-is\n- The Work may NOT be used in on-demand print services (POD) without a separate license\n- The Work may NOT be included in any competing stock/download service\n- The Work may NOT be used to train AI or machine learning models\n\n4. ATTRIBUTION\nAttribution is appreciated but not required for personal or commercial use.\n\n5. WARRANTY\nThe Work is provided \"as is\" without warranty of any kind. The Licensor is not liable for any damages arising from the use of the Work.\n\n6. TERMINATION\nThis license is effective until terminated. It terminates automatically if the Licensee breaches any terms. Upon termination, the Licensee must destroy all copies of the Work.\n\nBy downloading the Work, the Licensee agrees to these terms."),
+        ("downloads_license_template", "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis license is granted by the website owner (\"Licensor\") to the purchaser (\"Licensee\").\n\n1. GRANT OF LICENSE\nThe Licensor grants the Licensee a non-exclusive, non-transferable, worldwide license to use the purchased digital file (\"Work\") subject to the terms below.\n\n2. PERMITTED USES\n- Personal use (prints, wallpapers, personal projects)\n- Commercial use in a single end product (website, marketing material, publication)\n- Social media use with credit to the Licensor\n\n3. RESTRICTIONS\n- The Work may NOT be resold, sublicensed, or redistributed as-is\n- The Work may NOT be used in on-demand print services (POD) without a separate license\n- The Work may NOT be included in any competing stock/download service\n- The Work may NOT be used to train AI or machine learning models\n\n4. ATTRIBUTION\nAttribution is appreciated but not required for personal or commercial use.\n\n5. WARRANTY\nThe Work is provided \"as is\" without warranty of any kind. The Licensor is not liable for any damages arising from the use of the Work.\n\n6. TERMINATION\nThis license is effective until terminated. It terminates automatically if the Licensee breaches any terms. Upon termination, the Licensee must destroy all copies of the Work.\n\nBy downloading the Work, the Licensee agrees to these terms."),
         // AI (Phase 4 — defaults ready)
         ("ai_failover_chain", "ollama,openai,gemini,groq,cloudflare"),
         ("ai_ollama_enabled", "false"),

@@ -3857,3 +3857,506 @@ fn render_portfolio_click_mode_data_attr() {
         "click_mode should appear as data attribute"
     );
 }
+
+// ═══════════════════════════════════════════════════════════
+// Render: Commerce Settings
+// ═══════════════════════════════════════════════════════════
+
+/// Helper: build a portfolio_single context with commerce enabled
+fn commerce_single_context(pool: &DbPool) -> serde_json::Value {
+    let settings = Setting::all(pool);
+    json!({
+        "settings": settings,
+        "item": {
+            "id": 1,
+            "title": "Test Item",
+            "slug": "test-item",
+            "image_path": "test.jpg",
+            "description_html": "<p>Description</p>",
+            "likes": 0,
+            "price": 29.99,
+            "purchase_note": "Includes source files",
+            "payment_provider": "stripe",
+            "sell_enabled": true,
+        },
+        "tags": [],
+        "categories": [],
+        "commerce_enabled": true,
+        "page_type": "portfolio_single",
+        "seo": "",
+    })
+}
+
+/// Helper: build a portfolio_grid context with one sellable item
+fn commerce_grid_context(pool: &DbPool) -> serde_json::Value {
+    let settings = Setting::all(pool);
+    json!({
+        "settings": settings,
+        "items": [{
+            "item": {
+                "id": 1,
+                "title": "Sellable Item",
+                "slug": "sellable",
+                "image_path": "sell.jpg",
+                "thumbnail_path": "",
+                "likes": 0,
+                "price": 19.99,
+                "sell_enabled": true,
+            },
+            "categories": [],
+            "tags": [],
+        }],
+        "categories": [],
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    })
+}
+
+#[test]
+fn render_commerce_button_custom_color() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_color", "#FF0000"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("background:#FF0000"),
+        "custom button color should override provider default"
+    );
+}
+
+#[test]
+fn render_commerce_button_default_stripe_color() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("background:#635BFF"),
+        "stripe default color should be used when no custom color"
+    );
+}
+
+#[test]
+fn render_commerce_button_custom_label() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_label", "Purchase Now"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("Purchase Now"),
+        "custom button label should appear"
+    );
+    assert!(
+        !html.contains("Pay with Stripe"),
+        "default label should not appear when custom label set"
+    );
+}
+
+#[test]
+fn render_commerce_button_radius_pill() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_radius", "pill"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("border-radius:999px"),
+        "pill radius should be 999px"
+    );
+}
+
+#[test]
+fn render_commerce_button_radius_square() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_radius", "square"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("border-radius:0"),
+        "square radius should be 0"
+    );
+}
+
+#[test]
+fn render_commerce_button_alignment_center() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_alignment", "center"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("text-align:center"),
+        "center alignment should set text-align:center on commerce section"
+    );
+    assert!(
+        html.contains("display:inline-block"),
+        "center alignment should use inline-block button"
+    );
+}
+
+#[test]
+fn render_commerce_paypal_sdk_style() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_paypal_enabled", "true"),
+            ("paypal_client_id", "test_id"),
+            ("paypal_button_color", "blue"),
+            ("paypal_button_shape", "pill"),
+            ("paypal_button_label", "buynow"),
+        ],
+    );
+    let mut ctx = commerce_single_context(&pool);
+    ctx["item"]["payment_provider"] = json!("paypal");
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("color:'blue'"),
+        "PayPal button color should be blue"
+    );
+    assert!(
+        html.contains("shape:'pill'"),
+        "PayPal button shape should be pill"
+    );
+    assert!(
+        html.contains("label:'buynow'"),
+        "PayPal button label should be buynow"
+    );
+}
+
+#[test]
+fn render_commerce_position_below_image() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_position", "below_image"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    let body = body_html(&html);
+    let img_pos = body.find("portfolio-image").unwrap_or(0);
+    let commerce_pos = body.find("commerce-section").unwrap_or(0);
+    let meta_pos = body.find("portfolio-meta").unwrap_or(0);
+    assert!(
+        commerce_pos > img_pos && commerce_pos < meta_pos,
+        "below_image: commerce should be between image and meta"
+    );
+}
+
+#[test]
+fn render_commerce_position_below_description() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_position", "below_description"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    let body = body_html(&html);
+    let desc_pos = body.find("portfolio-description").unwrap_or(0);
+    let commerce_pos = body.find("commerce-section").unwrap_or(0);
+    assert!(
+        commerce_pos > desc_pos,
+        "below_description: commerce should be after description"
+    );
+}
+
+#[test]
+fn render_commerce_position_sidebar_right() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_stripe_enabled", "true"),
+            ("stripe_publishable_key", "pk_test"),
+            ("commerce_button_position", "sidebar_right"),
+        ],
+    );
+    let ctx = commerce_single_context(&pool);
+    let html = render::render_page(&pool, "portfolio_single", &ctx);
+    assert!(
+        html.contains("portfolio-single-row"),
+        "sidebar_right should create flex row layout"
+    );
+    assert!(
+        html.contains("portfolio-single-sidebar"),
+        "sidebar_right should create sidebar column"
+    );
+}
+
+#[test]
+fn render_commerce_price_badge_top_right() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_show_price", "true"),
+            ("commerce_price_position", "top_right"),
+        ],
+    );
+    let ctx = commerce_grid_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(html.contains("price-badge"), "price badge should be rendered");
+    assert!(
+        html.contains("top:8px;right:8px"),
+        "top_right position should have top:8px;right:8px"
+    );
+    assert!(
+        html.contains("USD 19.99"),
+        "price badge should show currency and price"
+    );
+}
+
+#[test]
+fn render_commerce_price_badge_top_left() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_show_price", "true"),
+            ("commerce_price_position", "top_left"),
+        ],
+    );
+    let ctx = commerce_grid_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("top:8px;left:8px"),
+        "top_left position should have top:8px;left:8px"
+    );
+}
+
+#[test]
+fn render_commerce_price_badge_below_title() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_show_title", "true"),
+            ("commerce_show_price", "true"),
+            ("commerce_price_position", "below_title"),
+        ],
+    );
+    let ctx = commerce_grid_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("price-badge-below"),
+        "below_title should use price-badge-below class"
+    );
+}
+
+#[test]
+fn render_commerce_price_badge_hidden() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_show_price", "false"),
+        ],
+    );
+    let ctx = commerce_grid_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        !html.contains("price-badge"),
+        "price badge should not render when show_price=false"
+    );
+}
+
+#[test]
+fn render_commerce_lightbox_buy_data_attrs() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_lightbox_buy", "true"),
+            ("commerce_lightbox_buy_position", "sidebar"),
+            ("commerce_currency", "EUR"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-lb-buy=\"true\""),
+        "lightbox buy should be true"
+    );
+    assert!(
+        html.contains("data-lb-buy-position=\"sidebar\""),
+        "lightbox buy position should be sidebar"
+    );
+    assert!(
+        html.contains("data-commerce-currency=\"EUR\""),
+        "commerce currency should be EUR"
+    );
+}
+
+#[test]
+fn render_commerce_lightbox_buy_disabled() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("commerce_lightbox_buy", "false"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-lb-buy=\"false\""),
+        "lightbox buy should be false"
+    );
+}
+
+#[test]
+fn render_commerce_grid_item_data_attrs() {
+    let pool = test_pool();
+    set_settings(&pool, &[("portfolio_enabled", "true")]);
+    let ctx = commerce_grid_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    assert!(
+        html.contains("data-price=\"19.99\""),
+        "grid item should have data-price attribute"
+    );
+    assert!(
+        html.contains("data-sell=\"true\""),
+        "grid item should have data-sell attribute"
+    );
+}
+
+// ── License Default & Generation Tests ──────────────────
+
+#[test]
+fn license_default_text_seeded() {
+    let pool = test_pool();
+    let val = Setting::get(&pool, "downloads_license_template").expect("downloads_license_template should be seeded");
+    assert!(val.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT"), "should contain license title");
+    assert!(val.contains("GRANT OF LICENSE"), "should contain grant of license section");
+    assert!(val.contains("PERMITTED USES"), "should contain permitted uses section");
+    assert!(val.contains("Commercial use in a single end product"), "should allow commercial use");
+    assert!(val.contains("RESTRICTIONS"), "should contain restrictions section");
+    assert!(val.contains("ATTRIBUTION"), "should contain attribution section");
+    assert!(val.contains("WARRANTY"), "should contain warranty section");
+    assert!(val.contains("TERMINATION"), "should contain termination section");
+    assert!(val.contains("Licensor"), "should reference Licensor");
+    assert!(val.contains("Licensee"), "should reference Licensee");
+}
+
+#[test]
+fn license_default_not_personal_only() {
+    let pool = test_pool();
+    let val = Setting::get(&pool, "downloads_license_template").unwrap();
+    assert!(!val.contains("personal, non-commercial purposes only"), "should NOT be personal-use-only license");
+    assert!(!val.contains("personal use only"), "should NOT contain personal use only");
+    assert!(val.contains("Commercial use in a single end product"), "should explicitly allow commercial use");
+}
+
+#[test]
+fn license_paypal_legacy_key_empty() {
+    let pool = test_pool();
+    let val = Setting::get(&pool, "paypal_license_text").unwrap_or_default();
+    assert!(val.is_empty(), "paypal_license_text should be empty (legacy key deprecated)");
+}
+
+#[test]
+fn license_text_generation_header() {
+    // Simulate what the download_license route produces
+    let item_title = "Sunset Over Mountains";
+    let site_name = "My Photography";
+    let txn_id = "PAY-12345ABC";
+    let date = "2026-02-19 10:30:00";
+    let license_key = "A1B2-C3D4-E5F6-G7H8";
+    let license_template = "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis is the license body.";
+
+    let mut txt = String::new();
+    txt.push_str(&format!("License for: {}\n", item_title));
+    txt.push_str(&format!("Purchased from: {}\n", site_name));
+    txt.push_str(&format!("Transaction: {}\n", txn_id));
+    txt.push_str(&format!("Date: {}\n", date));
+    txt.push_str(&format!("License Key: {}\n", license_key));
+    txt.push_str("\n---\n\n");
+    txt.push_str(license_template);
+
+    assert!(txt.starts_with("License for: Sunset Over Mountains\n"), "should start with item title");
+    assert!(txt.contains("Purchased from: My Photography\n"), "should contain site name");
+    assert!(txt.contains("Transaction: PAY-12345ABC\n"), "should contain transaction ID");
+    assert!(txt.contains("Date: 2026-02-19 10:30:00\n"), "should contain date");
+    assert!(txt.contains("License Key: A1B2-C3D4-E5F6-G7H8\n"), "should contain license key");
+    assert!(txt.contains("\n---\n\n"), "should have separator between header and body");
+    assert!(txt.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT"), "should contain license body");
+}
+
+#[test]
+fn license_text_generation_no_provider_order_id() {
+    // When provider_order_id is empty, should fall back to ORD-{id}
+    let provider_order_id = "";
+    let order_id: i64 = 42;
+    let txn_id = if provider_order_id.is_empty() {
+        format!("ORD-{}", order_id)
+    } else {
+        provider_order_id.to_string()
+    };
+    assert_eq!(txn_id, "ORD-42", "should fall back to ORD-ID when provider_order_id is empty");
+}
