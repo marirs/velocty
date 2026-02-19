@@ -128,12 +128,13 @@
                 e.preventDefault();
                 if (typeof tinymce !== 'undefined') tinymce.triggerSave();
                 var pubBtn = document.querySelector('button[name="status"][value="published"]');
-                // Find the right form: prefer the one inside the visible subtab panel
+                // Find the right form: 1) visible subtab panel, 2) data-saveable, 3) single form fallback
                 var activePanel = null;
                 document.querySelectorAll('.subtab-panel').forEach(function(p) { if (p.style.display !== 'none') activePanel = p; });
-                var form = activePanel ? activePanel.querySelector('form') : document.querySelector('form');
-                if (pubBtn) { if (form && location.hash) form.action = form.action.split('#')[0] + location.hash; pubBtn.click(); }
-                else if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); }
+                var form = activePanel ? activePanel.querySelector('form') : (document.querySelector('form[data-saveable]') || (document.querySelectorAll('form').length === 1 ? document.querySelector('form') : null));
+                if (!form) return;
+                if (pubBtn) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; pubBtn.click(); }
+                else { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); }
             }
             if (e.key === 'p' || e.key === 'P') {
                 e.preventDefault();
