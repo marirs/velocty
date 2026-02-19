@@ -215,6 +215,12 @@ pub async fn posts_create(
                     admin_base(slug),
                     id
                 ))
+            } else if form.status == "scheduled" {
+                Redirect::to(format!(
+                    "{}/posts/{}/edit?saved=scheduled",
+                    admin_base(slug),
+                    id
+                ))
             } else {
                 Redirect::to(format!("{}/posts", admin_base(slug)))
             }
@@ -295,6 +301,12 @@ pub async fn posts_update(
     if form.status == "draft" {
         Redirect::to(format!(
             "{}/posts/{}/edit?saved=draft",
+            admin_base(slug),
+            id
+        ))
+    } else if form.status == "scheduled" {
+        Redirect::to(format!(
+            "{}/posts/{}/edit?saved=scheduled",
             admin_base(slug),
             id
         ))

@@ -10,8 +10,7 @@
     <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>{% if post %}Edit Post{% else %}New Post{% endif %}</h2>
     <div class="header-actions">
         <button type="submit" form="post-form" name="status" value="draft" class="btn btn-secondary">Save Draft</button>
-        <button type="submit" form="post-form" name="status" value="scheduled" class="btn btn-secondary" id="btn-schedule" title="Set a future publish date first">Schedule</button>
-        <button type="submit" form="post-form" name="status" value="published" class="btn btn-primary">Publish <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
+        <button type="submit" form="post-form" name="status" value="published" class="btn btn-primary" id="btn-publish">Publish <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>
 </div>
 
@@ -70,6 +69,14 @@
             </div>
 
             <div class="form-card collapsible">
+                <h4>Publish Date</h4>
+                <div class="form-group" style="margin-bottom:0">
+                    <input type="text" name="published_at" id="published_at" value="{% if post and post.published_at %}{{ post.published_at | date(format='%Y-%m-%dT%H:%M') }}{% endif %}" style="font-size:12px" placeholder="Select date & time..." autocomplete="off">
+                    <p class="text-muted" style="font-size:11px;margin-top:4px">Leave empty to use current time on publish. Set a future date to schedule.</p>
+                </div>
+            </div>
+
+            <div class="form-card collapsible">
                 <h4>Categories</h4>
                 <div class="checkbox-list" id="category-list">
                     {% for cat in categories %}
@@ -83,14 +90,6 @@
                 <div style="margin-top:8px;display:flex;gap:6px" id="add-cat-row">
                     <input type="text" id="new-cat-name" placeholder="New category…" style="flex:1;font-size:12px;padding:5px 8px">
                     <button type="button" class="btn btn-sm btn-secondary" onclick="addCategory()" style="white-space:nowrap;font-size:11px;padding:4px 10px">+ Add</button>
-                </div>
-            </div>
-
-            <div class="form-card collapsible">
-                <h4>Publish Date</h4>
-                <div class="form-group" style="margin-bottom:0">
-                    <input type="text" name="published_at" id="published_at" value="{% if post and post.published_at %}{{ post.published_at | date(format='%Y-%m-%dT%H:%M') }}{% endif %}" style="font-size:12px" placeholder="Select date & time..." autocomplete="off">
-                    <p class="text-muted" style="font-size:11px;margin-top:4px">Leave empty to use current time on publish. Set a future date to schedule.</p>
                 </div>
             </div>
 
@@ -253,11 +252,12 @@
         this.dataset.manual = 'true';
     });
 
-    // Schedule button validation
-    document.getElementById('btn-schedule').addEventListener('click', function(e) {
+    // Auto-schedule: if publish date is in the future, change status to scheduled
+    document.getElementById('btn-publish').addEventListener('click', function(e) {
         var dt = document.getElementById('published_at').value;
-        if (!dt) { e.preventDefault(); alert('Please set a publish date before scheduling.'); return; }
-        if (new Date(dt) <= new Date()) { e.preventDefault(); alert('Schedule date must be in the future.'); return; }
+        if (dt && new Date(dt) > new Date()) {
+            this.value = 'scheduled';
+        }
     });
 
     // ── Tag input handling ──
@@ -551,14 +551,19 @@
         time_24hr: false,
         allowInput: true,
     });
-    if (new URLSearchParams(window.location.search).get('saved') === 'draft') {
+    (function() {
+        var saved = new URLSearchParams(window.location.search).get('saved');
+        if (!saved) return;
+        var msgs = { draft: 'Draft saved', scheduled: 'Scheduled for publishing' };
+        var colors = { draft: 'var(--success)', scheduled: 'var(--warning,#f59e0b)' };
+        var msg = msgs[saved]; if (!msg) return;
         var t = document.createElement('div');
-        t.textContent = 'Draft saved';
-        t.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--success);color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .4s';
+        t.textContent = msg;
+        t.style.cssText = 'position:fixed;top:20px;right:20px;background:' + (colors[saved] || 'var(--success)') + ';color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .4s';
         document.body.appendChild(t);
         setTimeout(function(){ t.style.opacity='0'; }, 2500);
         setTimeout(function(){ t.remove(); }, 3000);
         history.replaceState(null, '', window.location.pathname);
-    }
+    })();
 </script>
 {% endblock scripts %}

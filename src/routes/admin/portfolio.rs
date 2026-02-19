@@ -233,6 +233,12 @@ pub async fn portfolio_create(
                     admin_base(slug),
                     id
                 ))
+            } else if form.status == "scheduled" {
+                Redirect::to(format!(
+                    "{}/portfolio/{}/edit?saved=scheduled",
+                    admin_base(slug),
+                    id
+                ))
             } else {
                 Redirect::to(format!("{}/portfolio", admin_base(slug)))
             }
@@ -326,6 +332,12 @@ pub async fn portfolio_update(
     if form.status == "draft" {
         Redirect::to(format!(
             "{}/portfolio/{}/edit?saved=draft",
+            admin_base(slug),
+            id
+        ))
+    } else if form.status == "scheduled" {
+        Redirect::to(format!(
+            "{}/portfolio/{}/edit?saved=scheduled",
             admin_base(slug),
             id
         ))
