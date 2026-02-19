@@ -160,12 +160,22 @@
                     </div>
                     {% if settings.portfolio_enable_likes is defined and settings.portfolio_enable_likes == "true" %}
                     <div class="cz-field">
-                        <label>Heart / Like Position</label>
+                        <label>Hearts on Image</label>
                         <select name="portfolio_like_position" data-setting="portfolio_like_position">
                             <option value="bottom_left" {% if settings.portfolio_like_position is defined and settings.portfolio_like_position == "bottom_left" %}selected{% endif %}>Bottom Left</option>
                             <option value="bottom_right" {% if not settings.portfolio_like_position is defined or settings.portfolio_like_position == "bottom_right" or settings.portfolio_like_position == "image_bottom_right" %}selected{% endif %}>Bottom Right</option>
                             <option value="top_left" {% if settings.portfolio_like_position is defined and settings.portfolio_like_position == "top_left" %}selected{% endif %}>Top Left</option>
                             <option value="top_right" {% if settings.portfolio_like_position is defined and settings.portfolio_like_position == "top_right" %}selected{% endif %}>Top Right</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Hearts on Grid</label>
+                        <select name="portfolio_like_grid_position" data-setting="portfolio_like_grid_position">
+                            <option value="hidden" {% if not settings.portfolio_like_grid_position is defined or settings.portfolio_like_grid_position == "hidden" %}selected{% endif %}>Hidden</option>
+                            <option value="bottom_left" {% if settings.portfolio_like_grid_position is defined and settings.portfolio_like_grid_position == "bottom_left" %}selected{% endif %}>Bottom Left</option>
+                            <option value="bottom_right" {% if settings.portfolio_like_grid_position is defined and settings.portfolio_like_grid_position == "bottom_right" %}selected{% endif %}>Bottom Right</option>
+                            <option value="top_left" {% if settings.portfolio_like_grid_position is defined and settings.portfolio_like_grid_position == "top_left" %}selected{% endif %}>Top Left</option>
+                            <option value="top_right" {% if settings.portfolio_like_grid_position is defined and settings.portfolio_like_grid_position == "top_right" %}selected{% endif %}>Top Right</option>
                         </select>
                     </div>
                     {% endif %}

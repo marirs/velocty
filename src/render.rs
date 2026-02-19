@@ -1590,7 +1590,9 @@ fn render_portfolio_grid(context: &Value) -> String {
         show_cats_mode_raw
     };
     let show_cats = show_cats_mode != "false";
-    let _show_likes = sg("portfolio_enable_likes", "true") == "true";
+    let show_likes_enabled = sg("portfolio_enable_likes", "true") == "true";
+    let grid_hearts_pos = sg("portfolio_like_grid_position", "hidden");
+    let show_grid_hearts = show_likes_enabled && grid_hearts_pos != "hidden";
     let fade_mode = sg("portfolio_fade_animation", "true");
     let fade_anim = fade_mode != "none" && fade_mode != "false";
     let fade_class = if fade_mode == "slide_up" {
@@ -1753,9 +1755,8 @@ fn render_portfolio_grid(context: &Value) -> String {
 
         let item_url = slug_url(&portfolio_slug, slug);
         // Price badge HTML (overlay positions: inside the <a> tag)
-        let price_badge_overlay = if show_price && item_sell && item_price > 0.0
-            && price_position != "below_title"
-        {
+        let has_price_overlay = show_price && item_sell && item_price > 0.0 && price_position != "below_title";
+        let price_badge_overlay = if has_price_overlay {
             let pos_style = match price_position.as_str() {
                 "top_left" => "position:absolute;top:8px;left:8px",
                 "bottom_left" => "position:absolute;bottom:8px;left:8px",
@@ -1769,11 +1770,31 @@ fn render_portfolio_grid(context: &Value) -> String {
             String::new()
         };
 
+        // Heart overlay on grid thumbnail
+        let heart_overlay = if show_grid_hearts {
+            let h_is_top = grid_hearts_pos.starts_with("top");
+            let h_is_right = grid_hearts_pos.ends_with("right");
+            // Check if price badge is on the same corner
+            let price_is_top = price_position.starts_with("top");
+            let price_is_right = price_position.ends_with("right") || price_position == "top_right";
+            let same_corner = has_price_overlay && (h_is_top == price_is_top) && (h_is_right == price_is_right);
+            let v_offset = if same_corner { if h_is_top { "top:36px" } else { "bottom:36px" } }
+                           else { if h_is_top { "top:8px" } else { "bottom:8px" } };
+            let h_offset = if h_is_right { "right:8px" } else { "left:8px" };
+            format!(
+                r#"<span class="like-btn grid-heart" data-id="{}" style="position:absolute;{};{};z-index:3;background:rgba(0,0,0,.45);color:#fff;padding:3px 8px;border-radius:16px;font-size:12px;cursor:pointer;user-select:none">&hearts; <span class="like-count">{}</span></span>"#,
+                item_id, v_offset, h_offset, format_likes(likes)
+            )
+        } else {
+            String::new()
+        };
+
         html.push_str(&format!(
             r#"<div class="{item_class}" data-categories="{cats_data}" data-price="{price}" data-sell="{sell}">
     <a href="{item_url}" class="portfolio-link" data-id="{item_id}" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}" style="position:relative;display:block">
         <img src="/uploads/{image}" alt="{title}" loading="lazy">
         {price_badge}
+        {heart_overlay}
     </a>"#,
             item_class = item_class_str,
             cats_data = cats_data,
@@ -1786,6 +1807,7 @@ fn render_portfolio_grid(context: &Value) -> String {
             price = item_price,
             sell = item_sell,
             price_badge = price_badge_overlay,
+            heart_overlay = heart_overlay,
         ));
 
         // Hover overlay: shared container with dimmed background, centered content
@@ -2843,7 +2865,8 @@ const LIGHTBOX_JS: &str = r#"
                 if (d.liked) btn.classList.add('liked');
             }).catch(function(){});
             // Click to toggle
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
                 fetch('/api/like/' + lid, { method: 'POST' }).then(function(r){return r.json()}).then(function(d){
                     var countEl = btn.querySelector('.like-count');
                     if (countEl) countEl.textContent = d.count;
