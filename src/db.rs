@@ -474,17 +474,6 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("security_hcaptcha_secret_key", ""),
         // Visitors (Design)
         ("design_site_search", "true"),
-        ("design_back_to_top", "false"),
-        ("cookie_consent_enabled", "false"),
-        ("cookie_consent_style", "minimal"),
-        ("cookie_consent_position", "bottom"),
-        ("cookie_consent_policy_url", "/privacy"),
-        ("cookie_consent_theme", "auto"),
-        ("cookie_consent_show_reject", "false"),
-        ("privacy_policy_enabled", "false"),
-        ("privacy_policy_content", ""),
-        ("terms_of_use_enabled", "false"),
-        ("terms_of_use_content", ""),
         // Labels & Branding
         ("blog_label", "journal"),
         ("portfolio_label", "experiences"),
@@ -816,7 +805,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("task_analytics_max_age_days", "365"),
     ];
 
-    for (key, value) in defaults {
+    for (key, value) in &defaults {
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?1, ?2)",
             params![key, value],
@@ -861,6 +850,16 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             conn.execute(
                 "UPDATE settings SET value = ?1 WHERE key = 'ai_failover_chain'",
                 params![new_chain],
+            )?;
+        }
+    }
+
+    // Backfill legal page content if empty (fix for duplicate seed entries bug)
+    for (key, value) in &defaults {
+        if (*key == "privacy_policy_content" || *key == "terms_of_use_content") && !value.is_empty() {
+            conn.execute(
+                "UPDATE settings SET value = ?1 WHERE key = ?2 AND value = ''",
+                params![value, key],
             )?;
         }
     }

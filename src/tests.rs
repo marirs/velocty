@@ -4561,3 +4561,121 @@ fn resolve_status_handles_timezone_offset_string_gracefully() {
     );
     assert_eq!(status, "published", "timezone-aware string should not parse with NaiveDateTime");
 }
+
+// ═══════════════════════════════════════════════════════════
+// SQL seed defaults: verify all critical settings are seeded
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn seed_defaults_no_duplicate_keys() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    // Count total vs distinct keys
+    let total: i64 = conn
+        .query_row("SELECT COUNT(*) FROM settings", [], |r| r.get(0))
+        .unwrap();
+    let distinct: i64 = conn
+        .query_row("SELECT COUNT(DISTINCT key) FROM settings", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(total, distinct, "settings table should have no duplicate keys");
+}
+
+#[test]
+fn seed_defaults_privacy_policy_content_not_empty() {
+    let pool = test_pool();
+    let val = Setting::get(&pool, "privacy_policy_content").unwrap_or_default();
+    assert!(!val.is_empty(), "privacy_policy_content should have default HTML content");
+    assert!(val.contains("Privacy Policy"), "privacy_policy_content should contain 'Privacy Policy'");
+    assert!(val.contains("<h1>"), "privacy_policy_content should contain HTML headings");
+}
+
+#[test]
+fn seed_defaults_terms_of_use_content_not_empty() {
+    let pool = test_pool();
+    let val = Setting::get(&pool, "terms_of_use_content").unwrap_or_default();
+    assert!(!val.is_empty(), "terms_of_use_content should have default HTML content");
+    assert!(val.contains("Terms of Use"), "terms_of_use_content should contain 'Terms of Use'");
+    assert!(val.contains("<h1>"), "terms_of_use_content should contain HTML headings");
+}
+
+#[test]
+fn seed_defaults_critical_settings_exist() {
+    let pool = test_pool();
+    // Core settings that must always exist
+    let required_keys = vec![
+        "site_name", "site_url", "admin_slug", "admin_theme",
+        "journal_enabled", "blog_slug", "blog_posts_per_page", "blog_display_type",
+        "portfolio_enabled", "portfolio_slug", "portfolio_display_type", "portfolio_grid_columns",
+        "comments_enabled", "font_primary", "font_heading",
+        "images_allowed_types", "images_max_upload_mb",
+        "seo_sitemap_enabled", "seo_robots_txt",
+        "privacy_policy_enabled", "privacy_policy_content",
+        "terms_of_use_enabled", "terms_of_use_content",
+        "design_active_id",
+        "task_scheduled_publish_interval",
+        "firewall_enabled",
+        "cookie_consent_enabled",
+        "design_back_to_top",
+        "downloads_license_template",
+        "commerce_currency",
+    ];
+    for key in required_keys {
+        let val = Setting::get(&pool, key);
+        assert!(val.is_some(), "required setting '{}' must exist after seed_defaults", key);
+    }
+}
+
+#[test]
+fn seed_defaults_setting_groups_present() {
+    let pool = test_pool();
+    let all = Setting::all(&pool);
+    // Verify each major group has at least one key
+    let groups = vec![
+        ("seo_", "SEO"),
+        ("font_", "Fonts"),
+        ("images_", "Images"),
+        ("blog_", "Blog/Journal"),
+        ("portfolio_", "Portfolio"),
+        ("comments_", "Comments"),
+        ("social_", "Social"),
+        ("cookie_consent_", "Cookie Consent"),
+        ("fw_", "Firewall"),
+        ("ai_", "AI"),
+        ("email_", "Email"),
+        ("task_", "Background Tasks"),
+        ("commerce_", "Commerce"),
+        ("layout_", "Layout"),
+    ];
+    for (prefix, label) in groups {
+        let count = all.keys().filter(|k| k.starts_with(prefix)).count();
+        assert!(count > 0, "{} settings (prefix '{}') should have at least one entry, found {}", label, prefix, count);
+    }
+}
+
+#[test]
+fn seed_defaults_legal_content_backfill_migration() {
+    // Simulate the bug: insert empty strings first, then run seed_defaults
+    let manager = SqliteConnectionManager::memory();
+    let pool: DbPool = Pool::builder().max_size(1).build(manager).unwrap();
+    run_migrations(&pool).expect("migrations");
+    // Manually insert empty legal content (simulating the old bug)
+    {
+        let conn = pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('privacy_policy_content', '')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('terms_of_use_content', '')",
+            [],
+        ).unwrap();
+    }
+    // Now run seed_defaults — the migration should backfill
+    seed_defaults(&pool).expect("seed_defaults");
+    let pp = Setting::get(&pool, "privacy_policy_content").unwrap_or_default();
+    let tu = Setting::get(&pool, "terms_of_use_content").unwrap_or_default();
+    assert!(!pp.is_empty(), "privacy_policy_content should be backfilled from empty");
+    assert!(!tu.is_empty(), "terms_of_use_content should be backfilled from empty");
+    assert!(pp.contains("Privacy Policy"), "backfilled privacy content should contain heading");
+    assert!(tu.contains("Terms of Use"), "backfilled terms content should contain heading");
+}
