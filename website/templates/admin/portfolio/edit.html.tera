@@ -28,8 +28,17 @@
                     <input type="text" id="slug" name="slug" value="{% if item %}{{ item.slug }}{% endif %}" required>
                 </div>
                 <div class="form-group">
-                    <label for="image">Portfolio Image (required)</label>
-                    <div class="image-drop-zone {% if item and item.image_path %}has-image{% endif %}" id="portfolio-zone" style="width:100%;height:140px">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description_html" rows="10" class="editor-textarea">{% if item %}{{ item.description_html | default(value="") | safe }}{% endif %}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="editor-sidebar">
+            <div class="form-card collapsible">
+                <h4>Portfolio Image</h4>
+                <div class="form-group">
+                    <div class="image-drop-zone {% if item and item.image_path %}has-image{% endif %}" id="portfolio-zone" style="width:100%;height:120px">
                         <input type="file" id="portfolio-file" name="image" accept="image/*" {% if not item %}required{% endif %}>
                         <div class="drop-placeholder" id="portfolio-placeholder" {% if item and item.image_path %}style="display:none"{% endif %}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
@@ -43,14 +52,8 @@
                         <button type="button" class="drop-clear" id="portfolio-clear" title="Remove">&times;</button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="description">Description</label>
-                    <textarea id="description" name="description_html" rows="10" class="editor-textarea">{% if item %}{{ item.description_html | default(value="") | safe }}{% endif %}</textarea>
-                </div>
             </div>
-        </div>
 
-        <div class="editor-sidebar">
             <div class="form-card collapsible">
                 <h4>Categories</h4>
                 <div class="checkbox-list" id="category-list">
@@ -184,8 +187,8 @@
         plugins: 'lists advlist table link image media autolink code codesample searchreplace wordcount autoresize fullscreen quickbars charmap emoticons anchor visualblocks preview directionality',
         toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat{% if ai_enabled %} | aiassist{% endif %}',
         menubar: 'file edit view insert format tools table',
-        height: 400,
-        min_height: 300,
+        height: 1000,
+        min_height: 700,
         autoresize_bottom_margin: 50,
         skin: '{% if settings.admin_theme | default(value="dark") == "dark" %}oxide-dark{% else %}oxide{% endif %}',
         content_css: false,
