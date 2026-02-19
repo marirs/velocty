@@ -4653,6 +4653,110 @@ fn seed_defaults_setting_groups_present() {
 }
 
 #[test]
+fn settings_save_portfolio_disable_persists() {
+    // Simulate: portfolio is enabled, user unchecks it and saves.
+    // The form only sends _tab=portfolio (checkbox unchecked = not in form data,
+    // fieldset disabled = inner fields not sent).
+    let pool = test_pool();
+
+    // Pre-condition: portfolio is enabled
+    Setting::set(&pool, "portfolio_enabled", "true").unwrap();
+    Setting::set(&pool, "portfolio_slug", "portfolio").unwrap();
+    Setting::set(&pool, "portfolio_enable_likes", "true").unwrap();
+    assert_eq!(Setting::get(&pool, "portfolio_enabled").unwrap(), "true");
+
+    // Simulate the save flow from settings_save for section="portfolio"
+    // Step 1: Reset all checkbox keys to "false"
+    let checkbox_keys: &[&str] = &[
+        "portfolio_enabled",
+        "portfolio_enable_likes",
+        "portfolio_image_protection",
+        "portfolio_lightbox_show_title",
+        "portfolio_lightbox_show_tags",
+        "portfolio_lightbox_nav",
+        "portfolio_lightbox_keyboard",
+    ];
+    for key in checkbox_keys {
+        Setting::set(&pool, key, "false").unwrap();
+    }
+
+    // Step 2: set_many with form data (only _tab since checkbox unchecked + fieldset disabled)
+    let mut data: HashMap<String, String> = HashMap::new();
+    data.insert("_tab".to_string(), "portfolio".to_string());
+    Setting::set_many(&pool, &data).unwrap();
+
+    // portfolio_enabled should be "false" — it was reset in step 1 and NOT in form data
+    let val = Setting::get(&pool, "portfolio_enabled").unwrap();
+    assert_eq!(val, "false", "portfolio_enabled should be false after unchecking and saving");
+
+    // Other checkbox keys should also be false
+    let likes = Setting::get(&pool, "portfolio_enable_likes").unwrap();
+    assert_eq!(likes, "false", "portfolio_enable_likes should be false after save");
+}
+
+#[test]
+fn settings_save_portfolio_enable_persists() {
+    // Simulate: portfolio is disabled, user checks it and saves.
+    // The form sends portfolio_enabled=true plus all the inner fields.
+    let pool = test_pool();
+
+    // Pre-condition: portfolio is disabled
+    Setting::set(&pool, "portfolio_enabled", "false").unwrap();
+
+    // Step 1: Reset checkboxes to false
+    let checkbox_keys: &[&str] = &[
+        "portfolio_enabled",
+        "portfolio_enable_likes",
+        "portfolio_image_protection",
+        "portfolio_lightbox_show_title",
+        "portfolio_lightbox_show_tags",
+        "portfolio_lightbox_nav",
+        "portfolio_lightbox_keyboard",
+    ];
+    for key in checkbox_keys {
+        Setting::set(&pool, key, "false").unwrap();
+    }
+
+    // Step 2: set_many with form data (checkbox checked = in form data)
+    let mut data: HashMap<String, String> = HashMap::new();
+    data.insert("_tab".to_string(), "portfolio".to_string());
+    data.insert("portfolio_enabled".to_string(), "true".to_string());
+    data.insert("portfolio_slug".to_string(), "portfolio".to_string());
+    data.insert("portfolio_enable_likes".to_string(), "true".to_string());
+    Setting::set_many(&pool, &data).unwrap();
+
+    let val = Setting::get(&pool, "portfolio_enabled").unwrap();
+    assert_eq!(val, "true", "portfolio_enabled should be true after checking and saving");
+}
+
+#[test]
+fn settings_save_journal_disable_persists() {
+    // Same test for journal_enabled
+    let pool = test_pool();
+    Setting::set(&pool, "journal_enabled", "true").unwrap();
+
+    // Step 1: Reset checkboxes
+    let checkbox_keys: &[&str] = &[
+        "journal_enabled",
+        "blog_show_author",
+        "blog_show_date",
+        "blog_show_reading_time",
+        "blog_featured_image_required",
+    ];
+    for key in checkbox_keys {
+        Setting::set(&pool, key, "false").unwrap();
+    }
+
+    // Step 2: set_many with only _tab (checkbox unchecked)
+    let mut data: HashMap<String, String> = HashMap::new();
+    data.insert("_tab".to_string(), "journal".to_string());
+    Setting::set_many(&pool, &data).unwrap();
+
+    let val = Setting::get(&pool, "journal_enabled").unwrap();
+    assert_eq!(val, "false", "journal_enabled should be false after unchecking and saving");
+}
+
+#[test]
 fn seed_defaults_legal_content_backfill_migration() {
     // Simulate the bug: insert empty strings first, then run seed_defaults
     let manager = SqliteConnectionManager::memory();

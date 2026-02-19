@@ -128,8 +128,12 @@
                 e.preventDefault();
                 if (typeof tinymce !== 'undefined') tinymce.triggerSave();
                 var pubBtn = document.querySelector('button[name="status"][value="published"]');
-                if (pubBtn) { var form = document.querySelector('form'); if (form && location.hash) form.action = form.action.split('#')[0] + location.hash; pubBtn.click(); }
-                else { var form = document.querySelector('form'); if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); } }
+                // Find the right form: prefer the one inside the visible subtab panel
+                var activePanel = null;
+                document.querySelectorAll('.subtab-panel').forEach(function(p) { if (p.style.display !== 'none') activePanel = p; });
+                var form = activePanel ? activePanel.querySelector('form') : document.querySelector('form');
+                if (pubBtn) { if (form && location.hash) form.action = form.action.split('#')[0] + location.hash; pubBtn.click(); }
+                else if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); }
             }
             if (e.key === 'p' || e.key === 'P') {
                 e.preventDefault();
