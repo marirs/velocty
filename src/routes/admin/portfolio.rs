@@ -142,7 +142,7 @@ pub struct PortfolioFormData<'f> {
     pub meta_title: Option<String>,
     pub meta_description: Option<String>,
     pub sell_enabled: Option<String>,
-    pub price: Option<f64>,
+    pub price: Option<String>,
     pub purchase_note: Option<String>,
     pub payment_provider: Option<String>,
     pub download_file_path: Option<String>,
@@ -167,6 +167,10 @@ pub async fn portfolio_create(
         _ => "placeholder.jpg".to_string(),
     };
 
+    let price: Option<f64> = form.price.as_deref()
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse::<f64>().ok());
+
     let pf = PortfolioForm {
         title: form.title.clone(),
         slug: form.slug.clone(),
@@ -177,7 +181,7 @@ pub async fn portfolio_create(
         meta_title: form.meta_title.clone(),
         meta_description: form.meta_description.clone(),
         sell_enabled: Some(form.sell_enabled.is_some()),
-        price: form.price,
+        price,
         purchase_note: form.purchase_note.clone(),
         payment_provider: form.payment_provider.clone(),
         download_file_path: form.download_file_path.clone(),
@@ -254,6 +258,10 @@ pub async fn portfolio_update(
             .unwrap_or_else(|| "placeholder.jpg".to_string()),
     };
 
+    let price: Option<f64> = form.price.as_deref()
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse::<f64>().ok());
+
     let pf = PortfolioForm {
         title: form.title.clone(),
         slug: form.slug.clone(),
@@ -264,7 +272,7 @@ pub async fn portfolio_update(
         meta_title: form.meta_title.clone(),
         meta_description: form.meta_description.clone(),
         sell_enabled: Some(form.sell_enabled.is_some()),
-        price: form.price,
+        price,
         purchase_note: form.purchase_note.clone(),
         payment_provider: form.payment_provider.clone(),
         download_file_path: form.download_file_path.clone(),

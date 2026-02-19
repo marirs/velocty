@@ -404,15 +404,51 @@
         });
     })();
 
-    // Sell toggle
+    // Sell toggle — also disable inputs so they don't submit empty values
+    function toggleSellFields(on) {
+        document.getElementById('sell-fields').style.display = on ? '' : 'none';
+        document.querySelectorAll('#sell-fields input, #sell-fields select, #sell-fields textarea').forEach(function(el) {
+            el.disabled = !on;
+        });
+        if (!on) { clearPriceError(); }
+    }
+    toggleSellFields(document.getElementById('sell-toggle').checked);
     document.getElementById('sell-toggle').addEventListener('change', function() {
-        document.getElementById('sell-fields').style.display = this.checked ? '' : 'none';
+        toggleSellFields(this.checked);
     });
 
     // Auto-format price: 25 → 25.00
     document.getElementById('price').addEventListener('blur', function() {
         var v = parseFloat(this.value);
         if (!isNaN(v) && v > 0) { this.value = v.toFixed(2); }
+    });
+
+    // Price validation when sell is enabled
+    function clearPriceError() {
+        var el = document.getElementById('price-error');
+        if (el) el.remove();
+        document.getElementById('price').style.borderColor = '';
+    }
+    document.getElementById('price').addEventListener('input', clearPriceError);
+
+    document.getElementById('portfolio-form').addEventListener('submit', function(e) {
+        if (!document.getElementById('sell-toggle').checked) return;
+        var price = parseFloat(document.getElementById('price').value);
+        if (isNaN(price) || price <= 0) {
+            e.preventDefault();
+            var priceInput = document.getElementById('price');
+            priceInput.style.borderColor = 'var(--danger)';
+            priceInput.focus();
+            if (!document.getElementById('price-error')) {
+                var err = document.createElement('span');
+                err.id = 'price-error';
+                err.className = 'form-help';
+                err.style.color = 'var(--danger)';
+                err.textContent = 'Price is required when selling is enabled. Enter a value greater than 0.';
+                priceInput.parentNode.appendChild(err);
+            }
+            document.getElementById('sell-fields').style.display = '';
+        }
     });
 
     // AI Suggest functions

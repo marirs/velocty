@@ -127,8 +127,9 @@
             if (e.key === 's' || e.key === 'S') {
                 e.preventDefault();
                 if (typeof tinymce !== 'undefined') tinymce.triggerSave();
-                var form = document.querySelector('form');
-                if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); }
+                var pubBtn = document.querySelector('button[name="status"][value="published"]');
+                if (pubBtn) { var form = document.querySelector('form'); if (form && location.hash) form.action = form.action.split('#')[0] + location.hash; pubBtn.click(); }
+                else { var form = document.querySelector('form'); if (form) { if (location.hash) form.action = form.action.split('#')[0] + location.hash; form.submit(); } }
             }
             if (e.key === 'p' || e.key === 'P') {
                 e.preventDefault();
