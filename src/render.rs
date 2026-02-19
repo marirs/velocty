@@ -1794,12 +1794,10 @@ fn render_portfolio_grid(context: &Value) -> String {
                 } else {
                     "bottom:36px"
                 }
+            } else if h_is_top {
+                "top:8px"
             } else {
-                if h_is_top {
-                    "top:8px"
-                } else {
-                    "bottom:8px"
-                }
+                "bottom:8px"
             };
             let h_offset = if h_is_right { "right:8px" } else { "left:8px" };
             format!(

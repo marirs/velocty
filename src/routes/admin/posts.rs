@@ -157,7 +157,7 @@ pub async fn posts_create(
     let featured = if form
         .uploaded_featured_path
         .as_ref()
-        .map_or(false, |p| !p.is_empty())
+        .is_some_and(|p| !p.is_empty())
     {
         Some(form.uploaded_featured_path.clone().unwrap())
     } else {
@@ -255,7 +255,7 @@ pub async fn posts_update(
     let featured = if form
         .uploaded_featured_path
         .as_ref()
-        .map_or(false, |p| !p.is_empty())
+        .is_some_and(|p| !p.is_empty())
     {
         Some(form.uploaded_featured_path.clone().unwrap())
     } else {

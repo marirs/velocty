@@ -164,7 +164,7 @@ pub async fn portfolio_create(
     let image_path = if form
         .uploaded_image_path
         .as_ref()
-        .map_or(false, |p| !p.is_empty())
+        .is_some_and(|p| !p.is_empty())
     {
         form.uploaded_image_path.clone().unwrap()
     } else {
@@ -275,7 +275,7 @@ pub async fn portfolio_update(
     let image_path = if form
         .uploaded_image_path
         .as_ref()
-        .map_or(false, |p| !p.is_empty())
+        .is_some_and(|p| !p.is_empty())
     {
         form.uploaded_image_path.clone().unwrap()
     } else {
