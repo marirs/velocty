@@ -271,11 +271,12 @@ fn render_with_shell(
     let lb_nav = sg("portfolio_lightbox_nav", "true");
     let lb_keyboard = sg("portfolio_lightbox_keyboard", "true");
     let lb_buy = sg("commerce_lightbox_buy", "true");
-    let lb_buy_pos = sg("commerce_lightbox_buy_position", "bottom");
+    let lb_buy_pos = sg("commerce_lightbox_buy_position", "bottom_left");
     let commerce_cur = sg("commerce_currency", "USD");
+    let hearts_pos = sg("portfolio_like_position", "bottom_right");
 
     let data_attrs = format!(
-        "data-click-mode=\"{click_mode}\" data-show-likes=\"{show_likes}\" data-show-categories=\"{show_cats}\" data-show-tags=\"{show_tags}\" data-fade-animation=\"{fade_anim}\" data-display-type=\"{display_type}\" data-pagination-type=\"{pagination_type}\" data-lb-show-title=\"{lb_show_title}\" data-lb-show-tags=\"{lb_show_tags}\" data-lb-nav=\"{lb_nav}\" data-lb-keyboard=\"{lb_keyboard}\" data-share-position=\"{share_pos}\" data-site-url=\"{site_url}\" data-lb-buy=\"{lb_buy}\" data-lb-buy-position=\"{lb_buy_pos}\" data-commerce-currency=\"{commerce_cur}\"",
+        "data-click-mode=\"{click_mode}\" data-show-likes=\"{show_likes}\" data-show-categories=\"{show_cats}\" data-show-tags=\"{show_tags}\" data-fade-animation=\"{fade_anim}\" data-display-type=\"{display_type}\" data-pagination-type=\"{pagination_type}\" data-lb-show-title=\"{lb_show_title}\" data-lb-show-tags=\"{lb_show_tags}\" data-lb-nav=\"{lb_nav}\" data-lb-keyboard=\"{lb_keyboard}\" data-share-position=\"{share_pos}\" data-site-url=\"{site_url}\" data-lb-buy=\"{lb_buy}\" data-lb-buy-position=\"{lb_buy_pos}\" data-commerce-currency=\"{commerce_cur}\" data-hearts-position=\"{hearts_pos}\"",
         click_mode = click_mode, show_likes = show_likes, show_cats = show_cats,
         show_tags = show_tags, fade_anim = fade_anim, display_type = display_type,
         pagination_type = pagination_type, lb_show_title = lb_show_title,
@@ -283,6 +284,7 @@ fn render_with_shell(
         share_pos = sg("share_icons_position", "below_content"),
         site_url = sg("site_url", ""),
         lb_buy = lb_buy, lb_buy_pos = lb_buy_pos, commerce_cur = commerce_cur,
+        hearts_pos = hearts_pos,
     );
 
     let image_protection_js = if sg("portfolio_image_protection", "false") == "true" {
@@ -1944,11 +1946,17 @@ fn render_portfolio_single(context: &Value) -> String {
     let tags = context.get("tags").and_then(|t| t.as_array());
     let categories = context.get("categories").and_then(|c| c.as_array());
 
-    let like_html = if show_likes {
+    let hearts_pos = sg("portfolio_like_position", "bottom_right");
+    let like_overlay = if show_likes {
+        let (h_top, h_left) = match hearts_pos.as_str() {
+            "top_left" => ("top:12px", "left:12px"),
+            "top_right" => ("top:12px", "right:12px"),
+            "bottom_left" => ("bottom:12px", "left:12px"),
+            _ => ("bottom:12px", "right:12px"),
+        };
         format!(
-            r#"<span class="like-btn" data-id="{}">♥ <span class="like-count">{}</span></span>"#,
-            item_id,
-            format_likes(likes)
+            r#"<span class="like-btn" data-id="{}" style="position:absolute;{};{};z-index:10;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:20px;color:#fff;font-size:14px">♥ <span class="like-count">{}</span></span>"#,
+            item_id, h_top, h_left, format_likes(likes)
         )
     } else {
         String::new()
@@ -2001,12 +2009,14 @@ fn render_portfolio_single(context: &Value) -> String {
     }
 
     html.push_str(&format!(
-        r#"<div class="portfolio-image">
+        r#"<div class="portfolio-image" style="position:relative">
         <img src="/uploads/{image}" alt="{title}">
+        {like_overlay}
     </div>
     {share_below_image}"#,
         image = image,
         title = html_escape(title),
+        like_overlay = like_overlay,
         share_below_image = share_below_image,
     ));
 
@@ -2018,10 +2028,8 @@ fn render_portfolio_single(context: &Value) -> String {
     html.push_str(&format!(
         r#"<div class="portfolio-meta">
         <h1>{title}</h1>
-        {like_html}
     </div>"#,
         title = html_escape(title),
-        like_html = like_html,
     ));
 
     if show_cats {
@@ -2680,8 +2688,9 @@ const LIGHTBOX_JS: &str = r#"
     const siteUrl = b.siteUrl || '';
     const showLbShare = sharePos === 'below_image' && siteUrl;
     const lbBuy = b.lbBuy !== 'false';
-    const lbBuyPos = b.lbBuyPosition || 'bottom';
+    const lbBuyPos = b.lbBuyPosition || 'bottom_left';
     const commerceCur = b.commerceCurrency || 'USD';
+    const heartsPos = b.heartsPosition || 'bottom_right';
 
     // Lightbox setup — only when click mode is lightbox
     if (mode === 'lightbox') {
@@ -2694,20 +2703,28 @@ const LIGHTBOX_JS: &str = r#"
     function createOverlay() {
         overlay = document.createElement('div');
         overlay.className = 'lightbox-overlay';
-        var buyHtml = lbBuy ? '<div class="lb-buy" style="margin-top:8px"></div>' : '';
-        var contentClass = lbBuyPos === 'sidebar' && lbBuy ? 'lb-content lb-content-sidebar' : 'lb-content';
+        var buyPos = lbBuyPos === 'bottom_right' ? 'right:12px' : 'left:12px';
+        var buyHtml = lbBuy ? '<div class="lb-buy" style="position:absolute;bottom:24px;' + buyPos + ';z-index:10"></div>' : '';
+        var hIsBottom = heartsPos.indexOf('top') !== 0;
+        var hIsRight = heartsPos.indexOf('right', 1) !== -1;
+        var buyIsRight = lbBuyPos === 'bottom_right';
+        var sameCorner = lbBuy && hIsBottom && (hIsRight === buyIsRight);
+        var hTop = !hIsBottom ? 'top:12px' : (sameCorner ? 'bottom:70px' : 'bottom:24px');
+        var hLeft = hIsRight ? 'right:12px' : 'left:12px';
+        var heartsHtml = showLikes ? '<div class="lb-likes" style="position:absolute;' + hTop + ';' + hLeft + ';z-index:10;cursor:pointer;user-select:none;color:#fff;font-size:14px;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:20px"></div>' : '';
         overlay.innerHTML =
             '<button class="lb-close">&times;</button>' +
             (showNav ? '<button class="lb-prev">&lsaquo;</button><button class="lb-next">&rsaquo;</button>' : '') +
-            '<div class="' + contentClass + '">' +
-                '<img class="lb-image" src="" alt="">' +
+            '<div class="lb-content">' +
+                '<div style="position:relative;display:inline-block">' +
+                    '<img class="lb-image" src="" alt="">' +
+                    buyHtml +
+                    heartsHtml +
+                '</div>' +
                 (showLbShare ? '<div class="lb-share"></div>' : '') +
                 (showTitle ? '<div class="lb-title"></div>' : '') +
                 (showTags ? '<div class="lb-tags"></div>' : '') +
-                (showLikes ? '<div class="lb-likes" style="color:#fff;font-size:14px;margin-top:4px;cursor:pointer;user-select:none"></div>' : '') +
-                (lbBuyPos === 'bottom' ? buyHtml : '') +
-            '</div>' +
-            (lbBuyPos === 'sidebar' ? '<div class="lb-sidebar">' + buyHtml + '</div>' : '');
+            '</div>';
         document.body.appendChild(overlay);
         img = overlay.querySelector('.lb-image');
         titleEl = overlay.querySelector('.lb-title');
@@ -2803,14 +2820,14 @@ const LIGHTBOX_JS: &str = r#"
         });
     });
 
-    if (useKeyboard) {
-        document.addEventListener('keydown', function(e) {
-            if (!overlay || !overlay.classList.contains('active')) return;
-            if (e.key === 'Escape') close();
+    document.addEventListener('keydown', function(e) {
+        if (!overlay || !overlay.classList.contains('active')) return;
+        if (e.key === 'Escape') close();
+        if (useKeyboard) {
             if (e.key === 'ArrowLeft') navigate(-1);
             if (e.key === 'ArrowRight') navigate(1);
-        });
-    }
+        }
+    });
 
     } // end lightbox-only block
 
@@ -2992,7 +3009,7 @@ h6 { font-size: var(--font-size-h6); }
 .lb-share {
     display: flex;
     gap: 12px;
-    justify-content: center;
+    justify-content: flex-start;
     margin-top: 10px;
 }
 .lb-share-btn {
