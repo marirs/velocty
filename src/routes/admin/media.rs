@@ -184,7 +184,11 @@ pub struct ImageUploadForm<'f> {
 }
 
 #[post("/upload/image", data = "<form>")]
-pub async fn upload_image(_admin: AuthorUser, pool: &State<DbPool>, mut form: Form<ImageUploadForm<'_>>) -> Json<Value> {
+pub async fn upload_image(
+    _admin: AuthorUser,
+    pool: &State<DbPool>,
+    mut form: Form<ImageUploadForm<'_>>,
+) -> Json<Value> {
     if !super::is_allowed_image(&form.file, pool) {
         return Json(json!({ "error": "File type not allowed" }));
     }

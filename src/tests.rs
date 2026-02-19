@@ -4156,7 +4156,10 @@ fn render_commerce_price_badge_top_right() {
     );
     let ctx = commerce_grid_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
-    assert!(html.contains("price-badge"), "price badge should be rendered");
+    assert!(
+        html.contains("price-badge"),
+        "price badge should be rendered"
+    );
     assert!(
         html.contains("top:8px;right:8px"),
         "top_right position should have top:8px;right:8px"
@@ -4291,15 +4294,37 @@ fn render_commerce_grid_item_data_attrs() {
 #[test]
 fn license_default_text_seeded() {
     let pool = test_pool();
-    let val = Setting::get(&pool, "downloads_license_template").expect("downloads_license_template should be seeded");
-    assert!(val.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT"), "should contain license title");
-    assert!(val.contains("GRANT OF LICENSE"), "should contain grant of license section");
-    assert!(val.contains("PERMITTED USES"), "should contain permitted uses section");
-    assert!(val.contains("Commercial use in a single end product"), "should allow commercial use");
-    assert!(val.contains("RESTRICTIONS"), "should contain restrictions section");
-    assert!(val.contains("ATTRIBUTION"), "should contain attribution section");
+    let val = Setting::get(&pool, "downloads_license_template")
+        .expect("downloads_license_template should be seeded");
+    assert!(
+        val.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT"),
+        "should contain license title"
+    );
+    assert!(
+        val.contains("GRANT OF LICENSE"),
+        "should contain grant of license section"
+    );
+    assert!(
+        val.contains("PERMITTED USES"),
+        "should contain permitted uses section"
+    );
+    assert!(
+        val.contains("Commercial use in a single end product"),
+        "should allow commercial use"
+    );
+    assert!(
+        val.contains("RESTRICTIONS"),
+        "should contain restrictions section"
+    );
+    assert!(
+        val.contains("ATTRIBUTION"),
+        "should contain attribution section"
+    );
     assert!(val.contains("WARRANTY"), "should contain warranty section");
-    assert!(val.contains("TERMINATION"), "should contain termination section");
+    assert!(
+        val.contains("TERMINATION"),
+        "should contain termination section"
+    );
     assert!(val.contains("Licensor"), "should reference Licensor");
     assert!(val.contains("Licensee"), "should reference Licensee");
 }
@@ -4308,16 +4333,28 @@ fn license_default_text_seeded() {
 fn license_default_not_personal_only() {
     let pool = test_pool();
     let val = Setting::get(&pool, "downloads_license_template").unwrap();
-    assert!(!val.contains("personal, non-commercial purposes only"), "should NOT be personal-use-only license");
-    assert!(!val.contains("personal use only"), "should NOT contain personal use only");
-    assert!(val.contains("Commercial use in a single end product"), "should explicitly allow commercial use");
+    assert!(
+        !val.contains("personal, non-commercial purposes only"),
+        "should NOT be personal-use-only license"
+    );
+    assert!(
+        !val.contains("personal use only"),
+        "should NOT contain personal use only"
+    );
+    assert!(
+        val.contains("Commercial use in a single end product"),
+        "should explicitly allow commercial use"
+    );
 }
 
 #[test]
 fn license_paypal_legacy_key_absent() {
     let pool = test_pool();
     let val = Setting::get(&pool, "paypal_license_text").unwrap_or_default();
-    assert!(val.is_empty(), "paypal_license_text should be absent or empty (stale key removed from seed)");
+    assert!(
+        val.is_empty(),
+        "paypal_license_text should be absent or empty (stale key removed from seed)"
+    );
 }
 
 #[test]
@@ -4339,13 +4376,34 @@ fn license_text_generation_header() {
     txt.push_str("\n---\n\n");
     txt.push_str(license_template);
 
-    assert!(txt.starts_with("License for: Sunset Over Mountains\n"), "should start with item title");
-    assert!(txt.contains("Purchased from: My Photography\n"), "should contain site name");
-    assert!(txt.contains("Transaction: PAY-12345ABC\n"), "should contain transaction ID");
-    assert!(txt.contains("Date: 2026-02-19 10:30:00\n"), "should contain date");
-    assert!(txt.contains("License Key: A1B2-C3D4-E5F6-G7H8\n"), "should contain license key");
-    assert!(txt.contains("\n---\n\n"), "should have separator between header and body");
-    assert!(txt.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT"), "should contain license body");
+    assert!(
+        txt.starts_with("License for: Sunset Over Mountains\n"),
+        "should start with item title"
+    );
+    assert!(
+        txt.contains("Purchased from: My Photography\n"),
+        "should contain site name"
+    );
+    assert!(
+        txt.contains("Transaction: PAY-12345ABC\n"),
+        "should contain transaction ID"
+    );
+    assert!(
+        txt.contains("Date: 2026-02-19 10:30:00\n"),
+        "should contain date"
+    );
+    assert!(
+        txt.contains("License Key: A1B2-C3D4-E5F6-G7H8\n"),
+        "should contain license key"
+    );
+    assert!(
+        txt.contains("\n---\n\n"),
+        "should have separator between header and body"
+    );
+    assert!(
+        txt.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT"),
+        "should contain license body"
+    );
 }
 
 #[test]
@@ -4358,7 +4416,10 @@ fn license_text_generation_no_provider_order_id() {
     } else {
         provider_order_id.to_string()
     };
-    assert_eq!(txn_id, "ORD-42", "should fall back to ORD-ID when provider_order_id is empty");
+    assert_eq!(
+        txn_id, "ORD-42",
+        "should fall back to ORD-ID when provider_order_id is empty"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4367,11 +4428,12 @@ fn license_text_generation_no_provider_order_id() {
 
 #[test]
 fn resolve_status_published_past_date_stays_published() {
-    let status = crate::routes::admin::resolve_status(
-        "published",
-        &Some("2020-01-01T12:00".to_string()),
+    let status =
+        crate::routes::admin::resolve_status("published", &Some("2020-01-01T12:00".to_string()));
+    assert_eq!(
+        status, "published",
+        "past date + published should stay published"
     );
-    assert_eq!(status, "published", "past date + published should stay published");
 }
 
 #[test]
@@ -4380,19 +4442,28 @@ fn resolve_status_published_future_date_becomes_scheduled() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("published", &Some(future));
-    assert_eq!(status, "scheduled", "future date + published should become scheduled");
+    assert_eq!(
+        status, "scheduled",
+        "future date + published should become scheduled"
+    );
 }
 
 #[test]
 fn resolve_status_published_no_date_stays_published() {
     let status = crate::routes::admin::resolve_status("published", &None);
-    assert_eq!(status, "published", "no date + published should stay published");
+    assert_eq!(
+        status, "published",
+        "no date + published should stay published"
+    );
 }
 
 #[test]
 fn resolve_status_published_empty_date_stays_published() {
     let status = crate::routes::admin::resolve_status("published", &Some("".to_string()));
-    assert_eq!(status, "published", "empty date + published should stay published");
+    assert_eq!(
+        status, "published",
+        "empty date + published should stay published"
+    );
 }
 
 #[test]
@@ -4401,17 +4472,21 @@ fn resolve_status_draft_future_date_stays_draft() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("draft", &Some(future));
-    assert_eq!(status, "draft", "draft should stay draft regardless of date");
+    assert_eq!(
+        status, "draft",
+        "draft should stay draft regardless of date"
+    );
 }
 
 #[test]
 fn resolve_status_scheduled_past_date_stays_scheduled() {
     // resolve_status only overrides "published" → "scheduled", not the reverse
-    let status = crate::routes::admin::resolve_status(
-        "scheduled",
-        &Some("2020-01-01T12:00".to_string()),
+    let status =
+        crate::routes::admin::resolve_status("scheduled", &Some("2020-01-01T12:00".to_string()));
+    assert_eq!(
+        status, "scheduled",
+        "scheduled status is not changed by resolve_status"
     );
-    assert_eq!(status, "scheduled", "scheduled status is not changed by resolve_status");
 }
 
 #[test]
@@ -4426,7 +4501,10 @@ fn resolve_status_published_near_future_becomes_scheduled() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("published", &Some(near));
-    assert_eq!(status, "scheduled", "5 minutes in future should still schedule");
+    assert_eq!(
+        status, "scheduled",
+        "5 minutes in future should still schedule"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4438,21 +4516,30 @@ fn uploaded_path_empty_string_is_not_used() {
     // Simulates what Rocket sends for <input type="hidden" value="">
     let path: Option<String> = Some("".to_string());
     let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
-    assert!(!use_pre, "empty string should NOT be treated as a pre-uploaded path");
+    assert!(
+        !use_pre,
+        "empty string should NOT be treated as a pre-uploaded path"
+    );
 }
 
 #[test]
 fn uploaded_path_none_is_not_used() {
     let path: Option<String> = None;
     let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
-    assert!(!use_pre, "None should NOT be treated as a pre-uploaded path");
+    assert!(
+        !use_pre,
+        "None should NOT be treated as a pre-uploaded path"
+    );
 }
 
 #[test]
 fn uploaded_path_with_value_is_used() {
     let path: Option<String> = Some("editor_abc123.jpg".to_string());
     let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
-    assert!(use_pre, "non-empty path should be treated as a pre-uploaded path");
+    assert!(
+        use_pre,
+        "non-empty path should be treated as a pre-uploaded path"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4465,7 +4552,11 @@ fn utc_format_roundtrip_parseable() {
     let now = chrono::Utc::now();
     let formatted = now.format("%Y-%m-%dT%H:%M").to_string();
     let parsed = chrono::NaiveDateTime::parse_from_str(&formatted, "%Y-%m-%dT%H:%M");
-    assert!(parsed.is_ok(), "UTC formatted date should be parseable: {}", formatted);
+    assert!(
+        parsed.is_ok(),
+        "UTC formatted date should be parseable: {}",
+        formatted
+    );
 }
 
 #[test]
@@ -4475,7 +4566,11 @@ fn resolve_status_utc_future_1h_becomes_scheduled() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("published", &Some(future_utc.clone()));
-    assert_eq!(status, "scheduled", "1h future UTC date should schedule: {}", future_utc);
+    assert_eq!(
+        status, "scheduled",
+        "1h future UTC date should schedule: {}",
+        future_utc
+    );
 }
 
 #[test]
@@ -4484,7 +4579,11 @@ fn resolve_status_utc_past_1h_stays_published() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("published", &Some(past_utc.clone()));
-    assert_eq!(status, "published", "1h past UTC date should publish: {}", past_utc);
+    assert_eq!(
+        status, "published",
+        "1h past UTC date should publish: {}",
+        past_utc
+    );
 }
 
 #[test]
@@ -4494,7 +4593,11 @@ fn resolve_status_utc_past_1min_stays_published() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("published", &Some(past_utc.clone()));
-    assert_eq!(status, "published", "1min past UTC should publish: {}", past_utc);
+    assert_eq!(
+        status, "published",
+        "1min past UTC should publish: {}",
+        past_utc
+    );
 }
 
 #[test]
@@ -4504,7 +4607,11 @@ fn resolve_status_utc_future_1min_becomes_scheduled() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("published", &Some(future_utc.clone()));
-    assert_eq!(status, "scheduled", "2min future UTC should schedule: {}", future_utc);
+    assert_eq!(
+        status, "scheduled",
+        "2min future UTC should schedule: {}",
+        future_utc
+    );
 }
 
 #[test]
@@ -4513,7 +4620,10 @@ fn resolve_status_draft_with_utc_future_stays_draft() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("draft", &Some(future_utc));
-    assert_eq!(status, "draft", "draft should never be overridden to scheduled");
+    assert_eq!(
+        status, "draft",
+        "draft should never be overridden to scheduled"
+    );
 }
 
 #[test]
@@ -4523,7 +4633,10 @@ fn resolve_status_scheduled_with_utc_past_stays_scheduled() {
         .format("%Y-%m-%dT%H:%M")
         .to_string();
     let status = crate::routes::admin::resolve_status("scheduled", &Some(past_utc));
-    assert_eq!(status, "scheduled", "resolve_status should not change scheduled to published");
+    assert_eq!(
+        status, "scheduled",
+        "resolve_status should not change scheduled to published"
+    );
 }
 
 #[test]
@@ -4545,11 +4658,12 @@ fn published_at_default_fallback_is_utc() {
 fn resolve_status_date_with_seconds_format_stays_published() {
     // DB stores dates like "2026-02-19 11:30:00" — resolve_status uses "%Y-%m-%dT%H:%M"
     // This format won't parse, so status should pass through unchanged
-    let status = crate::routes::admin::resolve_status(
-        "published",
-        &Some("2020-01-01 12:00:00".to_string()),
+    let status =
+        crate::routes::admin::resolve_status("published", &Some("2020-01-01 12:00:00".to_string()));
+    assert_eq!(
+        status, "published",
+        "DB datetime format (with space+seconds) should not parse and status passes through"
     );
-    assert_eq!(status, "published", "DB datetime format (with space+seconds) should not parse and status passes through");
 }
 
 #[test]
@@ -4559,7 +4673,10 @@ fn resolve_status_handles_timezone_offset_string_gracefully() {
         "published",
         &Some("2099-01-01T12:00+04:00".to_string()),
     );
-    assert_eq!(status, "published", "timezone-aware string should not parse with NaiveDateTime");
+    assert_eq!(
+        status, "published",
+        "timezone-aware string should not parse with NaiveDateTime"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4577,25 +4694,46 @@ fn seed_defaults_no_duplicate_keys() {
     let distinct: i64 = conn
         .query_row("SELECT COUNT(DISTINCT key) FROM settings", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(total, distinct, "settings table should have no duplicate keys");
+    assert_eq!(
+        total, distinct,
+        "settings table should have no duplicate keys"
+    );
 }
 
 #[test]
 fn seed_defaults_privacy_policy_content_not_empty() {
     let pool = test_pool();
     let val = Setting::get(&pool, "privacy_policy_content").unwrap_or_default();
-    assert!(!val.is_empty(), "privacy_policy_content should have default HTML content");
-    assert!(val.contains("Privacy Policy"), "privacy_policy_content should contain 'Privacy Policy'");
-    assert!(val.contains("<h1>"), "privacy_policy_content should contain HTML headings");
+    assert!(
+        !val.is_empty(),
+        "privacy_policy_content should have default HTML content"
+    );
+    assert!(
+        val.contains("Privacy Policy"),
+        "privacy_policy_content should contain 'Privacy Policy'"
+    );
+    assert!(
+        val.contains("<h1>"),
+        "privacy_policy_content should contain HTML headings"
+    );
 }
 
 #[test]
 fn seed_defaults_terms_of_use_content_not_empty() {
     let pool = test_pool();
     let val = Setting::get(&pool, "terms_of_use_content").unwrap_or_default();
-    assert!(!val.is_empty(), "terms_of_use_content should have default HTML content");
-    assert!(val.contains("Terms of Use"), "terms_of_use_content should contain 'Terms of Use'");
-    assert!(val.contains("<h1>"), "terms_of_use_content should contain HTML headings");
+    assert!(
+        !val.is_empty(),
+        "terms_of_use_content should have default HTML content"
+    );
+    assert!(
+        val.contains("Terms of Use"),
+        "terms_of_use_content should contain 'Terms of Use'"
+    );
+    assert!(
+        val.contains("<h1>"),
+        "terms_of_use_content should contain HTML headings"
+    );
 }
 
 #[test]
@@ -4603,14 +4741,29 @@ fn seed_defaults_critical_settings_exist() {
     let pool = test_pool();
     // Core settings that must always exist
     let required_keys = vec![
-        "site_name", "site_url", "admin_slug", "admin_theme",
-        "journal_enabled", "blog_slug", "blog_posts_per_page", "blog_display_type",
-        "portfolio_enabled", "portfolio_slug", "portfolio_display_type", "portfolio_grid_columns",
-        "comments_enabled", "font_primary", "font_heading",
-        "images_allowed_types", "images_max_upload_mb",
-        "seo_sitemap_enabled", "seo_robots_txt",
-        "privacy_policy_enabled", "privacy_policy_content",
-        "terms_of_use_enabled", "terms_of_use_content",
+        "site_name",
+        "site_url",
+        "admin_slug",
+        "admin_theme",
+        "journal_enabled",
+        "blog_slug",
+        "blog_posts_per_page",
+        "blog_display_type",
+        "portfolio_enabled",
+        "portfolio_slug",
+        "portfolio_display_type",
+        "portfolio_grid_columns",
+        "comments_enabled",
+        "font_primary",
+        "font_heading",
+        "images_allowed_types",
+        "images_max_upload_mb",
+        "seo_sitemap_enabled",
+        "seo_robots_txt",
+        "privacy_policy_enabled",
+        "privacy_policy_content",
+        "terms_of_use_enabled",
+        "terms_of_use_content",
         "task_scheduled_publish_interval",
         "firewall_enabled",
         "cookie_consent_enabled",
@@ -4620,7 +4773,11 @@ fn seed_defaults_critical_settings_exist() {
     ];
     for key in required_keys {
         let val = Setting::get(&pool, key);
-        assert!(val.is_some(), "required setting '{}' must exist after seed_defaults", key);
+        assert!(
+            val.is_some(),
+            "required setting '{}' must exist after seed_defaults",
+            key
+        );
     }
 }
 
@@ -4647,7 +4804,13 @@ fn seed_defaults_setting_groups_present() {
     ];
     for (prefix, label) in groups {
         let count = all.keys().filter(|k| k.starts_with(prefix)).count();
-        assert!(count > 0, "{} settings (prefix '{}') should have at least one entry, found {}", label, prefix, count);
+        assert!(
+            count > 0,
+            "{} settings (prefix '{}') should have at least one entry, found {}",
+            label,
+            prefix,
+            count
+        );
     }
 }
 
@@ -4682,11 +4845,17 @@ fn settings_save_portfolio_disable_persists() {
 
     // portfolio_enabled should be "false" — it was reset in step 1 and NOT in form data
     let val = Setting::get(&pool, "portfolio_enabled").unwrap();
-    assert_eq!(val, "false", "portfolio_enabled should be false after unchecking and saving");
+    assert_eq!(
+        val, "false",
+        "portfolio_enabled should be false after unchecking and saving"
+    );
 
     // Other checkbox keys should also be false
     let likes = Setting::get(&pool, "portfolio_enable_likes").unwrap();
-    assert_eq!(likes, "false", "portfolio_enable_likes should be false after save");
+    assert_eq!(
+        likes, "false",
+        "portfolio_enable_likes should be false after save"
+    );
 }
 
 #[test]
@@ -4717,7 +4886,10 @@ fn settings_save_portfolio_enable_persists() {
     Setting::set_many(&pool, &data).unwrap();
 
     let val = Setting::get(&pool, "portfolio_enabled").unwrap();
-    assert_eq!(val, "true", "portfolio_enabled should be true after checking and saving");
+    assert_eq!(
+        val, "true",
+        "portfolio_enabled should be true after checking and saving"
+    );
 }
 
 #[test]
@@ -4744,7 +4916,10 @@ fn settings_save_journal_disable_persists() {
     Setting::set_many(&pool, &data).unwrap();
 
     let val = Setting::get(&pool, "journal_enabled").unwrap();
-    assert_eq!(val, "false", "journal_enabled should be false after unchecking and saving");
+    assert_eq!(
+        val, "false",
+        "journal_enabled should be false after unchecking and saving"
+    );
 }
 
 #[test]
@@ -4759,18 +4934,32 @@ fn seed_defaults_legal_content_backfill_migration() {
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES ('privacy_policy_content', '')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES ('terms_of_use_content', '')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
     }
     // Now run seed_defaults — the migration should backfill
     seed_defaults(&pool).expect("seed_defaults");
     let pp = Setting::get(&pool, "privacy_policy_content").unwrap_or_default();
     let tu = Setting::get(&pool, "terms_of_use_content").unwrap_or_default();
-    assert!(!pp.is_empty(), "privacy_policy_content should be backfilled from empty");
-    assert!(!tu.is_empty(), "terms_of_use_content should be backfilled from empty");
-    assert!(pp.contains("Privacy Policy"), "backfilled privacy content should contain heading");
-    assert!(tu.contains("Terms of Use"), "backfilled terms content should contain heading");
+    assert!(
+        !pp.is_empty(),
+        "privacy_policy_content should be backfilled from empty"
+    );
+    assert!(
+        !tu.is_empty(),
+        "terms_of_use_content should be backfilled from empty"
+    );
+    assert!(
+        pp.contains("Privacy Policy"),
+        "backfilled privacy content should contain heading"
+    );
+    assert!(
+        tu.contains("Terms of Use"),
+        "backfilled terms content should contain heading"
+    );
 }

@@ -1610,7 +1610,11 @@ fn render_portfolio_grid(context: &Value) -> String {
     let price_position = sg("commerce_price_position", "top_right");
     let commerce_currency = {
         let c = sg("commerce_currency", "USD");
-        if c.is_empty() { "USD".to_string() } else { c }
+        if c.is_empty() {
+            "USD".to_string()
+        } else {
+            c
+        }
     };
 
     let grid_class = if display_type == "grid" {
@@ -1757,7 +1761,8 @@ fn render_portfolio_grid(context: &Value) -> String {
 
         let item_url = slug_url(&portfolio_slug, slug);
         // Price badge HTML (overlay positions: inside the <a> tag)
-        let has_price_overlay = show_price && item_sell && item_price > 0.0 && price_position != "below_title";
+        let has_price_overlay =
+            show_price && item_sell && item_price > 0.0 && price_position != "below_title";
         let price_badge_overlay = if has_price_overlay {
             let pos_style = match price_position.as_str() {
                 "top_left" => "position:absolute;top:8px;left:8px",
@@ -1766,7 +1771,9 @@ fn render_portfolio_grid(context: &Value) -> String {
             };
             format!(
                 r#"<span class="price-badge" style="{};background:rgba(0,0,0,.75);color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:700;z-index:2">{} {:.2}</span>"#,
-                pos_style, html_escape(&commerce_currency), item_price
+                pos_style,
+                html_escape(&commerce_currency),
+                item_price
             )
         } else {
             String::new()
@@ -1779,13 +1786,28 @@ fn render_portfolio_grid(context: &Value) -> String {
             // Check if price badge is on the same corner
             let price_is_top = price_position.starts_with("top");
             let price_is_right = price_position.ends_with("right") || price_position == "top_right";
-            let same_corner = has_price_overlay && (h_is_top == price_is_top) && (h_is_right == price_is_right);
-            let v_offset = if same_corner { if h_is_top { "top:36px" } else { "bottom:36px" } }
-                           else { if h_is_top { "top:8px" } else { "bottom:8px" } };
+            let same_corner =
+                has_price_overlay && (h_is_top == price_is_top) && (h_is_right == price_is_right);
+            let v_offset = if same_corner {
+                if h_is_top {
+                    "top:36px"
+                } else {
+                    "bottom:36px"
+                }
+            } else {
+                if h_is_top {
+                    "top:8px"
+                } else {
+                    "bottom:8px"
+                }
+            };
             let h_offset = if h_is_right { "right:8px" } else { "left:8px" };
             format!(
                 r#"<span class="like-btn grid-heart" data-id="{}" style="position:absolute;{};{};z-index:3;background:rgba(0,0,0,.45);color:#fff;padding:3px 8px;border-radius:16px;font-size:12px;cursor:pointer;user-select:none">&hearts; <span class="like-count">{}</span></span>"#,
-                item_id, v_offset, h_offset, format_likes(likes)
+                item_id,
+                v_offset,
+                h_offset,
+                format_likes(likes)
             )
         } else {
             String::new()
@@ -1980,7 +2002,10 @@ fn render_portfolio_single(context: &Value) -> String {
         };
         format!(
             r#"<span class="like-btn" data-id="{}" style="position:absolute;{};{};z-index:10;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:20px;color:#fff;font-size:14px">♥ <span class="like-count">{}</span></span>"#,
-            item_id, h_top, h_left, format_likes(likes)
+            item_id,
+            h_top,
+            h_left,
+            format_likes(likes)
         )
     } else {
         String::new()
@@ -2116,7 +2141,9 @@ fn render_portfolio_single(context: &Value) -> String {
     // Close sidebar layout main column and add commerce sidebar
     if is_sidebar_commerce {
         html.push_str("</div>"); // end portfolio-single-main
-        html.push_str(r#"<div class="portfolio-single-sidebar" style="width:340px;flex-shrink:0">"#);
+        html.push_str(
+            r#"<div class="portfolio-single-sidebar" style="width:340px;flex-shrink:0">"#,
+        );
         html.push_str(&commerce_html);
         html.push_str("</div>"); // end portfolio-single-sidebar
         html.push_str("</div>"); // end portfolio-single-row
@@ -4376,7 +4403,11 @@ fn build_commerce_html(
     // Designer settings
     let btn_alignment = {
         let a = gs("commerce_button_alignment");
-        if a.is_empty() { "full_width" } else { a }
+        if a.is_empty() {
+            "full_width"
+        } else {
+            a
+        }
     };
     let btn_radius = {
         let r = gs("commerce_button_radius");
@@ -4407,7 +4438,11 @@ fn build_commerce_html(
 
     let btn_position = {
         let p = gs("commerce_button_position");
-        if p.is_empty() { "below_description" } else { p }
+        if p.is_empty() {
+            "below_description"
+        } else {
+            p
+        }
     };
 
     let mut s = String::new();
@@ -4443,16 +4478,54 @@ fn build_commerce_html(
         _ => {
             // All non-PayPal providers use HTML buttons with customizable styling
             let (default_bg, default_label, btn_id, onclick) = match provider.as_str() {
-                "stripe" => ("#635BFF", "Pay with Stripe", "stripe-buy-btn", "commerceRedirect('stripe')"),
-                "razorpay" => ("#072654", "Pay with Razorpay", "razorpay-buy-btn", "commerceRazorpay()"),
-                "mollie" => ("#0a0a0a", "Pay with Mollie", "mollie-buy-btn", "commerceRedirect('mollie')"),
-                "square" => ("#006AFF", "Pay with Square", "square-buy-btn", "commerceRedirect('square')"),
-                "2checkout" => ("#F36F21", "Pay with 2Checkout", "2co-buy-btn", "commerceRedirect('2checkout')"),
-                "payoneer" => ("#FF6C00", "Pay with Payoneer", "payoneer-buy-btn", "commerceRedirect('payoneer')"),
+                "stripe" => (
+                    "#635BFF",
+                    "Pay with Stripe",
+                    "stripe-buy-btn",
+                    "commerceRedirect('stripe')",
+                ),
+                "razorpay" => (
+                    "#072654",
+                    "Pay with Razorpay",
+                    "razorpay-buy-btn",
+                    "commerceRazorpay()",
+                ),
+                "mollie" => (
+                    "#0a0a0a",
+                    "Pay with Mollie",
+                    "mollie-buy-btn",
+                    "commerceRedirect('mollie')",
+                ),
+                "square" => (
+                    "#006AFF",
+                    "Pay with Square",
+                    "square-buy-btn",
+                    "commerceRedirect('square')",
+                ),
+                "2checkout" => (
+                    "#F36F21",
+                    "Pay with 2Checkout",
+                    "2co-buy-btn",
+                    "commerceRedirect('2checkout')",
+                ),
+                "payoneer" => (
+                    "#FF6C00",
+                    "Pay with Payoneer",
+                    "payoneer-buy-btn",
+                    "commerceRedirect('payoneer')",
+                ),
                 _ => return String::new(),
             };
-            let bg = if custom_color.is_empty() { default_bg } else { custom_color };
-            let label = if custom_label.is_empty() { default_label } else { custom_label };
+            let bg = if custom_color.is_empty() {
+                default_bg
+            } else {
+                custom_color
+            };
+            let label = if custom_label.is_empty() {
+                default_label
+            } else {
+                custom_label
+            };
             s.push_str(&format!(
                 r#"<button type="button" id="{}" style="{};background:{};color:#fff" onclick="{}">{}</button>"#,
                 btn_id, btn_style, bg, onclick, html_escape(label)
@@ -4556,11 +4629,35 @@ fn build_commerce_html(
         };
         s.push_str("</script>\n");
         s.push_str(&format!("<script src=\"https://www.paypal.com/sdk/js?client-id={}&currency={}\"></script>\n<script>\n", html_escape(pp_id), html_escape(pp_cur)));
-        let pp_color = { let c = gs("paypal_button_color"); if c.is_empty() { "gold" } else { c } };
-        let pp_shape = { let c = gs("paypal_button_shape"); if c.is_empty() { "rect" } else { c } };
-        let pp_label = { let c = gs("paypal_button_label"); if c.is_empty() { "pay" } else { c } };
+        let pp_color = {
+            let c = gs("paypal_button_color");
+            if c.is_empty() {
+                "gold"
+            } else {
+                c
+            }
+        };
+        let pp_shape = {
+            let c = gs("paypal_button_shape");
+            if c.is_empty() {
+                "rect"
+            } else {
+                c
+            }
+        };
+        let pp_label = {
+            let c = gs("paypal_button_label");
+            if c.is_empty() {
+                "pay"
+            } else {
+                c
+            }
+        };
         s.push_str("paypal.Buttons({\n");
-        s.push_str(&format!("style:{{layout:'vertical',color:'{}',shape:'{}',label:'{}'}},\n", pp_color, pp_shape, pp_label));
+        s.push_str(&format!(
+            "style:{{layout:'vertical',color:'{}',shape:'{}',label:'{}'}},\n",
+            pp_color, pp_shape, pp_label
+        ));
         s.push_str("createOrder:function(){\n");
         s.push_str("var email=_vEmail();if(!email)return;\n");
         s.push_str("return fetch('/api/checkout/paypal/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({portfolio_id:_vItemId})}).then(function(r){return r.json()}).then(function(d){if(!d.ok){alert(d.error||'Failed');return;}window._vOid=d.order_id;return d.order_id.toString();});\n");

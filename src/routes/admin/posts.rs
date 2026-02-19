@@ -154,7 +154,11 @@ pub async fn posts_create(
     slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
-    let featured = if form.uploaded_featured_path.as_ref().map_or(false, |p| !p.is_empty()) {
+    let featured = if form
+        .uploaded_featured_path
+        .as_ref()
+        .map_or(false, |p| !p.is_empty())
+    {
         Some(form.uploaded_featured_path.clone().unwrap())
     } else {
         match form.featured_image.as_mut() {
@@ -190,7 +194,10 @@ pub async fn posts_create(
         tag_ids: None,
     };
     let final_status = super::resolve_status(&form.status, &post_form.published_at);
-    let post_form = PostForm { status: final_status.clone(), ..post_form };
+    let post_form = PostForm {
+        status: final_status.clone(),
+        ..post_form
+    };
 
     match Post::create(pool, &post_form) {
         Ok(id) => {
@@ -245,17 +252,17 @@ pub async fn posts_update(
     id: i64,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
-    let featured = if form.uploaded_featured_path.as_ref().map_or(false, |p| !p.is_empty()) {
+    let featured = if form
+        .uploaded_featured_path
+        .as_ref()
+        .map_or(false, |p| !p.is_empty())
+    {
         Some(form.uploaded_featured_path.clone().unwrap())
     } else {
         match form.featured_image.as_mut() {
             Some(f) if f.len() > 0 => {
                 if !super::is_allowed_image(f, pool) {
-                    return Redirect::to(format!(
-                        "{}/posts/{}/edit",
-                        admin_base(slug),
-                        id
-                    ));
+                    return Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id));
                 }
                 save_upload(f, "post", pool).await
             }
@@ -290,7 +297,10 @@ pub async fn posts_update(
         tag_ids: None,
     };
     let final_status = super::resolve_status(&form.status, &post_form.published_at);
-    let post_form = PostForm { status: final_status.clone(), ..post_form };
+    let post_form = PostForm {
+        status: final_status.clone(),
+        ..post_form
+    };
 
     let _ = Post::update(pool, id, &post_form);
     if let Some(ref cat_ids) = form.category_ids {

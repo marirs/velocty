@@ -408,8 +408,7 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             || current.contains("personal use only")
             || current.contains("personal use.")
             || current.contains("non-commercial purposes only")
-            || (!current.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT")
-                && current.len() < 200);
+            || (!current.contains("DIGITAL DOWNLOAD LICENSE AGREEMENT") && current.len() < 200);
         if needs_reset {
             let license = "DIGITAL DOWNLOAD LICENSE AGREEMENT\n\nThis license is granted by the website owner (\"Licensor\") to the purchaser (\"Licensee\").\n\n1. GRANT OF LICENSE\nThe Licensor grants the Licensee a non-exclusive, non-transferable, worldwide license to use the purchased digital file (\"Work\") subject to the terms below.\n\n2. PERMITTED USES\n- Personal use (prints, wallpapers, personal projects)\n- Commercial use in a single end product (website, marketing material, publication)\n- Social media use with credit to the Licensor\n\n3. RESTRICTIONS\n- The Work may NOT be resold, sublicensed, or redistributed as-is\n- The Work may NOT be used in on-demand print services (POD) without a separate license\n- The Work may NOT be included in any competing stock/download service\n- The Work may NOT be used to train AI or machine learning models\n\n4. ATTRIBUTION\nAttribution is appreciated but not required for personal or commercial use.\n\n5. WARRANTY\nThe Work is provided \"as is\" without warranty of any kind. The Licensor is not liable for any damages arising from the use of the Work.\n\n6. TERMINATION\nThis license is effective until terminated. It terminates automatically if the Licensee breaches any terms. Upon termination, the Licensee must destroy all copies of the Work.\n\nBy downloading the Work, the Licensee agrees to these terms.";
             conn.execute(
@@ -850,7 +849,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
 
     // Backfill legal page content if empty (fix for duplicate seed entries bug)
     for (key, value) in &defaults {
-        if (*key == "privacy_policy_content" || *key == "terms_of_use_content") && !value.is_empty() {
+        if (*key == "privacy_policy_content" || *key == "terms_of_use_content") && !value.is_empty()
+        {
             conn.execute(
                 "UPDATE settings SET value = ?1 WHERE key = ?2 AND value = ''",
                 params![value, key],

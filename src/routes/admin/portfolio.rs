@@ -161,7 +161,11 @@ pub async fn portfolio_create(
     slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
-    let image_path = if form.uploaded_image_path.as_ref().map_or(false, |p| !p.is_empty()) {
+    let image_path = if form
+        .uploaded_image_path
+        .as_ref()
+        .map_or(false, |p| !p.is_empty())
+    {
         form.uploaded_image_path.clone().unwrap()
     } else {
         match form.image.as_mut() {
@@ -177,7 +181,9 @@ pub async fn portfolio_create(
         }
     };
 
-    let price: Option<f64> = form.price.as_deref()
+    let price: Option<f64> = form
+        .price
+        .as_deref()
         .filter(|s| !s.is_empty())
         .and_then(|s| s.parse::<f64>().ok());
 
@@ -208,7 +214,10 @@ pub async fn portfolio_create(
         tag_ids: None,
     };
     let final_status = super::resolve_status(&form.status, &pf.published_at);
-    let pf = PortfolioForm { status: final_status.clone(), ..pf };
+    let pf = PortfolioForm {
+        status: final_status.clone(),
+        ..pf
+    };
 
     match PortfolioItem::create(pool, &pf) {
         Ok(id) => {
@@ -263,17 +272,17 @@ pub async fn portfolio_update(
     id: i64,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
-    let image_path = if form.uploaded_image_path.as_ref().map_or(false, |p| !p.is_empty()) {
+    let image_path = if form
+        .uploaded_image_path
+        .as_ref()
+        .map_or(false, |p| !p.is_empty())
+    {
         form.uploaded_image_path.clone().unwrap()
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
                 if !super::is_allowed_image(f, pool) {
-                    return Redirect::to(format!(
-                        "{}/portfolio/{}/edit",
-                        admin_base(slug),
-                        id
-                    ));
+                    return Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id));
                 }
                 save_upload(f, "portfolio", pool)
                     .await
@@ -285,7 +294,9 @@ pub async fn portfolio_update(
         }
     };
 
-    let price: Option<f64> = form.price.as_deref()
+    let price: Option<f64> = form
+        .price
+        .as_deref()
         .filter(|s| !s.is_empty())
         .and_then(|s| s.parse::<f64>().ok());
 
@@ -321,7 +332,10 @@ pub async fn portfolio_update(
         tag_ids: None,
     };
     let final_status = super::resolve_status(&form.status, &pf.published_at);
-    let pf = PortfolioForm { status: final_status.clone(), ..pf };
+    let pf = PortfolioForm {
+        status: final_status.clone(),
+        ..pf
+    };
 
     let _ = PortfolioItem::update(pool, id, &pf);
     if let Some(ref cat_ids) = form.category_ids {

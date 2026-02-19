@@ -51,11 +51,10 @@ pub(crate) async fn save_upload(
         .and_then(|ct| ct.extension())
         .map(|e| e.to_string())
         .or_else(|| {
-            file.raw_name()
-                .and_then(|rn| {
-                    let s = rn.dangerous_unsafe_unsanitized_raw().as_str().to_string();
-                    s.rsplit('.').next().map(|e| e.to_lowercase())
-                })
+            file.raw_name().and_then(|rn| {
+                let s = rn.dangerous_unsafe_unsanitized_raw().as_str().to_string();
+                s.rsplit('.').next().map(|e| e.to_lowercase())
+            })
         })
         .or_else(|| {
             file.name()
@@ -101,8 +100,7 @@ pub(crate) async fn save_upload(
     }
 
     // ── WebP conversion for other image types ──
-    if Setting::get_bool(pool, "images_webp_convert") && ext_lower != "webp" && ext_lower != "svg"
-    {
+    if Setting::get_bool(pool, "images_webp_convert") && ext_lower != "webp" && ext_lower != "svg" {
         if let Some(webp_name) = convert_to_webp_file(&dest, prefix, &uid, upload_dir) {
             let _ = std::fs::remove_file(&dest);
             return Some(webp_name);
@@ -187,11 +185,10 @@ pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
         .and_then(|ct| ct.extension())
         .map(|e| e.to_string().to_lowercase())
         .or_else(|| {
-            file.raw_name()
-                .and_then(|rn| {
-                    let s = rn.dangerous_unsafe_unsanitized_raw().as_str().to_string();
-                    s.rsplit('.').next().map(|e| e.to_lowercase())
-                })
+            file.raw_name().and_then(|rn| {
+                let s = rn.dangerous_unsafe_unsanitized_raw().as_str().to_string();
+                s.rsplit('.').next().map(|e| e.to_lowercase())
+            })
         })
         .or_else(|| {
             file.name()
