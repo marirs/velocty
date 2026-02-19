@@ -114,7 +114,7 @@ pub fn build_css_variables(settings: &Value) -> String {
     --content-margin-left: {margin_left};
     --content-margin-right: {margin_right};
     --content-max-width: {content_max_width};
-    --grid-gap: 8px;
+    --grid-gap: 12px;
     --grid-columns: {grid_cols};
     --blog-grid-columns: {blog_grid_cols};
     --lightbox-border-color: {lb_border};
