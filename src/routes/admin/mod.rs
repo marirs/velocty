@@ -1,5 +1,7 @@
 use rocket::fs::TempFile;
 
+use crate::db::DbPool;
+use crate::models::settings::Setting;
 use crate::AdminSlug;
 
 pub mod api;
@@ -22,19 +24,167 @@ pub(crate) fn admin_base(slug: &AdminSlug) -> String {
     format!("/{}", slug.0)
 }
 
-pub(crate) async fn save_upload(file: &mut TempFile<'_>, prefix: &str) -> Option<String> {
+pub(crate) async fn save_upload(
+    file: &mut TempFile<'_>,
+    prefix: &str,
+    pool: &DbPool,
+) -> Option<String> {
+    // Try content-type extension first, then original filename (raw_name), then field name
     let ext = file
         .content_type()
         .and_then(|ct| ct.extension())
         .map(|e| e.to_string())
+        .or_else(|| {
+            file.raw_name()
+                .and_then(|rn| {
+                    let s = rn.dangerous_unsafe_unsanitized_raw().as_str().to_string();
+                    s.rsplit('.').next().map(|e| e.to_lowercase())
+                })
+        })
+        .or_else(|| {
+            file.name()
+                .and_then(|n| n.rsplit('.').next())
+                .map(|e| e.to_lowercase())
+        })
         .unwrap_or_else(|| "jpg".to_string());
-    let filename = format!("{}_{}.{}", prefix, uuid::Uuid::new_v4(), ext);
-    let dest = std::path::Path::new("website/site/uploads").join(&filename);
-    let _ = std::fs::create_dir_all("website/site/uploads");
-    match file.persist_to(&dest).await {
-        Ok(_) => Some(filename),
-        Err(_) => None,
+
+    let uid = uuid::Uuid::new_v4();
+    let filename = format!("{}_{}.{}", prefix, uid, ext);
+    let upload_dir = std::path::Path::new("website/site/uploads");
+    let _ = std::fs::create_dir_all(upload_dir);
+    let dest = upload_dir.join(&filename);
+
+    if file.persist_to(&dest).await.is_err() {
+        return None;
     }
+
+    let ext_lower = ext.to_lowercase();
+
+    // ── HEIC/HEIF → JPG conversion (always, browsers can't display HEIC) ──
+    if ext_lower == "heic" || ext_lower == "heif" {
+        let jpg_filename = format!("{}_{}.jpg", prefix, uid);
+        let jpg_dest = upload_dir.join(&jpg_filename);
+
+        let converted = convert_heic_to_jpg(&dest, &jpg_dest);
+        // Remove the original HEIC file regardless
+        let _ = std::fs::remove_file(&dest);
+
+        if !converted {
+            return None;
+        }
+
+        // If WebP conversion is enabled, convert the JPG to WebP
+        if Setting::get_bool(pool, "images_webp_convert") {
+            if let Some(webp_name) = convert_to_webp_file(&jpg_dest, prefix, &uid, upload_dir) {
+                let _ = std::fs::remove_file(&jpg_dest);
+                return Some(webp_name);
+            }
+        }
+
+        return Some(jpg_filename);
+    }
+
+    // ── WebP conversion for other image types ──
+    if Setting::get_bool(pool, "images_webp_convert") && ext_lower != "webp" && ext_lower != "svg"
+    {
+        if let Some(webp_name) = convert_to_webp_file(&dest, prefix, &uid, upload_dir) {
+            let _ = std::fs::remove_file(&dest);
+            return Some(webp_name);
+        }
+    }
+
+    Some(filename)
+}
+
+/// Convert HEIC/HEIF to JPG using system tools (sips on macOS, magick/heif-convert on Linux)
+fn convert_heic_to_jpg(src: &std::path::Path, dst: &std::path::Path) -> bool {
+    // Try sips (macOS built-in)
+    if let Ok(status) = std::process::Command::new("sips")
+        .args(["-s", "format", "jpeg", "-s", "formatOptions", "85"])
+        .arg(src)
+        .arg("--out")
+        .arg(dst)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+    {
+        if status.success() {
+            return true;
+        }
+    }
+    // Try ImageMagick (magick convert)
+    if let Ok(status) = std::process::Command::new("magick")
+        .arg(src)
+        .arg("-quality")
+        .arg("85")
+        .arg(dst)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+    {
+        if status.success() {
+            return true;
+        }
+    }
+    // Try heif-convert
+    if let Ok(status) = std::process::Command::new("heif-convert")
+        .arg(src)
+        .arg(dst)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+    {
+        if status.success() {
+            return true;
+        }
+    }
+    false
+}
+
+/// Convert an image file to WebP using the image + webp crates
+fn convert_to_webp_file(
+    src: &std::path::Path,
+    prefix: &str,
+    uid: &uuid::Uuid,
+    upload_dir: &std::path::Path,
+) -> Option<String> {
+    let img = image::open(src).ok()?;
+    let (w, h) = image::GenericImageView::dimensions(&img);
+    let rgba = img.to_rgba8();
+    let encoder = webp::Encoder::from_rgba(&rgba, w, h);
+    let webp_data = encoder.encode(85.0);
+    let webp_filename = format!("{}_{}.webp", prefix, uid);
+    let webp_dest = upload_dir.join(&webp_filename);
+    std::fs::write(&webp_dest, &*webp_data).ok()?;
+    Some(webp_filename)
+}
+
+/// Check if a file extension is in the allowed image types
+pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
+    let allowed = Setting::get(pool, "images_allowed_types")
+        .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
+    let allowed_list: Vec<&str> = allowed.split(',').map(|s| s.trim()).collect();
+
+    // Get extension from content type, then original filename (raw_name), then field name
+    let ext = file
+        .content_type()
+        .and_then(|ct| ct.extension())
+        .map(|e| e.to_string().to_lowercase())
+        .or_else(|| {
+            file.raw_name()
+                .and_then(|rn| {
+                    let s = rn.dangerous_unsafe_unsanitized_raw().as_str().to_string();
+                    s.rsplit('.').next().map(|e| e.to_lowercase())
+                })
+        })
+        .or_else(|| {
+            file.name()
+                .and_then(|n| n.rsplit('.').next())
+                .map(|e| e.to_lowercase())
+        })
+        .unwrap_or_default();
+
+    allowed_list.iter().any(|a| a.eq_ignore_ascii_case(&ext))
 }
 
 pub fn routes() -> Vec<rocket::Route> {

@@ -235,7 +235,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 | **Portfolio** | Grid columns, likes, lightbox, image protection, animations |
 | **Comments** | Enable/disable, moderation mode, spam protection, rate limits |
 | **Typography** | Fonts, sizes, sources, per-element assignment |
-| **Media** | Image upload (max size, quality, WebP, thumbnails), video upload (types, size, duration), media organization (6 folder structures) |
+| **Media** | Image upload (max size, quality, WebP, thumbnails, HEIC/HEIF conversion), video upload (types, size, duration), media organization (6 folder structures) |
 | **SEO** | Title template, meta defaults, sitemap, structured data, robots.txt, webmaster verification, 7 analytics providers |
 | **Security** | Admin slug, auth method, MFA, sessions, rate limits, captcha, anti-spam |
 | **Frontend** | Active design, back-to-top button |
@@ -253,6 +253,14 @@ Velocty guides you through a 4-step setup wizard on first run:
 
 - Rust toolchain (1.75+)
 - (Optional) [MaxMind GeoLite2-City.mmdb](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) for analytics geo-lookup
+
+### Optional System Dependencies
+
+| Feature | macOS | Linux |
+|---|---|---|
+| **HEIC/HEIF image upload** | Built-in (`sips`) — no install needed | `apt install imagemagick` or `apt install libheif-examples` |
+
+HEIC/HEIF support is **not enabled by default**. To enable it, add `heic` and/or `heif` to the allowed image types in **Settings › Media**. A confirmation dialog will explain the system requirements. When enabled, HEIC/HEIF files are automatically converted to JPEG on upload — no browser plugin or Rust crate needed.
 
 ### Build & Run
 

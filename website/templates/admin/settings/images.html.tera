@@ -33,7 +33,7 @@
         <label class="checkbox-item"><input type="checkbox" name="images_webp_convert" value="true" {% if settings.images_webp_convert == "true" %}checked{% endif %}> Auto-convert to WebP</label>
         <div class="form-group" style="margin-top:16px">
             <label for="images_allowed_types">Allowed Image Types</label>
-            <input type="text" id="images_allowed_types" name="images_allowed_types" value="{{ settings.images_allowed_types | default(value='jpg,jpeg,png,gif,webp,svg,tiff,heic') }}">
+            <input type="text" id="images_allowed_types" name="images_allowed_types" value="{{ settings.images_allowed_types | default(value='jpg,jpeg,png,gif,webp,svg,tiff') }}">
             <span class="form-help">Comma-separated list of allowed image extensions.</span>
         </div>
     </div>
@@ -102,6 +102,53 @@
             fs.disabled = !this.checked;
         });
     }
+})();
+
+// HEIC/HEIF confirmation modal on save
+(function() {
+    var form = document.querySelector('form[action$="/settings/images"]');
+    if (!form) return;
+    var confirmed = false;
+
+    form.addEventListener('submit', function(e) {
+        if (confirmed) return;
+        var val = (document.getElementById('images_allowed_types').value || '').toLowerCase();
+        var types = val.split(',').map(function(s){ return s.trim(); });
+        var hasHeic = types.indexOf('heic') !== -1 || types.indexOf('heif') !== -1;
+        if (!hasHeic) return;
+
+        e.preventDefault();
+
+        // Create modal overlay
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+        var modal = document.createElement('div');
+        modal.style.cssText = 'background:var(--bg-card,#1e1e2e);border:1px solid var(--border-subtle,#333);border-radius:12px;padding:24px;max-width:440px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.5)';
+        modal.innerHTML = '<h3 style="margin:0 0 12px;font-size:16px;color:var(--text-primary,#fff)">⚠️ HEIC/HEIF Support</h3>'
+            + '<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:var(--text-secondary,#aaa)">'
+            + 'HEIC/HEIF files will be automatically converted to JPEG on upload. This requires a system tool:<br><br>'
+            + '<strong style="color:var(--text-primary,#fff)">macOS:</strong> Built-in (<code>sips</code>) — no install needed.<br>'
+            + '<strong style="color:var(--text-primary,#fff)">Linux:</strong> Requires <code>imagemagick</code> or <code>libheif-examples</code>.<br><br>'
+            + 'If no converter is available, HEIC uploads will fail silently.</p>'
+            + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+            + '<button id="heic-cancel" style="padding:8px 16px;border-radius:6px;border:1px solid var(--border-input,#444);background:transparent;color:var(--text-primary,#fff);cursor:pointer;font-size:13px">Cancel</button>'
+            + '<button id="heic-confirm" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent,#e8913a);color:#fff;cursor:pointer;font-weight:600;font-size:13px">Enable & Save</button>'
+            + '</div>';
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', function(ev) {
+            if (ev.target === overlay) { overlay.remove(); }
+        });
+        document.getElementById('heic-cancel').addEventListener('click', function() { overlay.remove(); });
+        document.getElementById('heic-confirm').addEventListener('click', function() {
+            overlay.remove();
+            confirmed = true;
+            form.submit();
+        });
+    });
 })();
 </script>
 {% endblock scripts %}

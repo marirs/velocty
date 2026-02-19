@@ -225,7 +225,7 @@ pub async fn user_avatar_upload(
         None => return Json(json!({"success": false, "error": "User not found"})),
     };
 
-    match save_upload(&mut form.file, "avatar").await {
+    match save_upload(&mut form.file, "avatar", pool).await {
         Some(filename) => {
             let avatar_url = format!("/uploads/{}", filename);
             if let Err(e) = User::update_avatar(pool, user.id, &avatar_url) {

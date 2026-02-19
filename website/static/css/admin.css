@@ -2084,6 +2084,7 @@ input[type="file"]::file-selector-button:hover {
     max-height: 100%;
     object-fit: contain;
     padding: 8px;
+    pointer-events: none;
 }
 
 .image-drop-zone .drop-placeholder {

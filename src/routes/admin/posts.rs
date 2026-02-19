@@ -144,6 +144,7 @@ pub struct PostFormData<'f> {
     pub category_ids: Option<Vec<i64>>,
     pub tag_names: Option<String>,
     pub featured_image: Option<TempFile<'f>>,
+    pub uploaded_featured_path: Option<String>,
 }
 
 #[post("/posts/new", data = "<form>")]
@@ -153,9 +154,18 @@ pub async fn posts_create(
     slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
-    let featured = match form.featured_image.as_mut() {
-        Some(f) if f.len() > 0 => save_upload(f, "post").await,
-        _ => None,
+    let featured = if let Some(ref pre) = form.uploaded_featured_path {
+        if !pre.is_empty() { Some(pre.clone()) } else { None }
+    } else {
+        match form.featured_image.as_mut() {
+            Some(f) if f.len() > 0 => {
+                if !super::is_allowed_image(f, pool) {
+                    return Redirect::to(format!("{}/posts/new", admin_base(slug)));
+                }
+                save_upload(f, "post", pool).await
+            }
+            _ => None,
+        }
     };
 
     let post_form = PostForm {
@@ -237,9 +247,24 @@ pub async fn posts_update(
     id: i64,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
-    let featured = match form.featured_image.as_mut() {
-        Some(f) if f.len() > 0 => save_upload(f, "post").await,
-        _ => Post::find_by_id(pool, id).and_then(|p| p.featured_image),
+    let featured = if let Some(ref pre) = form.uploaded_featured_path {
+        if !pre.is_empty() { Some(pre.clone()) } else {
+            Post::find_by_id(pool, id).and_then(|p| p.featured_image)
+        }
+    } else {
+        match form.featured_image.as_mut() {
+            Some(f) if f.len() > 0 => {
+                if !super::is_allowed_image(f, pool) {
+                    return Redirect::to(format!(
+                        "{}/posts/{}/edit",
+                        admin_base(slug),
+                        id
+                    ));
+                }
+                save_upload(f, "post", pool).await
+            }
+            _ => Post::find_by_id(pool, id).and_then(|p| p.featured_image),
+        }
     };
 
     let post_form = PostForm {

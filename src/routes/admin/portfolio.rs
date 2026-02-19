@@ -151,6 +151,7 @@ pub struct PortfolioFormData<'f> {
     pub category_ids: Option<Vec<i64>>,
     pub tag_names: Option<String>,
     pub image: Option<TempFile<'f>>,
+    pub uploaded_image_path: Option<String>,
 }
 
 #[post("/portfolio/new", data = "<form>")]
@@ -160,11 +161,20 @@ pub async fn portfolio_create(
     slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
-    let image_path = match form.image.as_mut() {
-        Some(f) if f.len() > 0 => save_upload(f, "portfolio")
-            .await
-            .unwrap_or_else(|| "placeholder.jpg".to_string()),
-        _ => "placeholder.jpg".to_string(),
+    let image_path = if let Some(ref pre) = form.uploaded_image_path {
+        if !pre.is_empty() { pre.clone() } else { "placeholder.jpg".to_string() }
+    } else {
+        match form.image.as_mut() {
+            Some(f) if f.len() > 0 => {
+                if !super::is_allowed_image(f, pool) {
+                    return Redirect::to(format!("{}/portfolio/new", admin_base(slug)));
+                }
+                save_upload(f, "portfolio", pool)
+                    .await
+                    .unwrap_or_else(|| "placeholder.jpg".to_string())
+            }
+            _ => "placeholder.jpg".to_string(),
+        }
     };
 
     let price: Option<f64> = form.price.as_deref()
@@ -255,13 +265,32 @@ pub async fn portfolio_update(
     id: i64,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
-    let image_path = match form.image.as_mut() {
-        Some(f) if f.len() > 0 => save_upload(f, "portfolio")
-            .await
-            .unwrap_or_else(|| "placeholder.jpg".to_string()),
-        _ => PortfolioItem::find_by_id(pool, id)
-            .map(|e| e.image_path)
-            .unwrap_or_else(|| "placeholder.jpg".to_string()),
+    let image_path = if let Some(ref pre) = form.uploaded_image_path {
+        if !pre.is_empty() {
+            pre.clone()
+        } else {
+            PortfolioItem::find_by_id(pool, id)
+                .map(|e| e.image_path)
+                .unwrap_or_else(|| "placeholder.jpg".to_string())
+        }
+    } else {
+        match form.image.as_mut() {
+            Some(f) if f.len() > 0 => {
+                if !super::is_allowed_image(f, pool) {
+                    return Redirect::to(format!(
+                        "{}/portfolio/{}/edit",
+                        admin_base(slug),
+                        id
+                    ));
+                }
+                save_upload(f, "portfolio", pool)
+                    .await
+                    .unwrap_or_else(|| "placeholder.jpg".to_string())
+            }
+            _ => PortfolioItem::find_by_id(pool, id)
+                .map(|e| e.image_path)
+                .unwrap_or_else(|| "placeholder.jpg".to_string()),
+        }
     };
 
     let price: Option<f64> = form.price.as_deref()

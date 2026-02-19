@@ -52,8 +52,9 @@
             <div class="form-card collapsible">
                 <h4>Featured Image</h4>
                 <div class="form-group">
+                    <input type="hidden" id="featured-uploaded-path" name="uploaded_featured_path" value="">
                     <div class="image-drop-zone {% if post and post.featured_image %}has-image{% endif %}" id="featured-zone" style="width:100%;height:120px">
-                        <input type="file" id="featured-file" name="featured_image" accept="image/*">
+                        <input type="file" id="featured-file" name="featured_image" accept="image/*,.heic,.heif">
                         <div class="drop-placeholder" id="featured-placeholder" {% if post and post.featured_image %}style="display:none"{% endif %}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
                             <span>Drop image or click to browse</span>
@@ -206,6 +207,25 @@
         }
     });
 
+    // Toast helper
+    function showToast(msg, color) {
+        var t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = 'position:fixed;top:20px;right:20px;background:' + (color || 'var(--danger,#ef4444)') + ';color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .4s';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.style.opacity='0'; }, 3000);
+        setTimeout(function(){ t.remove(); }, 3500);
+    }
+
+    // Allowed image types from settings
+    var allowedTypes = '{{ settings.images_allowed_types | default(value="jpg,jpeg,png,gif,webp,svg,tiff") }}'.toLowerCase().split(',').map(function(s){ return s.trim(); });
+
+    function isAllowedFile(file) {
+        var name = file.name.toLowerCase();
+        var ext = name.split('.').pop();
+        return allowedTypes.indexOf(ext) !== -1;
+    }
+
     // Inline category creation
     function addCategory() {
         var input = document.getElementById('new-cat-name');
@@ -227,10 +247,10 @@
                 list.appendChild(label);
                 input.value = '';
             } else {
-                alert(data.error || 'Failed to create category');
+                showToast(data.error || 'Failed to create category');
             }
         })
-        .catch(function() { alert('Failed to create category'); })
+        .catch(function() { showToast('Failed to create category'); })
         .finally(function() { input.disabled = false; input.focus(); });
     }
     document.getElementById('new-cat-name').addEventListener('keydown', function(e) {
@@ -328,9 +348,52 @@
         var placeholder = document.getElementById('featured-placeholder');
         var preview = document.getElementById('featured-preview');
         var clearBtn = document.getElementById('featured-clear');
+        var uploadedPath = document.getElementById('featured-uploaded-path');
+        var placeholderOriginal = placeholder.innerHTML;
+
+        function ajaxUploadHeic(file) {
+            placeholder.innerHTML = '<span style="font-size:13px;color:var(--text-secondary)">Converting ' + file.name + '…</span>';
+            placeholder.style.display = '';
+            preview.style.display = 'none';
+            zone.classList.add('has-image');
+
+            var fd = new FormData();
+            fd.append('file', file);
+            fetch('/{{ admin_slug }}/upload/image', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.location) {
+                        preview.src = data.location;
+                        preview.style.display = '';
+                        placeholder.style.display = 'none';
+                        uploadedPath.value = data.location.replace('/uploads/', '');
+                        fileInput.value = '';
+                    } else {
+                        showToast(data.error || 'Upload failed');
+                        zone.classList.remove('has-image');
+                        placeholder.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg><span>Drop image or click to browse</span>';
+                    }
+                })
+                .catch(function() {
+                    showToast('Upload failed');
+                    zone.classList.remove('has-image');
+                    placeholder.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg><span>Drop image or click to browse</span>';
+                });
+        }
 
         function showPreview(file) {
-            if (!file || !file.type.startsWith('image/')) return;
+            if (!file) return;
+            if (!isAllowedFile(file)) {
+                showToast('File type not allowed. Accepted: ' + allowedTypes.join(', '));
+                fileInput.value = '';
+                return;
+            }
+            uploadedPath.value = '';
+            var ext = file.name.toLowerCase().split('.').pop();
+            if (ext === 'heic' || ext === 'heif') {
+                ajaxUploadHeic(file);
+                return;
+            }
             var reader = new FileReader();
             reader.onload = function(e) {
                 preview.src = e.target.result;
@@ -353,6 +416,10 @@
         zone.addEventListener('drop', function(e) {
             e.preventDefault(); zone.classList.remove('dragover');
             if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                if (!isAllowedFile(e.dataTransfer.files[0])) {
+                    showToast('File type not allowed. Accepted: ' + allowedTypes.join(', '));
+                    return;
+                }
                 fileInput.files = e.dataTransfer.files;
                 showPreview(e.dataTransfer.files[0]);
             }
@@ -360,8 +427,10 @@
         clearBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             fileInput.value = '';
+            uploadedPath.value = '';
             preview.style.display = 'none';
             preview.src = '';
+            placeholder.innerHTML = placeholderOriginal;
             placeholder.style.display = '';
             zone.classList.remove('has-image');
         });
