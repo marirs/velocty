@@ -97,9 +97,11 @@ fn not_found(req: &rocket::Request<'_>) -> RawHtml<String> {
     if let Some(pool) = req.rocket().state::<db::DbPool>() {
         let settings = Setting::all(pool);
         let nav_cats = models::category::Category::list_nav_visible(pool, Some("portfolio"));
+        let nav_journal_cats = models::category::Category::list_nav_visible(pool, Some("post"));
         let context = serde_json::json!({
             "settings": settings,
             "nav_categories": nav_cats,
+            "nav_journal_categories": nav_journal_cats,
             "page_type": "404",
             "seo": "<title>404 — Page Not Found</title>",
         });

@@ -69,6 +69,10 @@ pub fn design_overview(
         .iter()
         .map(|c| json!({"id": c.id, "name": c.name, "slug": c.slug, "show_in_nav": c.show_in_nav}))
         .collect();
+    let journal_categories: Vec<serde_json::Value> = Category::list(pool, Some("post"))
+        .iter()
+        .map(|c| json!({"id": c.id, "name": c.name, "slug": c.slug, "show_in_nav": c.show_in_nav}))
+        .collect();
 
     let context = json!({
         "page_title": format!("Design: {}", design.name),
@@ -76,6 +80,7 @@ pub fn design_overview(
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
         "portfolio_categories": portfolio_categories,
+        "journal_categories": journal_categories,
     });
 
     Some(Template::render("admin/designs/overview", &context))

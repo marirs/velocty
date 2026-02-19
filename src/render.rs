@@ -116,8 +116,28 @@ fn render_with_shell(
     let contact_label = sg("contact_label", "catch up");
     let contact_enabled = sg("contact_page_enabled", "false") == "true";
 
+    // ── Journal categories ──
+    let journal_cats_mode = sg("journal_nav_categories", "hidden");
+
+    let journal_categories_html = if blog_enabled && journal_cats_mode == "under_link" {
+        build_journal_categories_sidebar(context, true)
+    } else {
+        String::new()
+    };
+
+    let journal_categories_page_top = if blog_enabled && journal_cats_mode == "page_top" {
+        let align = sg("journal_nav_categories_align", "left");
+        build_journal_categories_page_top(context, &blog_slug, &align)
+    } else {
+        String::new()
+    };
+
+    // Journal nav-link: only show when categories don't replace it
+    let blog_in_nav =
+        blog_enabled && (journal_cats_mode == "hidden" || journal_cats_mode == "page_top");
+
     // Build nav links in user-defined order (nav_order setting)
-    // Portfolio with categories_html is treated as a single unit
+    // Portfolio/Journal with categories_html is treated as a single unit
     let nav_order_raw = sg("nav_order", "portfolio,blog,contact");
     let nav_order: Vec<&str> = nav_order_raw.split(',').map(|s| s.trim()).collect();
 
@@ -137,7 +157,9 @@ fn render_with_shell(
                 }
             }
             "blog" => {
-                if blog_enabled {
+                if !journal_categories_html.is_empty() {
+                    nav_links.push_str(&journal_categories_html);
+                } else if blog_in_nav {
                     nav_links.push_str(&format!(
                         "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
                         slug_url(&blog_slug, ""),
@@ -361,10 +383,24 @@ fn render_with_shell(
         build_footer_legal_links(&settings)
     };
     html = html.replace("{{footer_legal_links}}", &legal_links);
-    let body_with_cats = if categories_page_top.is_empty() {
-        body_html.clone()
-    } else {
-        format!("{}{}", categories_page_top, body_html)
+    let page_type = context
+        .get("page_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let body_with_cats = {
+        let mut b = String::new();
+        if !categories_page_top.is_empty()
+            && (page_type == "portfolio_grid" || page_type == "portfolio_single")
+        {
+            b.push_str(&categories_page_top);
+        }
+        if !journal_categories_page_top.is_empty()
+            && (page_type == "blog_list" || page_type == "blog_single")
+        {
+            b.push_str(&journal_categories_page_top);
+        }
+        b.push_str(&body_html);
+        b
     };
     html = html.replace("{{body_content}}", &body_with_cats);
     html = html.replace("{{footer_inner}}", &footer_inner);
@@ -929,6 +965,154 @@ fn build_categories_below_menu(context: &Value, portfolio_slug: &str) -> String 
         html.push_str(&format!(
             "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
             slug_url(portfolio_slug, &format!("category/{}", slug)),
+            active_class,
+            html_escape(name)
+        ));
+    }
+
+    html.push_str("</div>");
+    html
+}
+
+/// Journal sidebar: collapsible category tree under the journal nav link
+fn build_journal_categories_sidebar(context: &Value, start_open: bool) -> String {
+    let categories = match context.get("nav_journal_categories") {
+        Some(Value::Array(cats)) => cats,
+        _ => return String::new(),
+    };
+
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let blog_slug = settings
+        .get("blog_slug")
+        .and_then(|v| v.as_str())
+        .unwrap_or("journal");
+    let blog_label = settings
+        .get("blog_label")
+        .and_then(|v| v.as_str())
+        .unwrap_or("journal");
+
+    let active_slug = context
+        .get("active_category")
+        .and_then(|c| c.get("slug"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+
+    let mut html = String::new();
+
+    let show_all = settings
+        .get("journal_show_all_categories")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        == "true";
+    let has_children = !categories.is_empty() || show_all;
+
+    if has_children {
+        let open_cls = if start_open { " open" } else { "" };
+        html.push_str(&format!(
+            "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
+             <span>{}</span> <span class=\"arrow\">&#9662;</span></button>\
+             <div class=\"nav-subcategories{}\">",
+            open_cls, html_escape(blog_label), open_cls
+        ));
+
+        if show_all {
+            let all_label = settings
+                .get("journal_all_categories_label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("All");
+            let all_active = if active_slug.is_empty() {
+                " active"
+            } else {
+                ""
+            };
+            html.push_str(&format!(
+                "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
+                slug_url(blog_slug, ""),
+                all_active,
+                html_escape(all_label)
+            ));
+        }
+
+        for cat in categories {
+            let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            if slug.is_empty() {
+                continue;
+            }
+            let active_class = if slug == active_slug { " active" } else { "" };
+            html.push_str(&format!(
+                "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
+                slug_url(blog_slug, &format!("category/{}", slug)),
+                active_class,
+                html_escape(name)
+            ));
+        }
+
+        html.push_str("</div></div>\n");
+    } else {
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+            slug_url(blog_slug, ""),
+            html_escape(blog_label)
+        ));
+    }
+
+    html
+}
+
+/// Journal Page Top mode: horizontal category links at the top of blog content area
+fn build_journal_categories_page_top(context: &Value, blog_slug: &str, align: &str) -> String {
+    let categories = match context.get("nav_journal_categories") {
+        Some(Value::Array(cats)) => cats,
+        _ => return String::new(),
+    };
+    if categories.is_empty() {
+        return String::new();
+    }
+
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let active_slug = context
+        .get("active_category")
+        .and_then(|c| c.get("slug"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+
+    let align_cls = if align == "right" { " cats-right" } else { "" };
+    let mut html = format!("<div class=\"categories-page-top{}\">", align_cls);
+
+    let show_all = settings
+        .get("journal_show_all_categories")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        == "true";
+    if show_all {
+        let all_label = settings
+            .get("journal_all_categories_label")
+            .and_then(|v| v.as_str())
+            .unwrap_or("All");
+        let all_active = if active_slug.is_empty() {
+            " active"
+        } else {
+            ""
+        };
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
+            slug_url(blog_slug, ""),
+            all_active,
+            html_escape(all_label)
+        ));
+    }
+
+    for cat in categories {
+        let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+        if slug.is_empty() {
+            continue;
+        }
+        let active_class = if slug == active_slug { " active" } else { "" };
+        html.push_str(&format!(
+            "<a href=\"{}\" class=\"cat-link{}\">{}</a>",
+            slug_url(blog_slug, &format!("category/{}", slug)),
             active_class,
             html_escape(name)
         ));

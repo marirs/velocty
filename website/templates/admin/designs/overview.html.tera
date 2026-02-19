@@ -737,53 +737,93 @@
                         <!-- Items injected by JS based on nav_order -->
                     </div>
 
+                    <!-- Hidden templates: JS clones these into the correct nav-sort-item -->
                     {% if settings.portfolio_enabled == "true" %}
-                    <div class="cz-divider"></div>
-                    <div class="cz-sub-heading">Portfolio Options</div>
-                    <div class="cz-field">
-                        <label>Category Filters</label>
-                        <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories" id="portfolio-nav-categories" onchange="czConditions()">
-                            <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
-                            <option value="under_link" data-sidebar-only {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
-                            <option value="page_top" data-sidebar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
-                            <option value="submenu" data-topbar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "submenu" %}selected{% endif %}>Sub-menu</option>
-                            <option value="below_menu" data-topbar-only {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "below_menu" %}selected{% endif %}>Below Main Menu</option>
-                        </select>
-                    </div>
-                    <div class="cz-field">
-                        <label>Show "All" Link</label>
-                        <select name="portfolio_show_all_categories" data-setting="portfolio_show_all_categories" onchange="czConditions()">
-                            <option value="true" {% if not settings.portfolio_show_all_categories is defined or settings.portfolio_show_all_categories == "true" %}selected{% endif %}>Yes</option>
-                            <option value="false" {% if settings.portfolio_show_all_categories is defined and settings.portfolio_show_all_categories == "false" %}selected{% endif %}>No</option>
-                        </select>
-                    </div>
-                    <div class="cz-field" data-cz-show="portfolio_show_all_categories=true">
-                        <label>"All" Label</label>
-                        <input type="text" name="portfolio_all_categories_label" value="{{ settings.portfolio_all_categories_label | default(value='All') }}" data-setting="portfolio_all_categories_label">
-                    </div>
-                    <div class="cz-field" data-cz-show="portfolio_nav_categories=page_top" id="page-top-align-field">
-                        <label>Page Top Alignment</label>
-                        <select name="portfolio_nav_categories_align" data-setting="portfolio_nav_categories_align">
-                            <option value="left" {% if not settings.portfolio_nav_categories_align is defined or settings.portfolio_nav_categories_align == "left" %}selected{% endif %}>Left</option>
-                            <option value="right" {% if settings.portfolio_nav_categories_align is defined and settings.portfolio_nav_categories_align == "right" %}selected{% endif %}>Right</option>
-                        </select>
-                    </div>
-
-                    <div class="cz-sub-heading" style="margin-top:8px;color:#446D7F">Category Visibility</div>
-                    <div class="cz-cat-toggles">
-                        {% for cat in portfolio_categories %}
-                        <div class="cz-cat-toggle-row">
-                            <label class="toggle-switch-sm" title="Show in navigation">
-                                <input type="checkbox" {% if cat.show_in_nav %}checked{% endif %} onchange="czToggleCatNav({{ cat.id }}, this.checked)">
-                                <span class="toggle-slider-sm"></span>
-                            </label>
-                            <span class="cz-cat-name">{{ cat.name }}</span>
+                    <template id="tpl-cat-portfolio">
+                        <div class="nav-sort-cats">
+                            <div class="cz-field">
+                                <label style="font-size:11px">Category Filters</label>
+                                <select name="portfolio_nav_categories" data-setting="portfolio_nav_categories" onchange="czConditions()">
+                                    <option value="hidden" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
+                                    <option value="under_link" {% if not settings.portfolio_nav_categories is defined or settings.portfolio_nav_categories == "under_link" %}selected{% endif %}>Under Portfolio Link</option>
+                                    <option value="page_top" {% if settings.portfolio_nav_categories is defined and settings.portfolio_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
+                                </select>
+                            </div>
+                            <div class="cz-field" data-cz-show="portfolio_nav_categories=page_top">
+                                <label>Alignment</label>
+                                <select name="portfolio_nav_categories_align" data-setting="portfolio_nav_categories_align">
+                                    <option value="left" {% if not settings.portfolio_nav_categories_align is defined or settings.portfolio_nav_categories_align == "left" %}selected{% endif %}>Left</option>
+                                    <option value="right" {% if settings.portfolio_nav_categories_align is defined and settings.portfolio_nav_categories_align == "right" %}selected{% endif %}>Right</option>
+                                </select>
+                            </div>
+                            <div class="cz-cat-toggles" style="margin-top:6px">
+                                <div class="cz-cat-toggle-row">
+                                    <label class="toggle-switch-sm" title="Show 'All' link">
+                                        <input type="checkbox" data-all-toggle="portfolio" {% if not settings.portfolio_show_all_categories is defined or settings.portfolio_show_all_categories == "true" %}checked{% endif %} onchange="var inp=this.closest('.cz-cat-toggle-row').querySelector('.all-label-input'); inp.disabled=!this.checked; inp.style.opacity=this.checked?'1':'0.4'; document.querySelector('[data-setting=portfolio_show_all_categories]').value=this.checked?'true':'false'">
+                                        <span class="toggle-slider-sm"></span>
+                                    </label>
+                                    <input type="text" class="all-label-input nav-sort-input" name="portfolio_all_categories_label" data-setting="portfolio_all_categories_label" value="{{ settings.portfolio_all_categories_label | default(value='All') }}" {% if settings.portfolio_show_all_categories is defined and settings.portfolio_show_all_categories == 'false' %}disabled style="opacity:0.4"{% endif %}>
+                                    <input type="hidden" name="portfolio_show_all_categories" data-setting="portfolio_show_all_categories" value="{{ settings.portfolio_show_all_categories | default(value='true') }}">
+                                </div>
+                                {% for cat in portfolio_categories %}
+                                <div class="cz-cat-toggle-row">
+                                    <label class="toggle-switch-sm" title="Show in navigation">
+                                        <input type="checkbox" {% if cat.show_in_nav %}checked{% endif %} onchange="czToggleCatNav({{ cat.id }}, this.checked)">
+                                        <span class="toggle-slider-sm"></span>
+                                    </label>
+                                    <span class="cz-cat-name">{{ cat.name }}</span>
+                                </div>
+                                {% endfor %}
+                                {% if portfolio_categories | length == 0 %}
+                                <div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No portfolio categories yet.</div>
+                                {% endif %}
+                            </div>
                         </div>
-                        {% endfor %}
-                        {% if portfolio_categories | length == 0 %}
-                        <div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No portfolio categories yet.</div>
-                        {% endif %}
-                    </div>
+                    </template>
+                    {% endif %}
+
+                    {% if settings.journal_enabled is defined and settings.journal_enabled != "false" %}
+                    <template id="tpl-cat-blog">
+                        <div class="nav-sort-cats">
+                            <div class="cz-field">
+                                <label style="font-size:11px">Category Filters</label>
+                                <select name="journal_nav_categories" data-setting="journal_nav_categories" onchange="czConditions()">
+                                    <option value="hidden" {% if not settings.journal_nav_categories is defined or settings.journal_nav_categories == "hidden" %}selected{% endif %}>Hidden</option>
+                                    <option value="under_link" {% if settings.journal_nav_categories is defined and settings.journal_nav_categories == "under_link" %}selected{% endif %}>Under Journal Link</option>
+                                    <option value="page_top" {% if settings.journal_nav_categories is defined and settings.journal_nav_categories == "page_top" %}selected{% endif %}>Page Top</option>
+                                </select>
+                            </div>
+                            <div class="cz-field" data-cz-show="journal_nav_categories=page_top">
+                                <label>Alignment</label>
+                                <select name="journal_nav_categories_align" data-setting="journal_nav_categories_align">
+                                    <option value="left" {% if not settings.journal_nav_categories_align is defined or settings.journal_nav_categories_align == "left" %}selected{% endif %}>Left</option>
+                                    <option value="right" {% if settings.journal_nav_categories_align is defined and settings.journal_nav_categories_align == "right" %}selected{% endif %}>Right</option>
+                                </select>
+                            </div>
+                            <div class="cz-cat-toggles" style="margin-top:6px">
+                                <div class="cz-cat-toggle-row">
+                                    <label class="toggle-switch-sm" title="Show 'All' link">
+                                        <input type="checkbox" data-all-toggle="journal" {% if not settings.journal_show_all_categories is defined or settings.journal_show_all_categories == "true" %}checked{% endif %} onchange="var inp=this.closest('.cz-cat-toggle-row').querySelector('.all-label-input'); inp.disabled=!this.checked; inp.style.opacity=this.checked?'1':'0.4'; document.querySelector('[data-setting=journal_show_all_categories]').value=this.checked?'true':'false'">
+                                        <span class="toggle-slider-sm"></span>
+                                    </label>
+                                    <input type="text" class="all-label-input nav-sort-input" name="journal_all_categories_label" data-setting="journal_all_categories_label" value="{{ settings.journal_all_categories_label | default(value='All') }}" {% if settings.journal_show_all_categories is defined and settings.journal_show_all_categories == 'false' %}disabled style="opacity:0.4"{% endif %}>
+                                    <input type="hidden" name="journal_show_all_categories" data-setting="journal_show_all_categories" value="{{ settings.journal_show_all_categories | default(value='true') }}">
+                                </div>
+                                {% for cat in journal_categories %}
+                                <div class="cz-cat-toggle-row">
+                                    <label class="toggle-switch-sm" title="Show in navigation">
+                                        <input type="checkbox" {% if cat.show_in_nav %}checked{% endif %} onchange="czToggleCatNav({{ cat.id }}, this.checked)">
+                                        <span class="toggle-slider-sm"></span>
+                                    </label>
+                                    <span class="cz-cat-name">{{ cat.name }}</span>
+                                </div>
+                                {% endfor %}
+                                {% if journal_categories | length == 0 %}
+                                <div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No journal categories yet.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </template>
                     {% endif %}
                 </div>
             </div>
@@ -1027,6 +1067,9 @@ function czToggle(btn) {
     var container = document.getElementById('nav-sortable');
     if (!orderInput || !container) return;
 
+    // Map nav keys to their category template IDs
+    var CAT_TEMPLATES = { portfolio: 'tpl-cat-portfolio', blog: 'tpl-cat-blog' };
+
     function buildItems() {
         container.innerHTML = '';
         var order = orderInput.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
@@ -1041,14 +1084,23 @@ function czToggle(btn) {
             row.draggable = true;
             var labelInput = document.querySelector('[data-setting="' + cfg.label + '"]');
             var displayName = labelInput ? labelInput.value : cfg.defaultLabel;
-            row.innerHTML = '<span class="nav-sort-handle">&#9776;</span>' +
+            row.innerHTML = '<div class="nav-sort-header">' +
+                '<span class="nav-sort-handle">&#9776;</span>' +
                 '<span class="nav-sort-label">' + displayName + '</span>' +
                 '<input type="text" class="nav-sort-input" data-setting="' + cfg.label + '" name="' + cfg.label + '" value="' + displayName.replace(/"/g,'&quot;') + '" required>' +
-                (!cfg.enabled ? '<span class="nav-sort-disabled">(disabled)</span>' : '');
+                (!cfg.enabled ? '<span class="nav-sort-disabled">(disabled)</span>' : '') +
+                '</div>';
+            // Inject category sub-section from template if available
+            var tplId = CAT_TEMPLATES[key];
+            if (tplId && cfg.enabled) {
+                var tpl = document.getElementById(tplId);
+                if (tpl) row.appendChild(tpl.content.cloneNode(true));
+            }
             container.appendChild(row);
         });
         initDrag();
         syncLabelInputs();
+        czConditions();
     }
 
     function syncLabelInputs() {
@@ -1657,12 +1709,13 @@ function saveCustomizer() {
 /* Nav sortable drag-to-reorder */
 .nav-sortable { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
 .nav-sort-item {
-    display:flex; align-items:center; gap:8px;
+    display:flex; flex-direction:column;
     padding:6px 10px; background:var(--bg-input); border:1px solid var(--border-input);
     border-radius:6px; cursor:grab; user-select:none; transition:border-color .15s, opacity .15s;
 }
 .nav-sort-item.dragging { opacity:.4; }
 .nav-sort-item.drag-over { border-color:var(--accent); }
+.nav-sort-header { display:flex; align-items:center; gap:8px; }
 .nav-sort-handle { font-size:14px; color:var(--text-tertiary); flex-shrink:0; cursor:grab; }
 .nav-sort-label { display:none; }
 .nav-sort-input {
@@ -1672,6 +1725,7 @@ function saveCustomizer() {
 }
 .nav-sort-input:focus { outline:none; border-color:var(--accent); background:var(--bg-input); }
 .nav-sort-disabled { font-size:10px; color:var(--text-tertiary); flex-shrink:0; }
+.nav-sort-cats { margin-top:6px; padding-top:6px; border-top:1px solid var(--border-input); }
 
 /* Category visibility toggles */
 .cz-cat-toggles { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }

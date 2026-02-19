@@ -635,6 +635,12 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("portfolio_nav_categories", "under_link"),
         ("portfolio_show_all_categories", "true"),
         ("portfolio_all_categories_label", "All"),
+        ("portfolio_nav_categories_align", "left"),
+        // Journal categories
+        ("journal_nav_categories", "hidden"),
+        ("journal_show_all_categories", "true"),
+        ("journal_all_categories_label", "All"),
+        ("journal_nav_categories_align", "left"),
         ("nav_position", "below_logo"),
         // Site Identity (Customizer)
         ("site_name_display", "text"),

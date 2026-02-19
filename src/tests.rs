@@ -5088,3 +5088,181 @@ fn seed_defaults_legal_content_backfill_migration() {
         "backfilled terms content should contain heading"
     );
 }
+
+// ═══════════════════════════════════════════════════════════
+// Journal Category Navigation Tests
+// ═══════════════════════════════════════════════════════════
+
+/// Helper: build a blog_list context with journal + portfolio nav categories.
+fn render_blog_nav_context(pool: &DbPool) -> serde_json::Value {
+    let settings = Setting::all(pool);
+    let nav_categories = Category::list_nav_visible(pool, Some("portfolio"));
+    let nav_journal_categories = Category::list_nav_visible(pool, Some("post"));
+    json!({
+        "settings": settings,
+        "posts": [],
+        "nav_categories": nav_categories,
+        "nav_journal_categories": nav_journal_categories,
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "blog_list",
+        "seo": "",
+    })
+}
+
+#[test]
+fn render_journal_sidebar_under_link_has_toggle() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Travel", "travel", "post")).unwrap();
+    set_settings(
+        &pool,
+        &[
+            ("journal_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("journal_nav_categories", "under_link"),
+        ],
+    );
+    let ctx = render_blog_nav_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+
+    assert!(
+        html.contains("nav-category-toggle open"),
+        "under_link toggle should start open"
+    );
+    assert!(
+        html.contains("nav-subcategories open"),
+        "under_link subcategories should start open"
+    );
+    assert!(html.contains(">All</a>"), "should have 'All' journal link");
+    assert!(
+        html.contains(">Travel</a>"),
+        "should have 'Travel' category link"
+    );
+}
+
+#[test]
+fn render_journal_sidebar_under_link_custom_all_label() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Tech", "tech", "post")).unwrap();
+    set_settings(
+        &pool,
+        &[
+            ("journal_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("journal_nav_categories", "under_link"),
+            ("journal_all_categories_label", "Everything"),
+        ],
+    );
+    let ctx = render_blog_nav_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+
+    assert!(
+        html.contains(">Everything</a>"),
+        "should use custom 'All' label"
+    );
+}
+
+#[test]
+fn render_journal_sidebar_under_link_all_hidden() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Tech", "tech", "post")).unwrap();
+    set_settings(
+        &pool,
+        &[
+            ("journal_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("journal_nav_categories", "under_link"),
+            ("journal_show_all_categories", "false"),
+        ],
+    );
+    let ctx = render_blog_nav_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+
+    assert!(
+        !html.contains("cat-link active\">All</a>"),
+        "should not have 'All' link when hidden"
+    );
+    assert!(
+        html.contains(">Tech</a>"),
+        "should still have category links"
+    );
+}
+
+#[test]
+fn render_journal_page_top_has_filter_bar() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Travel", "travel", "post")).unwrap();
+    set_settings(
+        &pool,
+        &[
+            ("journal_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("journal_nav_categories", "page_top"),
+        ],
+    );
+    let ctx = render_blog_nav_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+
+    assert!(
+        html.contains("categories-page-top"),
+        "page_top should render filter bar"
+    );
+    assert!(
+        html.contains(">Travel</a>"),
+        "page_top should have category link"
+    );
+    // Journal nav link should be a plain link (not a toggle) since page_top mode
+    // uses the filter bar instead of sidebar toggle
+    assert!(
+        html.contains("class=\"nav-link\">journal</a>"),
+        "page_top mode should show plain journal nav-link in sidebar"
+    );
+}
+
+#[test]
+fn render_journal_page_top_align_right() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Travel", "travel", "post")).unwrap();
+    set_settings(
+        &pool,
+        &[
+            ("journal_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("journal_nav_categories", "page_top"),
+            ("journal_nav_categories_align", "right"),
+        ],
+    );
+    let ctx = render_blog_nav_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+
+    assert!(
+        html.contains("categories-page-top cats-right"),
+        "page_top right alignment should have cats-right class"
+    );
+}
+
+#[test]
+fn render_journal_hidden_shows_plain_link() {
+    let pool = test_pool();
+    Category::create(&pool, &make_cat_form("Travel", "travel", "post")).unwrap();
+    set_settings(
+        &pool,
+        &[
+            ("journal_enabled", "true"),
+            ("layout_header_type", "sidebar"),
+            ("journal_nav_categories", "hidden"),
+        ],
+    );
+    let ctx = render_blog_nav_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+
+    // Should have a plain nav-link for journal, not a category toggle
+    assert!(
+        html.contains("class=\"nav-link\">journal</a>"),
+        "hidden mode should show plain journal nav-link"
+    );
+    assert!(
+        !html.contains("<div class=\"categories-page-top"),
+        "hidden mode should not have page_top filter div"
+    );
+}
