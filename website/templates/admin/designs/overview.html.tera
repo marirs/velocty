@@ -215,6 +215,47 @@
                         </select>
                     </div>
                     {% endif %}
+
+                    <div class="cz-divider"></div>
+                    <h4 class="cz-sub-heading">Footer</h4>
+                    <div class="cz-field">
+                        <label>Footer Behavior</label>
+                        <select name="footer_behavior" data-setting="footer_behavior" onchange="czConditions()">
+                            <option value="regular" {% if not settings.footer_behavior is defined or settings.footer_behavior == "regular" %}selected{% endif %}>Scroll with page</option>
+                            <option value="fixed_reveal" {% if settings.footer_behavior is defined and settings.footer_behavior == "fixed_reveal" %}selected{% endif %}>Fixed reveal</option>
+                            <option value="always_visible" {% if settings.footer_behavior is defined and settings.footer_behavior == "always_visible" %}selected{% endif %}>Always visible</option>
+                        </select>
+                    </div>
+                    <div data-cz-show="footer_behavior=fixed_reveal,footer_behavior=always_visible">
+                        <div class="cz-field">
+                            <label>Apply To</label>
+                            <select name="footer_behavior_scope" data-setting="footer_behavior_scope" onchange="czConditions()">
+                                <option value="site_wide" {% if not settings.footer_behavior_scope is defined or settings.footer_behavior_scope == "site_wide" %}selected{% endif %}>All pages</option>
+                                <option value="selected_pages" {% if settings.footer_behavior_scope is defined and settings.footer_behavior_scope == "selected_pages" %}selected{% endif %}>Selected pages</option>
+                            </select>
+                        </div>
+                        <div data-cz-show="footer_behavior_scope=selected_pages" class="cz-field">
+                            <label>Pages</label>
+                            <div class="cz-checkbox-group" id="footer-pages-group">
+                                {% if settings.portfolio_enabled is defined and settings.portfolio_enabled == "true" %}
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="portfolio_grid"> Portfolio</label>
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="portfolio_single"> Portfolio Detail</label>
+                                {% endif %}
+                                {% if settings.journal_enabled is defined and settings.journal_enabled != "false" %}
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="blog_list"> Journal</label>
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="blog_single"> Journal Post</label>
+                                {% endif %}
+                                {% if settings.privacy_policy_enabled is defined and settings.privacy_policy_enabled == "true" %}
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="privacy"> Privacy Policy</label>
+                                {% endif %}
+                                {% if settings.terms_of_use_enabled is defined and settings.terms_of_use_enabled == "true" %}
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="terms"> Terms of Use</label>
+                                {% endif %}
+                                <label class="cz-check-label"><input type="checkbox" data-footer-page="404"> 404 Page</label>
+                            </div>
+                            <input type="hidden" name="footer_behavior_pages" data-setting="footer_behavior_pages" value="{{ settings.footer_behavior_pages | default(value='') }}">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1391,6 +1432,24 @@ function czConditions() {
 }
 czConditions();
 
+// ── Footer pages checkbox sync ──
+(function() {
+    var hidden = document.querySelector('[data-setting="footer_behavior_pages"]');
+    if (!hidden) return;
+    var boxes = document.querySelectorAll('[data-footer-page]');
+    // Init checkboxes from saved value
+    var saved = (hidden.value || '').split(',').filter(Boolean);
+    boxes.forEach(function(cb) {
+        cb.checked = saved.indexOf(cb.getAttribute('data-footer-page')) !== -1;
+        cb.addEventListener('change', syncFooterPages);
+    });
+    function syncFooterPages() {
+        var vals = [];
+        boxes.forEach(function(cb) { if (cb.checked) vals.push(cb.getAttribute('data-footer-page')); });
+        hidden.value = vals.join(',');
+    }
+})();
+
 // ── Keyboard shortcut: Cmd+S / Ctrl+S ──
 document.addEventListener('keydown', function(e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -1629,5 +1688,14 @@ function saveCustomizer() {
 }
 .toggle-switch-sm input:checked + .toggle-slider-sm { background:var(--success); }
 .toggle-switch-sm input:checked + .toggle-slider-sm:before { transform:translateX(14px); }
+
+/* Footer page checkboxes */
+.cz-checkbox-group { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+.cz-check-label {
+    display:flex; align-items:center; gap:6px;
+    font-size:13px; color:var(--text-primary); cursor:pointer;
+    text-transform:none; letter-spacing:0; font-weight:400;
+}
+.cz-check-label input[type="checkbox"] { width:14px; height:14px; cursor:pointer; accent-color:var(--accent); }
 </style>
 {% endblock content %}

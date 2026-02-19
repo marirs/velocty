@@ -3690,6 +3690,131 @@ fn render_blog_list_pagination_classic() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Render: Footer Behavior
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_footer_regular_no_class() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("footer_behavior", "regular"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    // Body class should not contain footer behavior classes
+    let body_tag = html
+        .find("<body")
+        .and_then(|s| html[s..].find(">").map(|e| &html[s..s + e + 1]))
+        .unwrap_or("");
+    assert!(
+        !body_tag.contains("footer-fixed-reveal"),
+        "regular footer body tag should not have fixed-reveal class"
+    );
+    assert!(
+        !body_tag.contains("footer-always-visible"),
+        "regular footer body tag should not have always-visible class"
+    );
+}
+
+#[test]
+fn render_footer_fixed_reveal_site_wide() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("footer_behavior", "fixed_reveal"),
+            ("footer_behavior_scope", "site_wide"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body_tag = html
+        .find("<body")
+        .and_then(|s| html[s..].find(">").map(|e| &html[s..s + e + 1]))
+        .unwrap_or("");
+    assert!(
+        body_tag.contains("footer-fixed-reveal"),
+        "fixed_reveal + site_wide should add footer-fixed-reveal class to body"
+    );
+}
+
+#[test]
+fn render_footer_always_visible_site_wide() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("footer_behavior", "always_visible"),
+            ("footer_behavior_scope", "site_wide"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body_tag = html
+        .find("<body")
+        .and_then(|s| html[s..].find(">").map(|e| &html[s..s + e + 1]))
+        .unwrap_or("");
+    assert!(
+        body_tag.contains("footer-always-visible"),
+        "always_visible + site_wide should add footer-always-visible class to body"
+    );
+}
+
+#[test]
+fn render_footer_selected_pages_match() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("footer_behavior", "fixed_reveal"),
+            ("footer_behavior_scope", "selected_pages"),
+            ("footer_behavior_pages", "portfolio_grid,blog_list"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body_tag = html
+        .find("<body")
+        .and_then(|s| html[s..].find(">").map(|e| &html[s..s + e + 1]))
+        .unwrap_or("");
+    assert!(
+        body_tag.contains("footer-fixed-reveal"),
+        "selected_pages with portfolio_grid should add class on portfolio_grid page"
+    );
+}
+
+#[test]
+fn render_footer_selected_pages_no_match() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("footer_behavior", "fixed_reveal"),
+            ("footer_behavior_scope", "selected_pages"),
+            ("footer_behavior_pages", "blog_list,404"),
+        ],
+    );
+    let ctx = render_context(&pool);
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body_tag = html
+        .find("<body")
+        .and_then(|s| html[s..].find(">").map(|e| &html[s..s + e + 1]))
+        .unwrap_or("");
+    assert!(
+        !body_tag.contains("footer-fixed-reveal"),
+        "selected_pages without portfolio_grid should not add class on portfolio_grid page"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
 // Render: Portfolio Lightbox & Feature Settings
 // ═══════════════════════════════════════════════════════════
 

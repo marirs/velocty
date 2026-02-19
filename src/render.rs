@@ -233,11 +233,35 @@ fn render_with_shell(
     let header_type = sg("layout_header_type", "sidebar");
     let is_topbar = header_type == "topbar";
 
+    // ── Footer behavior ──
+    let footer_behavior = sg("footer_behavior", "regular");
+    let footer_active = if footer_behavior != "regular" {
+        let scope = sg("footer_behavior_scope", "site_wide");
+        if scope == "site_wide" {
+            true
+        } else {
+            let pages = sg("footer_behavior_pages", "");
+            pages.split(',').any(|p| p.trim() == template_type)
+        }
+    } else {
+        false
+    };
+
     // ── Layout classes ──
     let body_class = {
         let mut cls = String::new();
         if sg("layout_content_boundary", "full") == "boxed" {
             cls.push_str("boxed-mode");
+        }
+        if footer_active {
+            if !cls.is_empty() {
+                cls.push(' ');
+            }
+            if footer_behavior == "fixed_reveal" {
+                cls.push_str("footer-fixed-reveal");
+            } else if footer_behavior == "always_visible" {
+                cls.push_str("footer-always-visible");
+            }
         }
         cls
     };
@@ -700,7 +724,10 @@ fn render_comment(html: &mut String, comment: &Value, all_replies: &[&Value], de
 }
 
 fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
-    let categories = match context.get("categories") {
+    let categories = match context
+        .get("nav_categories")
+        .or_else(|| context.get("categories"))
+    {
         Some(Value::Array(cats)) => cats,
         _ => return String::new(),
     };
@@ -3617,6 +3644,68 @@ body.boxed-mode {
     left: auto;
     right: calc((100vw - var(--content-max-width, 1200px)) / 2);
 }
+/* ── Footer Behavior: Fixed Reveal ── */
+body.footer-fixed-reveal .site-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    background: var(--color-bg);
+}
+body.footer-fixed-reveal .content-column {
+    position: relative;
+    z-index: 2;
+    background: var(--color-bg);
+    margin-bottom: 80px;
+}
+body.footer-fixed-reveal .topbar-page {
+    position: relative;
+    z-index: 2;
+    background: var(--color-bg);
+    margin-bottom: 80px;
+}
+body.footer-fixed-reveal .sidebar {
+    z-index: 3;
+}
+/* ── Footer Behavior: Always Visible ── */
+body.footer-always-visible .site-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    background: var(--color-bg);
+    box-shadow: 0 -2px 8px rgba(0,0,0,.08);
+}
+body.footer-always-visible .content-column {
+    padding-bottom: 80px;
+}
+body.footer-always-visible .topbar-page {
+    padding-bottom: 80px;
+}
+/* Sidebar layout: offset fixed footer from sidebar */
+body.footer-fixed-reveal .site-wrapper .site-footer {
+    left: var(--sidebar-width);
+}
+body.footer-always-visible .site-wrapper .site-footer {
+    left: var(--sidebar-width);
+}
+body.footer-fixed-reveal .sidebar-right .site-footer {
+    left: 0;
+    right: var(--sidebar-width);
+}
+body.footer-always-visible .sidebar-right .site-footer {
+    left: 0;
+    right: var(--sidebar-width);
+}
+/* Topbar layout: footer spans full width */
+body.topbar-layout.footer-fixed-reveal .site-footer,
+body.topbar-layout.footer-always-visible .site-footer {
+    left: 0;
+    right: 0;
+}
+
 /* ── Content ── */
 .content {
     flex: 1;

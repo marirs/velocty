@@ -625,6 +625,10 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("layout_margin_bottom", "0"),
         ("layout_margin_left", "0"),
         ("layout_margin_right", "0"),
+        // Footer
+        ("footer_behavior", "regular"),
+        ("footer_behavior_scope", "site_wide"),
+        ("footer_behavior_pages", ""),
         ("portfolio_border_style", "none"),
         ("portfolio_show_title", "false"),
         ("portfolio_like_position", "image_bottom_right"),

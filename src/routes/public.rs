@@ -144,6 +144,12 @@ fn dispatch_portfolio(pool: &DbPool, rest: &str, page: Option<i64>) -> Option<Ra
     }
 }
 
+/// Portfolio nav categories for the sidebar — called by non-portfolio routes
+/// so the sidebar always shows the portfolio category tree.
+fn nav_categories(pool: &DbPool) -> Vec<Category> {
+    Category::list_nav_visible(pool, Some("portfolio"))
+}
+
 // ── Archives ──────────────────────────────────────────
 
 #[get("/archives")]
@@ -158,6 +164,7 @@ pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
                 "archives",
                 &json!({
                     "settings": settings,
+                    "nav_categories": nav_categories(pool),
                     "archives": [],
                     "page_type": "archives",
                     "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
@@ -179,6 +186,7 @@ pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
                 "archives",
                 &json!({
                     "settings": settings,
+                    "nav_categories": nav_categories(pool),
                     "archives": [],
                     "page_type": "archives",
                     "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
@@ -203,6 +211,7 @@ pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
 
     let context = json!({
         "settings": settings,
+        "nav_categories": nav_categories(pool),
         "archives": archive_entries,
         "page_type": "archives",
         "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
@@ -231,6 +240,7 @@ pub fn archives_month(
                 "blog_list",
                 &json!({
                     "settings": settings,
+                    "nav_categories": nav_categories(pool),
                     "posts": [],
                     "current_page": 1,
                     "total_pages": 1,
@@ -255,6 +265,7 @@ pub fn archives_month(
                 "blog_list",
                 &json!({
                     "settings": settings,
+                    "nav_categories": nav_categories(pool),
                     "posts": [],
                     "current_page": 1,
                     "total_pages": 1,
@@ -301,6 +312,7 @@ pub fn archives_month(
     let title = format!("Archives: {}/{}", year, month);
     let context = json!({
         "settings": settings,
+        "nav_categories": nav_categories(pool),
         "posts": posts,
         "current_page": current_page,
         "total_pages": total_pages,
@@ -395,6 +407,7 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
 
     let context = json!({
         "settings": settings,
+        "nav_categories": nav_categories(pool),
         "posts": posts,
         "current_page": current_page,
         "total_pages": total_pages,
@@ -435,6 +448,7 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         "settings": settings,
         "post": post,
         "categories": categories,
+        "nav_categories": nav_categories(pool),
         "tags": tags,
         "comments": comments,
         "comments_enabled": comments_enabled,
@@ -509,6 +523,7 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
 
     let context = json!({
         "settings": settings,
+        "nav_categories": nav_categories(pool),
         "posts": posts,
         "active_category": category,
         "current_page": current_page,
@@ -572,6 +587,7 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
 
     let context = json!({
         "settings": settings,
+        "nav_categories": nav_categories(pool),
         "posts": posts,
         "active_tag": tag,
         "current_page": current_page,
@@ -653,6 +669,7 @@ fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         "settings": settings,
         "item": item,
         "categories": categories,
+        "nav_categories": nav_categories(pool),
         "tags": tags,
         "comments": comments,
         "comments_enabled": comments_enabled,
