@@ -4454,3 +4454,110 @@ fn uploaded_path_with_value_is_used() {
     let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
     assert!(use_pre, "non-empty path should be treated as a pre-uploaded path");
 }
+
+// ═══════════════════════════════════════════════════════════
+// UTC date handling & scheduling edge cases
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn utc_format_roundtrip_parseable() {
+    // The format used by the server for published_at must be parseable by resolve_status
+    let now = chrono::Utc::now();
+    let formatted = now.format("%Y-%m-%dT%H:%M").to_string();
+    let parsed = chrono::NaiveDateTime::parse_from_str(&formatted, "%Y-%m-%dT%H:%M");
+    assert!(parsed.is_ok(), "UTC formatted date should be parseable: {}", formatted);
+}
+
+#[test]
+fn resolve_status_utc_future_1h_becomes_scheduled() {
+    // Simulates what the browser sends after localToUtc conversion: a UTC datetime string
+    let future_utc = (chrono::Utc::now() + chrono::Duration::hours(1))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("published", &Some(future_utc.clone()));
+    assert_eq!(status, "scheduled", "1h future UTC date should schedule: {}", future_utc);
+}
+
+#[test]
+fn resolve_status_utc_past_1h_stays_published() {
+    let past_utc = (chrono::Utc::now() - chrono::Duration::hours(1))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("published", &Some(past_utc.clone()));
+    assert_eq!(status, "published", "1h past UTC date should publish: {}", past_utc);
+}
+
+#[test]
+fn resolve_status_utc_past_1min_stays_published() {
+    // Edge case: just barely in the past
+    let past_utc = (chrono::Utc::now() - chrono::Duration::minutes(1))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("published", &Some(past_utc.clone()));
+    assert_eq!(status, "published", "1min past UTC should publish: {}", past_utc);
+}
+
+#[test]
+fn resolve_status_utc_future_1min_becomes_scheduled() {
+    // Edge case: just barely in the future
+    let future_utc = (chrono::Utc::now() + chrono::Duration::minutes(2))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("published", &Some(future_utc.clone()));
+    assert_eq!(status, "scheduled", "2min future UTC should schedule: {}", future_utc);
+}
+
+#[test]
+fn resolve_status_draft_with_utc_future_stays_draft() {
+    let future_utc = (chrono::Utc::now() + chrono::Duration::hours(1))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("draft", &Some(future_utc));
+    assert_eq!(status, "draft", "draft should never be overridden to scheduled");
+}
+
+#[test]
+fn resolve_status_scheduled_with_utc_past_stays_scheduled() {
+    // resolve_status does not convert scheduled→published; the background task does that
+    let past_utc = (chrono::Utc::now() - chrono::Duration::hours(1))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("scheduled", &Some(past_utc));
+    assert_eq!(status, "scheduled", "resolve_status should not change scheduled to published");
+}
+
+#[test]
+fn published_at_default_fallback_is_utc() {
+    // When published_at is empty, the server defaults to Utc::now()
+    // Verify the format matches what resolve_status expects
+    let fallback = chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string();
+    let parsed = chrono::NaiveDateTime::parse_from_str(&fallback, "%Y-%m-%dT%H:%M");
+    assert!(parsed.is_ok(), "default fallback format must be parseable");
+    // The fallback should be "now" which is not in the future
+    let dt = parsed.unwrap();
+    assert!(
+        dt <= chrono::Utc::now().naive_utc() + chrono::Duration::seconds(1),
+        "default fallback should be approximately now, not in the future"
+    );
+}
+
+#[test]
+fn resolve_status_date_with_seconds_format_stays_published() {
+    // DB stores dates like "2026-02-19 11:30:00" — resolve_status uses "%Y-%m-%dT%H:%M"
+    // This format won't parse, so status should pass through unchanged
+    let status = crate::routes::admin::resolve_status(
+        "published",
+        &Some("2020-01-01 12:00:00".to_string()),
+    );
+    assert_eq!(status, "published", "DB datetime format (with space+seconds) should not parse and status passes through");
+}
+
+#[test]
+fn resolve_status_handles_timezone_offset_string_gracefully() {
+    // If somehow a timezone-aware string gets through, it should not parse and pass through
+    let status = crate::routes::admin::resolve_status(
+        "published",
+        &Some("2099-01-01T12:00+04:00".to_string()),
+    );
+    assert_eq!(status, "published", "timezone-aware string should not parse with NaiveDateTime");
+}
