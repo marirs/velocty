@@ -161,8 +161,8 @@ pub async fn portfolio_create(
     slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
-    let image_path = if let Some(ref pre) = form.uploaded_image_path {
-        if !pre.is_empty() { pre.clone() } else { "placeholder.jpg".to_string() }
+    let image_path = if form.uploaded_image_path.as_ref().map_or(false, |p| !p.is_empty()) {
+        form.uploaded_image_path.clone().unwrap()
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
@@ -195,7 +195,7 @@ pub async fn portfolio_create(
         purchase_note: form.purchase_note.clone(),
         payment_provider: form.payment_provider.clone(),
         download_file_path: form.download_file_path.clone(),
-        status: form.status.clone(),
+        status: "pending".to_string(), // placeholder, overwritten below
         published_at: if form.status == "published" || form.status == "scheduled" {
             form.published_at
                 .clone()
@@ -207,6 +207,8 @@ pub async fn portfolio_create(
         category_ids: form.category_ids.clone(),
         tag_ids: None,
     };
+    let final_status = super::resolve_status(&form.status, &pf.published_at);
+    let pf = PortfolioForm { status: final_status.clone(), ..pf };
 
     match PortfolioItem::create(pool, &pf) {
         Ok(id) => {
@@ -234,21 +236,17 @@ pub async fn portfolio_create(
                 Some("portfolio"),
                 Some(id),
                 Some(&form.title),
-                Some(&form.status),
+                Some(&final_status),
                 None,
             );
-            if form.status == "draft" {
+            if final_status == "draft" {
                 Redirect::to(format!(
                     "{}/portfolio/{}/edit?saved=draft",
                     admin_base(slug),
                     id
                 ))
-            } else if form.status == "scheduled" {
-                Redirect::to(format!(
-                    "{}/portfolio/{}/edit?saved=scheduled",
-                    admin_base(slug),
-                    id
-                ))
+            } else if final_status == "scheduled" {
+                Redirect::to(format!("{}/portfolio?saved=scheduled", admin_base(slug)))
             } else {
                 Redirect::to(format!("{}/portfolio", admin_base(slug)))
             }
@@ -265,14 +263,8 @@ pub async fn portfolio_update(
     id: i64,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
-    let image_path = if let Some(ref pre) = form.uploaded_image_path {
-        if !pre.is_empty() {
-            pre.clone()
-        } else {
-            PortfolioItem::find_by_id(pool, id)
-                .map(|e| e.image_path)
-                .unwrap_or_else(|| "placeholder.jpg".to_string())
-        }
+    let image_path = if form.uploaded_image_path.as_ref().map_or(false, |p| !p.is_empty()) {
+        form.uploaded_image_path.clone().unwrap()
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
@@ -311,7 +303,7 @@ pub async fn portfolio_update(
         purchase_note: form.purchase_note.clone(),
         payment_provider: form.payment_provider.clone(),
         download_file_path: form.download_file_path.clone(),
-        status: form.status.clone(),
+        status: "pending".to_string(), // placeholder, overwritten below
         published_at: if form.status == "published" || form.status == "scheduled" {
             form.published_at
                 .clone()
@@ -328,6 +320,8 @@ pub async fn portfolio_update(
         category_ids: form.category_ids.clone(),
         tag_ids: None,
     };
+    let final_status = super::resolve_status(&form.status, &pf.published_at);
+    let pf = PortfolioForm { status: final_status.clone(), ..pf };
 
     let _ = PortfolioItem::update(pool, id, &pf);
     if let Some(ref cat_ids) = form.category_ids {
@@ -355,21 +349,17 @@ pub async fn portfolio_update(
         Some("portfolio"),
         Some(id),
         Some(&form.title),
-        Some(&form.status),
+        Some(&final_status),
         None,
     );
-    if form.status == "draft" {
+    if final_status == "draft" {
         Redirect::to(format!(
             "{}/portfolio/{}/edit?saved=draft",
             admin_base(slug),
             id
         ))
-    } else if form.status == "scheduled" {
-        Redirect::to(format!(
-            "{}/portfolio/{}/edit?saved=scheduled",
-            admin_base(slug),
-            id
-        ))
+    } else if final_status == "scheduled" {
+        Redirect::to(format!("{}/portfolio?saved=scheduled", admin_base(slug)))
     } else {
         Redirect::to(format!("{}/portfolio", admin_base(slug)))
     }

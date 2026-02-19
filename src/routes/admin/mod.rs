@@ -24,6 +24,22 @@ pub(crate) fn admin_base(slug: &AdminSlug) -> String {
     format!("/{}", slug.0)
 }
 
+/// If status is "published" but published_at is in the future, override to "scheduled".
+pub(crate) fn resolve_status(status: &str, published_at: &Option<String>) -> String {
+    if status == "published" {
+        if let Some(ref dt_str) = published_at {
+            if !dt_str.is_empty() {
+                if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M") {
+                    if dt > chrono::Utc::now().naive_utc() {
+                        return "scheduled".to_string();
+                    }
+                }
+            }
+        }
+    }
+    status.to_string()
+}
+
 pub(crate) async fn save_upload(
     file: &mut TempFile<'_>,
     prefix: &str,

@@ -4360,3 +4360,97 @@ fn license_text_generation_no_provider_order_id() {
     };
     assert_eq!(txn_id, "ORD-42", "should fall back to ORD-ID when provider_order_id is empty");
 }
+
+// ═══════════════════════════════════════════════════════════
+// resolve_status: server-side scheduling enforcement
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn resolve_status_published_past_date_stays_published() {
+    let status = crate::routes::admin::resolve_status(
+        "published",
+        &Some("2020-01-01T12:00".to_string()),
+    );
+    assert_eq!(status, "published", "past date + published should stay published");
+}
+
+#[test]
+fn resolve_status_published_future_date_becomes_scheduled() {
+    let future = (chrono::Utc::now() + chrono::Duration::hours(2))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("published", &Some(future));
+    assert_eq!(status, "scheduled", "future date + published should become scheduled");
+}
+
+#[test]
+fn resolve_status_published_no_date_stays_published() {
+    let status = crate::routes::admin::resolve_status("published", &None);
+    assert_eq!(status, "published", "no date + published should stay published");
+}
+
+#[test]
+fn resolve_status_published_empty_date_stays_published() {
+    let status = crate::routes::admin::resolve_status("published", &Some("".to_string()));
+    assert_eq!(status, "published", "empty date + published should stay published");
+}
+
+#[test]
+fn resolve_status_draft_future_date_stays_draft() {
+    let future = (chrono::Utc::now() + chrono::Duration::hours(2))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("draft", &Some(future));
+    assert_eq!(status, "draft", "draft should stay draft regardless of date");
+}
+
+#[test]
+fn resolve_status_scheduled_past_date_stays_scheduled() {
+    // resolve_status only overrides "published" → "scheduled", not the reverse
+    let status = crate::routes::admin::resolve_status(
+        "scheduled",
+        &Some("2020-01-01T12:00".to_string()),
+    );
+    assert_eq!(status, "scheduled", "scheduled status is not changed by resolve_status");
+}
+
+#[test]
+fn resolve_status_published_invalid_date_stays_published() {
+    let status = crate::routes::admin::resolve_status("published", &Some("not-a-date".to_string()));
+    assert_eq!(status, "published", "invalid date should not change status");
+}
+
+#[test]
+fn resolve_status_published_near_future_becomes_scheduled() {
+    let near = (chrono::Utc::now() + chrono::Duration::minutes(5))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let status = crate::routes::admin::resolve_status("published", &Some(near));
+    assert_eq!(status, "scheduled", "5 minutes in future should still schedule");
+}
+
+// ═══════════════════════════════════════════════════════════
+// uploaded_image_path: empty-string guard pattern
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn uploaded_path_empty_string_is_not_used() {
+    // Simulates what Rocket sends for <input type="hidden" value="">
+    let path: Option<String> = Some("".to_string());
+    let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
+    assert!(!use_pre, "empty string should NOT be treated as a pre-uploaded path");
+}
+
+#[test]
+fn uploaded_path_none_is_not_used() {
+    let path: Option<String> = None;
+    let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
+    assert!(!use_pre, "None should NOT be treated as a pre-uploaded path");
+}
+
+#[test]
+fn uploaded_path_with_value_is_used() {
+    let path: Option<String> = Some("editor_abc123.jpg".to_string());
+    let use_pre = path.as_ref().map_or(false, |p| !p.is_empty());
+    assert!(use_pre, "non-empty path should be treated as a pre-uploaded path");
+}

@@ -39,7 +39,7 @@
         <tbody>
             {% for entry in entries %}
             <tr>
-                <td class="text-muted" style="font-size:12px;white-space:nowrap">{{ entry.created_at }}</td>
+                <td class="text-muted utc-date" style="font-size:12px;white-space:nowrap">{{ entry.created_at }}</td>
                 <td>
                     {% if entry.user_name %}
                     <a href="/{{ admin_slug }}/audit-log?user_id={{ entry.user_id }}" style="font-size:12px">{{ entry.user_name }}</a>

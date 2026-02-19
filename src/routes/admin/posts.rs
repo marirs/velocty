@@ -154,8 +154,8 @@ pub async fn posts_create(
     slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
-    let featured = if let Some(ref pre) = form.uploaded_featured_path {
-        if !pre.is_empty() { Some(pre.clone()) } else { None }
+    let featured = if form.uploaded_featured_path.as_ref().map_or(false, |p| !p.is_empty()) {
+        Some(form.uploaded_featured_path.clone().unwrap())
     } else {
         match form.featured_image.as_mut() {
             Some(f) if f.len() > 0 => {
@@ -177,7 +177,7 @@ pub async fn posts_create(
         featured_image: featured,
         meta_title: form.meta_title.clone(),
         meta_description: form.meta_description.clone(),
-        status: form.status.clone(),
+        status: "pending".to_string(), // placeholder, overwritten below
         published_at: if form.status == "published" || form.status == "scheduled" {
             form.published_at
                 .clone()
@@ -189,6 +189,8 @@ pub async fn posts_create(
         category_ids: form.category_ids.clone(),
         tag_ids: None,
     };
+    let final_status = super::resolve_status(&form.status, &post_form.published_at);
+    let post_form = PostForm { status: final_status.clone(), ..post_form };
 
     match Post::create(pool, &post_form) {
         Ok(id) => {
@@ -216,21 +218,17 @@ pub async fn posts_create(
                 Some("post"),
                 Some(id),
                 Some(&form.title),
-                Some(&form.status),
+                Some(&final_status),
                 None,
             );
-            if form.status == "draft" {
+            if final_status == "draft" {
                 Redirect::to(format!(
                     "{}/posts/{}/edit?saved=draft",
                     admin_base(slug),
                     id
                 ))
-            } else if form.status == "scheduled" {
-                Redirect::to(format!(
-                    "{}/posts/{}/edit?saved=scheduled",
-                    admin_base(slug),
-                    id
-                ))
+            } else if final_status == "scheduled" {
+                Redirect::to(format!("{}/posts?saved=scheduled", admin_base(slug)))
             } else {
                 Redirect::to(format!("{}/posts", admin_base(slug)))
             }
@@ -247,10 +245,8 @@ pub async fn posts_update(
     id: i64,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
-    let featured = if let Some(ref pre) = form.uploaded_featured_path {
-        if !pre.is_empty() { Some(pre.clone()) } else {
-            Post::find_by_id(pool, id).and_then(|p| p.featured_image)
-        }
+    let featured = if form.uploaded_featured_path.as_ref().map_or(false, |p| !p.is_empty()) {
+        Some(form.uploaded_featured_path.clone().unwrap())
     } else {
         match form.featured_image.as_mut() {
             Some(f) if f.len() > 0 => {
@@ -276,7 +272,7 @@ pub async fn posts_update(
         featured_image: featured,
         meta_title: form.meta_title.clone(),
         meta_description: form.meta_description.clone(),
-        status: form.status.clone(),
+        status: "pending".to_string(), // placeholder, overwritten below
         published_at: if form.status == "published" || form.status == "scheduled" {
             form.published_at
                 .clone()
@@ -293,6 +289,8 @@ pub async fn posts_update(
         category_ids: form.category_ids.clone(),
         tag_ids: None,
     };
+    let final_status = super::resolve_status(&form.status, &post_form.published_at);
+    let post_form = PostForm { status: final_status.clone(), ..post_form };
 
     let _ = Post::update(pool, id, &post_form);
     if let Some(ref cat_ids) = form.category_ids {
@@ -320,21 +318,17 @@ pub async fn posts_update(
         Some("post"),
         Some(id),
         Some(&form.title),
-        Some(&form.status),
+        Some(&final_status),
         None,
     );
-    if form.status == "draft" {
+    if final_status == "draft" {
         Redirect::to(format!(
             "{}/posts/{}/edit?saved=draft",
             admin_base(slug),
             id
         ))
-    } else if form.status == "scheduled" {
-        Redirect::to(format!(
-            "{}/posts/{}/edit?saved=scheduled",
-            admin_base(slug),
-            id
-        ))
+    } else if final_status == "scheduled" {
+        Redirect::to(format!("{}/posts?saved=scheduled", admin_base(slug)))
     } else {
         Redirect::to(format!("{}/posts", admin_base(slug)))
     }

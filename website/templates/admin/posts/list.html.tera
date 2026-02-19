@@ -31,7 +31,7 @@
                 <td>
                     <span class="badge badge-{{ post.status }}">{{ post.status }}</span>
                 </td>
-                <td class="text-muted">{{ post.created_at }}</td>
+                <td class="text-muted utc-date">{{ post.created_at }}</td>
                 <td class="actions">
                     <a href="/{{ admin_slug }}/posts/{{ post.id }}/edit" class="btn btn-sm">Edit</a>
                     <form method="post" action="/{{ admin_slug }}/posts/{{ post.id }}/delete" class="inline" onsubmit="return confirm('Delete this post?')">
@@ -62,3 +62,22 @@
 </div>
 {% endif %}
 {% endblock content %}
+
+{% block scripts %}
+<script>
+(function() {
+    var saved = new URLSearchParams(window.location.search).get('saved');
+    if (!saved) return;
+    var msgs = { scheduled: 'Scheduled for publishing' };
+    var colors = { scheduled: 'var(--warning,#f59e0b)' };
+    var msg = msgs[saved]; if (!msg) return;
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;top:20px;right:20px;background:' + (colors[saved] || 'var(--success)') + ';color:#fff;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .4s';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.opacity='0'; }, 3000);
+    setTimeout(function(){ t.remove(); }, 3500);
+    history.replaceState(null, '', window.location.pathname);
+})();
+</script>
+{% endblock scripts %}

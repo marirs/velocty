@@ -57,7 +57,7 @@
                     <span class="text-muted">Disabled</span>
                     {% endif %}
                 </td>
-                <td class="text-muted" style="padding:8px;vertical-align:middle;font-size:12px">{{ user.last_login_at | default(value="Never") }}</td>
+                <td class="text-muted utc-date" style="padding:8px;vertical-align:middle;font-size:12px">{{ user.last_login_at | default(value="Never") }}</td>
                 <td style="padding:8px;vertical-align:middle">
                     <div style="display:flex;gap:4px;flex-wrap:wrap">
                         <button type="button" class="btn btn-sm" onclick='showEditModal({{ user | json_encode() | safe }}, {{ user.id == current_user.id }})' title="Edit">

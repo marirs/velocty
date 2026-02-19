@@ -79,7 +79,7 @@
                         <span style="color:var(--text-secondary);font-size:12px">{{ order.status }}</span>
                         {% endif %}
                     </td>
-                    <td style="font-size:12px;color:var(--text-secondary);white-space:nowrap">{{ order.created_at }}</td>
+                    <td class="utc-date" style="font-size:12px;color:var(--text-secondary);white-space:nowrap">{{ order.created_at }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

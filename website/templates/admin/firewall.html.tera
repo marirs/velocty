@@ -67,7 +67,7 @@
             <tbody>
             {% for ev in events %}
             <tr>
-                <td style="white-space:nowrap">{{ ev.created_at }}</td>
+                <td class="utc-date" style="white-space:nowrap">{{ ev.created_at }}</td>
                 <td><span class="badge">{{ ev.event_type }}</span></td>
                 <td><code>{{ ev.ip }}</code></td>
                 <td>{{ ev.request_path | default(value="-") }}</td>
@@ -202,7 +202,7 @@
             <tbody>
             {% for e in audit_entries %}
             <tr>
-                <td style="white-space:nowrap">{{ e.created_at }}</td>
+                <td class="utc-date" style="white-space:nowrap">{{ e.created_at }}</td>
                 <td>{{ e.user_name | default(value="System") }}</td>
                 <td><span class="badge {% if e.action == 'delete' %}badge-danger{% elif e.action == 'create' %}badge-success{% elif e.action == 'login' %}badge-info{% elif e.action == 'login_failed' %}badge-danger{% elif e.action == 'settings_change' %}badge-warning{% endif %}">{{ e.action }}</span></td>
                 <td>{{ e.entity_type | default(value="-") }}</td>

@@ -20,7 +20,7 @@
             {% if comment.author_email %}
             <span class="text-muted">({{ comment.author_email }})</span>
             {% endif %}
-            <span class="text-muted"> — {{ comment.created_at }}</span>
+            <span class="text-muted"> — <span class="utc-date">{{ comment.created_at }}</span></span>
             <span class="badge badge-{{ comment.status }}">{{ comment.status }}</span>
         </div>
         <div class="comment-body">

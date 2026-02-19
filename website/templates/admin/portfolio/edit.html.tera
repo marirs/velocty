@@ -507,6 +507,9 @@
     document.getElementById('price').addEventListener('input', clearPriceError);
 
     document.getElementById('portfolio-form').addEventListener('submit', function(e) {
+        // Convert local published_at back to UTC before sending
+        var pa = document.getElementById('published_at');
+        if (pa.value) { pa.value = localToUtc(pa.value); }
         if (!document.getElementById('sell-toggle').checked) return;
         var price = parseFloat(document.getElementById('price').value);
         if (isNaN(price) || price <= 0) {
@@ -681,6 +684,24 @@
 </script>
 <script src="/static/js/flatpickr/flatpickr.min.js"></script>
 <script>
+    // UTC ↔ local helpers
+    function utcToLocal(utcStr) {
+        if (!utcStr) return '';
+        var d = new Date(utcStr + 'Z');
+        if (isNaN(d)) return utcStr;
+        var pad = function(n){ return n < 10 ? '0'+n : n; };
+        return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+    }
+    function localToUtc(localStr) {
+        if (!localStr) return '';
+        var d = new Date(localStr);
+        if (isNaN(d)) return localStr;
+        var pad = function(n){ return n < 10 ? '0'+n : n; };
+        return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())+'T'+pad(d.getUTCHours())+':'+pad(d.getUTCMinutes());
+    }
+    // Convert server UTC value to local for display
+    var pubInput = document.getElementById('published_at');
+    if (pubInput.value) { pubInput.value = utcToLocal(pubInput.value); }
     flatpickr('#published_at', {
         enableTime: true,
         dateFormat: 'Y-m-d\\TH:i',

@@ -175,6 +175,18 @@
             });
         });
     })();
+    // Convert UTC dates to browser local time
+    document.querySelectorAll('.utc-date').forEach(function(el) {
+        var raw = el.textContent.trim();
+        if (!raw || raw === 'Never' || raw === '-') return;
+        var d = new Date(raw.replace(' ', 'T') + 'Z');
+        if (isNaN(d)) return;
+        var pad = function(n){ return n < 10 ? '0'+n : n; };
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var h = d.getHours(), ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        el.textContent = months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear() + '  ' + h + ':' + pad(d.getMinutes()) + ' ' + ampm;
+    });
     {% if flash_msg is defined and flash_msg %}
     (function(){
         var el = document.createElement('div');
