@@ -510,10 +510,6 @@ pub fn settings_save(
             "portfolio_enabled",
             "portfolio_enable_likes",
             "portfolio_image_protection",
-            "portfolio_lightbox_show_title",
-            "portfolio_lightbox_show_tags",
-            "portfolio_lightbox_nav",
-            "portfolio_lightbox_keyboard",
         ],
         "comments" => &[
             "comments_enabled",

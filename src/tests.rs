@@ -3700,8 +3700,8 @@ fn render_portfolio_lightbox_data_attrs() {
         &pool,
         &[
             ("portfolio_enabled", "true"),
-            ("portfolio_lightbox_show_title", "false"),
-            ("portfolio_lightbox_show_tags", "false"),
+            ("portfolio_lightbox_show_title", "hidden"),
+            ("portfolio_lightbox_show_tags", "left"),
             ("portfolio_lightbox_nav", "false"),
             ("portfolio_lightbox_keyboard", "false"),
         ],
@@ -3709,12 +3709,12 @@ fn render_portfolio_lightbox_data_attrs() {
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     assert!(
-        html.contains("data-lb-show-title=\"false\""),
-        "lightbox show_title should be false"
+        html.contains("data-lb-title-pos=\"hidden\""),
+        "lightbox title position should be hidden"
     );
     assert!(
-        html.contains("data-lb-show-tags=\"false\""),
-        "lightbox show_tags should be false"
+        html.contains("data-lb-tags-pos=\"left\""),
+        "lightbox tags position should be left"
     );
     assert!(
         html.contains("data-lb-nav=\"false\""),
@@ -3727,18 +3727,18 @@ fn render_portfolio_lightbox_data_attrs() {
 }
 
 #[test]
-fn render_portfolio_lightbox_defaults_true() {
+fn render_portfolio_lightbox_defaults_center() {
     let pool = test_pool();
     set_settings(&pool, &[("portfolio_enabled", "true")]);
     let ctx = render_context(&pool);
     let html = render::render_page(&pool, "portfolio_grid", &ctx);
     assert!(
-        html.contains("data-lb-show-title=\"true\""),
-        "lightbox show_title should default to true"
+        html.contains("data-lb-title-pos=\"center\""),
+        "lightbox title position should default to center"
     );
     assert!(
-        html.contains("data-lb-show-tags=\"true\""),
-        "lightbox show_tags should default to true"
+        html.contains("data-lb-tags-pos=\"center\""),
+        "lightbox tags position should default to center"
     );
     assert!(
         html.contains("data-lb-nav=\"true\""),
@@ -4314,10 +4314,10 @@ fn license_default_not_personal_only() {
 }
 
 #[test]
-fn license_paypal_legacy_key_empty() {
+fn license_paypal_legacy_key_absent() {
     let pool = test_pool();
     let val = Setting::get(&pool, "paypal_license_text").unwrap_or_default();
-    assert!(val.is_empty(), "paypal_license_text should be empty (legacy key deprecated)");
+    assert!(val.is_empty(), "paypal_license_text should be absent or empty (stale key removed from seed)");
 }
 
 #[test]
@@ -4611,7 +4611,6 @@ fn seed_defaults_critical_settings_exist() {
         "seo_sitemap_enabled", "seo_robots_txt",
         "privacy_policy_enabled", "privacy_policy_content",
         "terms_of_use_enabled", "terms_of_use_content",
-        "design_active_id",
         "task_scheduled_publish_interval",
         "firewall_enabled",
         "cookie_consent_enabled",
@@ -4666,15 +4665,11 @@ fn settings_save_portfolio_disable_persists() {
     assert_eq!(Setting::get(&pool, "portfolio_enabled").unwrap(), "true");
 
     // Simulate the save flow from settings_save for section="portfolio"
-    // Step 1: Reset all checkbox keys to "false"
+    // Step 1: Reset all checkbox keys to "false" (lightbox keys moved to Designer)
     let checkbox_keys: &[&str] = &[
         "portfolio_enabled",
         "portfolio_enable_likes",
         "portfolio_image_protection",
-        "portfolio_lightbox_show_title",
-        "portfolio_lightbox_show_tags",
-        "portfolio_lightbox_nav",
-        "portfolio_lightbox_keyboard",
     ];
     for key in checkbox_keys {
         Setting::set(&pool, key, "false").unwrap();
@@ -4703,15 +4698,11 @@ fn settings_save_portfolio_enable_persists() {
     // Pre-condition: portfolio is disabled
     Setting::set(&pool, "portfolio_enabled", "false").unwrap();
 
-    // Step 1: Reset checkboxes to false
+    // Step 1: Reset checkboxes to false (lightbox keys moved to Designer)
     let checkbox_keys: &[&str] = &[
         "portfolio_enabled",
         "portfolio_enable_likes",
         "portfolio_image_protection",
-        "portfolio_lightbox_show_title",
-        "portfolio_lightbox_show_tags",
-        "portfolio_lightbox_nav",
-        "portfolio_lightbox_keyboard",
     ];
     for key in checkbox_keys {
         Setting::set(&pool, key, "false").unwrap();

@@ -585,28 +585,67 @@
                     <div class="cz-divider"></div>
                     <div class="cz-sub-heading">Lightbox</div>
                     <div class="cz-field">
-                        <label>Border</label>
+                        <label>Title</label>
+                        <select name="portfolio_lightbox_show_title" data-setting="portfolio_lightbox_show_title">
+                            <option value="hidden" {% if settings.portfolio_lightbox_show_title is defined and settings.portfolio_lightbox_show_title == "hidden" %}selected{% endif %}>Hidden</option>
+                            <option value="left" {% if settings.portfolio_lightbox_show_title is defined and settings.portfolio_lightbox_show_title == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if not settings.portfolio_lightbox_show_title is defined or settings.portfolio_lightbox_show_title == "true" or settings.portfolio_lightbox_show_title == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.portfolio_lightbox_show_title is defined and settings.portfolio_lightbox_show_title == "right" %}selected{% endif %}>Right</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Tags</label>
+                        <select name="portfolio_lightbox_show_tags" data-setting="portfolio_lightbox_show_tags">
+                            <option value="hidden" {% if settings.portfolio_lightbox_show_tags is defined and settings.portfolio_lightbox_show_tags == "hidden" %}selected{% endif %}>Hidden</option>
+                            <option value="left" {% if settings.portfolio_lightbox_show_tags is defined and settings.portfolio_lightbox_show_tags == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if not settings.portfolio_lightbox_show_tags is defined or settings.portfolio_lightbox_show_tags == "true" or settings.portfolio_lightbox_show_tags == "center" %}selected{% endif %}>Center</option>
+                            <option value="right" {% if settings.portfolio_lightbox_show_tags is defined and settings.portfolio_lightbox_show_tags == "right" %}selected{% endif %}>Right</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Prev / Next Arrows</label>
+                        <select name="portfolio_lightbox_nav" data-setting="portfolio_lightbox_nav">
+                            <option value="true" {% if not settings.portfolio_lightbox_nav is defined or settings.portfolio_lightbox_nav == "true" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.portfolio_lightbox_nav is defined and settings.portfolio_lightbox_nav == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Keyboard Navigation</label>
+                        <select name="portfolio_lightbox_keyboard" data-setting="portfolio_lightbox_keyboard">
+                            <option value="true" {% if not settings.portfolio_lightbox_keyboard is defined or settings.portfolio_lightbox_keyboard == "true" %}selected{% endif %}>Yes</option>
+                            <option value="false" {% if settings.portfolio_lightbox_keyboard is defined and settings.portfolio_lightbox_keyboard == "false" %}selected{% endif %}>No</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Border Color</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="portfolio_lightbox_border_color" value="{{ settings.portfolio_lightbox_border_color | default(value='#D4A017') }}" data-setting="portfolio_lightbox_border_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Title</label>
+                        <label>Title Color</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="portfolio_lightbox_title_color" value="{{ settings.portfolio_lightbox_title_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_title_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Tags</label>
+                        <label>Tags Color</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="portfolio_lightbox_tag_color" value="{{ settings.portfolio_lightbox_tag_color | default(value='#AAAAAA') }}" data-setting="portfolio_lightbox_tag_color" class="cz-color-text" oninput="czSyncFromHex(this)">
                         </div>
                     </div>
                     <div class="cz-field">
-                        <label>Categories</label>
+                        <label>Nav Arrow Color</label>
+                        <div class="cz-color-row">
+                            <div class="cz-swatch" style="background:{{ settings.portfolio_lightbox_nav_color | default(value='#FFFFFF') }}" onclick="czOpenPicker(this)"></div>
+                            <input type="text" name="portfolio_lightbox_nav_color" value="{{ settings.portfolio_lightbox_nav_color | default(value='#FFFFFF') }}" data-setting="portfolio_lightbox_nav_color" class="cz-color-text" oninput="czSyncFromHex(this)">
+                        </div>
+                    </div>
+                    <div class="cz-field">
+                        <label>Categories Color</label>
                         <div class="cz-color-row">
                             <div class="cz-swatch" style="background:{{ settings.color_lightbox_categories | default(value='#AAAAAA') }}" onclick="czOpenPicker(this)"></div>
                             <input type="text" name="color_lightbox_categories" value="{{ settings.color_lightbox_categories | default(value='#AAAAAA') }}" data-setting="color_lightbox_categories" class="cz-color-text" oninput="czSyncFromHex(this)">

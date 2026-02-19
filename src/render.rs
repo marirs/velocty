@@ -266,21 +266,23 @@ fn render_with_shell(
     let fade_anim = sg("portfolio_fade_animation", "true");
     let display_type = sg("portfolio_display_type", "masonry");
     let pagination_type = sg("portfolio_pagination_type", "classic");
-    let lb_show_title = sg("portfolio_lightbox_show_title", "true");
-    let lb_show_tags = sg("portfolio_lightbox_show_tags", "true");
+    let lb_title_pos = sg("portfolio_lightbox_show_title", "center");
+    let lb_tags_pos = sg("portfolio_lightbox_show_tags", "center");
     let lb_nav = sg("portfolio_lightbox_nav", "true");
     let lb_keyboard = sg("portfolio_lightbox_keyboard", "true");
+    let lb_nav_color = sg("portfolio_lightbox_nav_color", "#FFFFFF");
     let lb_buy = sg("commerce_lightbox_buy", "true");
     let lb_buy_pos = sg("commerce_lightbox_buy_position", "bottom_left");
     let commerce_cur = sg("commerce_currency", "USD");
     let hearts_pos = sg("portfolio_like_position", "bottom_right");
 
     let data_attrs = format!(
-        "data-click-mode=\"{click_mode}\" data-show-likes=\"{show_likes}\" data-show-categories=\"{show_cats}\" data-show-tags=\"{show_tags}\" data-fade-animation=\"{fade_anim}\" data-display-type=\"{display_type}\" data-pagination-type=\"{pagination_type}\" data-lb-show-title=\"{lb_show_title}\" data-lb-show-tags=\"{lb_show_tags}\" data-lb-nav=\"{lb_nav}\" data-lb-keyboard=\"{lb_keyboard}\" data-share-position=\"{share_pos}\" data-site-url=\"{site_url}\" data-lb-buy=\"{lb_buy}\" data-lb-buy-position=\"{lb_buy_pos}\" data-commerce-currency=\"{commerce_cur}\" data-hearts-position=\"{hearts_pos}\"",
+        "data-click-mode=\"{click_mode}\" data-show-likes=\"{show_likes}\" data-show-categories=\"{show_cats}\" data-show-tags=\"{show_tags}\" data-fade-animation=\"{fade_anim}\" data-display-type=\"{display_type}\" data-pagination-type=\"{pagination_type}\" data-lb-title-pos=\"{lb_title_pos}\" data-lb-tags-pos=\"{lb_tags_pos}\" data-lb-nav=\"{lb_nav}\" data-lb-keyboard=\"{lb_keyboard}\" data-lb-nav-color=\"{lb_nav_color}\" data-share-position=\"{share_pos}\" data-site-url=\"{site_url}\" data-lb-buy=\"{lb_buy}\" data-lb-buy-position=\"{lb_buy_pos}\" data-commerce-currency=\"{commerce_cur}\" data-hearts-position=\"{hearts_pos}\"",
         click_mode = click_mode, show_likes = show_likes, show_cats = show_cats,
         show_tags = show_tags, fade_anim = fade_anim, display_type = display_type,
-        pagination_type = pagination_type, lb_show_title = lb_show_title,
-        lb_show_tags = lb_show_tags, lb_nav = lb_nav, lb_keyboard = lb_keyboard,
+        pagination_type = pagination_type, lb_title_pos = lb_title_pos,
+        lb_tags_pos = lb_tags_pos, lb_nav = lb_nav, lb_keyboard = lb_keyboard,
+        lb_nav_color = lb_nav_color,
         share_pos = sg("share_icons_position", "below_content"),
         site_url = sg("site_url", ""),
         lb_buy = lb_buy, lb_buy_pos = lb_buy_pos, commerce_cur = commerce_cur,
@@ -2701,8 +2703,17 @@ const LIGHTBOX_JS: &str = r#"
     const b = document.body.dataset;
     const mode = b.clickMode || 'lightbox';
 
-    const showTitle = b.lbShowTitle !== 'false';
-    const showTags = b.lbShowTags !== 'false';
+    // Title/tags: position values (hidden/left/center/right) with backward compat for true/false
+    var rawTitlePos = b.lbTitlePos || 'center';
+    var rawTagsPos = b.lbTagsPos || 'center';
+    if (rawTitlePos === 'false') rawTitlePos = 'hidden';
+    if (rawTitlePos === 'true') rawTitlePos = 'center';
+    if (rawTagsPos === 'false') rawTagsPos = 'hidden';
+    if (rawTagsPos === 'true') rawTagsPos = 'center';
+    const titlePos = rawTitlePos;
+    const tagsPos = rawTagsPos;
+    const showTitle = titlePos !== 'hidden';
+    const showTags = tagsPos !== 'hidden';
     const showNav = b.lbNav !== 'false';
     const useKeyboard = b.lbKeyboard !== 'false';
     const showLikes = b.showLikes !== 'false';
@@ -2713,6 +2724,7 @@ const LIGHTBOX_JS: &str = r#"
     const lbBuyPos = b.lbBuyPosition || 'bottom_left';
     const commerceCur = b.commerceCurrency || 'USD';
     const heartsPos = b.heartsPosition || 'bottom_right';
+    const navColor = b.lbNavColor || '#FFFFFF';
 
     // Lightbox setup — only when click mode is lightbox
     if (mode === 'lightbox') {
@@ -2734,18 +2746,30 @@ const LIGHTBOX_JS: &str = r#"
         var hTop = !hIsBottom ? 'top:12px' : (sameCorner ? 'bottom:70px' : 'bottom:24px');
         var hLeft = hIsRight ? 'right:12px' : 'left:12px';
         var heartsHtml = showLikes ? '<div class="lb-likes" style="position:absolute;' + hTop + ';' + hLeft + ';z-index:10;cursor:pointer;user-select:none;color:#fff;font-size:14px;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:20px"></div>' : '';
+        // Nav arrows inside the image wrapper, vertically centered
+        var navHtml = '';
+        if (showNav) {
+            navHtml = '<button class="lb-prev" style="color:' + navColor + '">' +
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+                '</button>' +
+                '<button class="lb-next" style="color:' + navColor + '">' +
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
+                '</button>';
+        }
+        var titleAlign = titlePos === 'right' ? 'right' : titlePos === 'left' ? 'left' : 'center';
+        var tagsAlign = tagsPos === 'right' ? 'right' : tagsPos === 'left' ? 'left' : 'center';
         overlay.innerHTML =
             '<button class="lb-close">&times;</button>' +
-            (showNav ? '<button class="lb-prev">&lsaquo;</button><button class="lb-next">&rsaquo;</button>' : '') +
             '<div class="lb-content">' +
-                '<div style="position:relative;display:inline-block">' +
+                '<div class="lb-image-wrap">' +
                     '<img class="lb-image" src="" alt="">' +
+                    navHtml +
                     buyHtml +
                     heartsHtml +
                 '</div>' +
                 (showLbShare ? '<div class="lb-share"></div>' : '') +
-                (showTitle ? '<div class="lb-title"></div>' : '') +
-                (showTags ? '<div class="lb-tags"></div>' : '') +
+                (showTitle ? '<div class="lb-title" style="text-align:' + titleAlign + '"></div>' : '') +
+                (showTags ? '<div class="lb-tags" style="text-align:' + tagsAlign + '"></div>' : '') +
             '</div>';
         document.body.appendChild(overlay);
         img = overlay.querySelector('.lb-image');
@@ -2759,8 +2783,8 @@ const LIGHTBOX_JS: &str = r#"
         nextBtn = overlay.querySelector('.lb-next');
 
         closeBtn.addEventListener('click', close);
-        if (prevBtn) prevBtn.addEventListener('click', function() { navigate(-1); });
-        if (nextBtn) nextBtn.addEventListener('click', function() { navigate(1); });
+        if (prevBtn) prevBtn.addEventListener('click', function(e) { e.stopPropagation(); navigate(-1); });
+        if (nextBtn) nextBtn.addEventListener('click', function(e) { e.stopPropagation(); navigate(1); });
         overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
         if (likesEl) {
             likesEl.addEventListener('click', function(e) {
@@ -3104,6 +3128,11 @@ h6 { font-size: var(--font-size-h6); }
     color: #fff;
 }
 
+.lb-image-wrap {
+    position: relative;
+    display: inline-block;
+}
+
 .lb-close {
     position: absolute;
     top: 16px; right: 20px;
@@ -3111,6 +3140,7 @@ h6 { font-size: var(--font-size-h6); }
     color: #fff; font-size: 32px;
     cursor: pointer;
     opacity: 0.7;
+    z-index: 1001;
 }
 .lb-close:hover { opacity: 1; }
 
@@ -3118,16 +3148,25 @@ h6 { font-size: var(--font-size-h6); }
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: none; border: none;
-    color: var(--lightbox-nav-color);
-    opacity: 0.5;
-    font-size: 48px;
+    background: rgba(0,0,0,0.4);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: 20px;
+    opacity: 0;
+    transition: opacity .25s, background .25s;
+    z-index: 10;
+    padding: 0;
 }
-.lb-prev:hover, .lb-next:hover { opacity: 1; }
-.lb-prev { left: 8px; }
-.lb-next { right: 8px; }
+.lb-image-wrap:hover .lb-prev,
+.lb-image-wrap:hover .lb-next { opacity: 0.8; }
+.lb-prev:hover, .lb-next:hover { opacity: 1; background: rgba(0,0,0,0.65); }
+.lb-prev { left: 12px; }
+.lb-next { right: 12px; }
 
 /* Lightbox buy button */
 .lb-buy { text-align: center; }

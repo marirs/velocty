@@ -126,14 +126,6 @@
     </div>
 
     <div class="form-card">
-        <h3>Lightbox</h3>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_title" value="true" {% if settings.portfolio_lightbox_show_title == "true" %}checked{% endif %}> Show title in lightbox</label>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_show_tags" value="true" {% if settings.portfolio_lightbox_show_tags == "true" %}checked{% endif %}> Show tags in lightbox</label>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_nav" value="true" {% if settings.portfolio_lightbox_nav == "true" %}checked{% endif %}> Show prev/next navigation</label>
-        <label class="checkbox-item"><input type="checkbox" name="portfolio_lightbox_keyboard" value="true" {% if settings.portfolio_lightbox_keyboard == "true" %}checked{% endif %}> Keyboard navigation</label>
-    </div>
-
-    <div class="form-card">
         <h3>Features</h3>
         <label class="checkbox-item"><input type="checkbox" name="portfolio_enable_likes" value="true" {% if settings.portfolio_enable_likes == "true" %}checked{% endif %}> Enable heart/like</label>
         <label class="checkbox-item"><input type="checkbox" name="portfolio_image_protection" value="true" {% if settings.portfolio_image_protection == "true" %}checked{% endif %}> Image protection (disable right-click)</label>
