@@ -24,6 +24,7 @@ pub struct MediaFile {
     pub size_human: String,
     pub ext: String,
     pub is_image: bool,
+    pub is_video: bool,
     pub media_type: String,
     pub modified: String,
 }
@@ -40,7 +41,22 @@ pub fn media_library(
     let per_page = 60usize;
     let current_page = page.unwrap_or(1).max(1);
 
+    // Build allowed extension sets from settings
+    let img_allowed = Setting::get(pool, "images_allowed_types")
+        .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
+    let img_exts: Vec<String> = img_allowed
+        .split(',')
+        .map(|s| s.trim().to_lowercase())
+        .collect();
+    let vid_allowed = Setting::get(pool, "video_allowed_types")
+        .unwrap_or_else(|| "mp4,webm,mov,avi,mkv".to_string());
+    let vid_exts: Vec<String> = vid_allowed
+        .split(',')
+        .map(|s| s.trim().to_lowercase())
+        .collect();
+
     let mut files: Vec<MediaFile> = Vec::new();
+    let mut total_disk_bytes: u64 = 0;
     if let Ok(entries) = std::fs::read_dir(upload_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -52,13 +68,24 @@ pub fn media_library(
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
+            // Skip dotfiles (.DS_Store, .thumbs, etc.)
+            if name.starts_with('.') {
+                continue;
+            }
             let ext = path
                 .extension()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_lowercase();
+            // Only show files with allowed image or video extensions
+            let is_image = img_exts.iter().any(|e| e == &ext);
+            let is_video = vid_exts.iter().any(|e| e == &ext);
+            if !is_image && !is_video {
+                continue;
+            }
             let meta = std::fs::metadata(&path).ok();
             let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            total_disk_bytes += size;
             let modified = meta
                 .as_ref()
                 .and_then(|m| m.modified().ok())
@@ -67,30 +94,7 @@ pub fn media_library(
                     dt.format("%Y-%m-%d %H:%M").to_string()
                 })
                 .unwrap_or_default();
-            let is_image = matches!(
-                ext.as_str(),
-                "jpg"
-                    | "jpeg"
-                    | "png"
-                    | "gif"
-                    | "webp"
-                    | "svg"
-                    | "bmp"
-                    | "tiff"
-                    | "ico"
-                    | "heic"
-                    | "heif"
-            );
-            let media_type = match ext.as_str() {
-                "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico"
-                | "heic" | "heif" => "image",
-                "mp4" | "webm" | "mov" | "avi" | "mkv" | "ogv" => "video",
-                "mp3" | "wav" | "ogg" | "flac" | "aac" | "m4a" => "audio",
-                "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "csv"
-                | "rtf" | "md" => "document",
-                _ => "other",
-            }
-            .to_string();
+            let media_type = if is_image { "image" } else { "video" }.to_string();
             let size_human = if size >= 1_048_576 {
                 format!("{:.1} MB", size as f64 / 1_048_576.0)
             } else if size >= 1024 {
@@ -105,6 +109,7 @@ pub fn media_library(
                 size_human,
                 ext,
                 is_image,
+                is_video,
                 media_type,
                 modified,
             });
@@ -117,9 +122,22 @@ pub fn media_library(
     let count_all = files.len();
     let count_images = files.iter().filter(|f| f.media_type == "image").count();
     let count_videos = files.iter().filter(|f| f.media_type == "video").count();
-    let count_audio = files.iter().filter(|f| f.media_type == "audio").count();
-    let count_documents = files.iter().filter(|f| f.media_type == "document").count();
-    let count_other = files.iter().filter(|f| f.media_type == "other").count();
+
+    // Disk usage human-readable
+    let disk_used = if total_disk_bytes >= 1_073_741_824 {
+        format!("{:.1} GB", total_disk_bytes as f64 / 1_073_741_824.0)
+    } else if total_disk_bytes >= 1_048_576 {
+        format!("{:.1} MB", total_disk_bytes as f64 / 1_048_576.0)
+    } else if total_disk_bytes >= 1024 {
+        format!("{:.0} KB", total_disk_bytes as f64 / 1024.0)
+    } else {
+        format!("{} B", total_disk_bytes)
+    };
+    // Donut percentage — use 1 GB as reference capacity
+    let disk_capacity_bytes: u64 = 1_073_741_824;
+    let disk_pct = ((total_disk_bytes as f64 / disk_capacity_bytes as f64) * 100.0)
+        .min(100.0)
+        .round() as u32;
 
     let filtered: Vec<&MediaFile> = match filter.as_deref() {
         Some(f) if !f.is_empty() => files.iter().filter(|file| file.media_type == f).collect(),
@@ -140,9 +158,8 @@ pub fn media_library(
         "count_all": count_all,
         "count_images": count_images,
         "count_videos": count_videos,
-        "count_audio": count_audio,
-        "count_documents": count_documents,
-        "count_other": count_other,
+        "disk_used": disk_used,
+        "disk_pct": disk_pct,
         "current_page": current_page,
         "total_pages": total_pages,
         "settings": Setting::all(pool),

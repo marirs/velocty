@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="page-header">
-    <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Media Library</h2>
+    <h2 style="display:flex;align-items:center;gap:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Media Library<span class="disk-pill" title="{{ disk_used }} used (donut shows usage relative to 1 GB)"><svg width="22" height="22" viewBox="0 0 36 36" style="vertical-align:-3px"><circle cx="18" cy="18" r="15.915" fill="none" stroke="var(--border-subtle)" stroke-width="3"/><circle cx="18" cy="18" r="15.915" fill="none" stroke="{% if disk_pct > 85 %}var(--danger){% elif disk_pct > 60 %}var(--warning){% else %}var(--accent){% endif %}" stroke-width="3" stroke-dasharray="{{ disk_pct }} {{ 100 - disk_pct }}" stroke-dashoffset="25" stroke-linecap="round"/></svg><span style="font-size:11px;font-weight:500;color:var(--text-secondary)">{{ disk_used }}</span></span></h2>
     <span class="text-muted" style="font-size:13px">{{ total }} file{% if total != 1 %}s{% endif %}</span>
 </div>
 
@@ -10,9 +10,6 @@
     <a href="/{{ admin_slug }}/media" class="tab {% if not filter %}active{% endif %}">All ({{ count_all }})</a>
     {% if count_images > 0 %}<a href="/{{ admin_slug }}/media?filter=image" class="tab {% if filter == 'image' %}active{% endif %}">Images ({{ count_images }})</a>{% endif %}
     {% if count_videos > 0 %}<a href="/{{ admin_slug }}/media?filter=video" class="tab {% if filter == 'video' %}active{% endif %}">Videos ({{ count_videos }})</a>{% endif %}
-    {% if count_audio > 0 %}<a href="/{{ admin_slug }}/media?filter=audio" class="tab {% if filter == 'audio' %}active{% endif %}">Audio ({{ count_audio }})</a>{% endif %}
-    {% if count_documents > 0 %}<a href="/{{ admin_slug }}/media?filter=document" class="tab {% if filter == 'document' %}active{% endif %}">Documents ({{ count_documents }})</a>{% endif %}
-    {% if count_other > 0 %}<a href="/{{ admin_slug }}/media?filter=other" class="tab {% if filter == 'other' %}active{% endif %}">Other ({{ count_other }})</a>{% endif %}
 </div>
 
 {% if files | length == 0 %}
@@ -24,11 +21,16 @@
 {% else %}
 <div class="media-grid">
     {% for file in files %}
-    <div class="media-card" data-name="{{ file.name }}">
+    <div class="media-card" data-name="{{ file.name }}" data-is-video="{{ file.is_video }}">
         {% if file.is_image %}
-        <div class="media-thumb" style="background-image:url('/uploads/{{ file.path }}');" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}')"></div>
+        <div class="media-thumb" style="background-image:url('/uploads/{{ file.path }}');" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}', false)"></div>
+        {% elif file.is_video %}
+        <div class="media-thumb media-video-thumb" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}', true)">
+            <video src="/uploads/{{ file.path }}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>
+            <span class="media-video-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" stroke="none"><polygon points="5 3 19 12 5 21"/></svg></span>
+        </div>
         {% else %}
-        <div class="media-thumb media-file-icon" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}')">
+        <div class="media-thumb media-file-icon" onclick="openPreview('{{ file.path }}', '{{ file.name }}', '{{ file.size_human }}', '{{ file.modified }}', false)">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <span class="media-ext">.{{ file.ext }}</span>
         </div>
@@ -65,6 +67,7 @@
         </div>
         <div id="preview-image-wrap" style="padding:16px;text-align:center">
             <img id="preview-img" src="" alt="" style="max-width:100%;max-height:60vh;border-radius:6px">
+            <video id="preview-video" src="" controls style="max-width:100%;max-height:60vh;border-radius:6px;display:none"></video>
         </div>
         <div style="padding:0 16px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
             <div style="font-size:12px;color:var(--text-secondary)">
@@ -83,17 +86,31 @@
 
 <script>
 var overlay = document.getElementById('media-preview-overlay');
-function openPreview(path, name, size, date) {
+var previewImg = document.getElementById('preview-img');
+var previewVideo = document.getElementById('preview-video');
+function openPreview(path, name, size, date, isVideo) {
     document.getElementById('preview-name').textContent = name;
-    document.getElementById('preview-img').src = '/uploads/' + path;
     document.getElementById('preview-size').textContent = size;
     document.getElementById('preview-date').textContent = date;
     document.getElementById('preview-download').href = '/uploads/' + path;
     document.getElementById('preview-delete-form').action = '/{{ admin_slug }}/media/' + encodeURIComponent(path) + '/delete';
+    if (isVideo) {
+        previewImg.style.display = 'none';
+        previewVideo.style.display = 'block';
+        previewVideo.src = '/uploads/' + path;
+    } else {
+        previewVideo.style.display = 'none';
+        previewVideo.pause();
+        previewImg.style.display = 'block';
+        previewImg.src = '/uploads/' + path;
+    }
     overlay.style.display = 'flex';
 }
 function closePreview(e) {
-    if (!e || e.target === overlay) overlay.style.display = 'none';
+    if (!e || e.target === overlay) {
+        overlay.style.display = 'none';
+        previewVideo.pause();
+    }
 }
 function copyUrl() {
     var url = window.location.origin + document.getElementById('preview-download').getAttribute('href');
@@ -162,6 +179,37 @@ document.addEventListener('keydown', function(e) {
 .media-meta {
     font-size: 10px;
     color: var(--text-tertiary);
+}
+.disk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 3px 10px 3px 6px;
+    font-size: 11px;
+    vertical-align: middle;
+    cursor: default;
+}
+.media-video-thumb {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.media-video-badge {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
 }
 </style>
 {% endblock content %}
