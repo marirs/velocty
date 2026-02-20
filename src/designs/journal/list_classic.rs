@@ -106,7 +106,7 @@ pub fn render_single(context: &Value) -> String {
                 .filter_map(|t| {
                     let name = t.get("name").and_then(|v| v.as_str())?;
                     Some(format!(
-                        "<span class=\"bsc-tag\">{}</span>",
+                        "<span class=\"bsc-tag\">#{}</span>",
                         html_escape(name)
                     ))
                 })
