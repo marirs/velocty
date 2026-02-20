@@ -30,6 +30,7 @@
     <button type="button" class="tab" data-seo-tab="tab-seo-clicky">Clicky{% if settings.seo_clicky_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-seo-tab="tab-seo-umami">Umami{% if settings.seo_umami_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-seo-tab="tab-seo-audit">Audit</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-ranking">Ranking</button>
 </div>
 
 <form method="post" action="/{{ admin_slug }}/settings/seo">
@@ -254,6 +255,30 @@
         </div>
     </div>
 
+    <!-- ── Ranking ────────────────────────────────── -->
+    <div id="tab-seo-ranking" style="display:none">
+        <div class="form-card" style="margin-bottom:20px">
+            <h3>Moz Link API</h3>
+            <p class="text-muted" style="margin-bottom:16px">Domain Authority, Page Authority, backlinks, and spam score. Free tier allows 10 queries/month. <a href="https://moz.com/products/api" target="_blank" style="color:var(--accent)">Get API credentials</a>.</p>
+            <div class="form-group">
+                <label for="seo_moz_access_id">Moz Access ID</label>
+                <input type="text" id="seo_moz_access_id" name="seo_moz_access_id" value="{{ settings.seo_moz_access_id | default(value='') }}" placeholder="mozscape-...">
+            </div>
+            <div class="form-group">
+                <label for="seo_moz_secret_key">Moz Secret Key</label>
+                <input type="password" id="seo_moz_secret_key" name="seo_moz_secret_key" value="{{ settings.seo_moz_secret_key | default(value='') }}" placeholder="Enter secret key">
+            </div>
+        </div>
+        <div class="form-card">
+            <h3>Open PageRank</h3>
+            <p class="text-muted" style="margin-bottom:16px">Free PageRank score (10,000 queries/day). Used as a fallback when Moz is not configured. <a href="https://www.domcop.com/openpagerank/" target="_blank" style="color:var(--accent)">Get a free API key</a>.</p>
+            <div class="form-group">
+                <label for="seo_openpagerank_api_key">Open PageRank API Key</label>
+                <input type="text" id="seo_openpagerank_api_key" name="seo_openpagerank_api_key" value="{{ settings.seo_openpagerank_api_key | default(value='') }}" placeholder="Enter API key">
+            </div>
+        </div>
+    </div>
+
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
@@ -262,7 +287,7 @@
 <script>
 (function() {
     var tabs = document.querySelectorAll('[data-seo-tab]');
-    var panels = ['tab-seo-general','tab-seo-webmaster','tab-seo-ga','tab-seo-plausible','tab-seo-fathom','tab-seo-matomo','tab-seo-cloudflare','tab-seo-clicky','tab-seo-umami','tab-seo-audit'];
+    var panels = ['tab-seo-general','tab-seo-webmaster','tab-seo-ga','tab-seo-plausible','tab-seo-fathom','tab-seo-matomo','tab-seo-cloudflare','tab-seo-clicky','tab-seo-umami','tab-seo-audit','tab-seo-ranking'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });

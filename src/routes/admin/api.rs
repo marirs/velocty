@@ -515,3 +515,177 @@ pub fn pagespeed_fetch(_admin: EditorUser, pool: &State<DbPool>, url: &str) -> J
         Err(e) => Json(serde_json::json!({"error": format!("Request failed: {}", e)})),
     }
 }
+
+/// Fetch Moz domain metrics (DA, PA, backlinks, spam score) — cached in settings
+#[get("/moz-domain")]
+pub fn moz_domain_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+    let access_id = Setting::get_or(pool, "seo_moz_access_id", "");
+    let secret_key = Setting::get_or(pool, "seo_moz_secret_key", "");
+
+    if access_id.is_empty() || secret_key.is_empty() {
+        return Json(
+            serde_json::json!({"error": "Moz API credentials not configured. Go to Settings > SEO > Ranking."}),
+        );
+    }
+
+    let site_url = Setting::get_or(pool, "seo_canonical_base", "");
+    let site_url = if site_url.is_empty() {
+        Setting::get_or(pool, "site_url", "")
+    } else {
+        site_url
+    };
+    if site_url.is_empty() {
+        return Json(
+            serde_json::json!({"error": "No site URL configured. Set a canonical base URL in Settings > SEO > General."}),
+        );
+    }
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return Json(serde_json::json!({"error": format!("HTTP client error: {}", e)})),
+    };
+
+    let body = serde_json::json!({
+        "targets": [site_url],
+        "columns": ["domain_authority", "page_authority", "spam_score", "external_links_to_root_domain", "linking_root_domains_to_root_domain"]
+    });
+
+    match client
+        .post("https://lsapi.seomoz.com/v2/url_metrics")
+        .basic_auth(&access_id, Some(&secret_key))
+        .json(&body)
+        .send()
+    {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.json::<Value>() {
+                Ok(data) => {
+                    if !status.is_success() {
+                        let msg = data
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown Moz API error");
+                        Json(
+                            serde_json::json!({"error": format!("Moz API error ({}): {}", status.as_u16(), msg)}),
+                        )
+                    } else {
+                        // Cache the result
+                        let cache = serde_json::json!({
+                            "data": data,
+                            "fetched_at": chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+                        });
+                        let _ = Setting::set(pool, "seo_moz_cache", &cache.to_string());
+                        Json(cache)
+                    }
+                }
+                Err(_) => Json(
+                    serde_json::json!({"error": format!("Failed to parse Moz response (HTTP {})", status.as_u16())}),
+                ),
+            }
+        }
+        Err(e) => Json(serde_json::json!({"error": format!("Request failed: {}", e)})),
+    }
+}
+
+/// Fetch cached Moz data without hitting the API
+#[get("/moz-domain/cached")]
+pub fn moz_domain_cached(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+    let cached = Setting::get_or(pool, "seo_moz_cache", "");
+    if cached.is_empty() {
+        return Json(serde_json::json!({"cached": false}));
+    }
+    match serde_json::from_str::<Value>(&cached) {
+        Ok(v) => Json(v),
+        Err(_) => Json(serde_json::json!({"cached": false})),
+    }
+}
+
+/// Fetch Open PageRank score — cached in settings
+#[get("/pagerank")]
+pub fn pagerank_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+    let api_key = Setting::get_or(pool, "seo_openpagerank_api_key", "");
+
+    if api_key.is_empty() {
+        return Json(
+            serde_json::json!({"error": "Open PageRank API key not configured. Go to Settings > SEO > Ranking."}),
+        );
+    }
+
+    let site_url = Setting::get_or(pool, "seo_canonical_base", "");
+    let site_url = if site_url.is_empty() {
+        Setting::get_or(pool, "site_url", "")
+    } else {
+        site_url
+    };
+    if site_url.is_empty() {
+        return Json(
+            serde_json::json!({"error": "No site URL configured. Set a canonical base URL in Settings > SEO > General."}),
+        );
+    }
+
+    // Extract domain from URL
+    let domain = site_url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/')
+        .to_string();
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return Json(serde_json::json!({"error": format!("HTTP client error: {}", e)})),
+    };
+
+    let endpoint = format!(
+        "https://openpagerank.com/api/v1.0/getPageRank?domains%5B0%5D={}",
+        domain
+    );
+
+    match client.get(&endpoint).header("API-OPR", &api_key).send() {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.json::<Value>() {
+                Ok(data) => {
+                    if !status.is_success() {
+                        let msg = data
+                            .get("error")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown PageRank API error");
+                        Json(
+                            serde_json::json!({"error": format!("PageRank API error ({}): {}", status.as_u16(), msg)}),
+                        )
+                    } else {
+                        let cache = serde_json::json!({
+                            "data": data,
+                            "fetched_at": chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+                        });
+                        let _ = Setting::set(pool, "seo_pagerank_cache", &cache.to_string());
+                        Json(cache)
+                    }
+                }
+                Err(_) => Json(
+                    serde_json::json!({"error": format!("Failed to parse PageRank response (HTTP {})", status.as_u16())}),
+                ),
+            }
+        }
+        Err(e) => Json(serde_json::json!({"error": format!("Request failed: {}", e)})),
+    }
+}
+
+/// Fetch cached PageRank data without hitting the API
+#[get("/pagerank/cached")]
+pub fn pagerank_cached(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+    let cached = Setting::get_or(pool, "seo_pagerank_cache", "");
+    if cached.is_empty() {
+        return Json(serde_json::json!({"cached": false}));
+    }
+    match serde_json::from_str::<Value>(&cached) {
+        Ok(v) => Json(v),
+        Err(_) => Json(serde_json::json!({"cached": false})),
+    }
+}

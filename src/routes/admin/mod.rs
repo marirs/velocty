@@ -353,5 +353,9 @@ pub fn api_routes() -> Vec<rocket::Route> {
         api::seo_score_summary,
         api::seo_rescan_all,
         api::pagespeed_fetch,
+        api::moz_domain_fetch,
+        api::moz_domain_cached,
+        api::pagerank_fetch,
+        api::pagerank_cached,
     ]
 }

@@ -16,6 +16,7 @@
     {% if journal_enabled %}<button type="button" class="tab" data-seo-tab="tab-journal">Journal</button>{% endif %}
     {% if portfolio_enabled %}<button type="button" class="tab" data-seo-tab="tab-portfolio">Portfolio</button>{% endif %}
     <button type="button" class="tab" data-seo-tab="tab-pagespeed">PageSpeed</button>
+    <button type="button" class="tab" data-seo-tab="tab-rankings">Rankings</button>
 </div>
 
 <!-- ═══ Overview Tab ═══ -->
@@ -86,6 +87,42 @@
                     {% endif %}
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Domain Authority Summary -->
+    <div class="form-card" style="margin-bottom:24px" id="da-summary-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3>Domain Authority</h3>
+            <span id="da-summary-source" style="font-size:11px;color:var(--text-tertiary)"></span>
+        </div>
+        <div id="da-summary-loading" style="color:var(--text-tertiary);font-size:13px">Loading cached data...</div>
+        <div id="da-summary-empty" style="display:none;color:var(--text-secondary);font-size:13px">
+            No ranking data yet. Go to the <a href="#tab-rankings" onclick="document.querySelector('[data-seo-tab=tab-rankings]').click();return false" style="color:var(--accent)">Rankings tab</a> to check your domain.
+        </div>
+        <div id="da-summary-data" style="display:none">
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div style="text-align:center;flex:1;min-width:80px">
+                    <div id="da-val" style="font-size:28px;font-weight:700;color:var(--accent)">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary)">Domain Authority</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px" id="da-pa-block">
+                    <div id="da-pa-val" style="font-size:28px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary)">Page Authority</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px" id="da-backlinks-block">
+                    <div id="da-backlinks-val" style="font-size:28px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary)">Backlinks</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px" id="da-domains-block">
+                    <div id="da-domains-val" style="font-size:28px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary)">Linking Domains</div>
+                </div>
+                <div style="text-align:center;flex:1;min-width:80px" id="da-spam-block">
+                    <div id="da-spam-val" style="font-size:28px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary)">Spam Score</div>
+                </div>
             </div>
         </div>
     </div>
@@ -257,6 +294,85 @@
             <div style="margin-top:8px">Running PageSpeed test... this may take 15-30 seconds</div>
         </div>
         <div id="pagespeed-error" style="display:none;color:var(--danger)"></div>
+    </div>
+</div>
+
+<!-- ═══ Rankings Tab ═══ -->
+<div id="tab-rankings" style="display:none">
+    <!-- Moz Section -->
+    <div class="form-card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+                <h3>Moz Domain Metrics</h3>
+                <p class="text-muted" style="margin-top:4px;font-size:13px">Domain Authority, Page Authority, backlinks, linking domains, and spam score.</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-moz-check" onclick="checkMoz()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Check Now
+            </button>
+        </div>
+        <div id="moz-loading" style="display:none;text-align:center;padding:30px;color:var(--text-secondary)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <div style="margin-top:8px">Fetching Moz data...</div>
+        </div>
+        <div id="moz-error" style="display:none;color:var(--danger);font-size:13px"></div>
+        <div id="moz-empty" style="color:var(--text-tertiary);font-size:13px">No Moz data yet. Click "Check Now" to fetch domain metrics.</div>
+        <div id="moz-data" style="display:none">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:16px">
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="moz-da" style="font-size:32px;font-weight:700;color:var(--accent)">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Domain Authority</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="moz-pa" style="font-size:32px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Page Authority</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="moz-backlinks" style="font-size:32px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Backlinks</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="moz-domains" style="font-size:32px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Linking Domains</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="moz-spam" style="font-size:32px;font-weight:700;color:var(--text-primary)">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Spam Score</div>
+                </div>
+            </div>
+            <div id="moz-fetched" style="font-size:11px;color:var(--text-tertiary)"></div>
+        </div>
+    </div>
+
+    <!-- Open PageRank Section -->
+    <div class="form-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+                <h3>Open PageRank</h3>
+                <p class="text-muted" style="margin-top:4px;font-size:13px">Free PageRank score based on Open PageRank data (10,000 queries/day).</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-pr-check" onclick="checkPageRank()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Check Now
+            </button>
+        </div>
+        <div id="pr-loading" style="display:none;text-align:center;padding:30px;color:var(--text-secondary)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <div style="margin-top:8px">Fetching PageRank data...</div>
+        </div>
+        <div id="pr-error" style="display:none;color:var(--danger);font-size:13px"></div>
+        <div id="pr-empty" style="color:var(--text-tertiary);font-size:13px">No PageRank data yet. Click "Check Now" to fetch your domain's PageRank.</div>
+        <div id="pr-data" style="display:none">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:16px">
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="pr-rank" style="font-size:32px;font-weight:700;color:var(--accent)">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">PageRank</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-subtle)">
+                    <div id="pr-domain" style="font-size:18px;font-weight:600;color:var(--text-primary);word-break:break-all">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Domain</div>
+                </div>
+            </div>
+            <div id="pr-fetched" style="font-size:11px;color:var(--text-tertiary)"></div>
+        </div>
     </div>
 </div>
 
@@ -499,5 +615,162 @@ function renderPageSpeed(data) {
     }
     document.getElementById('ps-vitals').innerHTML = vitalsHtml;
 }
+
+// ── Domain Authority Summary (Overview card) ──
+function populateDASummary(source, da, pa, backlinks, domains, spam, fetchedAt) {
+    document.getElementById('da-summary-loading').style.display = 'none';
+    document.getElementById('da-summary-empty').style.display = 'none';
+    document.getElementById('da-summary-data').style.display = '';
+    document.getElementById('da-summary-source').textContent = source + (fetchedAt ? ' · ' + fetchedAt : '');
+    document.getElementById('da-val').textContent = da != null ? Math.round(da) : '—';
+    if (pa != null) { document.getElementById('da-pa-val').textContent = Math.round(pa); } else { document.getElementById('da-pa-block').style.display = 'none'; }
+    if (backlinks != null) { document.getElementById('da-backlinks-val').textContent = backlinks.toLocaleString(); } else { document.getElementById('da-backlinks-block').style.display = 'none'; }
+    if (domains != null) { document.getElementById('da-domains-val').textContent = domains.toLocaleString(); } else { document.getElementById('da-domains-block').style.display = 'none'; }
+    if (spam != null) { document.getElementById('da-spam-val').textContent = Math.round(spam) + '%'; var c = spam <= 30 ? 'var(--success)' : spam <= 60 ? 'var(--warning)' : 'var(--danger)'; document.getElementById('da-spam-val').style.color = c; } else { document.getElementById('da-spam-block').style.display = 'none'; }
+}
+
+function showDASummaryEmpty() {
+    document.getElementById('da-summary-loading').style.display = 'none';
+    document.getElementById('da-summary-empty').style.display = '';
+    document.getElementById('da-summary-data').style.display = 'none';
+}
+
+// ── Moz ──
+function renderMozData(result, fetchedAt) {
+    var d = Array.isArray(result) ? result[0] : result;
+    if (!d) return;
+    document.getElementById('moz-empty').style.display = 'none';
+    document.getElementById('moz-data').style.display = '';
+    document.getElementById('moz-da').textContent = d.domain_authority != null ? Math.round(d.domain_authority) : '—';
+    document.getElementById('moz-pa').textContent = d.page_authority != null ? Math.round(d.page_authority) : '—';
+    document.getElementById('moz-backlinks').textContent = (d.external_links_to_root_domain || 0).toLocaleString();
+    document.getElementById('moz-domains').textContent = (d.linking_root_domains_to_root_domain || 0).toLocaleString();
+    var spam = d.spam_score != null ? Math.round(d.spam_score) : null;
+    document.getElementById('moz-spam').textContent = spam != null ? spam + '%' : '—';
+    if (spam != null) { var c = spam <= 30 ? 'var(--success)' : spam <= 60 ? 'var(--warning)' : 'var(--danger)'; document.getElementById('moz-spam').style.color = c; }
+    if (fetchedAt) document.getElementById('moz-fetched').textContent = 'Last checked: ' + fetchedAt;
+    // Also update overview summary
+    populateDASummary('Moz', d.domain_authority, d.page_authority, d.external_links_to_root_domain, d.linking_root_domains_to_root_domain, d.spam_score, fetchedAt);
+}
+
+function checkMoz() {
+    var btn = document.getElementById('btn-moz-check');
+    var origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Checking...';
+    document.getElementById('moz-loading').style.display = '';
+    document.getElementById('moz-error').style.display = 'none';
+    document.getElementById('moz-empty').style.display = 'none';
+    document.getElementById('moz-data').style.display = 'none';
+
+    fetch('/{{ admin_slug }}/api/moz-domain', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            document.getElementById('moz-loading').style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            if (d.error) {
+                document.getElementById('moz-error').style.display = '';
+                document.getElementById('moz-error').textContent = d.error;
+                document.getElementById('moz-empty').style.display = '';
+                setTimeout(function() { document.getElementById('moz-error').style.display = 'none'; }, 6000);
+                return;
+            }
+            renderMozData(d.data, d.fetched_at);
+        })
+        .catch(function(e) {
+            document.getElementById('moz-loading').style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            document.getElementById('moz-error').style.display = '';
+            document.getElementById('moz-error').textContent = 'Request failed: ' + e;
+            document.getElementById('moz-empty').style.display = '';
+            setTimeout(function() { document.getElementById('moz-error').style.display = 'none'; }, 6000);
+        });
+}
+
+// ── Open PageRank ──
+function renderPageRankData(result, fetchedAt) {
+    var responses = result.response || [];
+    var d = responses[0];
+    if (!d) return;
+    document.getElementById('pr-empty').style.display = 'none';
+    document.getElementById('pr-data').style.display = '';
+    document.getElementById('pr-rank').textContent = d.page_rank_decimal != null ? d.page_rank_decimal.toFixed(1) : (d.rank != null ? d.rank : '—');
+    document.getElementById('pr-domain').textContent = d.domain || '—';
+    if (fetchedAt) document.getElementById('pr-fetched').textContent = 'Last checked: ' + fetchedAt;
+    // Update overview summary if Moz isn't already shown
+    if (document.getElementById('da-summary-loading').style.display !== 'none' || document.getElementById('da-summary-empty').style.display !== 'none') {
+        populateDASummary('Open PageRank', d.page_rank_decimal, null, null, null, null, fetchedAt);
+    }
+}
+
+function checkPageRank() {
+    var btn = document.getElementById('btn-pr-check');
+    var origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Checking...';
+    document.getElementById('pr-loading').style.display = '';
+    document.getElementById('pr-error').style.display = 'none';
+    document.getElementById('pr-empty').style.display = 'none';
+    document.getElementById('pr-data').style.display = 'none';
+
+    fetch('/{{ admin_slug }}/api/pagerank', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            document.getElementById('pr-loading').style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            if (d.error) {
+                document.getElementById('pr-error').style.display = '';
+                document.getElementById('pr-error').textContent = d.error;
+                document.getElementById('pr-empty').style.display = '';
+                setTimeout(function() { document.getElementById('pr-error').style.display = 'none'; }, 6000);
+                return;
+            }
+            renderPageRankData(d.data, d.fetched_at);
+        })
+        .catch(function(e) {
+            document.getElementById('pr-loading').style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            document.getElementById('pr-error').style.display = '';
+            document.getElementById('pr-error').textContent = 'Request failed: ' + e;
+            document.getElementById('pr-empty').style.display = '';
+            setTimeout(function() { document.getElementById('pr-error').style.display = 'none'; }, 6000);
+        });
+}
+
+// ── Load cached data on page load ──
+(function() {
+    var mozLoaded = false;
+    // Try Moz cached first
+    fetch('/{{ admin_slug }}/api/moz-domain/cached', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.data) {
+                mozLoaded = true;
+                renderMozData(d.data, d.fetched_at);
+            }
+        })
+        .catch(function(){})
+        .finally(function() {
+            // Then try PageRank cached
+            fetch('/{{ admin_slug }}/api/pagerank/cached', { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.data) {
+                        renderPageRankData(d.data, d.fetched_at);
+                    }
+                    // If neither has data, show empty state on overview
+                    if (!mozLoaded && !(d.data)) {
+                        showDASummaryEmpty();
+                    }
+                })
+                .catch(function() {
+                    if (!mozLoaded) showDASummaryEmpty();
+                });
+        });
+})();
 </script>
 {% endblock scripts %}
