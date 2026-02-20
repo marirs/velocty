@@ -141,6 +141,11 @@ fn render_with_shell(
     let nav_order_raw = sg("nav_order", "portfolio,blog,contact");
     let nav_order: Vec<&str> = nav_order_raw.split(',').map(|s| s.trim()).collect();
 
+    let page_type = context
+        .get("page_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
     let mut nav_links = String::new();
     for key in &nav_order {
         match *key {
@@ -149,9 +154,15 @@ fn render_with_shell(
                 if !categories_html.is_empty() {
                     nav_links.push_str(&categories_html);
                 } else if portfolio_in_nav {
+                    let active = if page_type.starts_with("portfolio") || page_type == "homepage" {
+                        " active"
+                    } else {
+                        ""
+                    };
                     nav_links.push_str(&format!(
-                        "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        "<a href=\"{}\" class=\"nav-link{}\">{}</a>\n",
                         slug_url(&portfolio_slug, ""),
+                        active,
                         html_escape(&portfolio_label)
                     ));
                 }
@@ -160,9 +171,15 @@ fn render_with_shell(
                 if !journal_categories_html.is_empty() {
                     nav_links.push_str(&journal_categories_html);
                 } else if blog_in_nav {
+                    let active = if page_type.starts_with("blog") {
+                        " active"
+                    } else {
+                        ""
+                    };
                     nav_links.push_str(&format!(
-                        "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        "<a href=\"{}\" class=\"nav-link{}\">{}</a>\n",
                         slug_url(&blog_slug, ""),
+                        active,
                         html_escape(&blog_label)
                     ));
                 }
@@ -796,6 +813,16 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
         .and_then(|s| s.as_str())
         .unwrap_or("");
 
+    let page_type = context
+        .get("page_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let toggle_active = if page_type.starts_with("portfolio") {
+        " active"
+    } else {
+        ""
+    };
+
     // Build collapsible category dropdown
     // Always render the parent toggle — even when all categories are hidden,
     // the portfolio label + "All" link should remain visible.
@@ -811,10 +838,10 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
     if has_children {
         let open_cls = if start_open { " open" } else { "" };
         html.push_str(&format!(
-            "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
+            "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
              <span>{}</span> <span class=\"arrow\">&#9662;</span></button>\
              <div class=\"nav-subcategories{}\">",
-            open_cls, html_escape(portfolio_label), open_cls
+            open_cls, toggle_active, html_escape(portfolio_label), open_cls
         ));
 
         if show_all {
@@ -822,7 +849,8 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
                 .get("portfolio_all_categories_label")
                 .and_then(|v| v.as_str())
                 .unwrap_or("All");
-            let all_active = if active_slug.is_empty() {
+            let is_portfolio_page = page_type.starts_with("portfolio") || page_type == "homepage";
+            let all_active = if active_slug.is_empty() && is_portfolio_page {
                 " active"
             } else {
                 ""
@@ -841,7 +869,7 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
             if slug.is_empty() {
                 continue;
             }
-            let active_class = if slug == active_slug { " active" } else { "" };
+            let active_class = if slug == active_slug && (page_type.starts_with("portfolio") || page_type == "homepage") { " active" } else { "" };
             html.push_str(&format!(
                 "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
                 slug_url(portfolio_slug, &format!("category/{}", slug)),
@@ -1009,6 +1037,16 @@ fn build_journal_categories_sidebar(context: &Value, start_open: bool) -> String
         .and_then(|s| s.as_str())
         .unwrap_or("");
 
+    let page_type = context
+        .get("page_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let toggle_active = if page_type.starts_with("blog") {
+        " active"
+    } else {
+        ""
+    };
+
     let mut html = String::new();
 
     let show_all = settings
@@ -1021,10 +1059,10 @@ fn build_journal_categories_sidebar(context: &Value, start_open: bool) -> String
     if has_children {
         let open_cls = if start_open { " open" } else { "" };
         html.push_str(&format!(
-            "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
+            "<div class=\"nav-category-group\">\n             <button class=\"nav-category-toggle{}{}\" onclick=\"this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')\">\
              <span>{}</span> <span class=\"arrow\">&#9662;</span></button>\
              <div class=\"nav-subcategories{}\">",
-            open_cls, html_escape(blog_label), open_cls
+            open_cls, toggle_active, html_escape(blog_label), open_cls
         ));
 
         if show_all {
@@ -1032,7 +1070,8 @@ fn build_journal_categories_sidebar(context: &Value, start_open: bool) -> String
                 .get("journal_all_categories_label")
                 .and_then(|v| v.as_str())
                 .unwrap_or("All");
-            let all_active = if active_slug.is_empty() {
+            let is_blog_page = page_type.starts_with("blog");
+            let all_active = if active_slug.is_empty() && is_blog_page {
                 " active"
             } else {
                 ""
@@ -1051,7 +1090,7 @@ fn build_journal_categories_sidebar(context: &Value, start_open: bool) -> String
             if slug.is_empty() {
                 continue;
             }
-            let active_class = if slug == active_slug { " active" } else { "" };
+            let active_class = if slug == active_slug && page_type.starts_with("blog") { " active" } else { "" };
             html.push_str(&format!(
                 "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
                 slug_url(blog_slug, &format!("category/{}", slug)),
@@ -3666,6 +3705,7 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     text-align: left;
 }
 .nav-category-toggle:hover { color: var(--color-accent); }
+.nav-category-toggle.active { font-weight: 700; color: var(--color-accent); }
 .nav-category-toggle .arrow { font-size: 9px; transition: transform 0.2s; }
 .nav-category-toggle.open .arrow { transform: rotate(180deg); }
 
@@ -3697,7 +3737,7 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     display: block;
 }
 .nav-link:hover { color: var(--color-accent); }
-.nav-link.active { color: var(--color-accent); }
+.nav-link.active { font-weight: 700; color: var(--color-accent); }
 
 .archives-link {
     font-family: var(--font-nav);
