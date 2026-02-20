@@ -552,10 +552,7 @@ pub fn settings_save(
             "seo_clicky_enabled",
             "seo_umami_enabled",
         ],
-        "images" => &[
-            "images_webp_convert",
-            "video_upload_enabled",
-        ],
+        "images" => &["images_webp_convert", "video_upload_enabled"],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &[
             "design_site_search",
@@ -576,6 +573,17 @@ pub fn settings_save(
     };
     for key in checkbox_keys {
         let _ = Setting::set(pool, key, "false");
+    }
+
+    // Sanitize SVG data URLs in branding fields (logo, favicon)
+    if section == "general" {
+        for key in &["site_logo", "site_favicon"] {
+            if let Some(val) = data.get(*key) {
+                if let Some(sanitized) = sanitize_svg_data_url(val) {
+                    data.insert(key.to_string(), sanitized);
+                }
+            }
+        }
     }
 
     // Server-side clamp for video settings
@@ -654,4 +662,22 @@ pub fn settings_save(
         )),
         "Settings saved successfully",
     ))
+}
+
+/// If the value is an SVG data URL, decode → sanitize → re-encode.
+/// Returns Some(sanitized_data_url) if it was an SVG, None otherwise (leave as-is).
+fn sanitize_svg_data_url(value: &str) -> Option<String> {
+    use base64::Engine;
+    let engine = base64::engine::general_purpose::STANDARD;
+
+    // Check for base64-encoded SVG data URL
+    if let Some(b64) = value.strip_prefix("data:image/svg+xml;base64,") {
+        if let Ok(raw) = engine.decode(b64.trim()) {
+            if let Some(clean) = crate::svg_sanitizer::sanitize_svg(&raw) {
+                let encoded = engine.encode(&clean);
+                return Some(format!("data:image/svg+xml;base64,{}", encoded));
+            }
+        }
+    }
+    None
 }

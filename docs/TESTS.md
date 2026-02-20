@@ -1,6 +1,6 @@
 # Velocty — Test Coverage Report
 
-> **Last run:** 2026-02-20 | **Result:** 231 passed, 0 failed | **Duration:** ~2.0s  
+> **Last run:** 2026-02-20 | **Result:** 243 passed, 0 failed | **Duration:** ~2.0s  
 > **Command:** `cargo test`
 
 ---
@@ -33,7 +33,8 @@
 | `db.rs` | 4 | 3 | **75%** |
 | `render.rs` | 3 | 3 | **100%** |
 | `image_proxy.rs` | 4 | 4 | **100%** |
-| **TOTAL** | **186** | **175** | **94%** |
+| `svg_sanitizer.rs` | 1 | 1 | **100%** |
+| **TOTAL** | **187** | **176** | **94%** |
 
 ### Not unit-testable (excluded from coverage)
 
@@ -516,6 +517,23 @@
 | 231 | `uploaded_path_empty_string_is_not_used` | Empty uploaded_path | Falls back to image_path | Correct | ✅ Pass |
 | 232 | `uploaded_path_none_is_not_used` | None uploaded_path | Falls back to image_path | Correct | ✅ Pass |
 
+### 45. SVG Sanitizer (`svg_sanitizer.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 233 | `test_clean_svg_passes_through` | Clean SVG with circle element | Preserved as-is | `<circle` present | ✅ Pass |
+| 234 | `test_strips_script_element` | SVG with `<script>alert('xss')</script>` | Script removed, circle kept | No `<script>`, circle present | ✅ Pass |
+| 235 | `test_strips_event_handlers` | Circle with `onload` and `onclick` attrs | Event handlers removed | No `onload`/`onclick` | ✅ Pass |
+| 236 | `test_strips_javascript_href` | `<a href="javascript:alert(1)">` | href removed | No `javascript:` | ✅ Pass |
+| 237 | `test_strips_foreignobject` | `<foreignObject>` with nested script | Entire element removed | No `foreignObject` | ✅ Pass |
+| 238 | `test_strips_external_use` | `<use href="https://evil.com/...">` | External use removed | No `evil.com` | ✅ Pass |
+| 239 | `test_allows_internal_use` | `<use href="#c">` (internal ref) | Preserved | `use` and `#c` present | ✅ Pass |
+| 240 | `test_strips_data_uri_href` | `href="data:text/html,..."` | href removed | No `data:text/html` | ✅ Pass |
+| 241 | `test_strips_style_expression` | `style="width:expression(alert(1))"` | Style attr removed | No `expression(` | ✅ Pass |
+| 242 | `test_strips_comments` | IE conditional comment with script | Comment stripped | No `<!--` or `alert` | ✅ Pass |
+| 243 | `test_strips_iframe_element` | `<iframe src="...">` inside SVG | Element removed | No `iframe` | ✅ Pass |
+| 244 | `test_strips_embed_element` | `<embed src="...">` inside SVG | Element removed | No `embed` | ✅ Pass |
+
 ---
 
 ## Running Tests
@@ -591,4 +609,5 @@ src/tests.rs
 ├── Render: Footer Modes (5 tests)
 ├── Render: Journal Navigation (6 tests)
 ├── Render: Portfolio Lightbox Defaults (1 test)
-└── Render: Upload Path Handling (3 tests)
+├── Render: Upload Path Handling (3 tests)
+└── SVG Sanitizer (12 tests)

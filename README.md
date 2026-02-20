@@ -212,6 +212,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Session expiry** — configurable (default 24h)
 - **Security headers** — X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy
 - **Image proxy** — all public `/uploads/` URLs rewritten to HMAC-signed `/img/<token>` paths, with zero-downtime key rotation and configurable grace period
+- **SVG sanitization** — uploaded SVGs are sanitized to strip `<script>`, event handlers, `<foreignObject>`, dangerous URIs, and IE conditional comments; SVGs served with restrictive CSP (`script-src 'none'`) as defense-in-depth
 
 ### Email
 
@@ -336,6 +337,7 @@ velocty/
 │   ├── seo.rs                   # Meta tags, JSON-LD, sitemap
 │   ├── rss.rs                   # RSS/Atom feed generation
 │   ├── image_proxy.rs            # HMAC-signed image URL proxy with key rotation
+│   ├── svg_sanitizer.rs          # SVG upload sanitizer (strips scripts, event handlers, etc.)
 │   ├── images.rs                # Upload, thumbnails, WebP conversion
 │   ├── license.rs               # Purchase license.txt generation
 │   ├── rate_limit.rs            # In-memory rate limiter (login, comments)

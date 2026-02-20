@@ -22,6 +22,7 @@ mod render;
 mod rss;
 mod security;
 mod seo;
+mod svg_sanitizer;
 mod typography;
 
 mod import;

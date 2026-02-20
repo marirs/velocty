@@ -23,16 +23,20 @@ pub struct FileResponse {
     pub bytes: Vec<u8>,
     pub content_type: String,
     pub cache_control: String,
+    pub content_security_policy: Option<String>,
 }
 
 impl<'r> Responder<'r, 'static> for FileResponse {
     fn respond_to(self, _req: &'r Request<'_>) -> response::Result<'static> {
         let ct = ContentType::parse_flexible(&self.content_type).unwrap_or(ContentType::Binary);
-        Response::build()
-            .header(ct)
+        let mut resp = Response::build();
+        resp.header(ct)
             .header(Header::new("Cache-Control", self.cache_control))
-            .header(Header::new("X-Content-Type-Options", "nosniff"))
-            .sized_body(self.bytes.len(), Cursor::new(self.bytes))
+            .header(Header::new("X-Content-Type-Options", "nosniff"));
+        if let Some(csp) = self.content_security_policy {
+            resp.header(Header::new("Content-Security-Policy", csp));
+        }
+        resp.sized_body(self.bytes.len(), Cursor::new(self.bytes))
             .ok()
     }
 }
@@ -491,10 +495,17 @@ fn serve_file_from_path(path: &str, cache_control: &str) -> Result<FileResponse,
     let bytes = std::fs::read(&canonical).map_err(|_| Status::InternalServerError)?;
     let mime = image_proxy::mime_from_extension(canonical.to_str().unwrap_or(""));
 
+    let csp = if mime == "image/svg+xml" {
+        Some("default-src 'none'; style-src 'unsafe-inline'; img-src 'self'".to_string())
+    } else {
+        None
+    };
+
     Ok(FileResponse {
         bytes,
         content_type: mime.to_string(),
         cache_control: cache_control.to_string(),
+        content_security_policy: csp,
     })
 }
 

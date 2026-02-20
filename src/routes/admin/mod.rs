@@ -75,6 +75,23 @@ pub(crate) async fn save_upload(
 
     let ext_lower = ext.to_lowercase();
 
+    // ── SVG files: sanitize to remove scripts, event handlers, etc. ──
+    if ext_lower == "svg" {
+        if let Ok(raw) = std::fs::read(&dest) {
+            match crate::svg_sanitizer::sanitize_svg(&raw) {
+                Some(clean) => {
+                    let _ = std::fs::write(&dest, clean);
+                }
+                None => {
+                    // Parsing failed — reject the file
+                    let _ = std::fs::remove_file(&dest);
+                    return None;
+                }
+            }
+        }
+        return Some(filename);
+    }
+
     // ── Video files: skip all image processing, just store as-is ──
     if is_video_filename(&filename) {
         return Some(filename);
