@@ -279,6 +279,13 @@ fn build_classic_comments(context: &Value, settings: &Value, post_id: i64) -> St
     };
     let require_name = sg("comments_require_name") != "false";
     let name_req = if require_name { " required" } else { "" };
+    let require_email = sg("comments_require_email") == "true";
+    let email_field = if require_email {
+        "\n        <input type=\"email\" name=\"author_email\" placeholder=\"Email\" required>"
+            .to_string()
+    } else {
+        String::new()
+    };
 
     let (captcha_provider, captcha_site_key): (String, String) =
         if sg("security_recaptcha_enabled") == "true" {
@@ -355,7 +362,7 @@ fn build_classic_comments(context: &Value, settings: &Value, post_id: i64) -> St
 \n            Replying to <strong id=\"reply-to-name\"></strong> <a href=\"#\" id=\"cancel-reply\" style=\"margin-left:8px\">Cancel</a>\
 \n        </div>\
 \n        <textarea name=\"body\" placeholder=\"Your comment...\" required></textarea>\
-\n        <input type=\"text\" name=\"author_name\" placeholder=\"Name\"{name_req}>\
+\n        <input type=\"text\" name=\"author_name\" placeholder=\"Name\"{name_req}>{email_field}
 \n        <div style=\"display:none\"><input type=\"text\" name=\"honeypot\"></div>\
 \n        {captcha_html}\
 \n        <button type=\"submit\">Post Comment</button>\
@@ -393,7 +400,7 @@ fn build_classic_comments(context: &Value, settings: &Value, post_id: i64) -> St
 \n        post_id:parseInt(f.dataset.postId),\
 \n        content_type:f.dataset.contentType||'post',\
 \n        author_name:f.querySelector('[name=author_name]').value,\
-\n        author_email:null,\
+        author_email:(f.querySelector('[name=author_email]')||{{}}).value||null,\
 \n        body:f.querySelector('[name=body]').value,\
 \n        honeypot:f.querySelector('[name=honeypot]').value||null,\
 \n        parent_id:parentVal?parseInt(parentVal):null\
@@ -709,7 +716,8 @@ pub fn css() -> &'static str {
     margin-bottom: 12px;
     box-sizing: border-box;
 }
-.bsc-comment-form input[type="text"] {
+.bsc-comment-form input[type="text"],
+.bsc-comment-form input[type="email"] {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid rgba(0,0,0,0.15);

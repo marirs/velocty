@@ -569,7 +569,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("comments_honeypot", "true"),
         ("comments_rate_limit", "5"),
         ("comments_require_name", "true"),
-        ("comments_require_email", "true"),
+        ("comments_require_email", "false"),
         // Fonts
         ("font_primary", "Inter"),
         ("font_heading", "Inter"),

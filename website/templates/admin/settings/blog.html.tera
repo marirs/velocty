@@ -69,6 +69,7 @@
             <label for="blog_list_style">List Style</label>
             <select id="blog_list_style" name="blog_list_style">
                 <option value="compact" {% if settings.blog_list_style == "compact" %}selected{% endif %}>Compact</option>
+                <option value="classic" {% if settings.blog_list_style == "classic" %}selected{% endif %}>Classic</option>
                 <option value="editorial" {% if settings.blog_list_style == "editorial" %}selected{% endif %}>Editorial</option>
             </select>
         </div>
