@@ -459,15 +459,20 @@ pub fn pagespeed_fetch(_admin: EditorUser, pool: &State<DbPool>, url: &str) -> J
 
     // URL must be publicly accessible — localhost won't work
     if url.contains("localhost") || url.contains("127.0.0.1") {
-        return Json(serde_json::json!({"error": "PageSpeed Insights requires a publicly accessible URL. localhost cannot be tested."}));
+        return Json(
+            serde_json::json!({"error": "PageSpeed Insights requires a publicly accessible URL. localhost cannot be tested."}),
+        );
     }
 
-    let encoded_url: String = url.bytes().map(|b| match b {
-        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b':' | b'/' => {
-            format!("{}", b as char)
-        }
-        _ => format!("%{:02X}", b),
-    }).collect();
+    let encoded_url: String = url
+        .bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b':' | b'/' => {
+                format!("{}", b as char)
+            }
+            _ => format!("%{:02X}", b),
+        })
+        .collect();
     let mut endpoint = format!(
         "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={}&strategy=mobile&category=performance&category=accessibility&category=seo",
         encoded_url
@@ -495,12 +500,16 @@ pub fn pagespeed_fetch(_admin: EditorUser, pool: &State<DbPool>, url: &str) -> J
                             .and_then(|e| e.get("message"))
                             .and_then(|m| m.as_str())
                             .unwrap_or("Unknown API error");
-                        Json(serde_json::json!({"error": format!("PageSpeed API error ({}): {}", status.as_u16(), msg)}))
+                        Json(
+                            serde_json::json!({"error": format!("PageSpeed API error ({}): {}", status.as_u16(), msg)}),
+                        )
                     } else {
                         Json(data)
                     }
                 }
-                Err(_) => Json(serde_json::json!({"error": format!("Failed to parse PageSpeed response (HTTP {})", status.as_u16())})),
+                Err(_) => Json(
+                    serde_json::json!({"error": format!("Failed to parse PageSpeed response (HTTP {})", status.as_u16())}),
+                ),
             }
         }
         Err(e) => Json(serde_json::json!({"error": format!("Request failed: {}", e)})),

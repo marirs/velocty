@@ -11,12 +11,12 @@ pub mod dashboard;
 pub mod designs;
 pub mod firewall;
 pub mod health;
-pub mod seo_audit;
 pub mod import;
 pub mod media;
 pub mod portfolio;
 pub mod posts;
 pub mod sales;
+pub mod seo_audit;
 pub mod settings;
 pub mod users;
 

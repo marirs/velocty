@@ -12,7 +12,7 @@ pub struct SeoIssue {
 /// Full SEO audit result for a single content item
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SeoAudit {
-    pub score: i32, // 0-100
+    pub score: i32,    // 0-100
     pub grade: String, // "good", "needs_work", "poor"
     pub issues: Vec<SeoIssue>,
 }
@@ -209,10 +209,7 @@ pub fn compute_score(input: &SeoInput) -> SeoAudit {
         issues.push(SeoIssue {
             code: "images_missing_alt".into(),
             severity: "warning".into(),
-            message: format!(
-                "{} of {} images missing alt text",
-                img_no_alt, img_count
-            ),
+            message: format!("{} of {} images missing alt text", img_no_alt, img_count),
             points_lost: 5,
         });
         deductions += 5;
@@ -233,7 +230,7 @@ pub fn compute_score(input: &SeoInput) -> SeoAudit {
         }
     }
 
-    let score = (100 - deductions).max(0).min(100);
+    let score = (100 - deductions).clamp(0, 100);
     let grade = if score >= 80 {
         "good"
     } else if score >= 50 {
@@ -294,7 +291,9 @@ fn count_images_without_alt(html: &str) -> usize {
     let mut pos = 0;
     while let Some(start) = lower[pos..].find("<img ") {
         let abs_start = pos + start;
-        let end = lower[abs_start..].find('>').unwrap_or(lower.len() - abs_start);
+        let end = lower[abs_start..]
+            .find('>')
+            .unwrap_or(lower.len() - abs_start);
         let tag = &lower[abs_start..abs_start + end + 1];
         // Missing alt, or alt=""
         if !tag.contains("alt=") || tag.contains("alt=\"\"") || tag.contains("alt=''") {
@@ -358,9 +357,8 @@ mod tests {
 
     #[test]
     fn missing_meta_desc_deducts_15() {
-        let body = "<h2>Heading</h2><p>".to_string()
-            + &"word ".repeat(350)
-            + "</p><a href='/x'>link</a>";
+        let body =
+            "<h2>Heading</h2><p>".to_string() + &"word ".repeat(350) + "</p><a href='/x'>link</a>";
         let input = make_input(
             "A Good Title That Is Long Enough For SEO",
             "A Good Title That Is Long Enough For SEO",
@@ -407,7 +405,8 @@ mod tests {
 
     #[test]
     fn images_without_alt_detected() {
-        let body = "<p>Text</p><img src='a.jpg'><img src='b.jpg' alt='good'><img src='c.jpg' alt=''>";
+        let body =
+            "<p>Text</p><img src='a.jpg'><img src='b.jpg' alt='good'><img src='c.jpg' alt=''>";
         let input = make_input(
             "Title That Is Long Enough For Good SEO Score",
             "Title That Is Long Enough For Good SEO Score",
@@ -417,10 +416,7 @@ mod tests {
             "post",
         );
         let result = compute_score(&input);
-        assert!(result
-            .issues
-            .iter()
-            .any(|i| i.code == "images_missing_alt"));
+        assert!(result.issues.iter().any(|i| i.code == "images_missing_alt"));
     }
 
     #[test]
@@ -454,9 +450,7 @@ mod tests {
     #[test]
     fn grade_boundaries() {
         // Score 80+ = good
-        let body = "<h2>H</h2><p>".to_string()
-            + &"word ".repeat(350)
-            + "</p><a href='/x'>l</a>";
+        let body = "<h2>H</h2><p>".to_string() + &"word ".repeat(350) + "</p><a href='/x'>l</a>";
         let input = make_input(
             "Title That Is Long Enough",
             "Title That Is Long Enough",
