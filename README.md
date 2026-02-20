@@ -92,7 +92,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 | **Analytics Charts** | D3.js (admin-only) |
 | **GeoIP** | MaxMind GeoLite2 (offline, privacy-preserving) |
 | **Frontend (visitors)** | Pure HTML/CSS + minimal vanilla JS |
-| **Auth** | Bcrypt + session cookies + optional TOTP MFA + Magic Link |
+| **Auth** | Bcrypt + session cookies + optional TOTP MFA + Magic Link + Passkey (WebAuthn/FIDO2) |
 | **Background Tasks** | Tokio async runtime (session/token/analytics cleanup) |
 
 ### Why Rust?
@@ -206,6 +206,8 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Authentication modes:**
   - **Email & Password** — traditional login
   - **Magic Link** — passwordless login via email (requires email provider)
+  - **Passkey (WebAuthn/FIDO2)** — phishing-resistant login with hardware keys, fingerprint, or Face ID; replaces both password and MFA
+- **Passkey management** — register multiple passkeys per user, auto-enable on first registration, auto-revert to fallback method on last deletion, MFA automatically disabled when passkey is active
 - **Optional TOTP MFA** — per-user, Google Authenticator, Authy, etc. with recovery codes
 - **Multi-user auth guards** — AdminUser, EditorUser, AuthorUser, AuthenticatedUser with role-based route gating
 - **Login rate limiting** — in-memory IP-based enforcement, configurable attempts per 15 minutes
@@ -243,7 +245,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 | **Typography** | Fonts, sizes, sources, per-element assignment |
 | **Media** | Image upload (max size, quality, WebP, thumbnails, HEIC/HEIF conversion), video upload (types, size, duration), media organization (6 folder structures) |
 | **SEO** | Title template, meta defaults, sitemap, structured data, robots.txt, webmaster verification, 7 analytics providers |
-| **Security** | Admin slug, auth method, MFA, sessions, rate limits, captcha, anti-spam |
+| **Security** | Admin slug, auth method (password/magic link/passkey), MFA, passkey management, sessions, rate limits, captcha, anti-spam |
 | **Frontend** | Active design, back-to-top button |
 | **Social** | Social media links with brand color icons |
 | **Email** | 11 provider configurations |
@@ -376,6 +378,7 @@ velocty/
 │   │   ├── auth.rs              # Auth guards (Admin/Editor/Author/Authenticated), sessions, password
 │   │   ├── firewall.rs          # Firewall fairing (bot/XSS/SQLi/geo-blocking/rate-limit)
 │   │   ├── mfa.rs               # TOTP secret, QR code, verify, recovery codes
+│   │   ├── passkey.rs           # WebAuthn config, credential storage, reg/auth state management
 │   │   ├── magic_link.rs        # Token gen, email send, verify, cleanup
 │   │   ├── password_reset.rs    # Password reset flow
 │   │   ├── recaptcha.rs         # Google reCAPTCHA v2/v3
@@ -408,7 +411,7 @@ velocty/
 │       ├── ai/                  # AI API routes (suggest, generate, status)
 │       ├── commerce/            # Payment provider routes (paypal, stripe, razorpay, etc.)
 │       └── security/            # Auth & security routes
-│           └── auth/            # Login, MFA, magic link, setup, logout
+│           └── auth/            # Login, MFA, magic link, passkey, setup, logout
 ├── website/
 │   ├── site/                    # Site-specific data (single-site mode)
 │   │   ├── db/velocty.db        # SQLite database
@@ -444,7 +447,7 @@ velocty/
 - Built-in analytics with D3.js dashboard
 - WordPress XML importer
 - 16 settings sections with full configuration
-- Authentication: password, Magic Link, MFA, captcha
+- Authentication: password, Magic Link, Passkey (WebAuthn), MFA, captcha
 - Login & comment rate limiting (in-memory, IP-based)
 - Image right-click protection (configurable)
 - 7 commerce provider configurations
