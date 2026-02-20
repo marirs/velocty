@@ -4676,6 +4676,7 @@ body.topbar-layout .site-wrapper { display: none; }
     flex-wrap: wrap;
     gap: 8px;
     padding: 12px 0 16px;
+    margin-left: 24px;
     font-family: var(--font-nav);
     font-size: 13px;
 }

@@ -76,10 +76,7 @@ pub fn render_single(context: &Value) -> String {
         html_escape(title)
     ));
 
-    // Content
-    html.push_str(&format!("<div class=\"bsc-content\">{}</div>", content));
-
-    // Meta line (date / reading time)
+    // Meta line (date / reading time) — below title, before content
     let mut meta_parts: Vec<String> = Vec::new();
     if show_date && !date.is_empty() {
         meta_parts.push(format!("<span class=\"bsc-date\">{}</span>", date));
@@ -96,6 +93,9 @@ pub fn render_single(context: &Value) -> String {
             meta_parts.join(" / ")
         ));
     }
+
+    // Content
+    html.push_str(&format!("<div class=\"bsc-content\">{}</div>", content));
 
     // Tags (plain text, not links)
     if let Some(Value::Array(tags)) = context.get("tags") {
@@ -528,21 +528,19 @@ pub fn css() -> &'static str {
     max-width: 100%;
 }
 .bsc-hero {
-    width: 100%;
-    max-height: 600px;
+    max-width: clamp(780px, 70%, 1200px);
+    margin: 0 0 40px 24px;
     overflow: hidden;
-    margin-bottom: 40px;
 }
 .bsc-hero img {
     width: 100%;
     height: auto;
     display: block;
     object-fit: cover;
-    max-height: 600px;
 }
 .bsc-content-wrap {
-    max-width: clamp(780px, 60%, 1100px);
-    margin: 0 auto;
+    max-width: clamp(780px, 70%, 1200px);
+    margin: 0 0 0 24px;
     padding: 0 20px;
 }
 .bsc-title {
@@ -577,9 +575,7 @@ pub fn css() -> &'static str {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--color-text-secondary);
-    padding: 20px 0;
-    border-top: 1px solid rgba(0,0,0,0.08);
-    margin-bottom: 20px;
+    margin-bottom: 28px;
 }
 .bsc-tags {
     margin-bottom: 32px;
@@ -756,8 +752,7 @@ pub fn css() -> &'static str {
 @media (max-width: 768px) {
     .bsc-title { font-size: 24px; }
     .bsc-content { font-size: 15px; }
-    .bsc-hero { max-height: 300px; margin-bottom: 24px; }
-    .bsc-hero img { max-height: 300px; }
+    .bsc-hero { margin-bottom: 24px; max-width: 100%; }
     .bsc-content-wrap { max-width: 100%; padding: 0 16px; }
 }
 "#
