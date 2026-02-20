@@ -211,6 +211,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Firewall fairing** — bot detection, failed login tracking, auto-ban, XSS/SQLi/path traversal protection, rate limiting, geo-blocking, security headers
 - **Session expiry** — configurable (default 24h)
 - **Security headers** — X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy
+- **Image proxy** — all public `/uploads/` URLs rewritten to HMAC-signed `/img/<token>` paths, with zero-downtime key rotation and configurable grace period
 
 ### Email
 
@@ -334,6 +335,7 @@ velocty/
 │   ├── render.rs                # Design + content merge (with captcha widget injection)
 │   ├── seo.rs                   # Meta tags, JSON-LD, sitemap
 │   ├── rss.rs                   # RSS/Atom feed generation
+│   ├── image_proxy.rs            # HMAC-signed image URL proxy with key rotation
 │   ├── images.rs                # Upload, thumbnails, WebP conversion
 │   ├── license.rs               # Purchase license.txt generation
 │   ├── rate_limit.rs            # In-memory rate limiter (login, comments)

@@ -1,6 +1,6 @@
 # Velocty — Test Coverage Report
 
-> **Last run:** 2026-02-19 | **Result:** 179 passed, 0 failed | **Duration:** 1.39s  
+> **Last run:** 2026-02-20 | **Result:** 231 passed, 0 failed | **Duration:** ~2.0s  
 > **Command:** `cargo test`
 
 ---
@@ -32,7 +32,8 @@
 | `seo/jsonld.rs` | 2 | 2 | **100%** |
 | `db.rs` | 4 | 3 | **75%** |
 | `render.rs` | 3 | 3 | **100%** |
-| **TOTAL** | **182** | **171** | **94%** |
+| `image_proxy.rs` | 4 | 4 | **100%** |
+| **TOTAL** | **186** | **175** | **94%** |
 
 ### Not unit-testable (excluded from coverage)
 
@@ -414,6 +415,107 @@
 | 175 | `license_text_generation_header` | Build license .txt with header fields | Contains: License for, Purchased from, Transaction, Date, License Key, separator, body | All present | ✅ Pass |
 | 176 | `license_text_generation_no_provider_order_id` | Empty provider_order_id falls back to ORD-{id} | `"ORD-42"` | `"ORD-42"` | ✅ Pass |
 
+### 36. Image Proxy (`image_proxy.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 177 | `image_proxy_encode_decode_roundtrip` | Encode path → decode with same secret | Original path returned | Matched | ✅ Pass |
+| 178 | `image_proxy_tampered_token_rejected` | Tamper with token bytes | `None` returned | `None` | ✅ Pass |
+| 179 | `image_proxy_wrong_secret_rejected` | Decode with different secret | `None` returned | `None` | ✅ Pass |
+| 180 | `image_proxy_rewrite_upload_urls` | Rewrite `/uploads/` URLs in HTML | All replaced with `/img/<token>` | Matched | ✅ Pass |
+| 181 | `image_proxy_preserves_non_upload_urls` | Non-upload URLs unchanged | No rewriting | Matched | ✅ Pass |
+| 182 | `image_proxy_mime_detection` | Detect MIME from file extension | Correct MIME types | Matched | ✅ Pass |
+| 183 | `image_proxy_render_rewrites_urls` | Render pipeline rewrites upload URLs | `/img/` tokens in output | Present | ✅ Pass |
+| 184 | `image_proxy_seed_generates_secret` | seed_defaults creates image_proxy_secret | Non-empty 64-char hex | Valid | ✅ Pass |
+| 185 | `image_proxy_dual_key_fallback` | Decode with old secret during rotation | Path returned via fallback | Matched | ✅ Pass |
+| 186 | `image_proxy_dual_key_expired_old_rejected` | Decode with expired old secret | `None` returned | `None` | ✅ Pass |
+| 187 | `image_proxy_dual_key_no_old_secret` | Decode with empty old secret | Only current key works | Matched | ✅ Pass |
+
+### 37. Seed Defaults (`db.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 188 | `seed_defaults_critical_settings_exist` | Verify critical settings seeded | All required keys present | Present | ✅ Pass |
+| 189 | `seed_defaults_no_duplicate_keys` | Check no duplicate keys in defaults | All keys unique | Unique | ✅ Pass |
+| 190 | `seed_defaults_setting_groups_present` | Verify setting groups (smtp_, security_, etc.) | All groups have entries | Present | ✅ Pass |
+| 191 | `seed_defaults_privacy_policy_content_not_empty` | Privacy policy template seeded | Non-empty content | Non-empty | ✅ Pass |
+| 192 | `seed_defaults_terms_of_use_content_not_empty` | Terms of use template seeded | Non-empty content | Non-empty | ✅ Pass |
+| 193 | `seed_defaults_legal_content_backfill_migration` | Backfill migration for legal content | Content populated | Present | ✅ Pass |
+
+### 38. Resolve Status (`models/post.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 194 | `resolve_status_published_past_date_stays_published` | Published + past date | Stays published | `"published"` | ✅ Pass |
+| 195 | `resolve_status_published_future_date_becomes_scheduled` | Published + future date | Becomes scheduled | `"scheduled"` | ✅ Pass |
+| 196 | `resolve_status_draft_future_date_stays_draft` | Draft + future date | Stays draft | `"draft"` | ✅ Pass |
+| 197 | `resolve_status_published_empty_date_stays_published` | Published + empty date | Stays published | `"published"` | ✅ Pass |
+| 198 | `resolve_status_published_invalid_date_stays_published` | Published + invalid date | Stays published | `"published"` | ✅ Pass |
+| 199 | `resolve_status_published_no_date_stays_published` | Published + no date | Stays published | `"published"` | ✅ Pass |
+| 200 | `resolve_status_scheduled_past_date_stays_scheduled` | Scheduled + past date | Stays scheduled | `"scheduled"` | ✅ Pass |
+| 201 | `resolve_status_published_near_future_becomes_scheduled` | Published + near future | Becomes scheduled | `"scheduled"` | ✅ Pass |
+| 202 | `resolve_status_date_with_seconds_format_stays_published` | Date with seconds format | Stays published | `"published"` | ✅ Pass |
+| 203 | `resolve_status_utc_future_1h_becomes_scheduled` | UTC future +1h | Becomes scheduled | `"scheduled"` | ✅ Pass |
+| 204 | `resolve_status_utc_future_1min_becomes_scheduled` | UTC future +1min | Becomes scheduled | `"scheduled"` | ✅ Pass |
+| 205 | `resolve_status_utc_past_1h_stays_published` | UTC past -1h | Stays published | `"published"` | ✅ Pass |
+| 206 | `resolve_status_utc_past_1min_stays_published` | UTC past -1min | Stays published | `"published"` | ✅ Pass |
+| 207 | `resolve_status_draft_with_utc_future_stays_draft` | Draft + UTC future | Stays draft | `"draft"` | ✅ Pass |
+| 208 | `resolve_status_scheduled_with_utc_past_stays_scheduled` | Scheduled + UTC past | Stays scheduled | `"scheduled"` | ✅ Pass |
+| 209 | `resolve_status_handles_timezone_offset_string_gracefully` | Timezone offset string | Handled gracefully | No panic | ✅ Pass |
+| 210 | `published_at_default_fallback_is_utc` | Default published_at | UTC format | Valid UTC | ✅ Pass |
+| 211 | `utc_format_roundtrip_parseable` | UTC format roundtrip | Parseable string | Valid | ✅ Pass |
+
+### 39. Settings Save (`models/settings.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 212 | `settings_save_portfolio_enable_persists` | Enable portfolio via save | `"true"` persisted | `"true"` | ✅ Pass |
+| 213 | `settings_save_portfolio_disable_persists` | Disable portfolio via save | `"false"` persisted | `"false"` | ✅ Pass |
+| 214 | `settings_save_journal_disable_persists` | Disable journal via save | `"false"` persisted | `"false"` | ✅ Pass |
+
+### 40. Tag Helpers (`models/tag.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 215 | `tag_names_to_content_roundtrip_post` | Assign tags by name to post; read back | Tags match | Matched | ✅ Pass |
+| 216 | `tag_names_to_content_roundtrip_portfolio` | Assign tags by name to portfolio; read back | Tags match | Matched | ✅ Pass |
+| 217 | `tag_names_empty_clears_all` | Assign empty tag list | All tags removed | 0 tags | ✅ Pass |
+
+### 41. Render: Footer Modes (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 218 | `render_footer_regular_no_class` | Footer mode=regular | No special class | Absent | ✅ Pass |
+| 219 | `render_footer_always_visible_site_wide` | Footer mode=always_visible, scope=site_wide | `footer-always-visible` class | Present | ✅ Pass |
+| 220 | `render_footer_fixed_reveal_site_wide` | Footer mode=fixed_reveal, scope=site_wide | `footer-fixed-reveal` class | Present | ✅ Pass |
+| 221 | `render_footer_selected_pages_match` | Footer mode on selected page types | Class applied on matching page | Present | ✅ Pass |
+| 222 | `render_footer_selected_pages_no_match` | Footer mode on non-matching page type | No class applied | Absent | ✅ Pass |
+
+### 42. Render: Journal Navigation (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 223 | `render_journal_sidebar_under_link_has_toggle` | Journal under_link mode | Toggle with "open" class | Present | ✅ Pass |
+| 224 | `render_journal_sidebar_under_link_custom_all_label` | Custom "All" label | Custom label rendered | Present | ✅ Pass |
+| 225 | `render_journal_sidebar_under_link_all_hidden` | journal_show_all_categories=false | No "All" link | Absent | ✅ Pass |
+| 226 | `render_journal_page_top_has_filter_bar` | Journal page_top mode | Horizontal filter bar | Present | ✅ Pass |
+| 227 | `render_journal_page_top_align_right` | page_top + right alignment | `cats-right` class | Present | ✅ Pass |
+| 228 | `render_journal_hidden_shows_plain_link` | Journal categories hidden | Plain nav-link for journal | Present | ✅ Pass |
+
+### 43. Render: Portfolio Lightbox Defaults (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 229 | `render_portfolio_lightbox_defaults_center` | Default lightbox center alignment | `data-lb-center` attribute | Present | ✅ Pass |
+
+### 44. Render: Upload Path Handling (`render.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 230 | `uploaded_path_with_value_is_used` | Portfolio item with uploaded_path | Path used for image | Present | ✅ Pass |
+| 231 | `uploaded_path_empty_string_is_not_used` | Empty uploaded_path | Falls back to image_path | Correct | ✅ Pass |
+| 232 | `uploaded_path_none_is_not_used` | None uploaded_path | Falls back to image_path | Correct | ✅ Pass |
+
 ---
 
 ## Running Tests
@@ -480,4 +582,13 @@ src/tests.rs
 ├── Render: Journal Settings (14 tests)
 ├── Render: Portfolio Lightbox & Features (8 tests)
 ├── Render: Commerce Settings (17 tests)
-└── License Default & Generation (5 tests)
+├── License Default & Generation (5 tests)
+├── Image Proxy (11 tests)
+├── Seed Defaults (6 tests)
+├── Resolve Status (18 tests)
+├── Settings Save (3 tests)
+├── Tag Helpers (3 tests)
+├── Render: Footer Modes (5 tests)
+├── Render: Journal Navigation (6 tests)
+├── Render: Portfolio Lightbox Defaults (1 test)
+└── Render: Upload Path Handling (3 tests)
