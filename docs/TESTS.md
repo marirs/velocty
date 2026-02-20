@@ -364,6 +364,8 @@
 | 134 | `render_blog_list_masonry_display` | blog_display_type=masonry | `blog-masonry` class in output | Present | ✅ Pass |
 | 135 | `render_blog_list_default_list_display` | blog_display_type=list | `blog-list` class, no grid/masonry | Correct | ✅ Pass |
 | 136 | `render_blog_list_editorial_style` | list + blog_list_style=editorial | `blog-editorial` class | Present | ✅ Pass |
+| 136b | `render_blog_list_classic_style` | list + blog_list_style=classic | `blog-classic` class | Present | ✅ Pass |
+| 136c | `render_blog_list_excerpt_fallback` | Empty excerpt + content_html with 8 words, excerpt_words=5 | Falls back to content_html, truncated to 5 words | Correct | ✅ Pass |
 | 137 | `render_blog_list_show_author` | blog_show_author=true | `blog-author` + author name in output | Present | ✅ Pass |
 | 138 | `render_blog_list_hide_author` | blog_show_author=false | No `blog-author` in output | Absent | ✅ Pass |
 | 139 | `render_blog_list_show_date` | blog_show_date=true | `<time>` element in output | Present | ✅ Pass |

@@ -3456,7 +3456,7 @@ fn render_blog_context(pool: &DbPool) -> serde_json::Value {
                 "published_at": "2026-01-15 10:00:00",
                 "featured_image": "hello.jpg",
                 "author_name": "Alice",
-                "word_count": 800
+                "content_html": "<p>Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum</p><p>Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum</p>"
             }
         ],
         "current_page": 1,
@@ -3529,6 +3529,60 @@ fn render_blog_list_editorial_style() {
     assert!(
         body.contains("blog-editorial"),
         "editorial list style should produce blog-editorial class"
+    );
+}
+
+#[test]
+fn render_blog_list_classic_style() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("blog_display_type", "list"),
+            ("blog_list_style", "classic"),
+        ],
+    );
+    let ctx = render_blog_context(&pool);
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-classic"),
+        "classic list style should produce blog-classic class"
+    );
+}
+
+#[test]
+fn render_blog_list_excerpt_fallback() {
+    let pool = test_pool();
+    set_settings(&pool, &[("blog_excerpt_words", "5")]);
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "posts": [
+            {
+                "title": "No Excerpt Post",
+                "slug": "no-excerpt",
+                "excerpt": "",
+                "published_at": "2026-01-15 10:00:00",
+                "featured_image": "",
+                "author_name": "",
+                "content_html": "<p>Alpha beta gamma delta epsilon zeta eta theta</p>"
+            }
+        ],
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "blog_list",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("Alpha beta gamma delta epsilon"),
+        "empty excerpt should fall back to content_html text"
+    );
+    assert!(
+        !body.contains("zeta"),
+        "fallback excerpt should be truncated to 5 words"
     );
 }
 

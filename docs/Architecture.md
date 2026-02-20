@@ -409,7 +409,7 @@ All settings stored in `settings` table as key-value pairs (`key TEXT PRIMARY KE
 |---|---|---|
 | `blog_posts_per_page` | Posts per page | "10" |
 | `blog_display_type` | grid / masonry / list | "grid" |
-| `blog_list_style` | compact / editorial (when list) | "compact" |
+| `blog_list_style` | compact / classic / editorial (when list) | "compact" |
 | `blog_excerpt_words` | Excerpt word count | "40" |
 | `blog_show_author` | Show author on posts | "true" |
 | `blog_show_date` | Show date on posts | "true" |

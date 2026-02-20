@@ -172,12 +172,12 @@ Last updated: 2026-02-15
 ### Journal Settings Audit ✅
 - **Bug fix:** `blog_display_type` now wired — supports "grid" (CSS grid), "masonry" (column-count), "list" (default compact or editorial)
 - **Bug fix:** `blog_grid_columns` now wired via CSS var `--blog-grid-columns` (separate from portfolio's `--grid-columns`)
-- **Bug fix:** `blog_list_style` now wired — "editorial" mode uses larger images, bigger headings, more spacing
-- **Bug fix:** `blog_excerpt_words` now wired — `truncate_words()` helper truncates excerpts to configured word count
+- **Bug fix:** `blog_list_style` now wired — "compact", "classic" (side-by-side 50/50 layout), "editorial" (full-width images, large headings)
+- **Bug fix:** `blog_excerpt_words` now wired — `truncate_words()` helper truncates excerpts to configured word count; auto-generates from `content_html` (stripped of tags + decoded entities) when excerpt field is empty
 - **Bug fix:** `blog_pagination_type` now wired — supports "classic", "load_more", "infinite" (reuses same JS from portfolio)
 - **Bug fix:** `blog_show_author` now wired — conditionally shows author name in list + single views
 - **Bug fix:** `blog_show_date` now wired — conditionally shows date in list + single views
-- **Bug fix:** `blog_show_reading_time` now wired — shows "X min read" based on word_count / 200 wpm
+- **Bug fix:** `blog_show_reading_time` now wired — shows "X min read" computed from `content_html` word count (~200 wpm) on both list and single pages
 - **Bug fix:** Blog list links now use dynamic `blog_slug` setting instead of hardcoded "/blog/"
 - **Refactored:** Blog meta (author · date · reading time) extracted into reusable `.blog-meta` div
 - **Added:** `truncate_words()` helper function for excerpt truncation

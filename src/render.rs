@@ -1744,9 +1744,11 @@ fn format_date_iso8601(raw: &str, settings: &Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("UTC");
 
-    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S").or_else(|_| {
-        chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S")
-    });
+    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S"))
+        .or_else(|_| {
+            chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S")
+        });
 
     match naive {
         Ok(ndt) => {
@@ -1775,10 +1777,12 @@ fn format_date(raw: &str, settings: &Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("UTC");
 
-    // Try parsing common DB formats: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
-    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S").or_else(|_| {
-        chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S")
-    });
+    // Try parsing common DB formats: "YYYY-MM-DD HH:MM:SS", "YYYY-MM-DDTHH:MM:SS", or "YYYY-MM-DD"
+    let naive = chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S"))
+        .or_else(|_| {
+            chrono::NaiveDateTime::parse_from_str(&format!("{} 00:00:00", raw), "%Y-%m-%d %H:%M:%S")
+        });
 
     match naive {
         Ok(ndt) => {
@@ -1793,6 +1797,49 @@ fn format_date(raw: &str, settings: &Value) -> String {
         }
         Err(_) => raw.to_string(), // Fallback: return raw string
     }
+}
+
+fn count_words_html(html: &str) -> usize {
+    // Strip HTML tags, then count whitespace-delimited words
+    let mut text = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        if ch == '<' {
+            in_tag = true;
+        } else if ch == '>' {
+            in_tag = false;
+            text.push(' ');
+        } else if !in_tag {
+            text.push(ch);
+        }
+    }
+    text.split_whitespace().count()
+}
+
+fn strip_html_to_text(html: &str) -> String {
+    let mut text = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        if ch == '<' {
+            in_tag = true;
+        } else if ch == '>' {
+            in_tag = false;
+            text.push(' ');
+        } else if !in_tag {
+            text.push(ch);
+        }
+    }
+    // Decode common HTML entities
+    text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&nbsp;", " ")
+        .replace("&mdash;", "—")
+        .replace("&ndash;", "–")
+        .replace("&hellip;", "…")
 }
 
 fn truncate_words(text: &str, max_words: usize) -> String {
@@ -2525,13 +2572,11 @@ fn render_blog_list(context: &Value) -> String {
     let container_class = match display_type.as_str() {
         "masonry" => "blog-list blog-masonry",
         "grid" => "blog-list blog-grid",
-        _ => {
-            if list_style == "editorial" {
-                "blog-list blog-editorial"
-            } else {
-                "blog-list"
-            }
-        }
+        _ => match list_style.as_str() {
+            "editorial" => "blog-list blog-editorial",
+            "classic" => "blog-list blog-classic",
+            _ => "blog-list",
+        },
     };
 
     let blog_label = sg("blog_label", "journal");
@@ -2545,6 +2590,15 @@ fn render_blog_list(context: &Value) -> String {
         let title = post.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let slug = post.get("slug").and_then(|v| v.as_str()).unwrap_or("");
         let raw_excerpt = post.get("excerpt").and_then(|v| v.as_str()).unwrap_or("");
+        let content_html = post
+            .get("content_html")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let excerpt_source = if raw_excerpt.is_empty() {
+            strip_html_to_text(content_html)
+        } else {
+            raw_excerpt.to_string()
+        };
         let raw_date = post
             .get("published_at")
             .and_then(|v| v.as_str())
@@ -2558,10 +2612,10 @@ fn render_blog_list(context: &Value) -> String {
             .get("author_name")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let word_count = post.get("word_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let word_count = count_words_html(content_html);
 
         // Truncate excerpt to configured word count
-        let excerpt = truncate_words(raw_excerpt, excerpt_words);
+        let excerpt = truncate_words(&excerpt_source, excerpt_words);
 
         // Reading time estimate (~200 wpm)
         let reading_time = ((word_count as f64) / 200.0).ceil().max(1.0) as i64;
@@ -2573,7 +2627,7 @@ fn render_blog_list(context: &Value) -> String {
                 html_escape(title)
             )
         } else {
-            String::new()
+            "<div class=\"blog-thumb blog-thumb-placeholder\"><svg width=\"32\" height=\"32\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"/><path d=\"M21 15l-5-5L5 21\"/></svg></div>".to_string()
         };
 
         // Build meta line (author, date, reading time)
@@ -2594,7 +2648,7 @@ fn render_blog_list(context: &Value) -> String {
             ));
         }
         let meta_html = if !meta_parts.is_empty() {
-            format!("<div class=\"blog-meta\">{}</div>", meta_parts.join(" · "))
+            format!("<div class=\"blog-meta\">{}</div>", meta_parts.join(" / "))
         } else {
             String::new()
         };
@@ -2604,8 +2658,8 @@ fn render_blog_list(context: &Value) -> String {
              {thumb_html}\
              <div class=\"blog-body\">\
              <h2><a href=\"/{blog_slug}/{slug}\">{title}</a></h2>\
-             {meta_html}\
              <div class=\"blog-excerpt\">{excerpt}</div>\
+             {meta_html}\
              </div>\
              </article>",
             thumb_html = thumb_html,
@@ -2693,7 +2747,7 @@ fn render_blog_single(context: &Value) -> String {
         .get("author_name")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let word_count = post.get("word_count").and_then(|v| v.as_i64()).unwrap_or(0);
+    let word_count = count_words_html(content);
     let reading_time = ((word_count as f64) / 200.0).ceil().max(1.0) as i64;
 
     let mut html = format!(
@@ -2721,7 +2775,7 @@ fn render_blog_single(context: &Value) -> String {
     if !meta_parts.is_empty() {
         html.push_str(&format!(
             "\n    <div class=\"blog-meta\">{}</div>",
-            meta_parts.join(" · ")
+            meta_parts.join(" / ")
         ));
     }
 
@@ -4249,6 +4303,26 @@ body.topbar-layout.footer-always-visible .site-footer {
     object-fit: cover;
     display: block;
 }
+.blog-thumb-placeholder {
+    width: 120px;
+    height: 120px;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ccc;
+}
+.blog-classic .blog-thumb-placeholder {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4/3;
+}
+.blog-grid .blog-thumb-placeholder,
+.blog-masonry .blog-thumb-placeholder,
+.blog-editorial .blog-thumb-placeholder {
+    width: 100%;
+    height: 200px;
+}
 
 .blog-body { flex: 1; min-width: 0; }
 
@@ -4306,6 +4380,76 @@ body.topbar-layout.footer-always-visible .site-footer {
     padding-bottom: 0;
 }
 .blog-masonry .blog-thumb img { width: 100%; height: auto; }
+
+/* Blog Classic list style */
+.blog-list.blog-classic {
+    max-width: 1100px;
+}
+.blog-classic .blog-item {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    padding-bottom: 40px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.blog-classic .blog-item:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+.blog-classic .blog-thumb {
+    flex: 0 0 50%;
+    max-width: 50%;
+}
+.blog-classic .blog-thumb img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    display: block;
+}
+.blog-classic .blog-body {
+    flex: 1;
+    min-width: 0;
+}
+.blog-classic .blog-item h2 {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 16px;
+}
+.blog-classic .blog-item h2 a {
+    color: var(--color-text);
+    text-decoration: none;
+}
+.blog-classic .blog-item h2 a:hover {
+    text-decoration: underline;
+}
+.blog-classic .blog-item .blog-excerpt {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--color-text);
+    margin-bottom: 20px;
+}
+.blog-classic .blog-meta {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    margin-top: 0;
+    margin-bottom: 0;
+}
+@media (max-width: 768px) {
+    .blog-classic .blog-item {
+        flex-direction: column;
+        gap: 16px;
+    }
+    .blog-classic .blog-thumb {
+        flex: none;
+        max-width: 100%;
+    }
+}
 
 /* Blog Editorial list style */
 .blog-list.blog-editorial .blog-item {
