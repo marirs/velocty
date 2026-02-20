@@ -99,7 +99,7 @@
             <tbody>
                 {% for issue in top_issues %}
                 {% if loop.index <= 10 %}
-                <tr>
+                <tr style="cursor:pointer" onclick="filterByIssue('{{ issue.code }}')" title="Click to view affected items">
                     <td style="color:var(--text-primary)">{{ issue.message }}</td>
                     <td style="text-align:right;font-weight:600;color:var(--text-secondary)">{{ issue.count }}</td>
                 </tr>
@@ -141,7 +141,7 @@
             </thead>
             <tbody>
                 {% for row in post_rows %}
-                <tr data-score="{{ row.seo_score }}">
+                <tr data-score="{{ row.seo_score }}" data-issues="{{ row.seo_issues | default(value='[]') }}">
                     <td style="color:var(--text-primary);font-weight:500">{{ row.title }}</td>
                     <td style="text-align:center">
                         {% if row.seo_score >= 80 %}
@@ -202,7 +202,7 @@
             </thead>
             <tbody>
                 {% for row in portfolio_rows %}
-                <tr data-score="{{ row.seo_score }}">
+                <tr data-score="{{ row.seo_score }}" data-issues="{{ row.seo_issues | default(value='[]') }}">
                     <td style="color:var(--text-primary);font-weight:500">{{ row.title }}</td>
                     <td style="text-align:center">
                         {% if row.seo_score >= 80 %}
@@ -348,6 +348,75 @@ function sortTable(tableId, colIdx) {
         return 0;
     });
     rows.forEach(function(r) { tbody.appendChild(r); });
+}
+
+function filterByIssue(code) {
+    // Switch to first available content tab
+    var target = document.getElementById('tab-journal') ? 'tab-journal' : (document.getElementById('tab-portfolio') ? 'tab-portfolio' : null);
+    if (!target) return;
+    // Activate that tab
+    var tabs = document.querySelectorAll('[data-seo-tab]');
+    var panelIds = [];
+    tabs.forEach(function(t) { panelIds.push(t.dataset.seoTab); });
+    tabs.forEach(function(t) { t.classList.remove('active'); });
+    panelIds.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    tabs.forEach(function(t) { if (t.dataset.seoTab === target) t.classList.add('active'); });
+    document.getElementById(target).style.display = '';
+    location.hash = target;
+
+    // Highlight matching rows, dim non-matching
+    ['journal-table', 'portfolio-table'].forEach(function(tableId) {
+        var table = document.getElementById(tableId);
+        if (!table) return;
+        var rows = table.querySelectorAll('tbody tr');
+        var hasMatch = false;
+        rows.forEach(function(row) {
+            var issues = row.getAttribute('data-issues') || '[]';
+            if (issues.indexOf(code) !== -1) {
+                row.style.opacity = '1';
+                row.style.background = 'rgba(232,145,58,0.08)';
+                hasMatch = true;
+            } else {
+                row.style.opacity = '0.35';
+                row.style.background = '';
+            }
+        });
+        // If no matches in this table but there are in the other, switch tab
+        if (!hasMatch && tableId === 'journal-table' && document.getElementById('tab-portfolio')) {
+            var otherRows = document.querySelectorAll('#portfolio-table tbody tr');
+            var otherHas = false;
+            otherRows.forEach(function(r) { if ((r.getAttribute('data-issues') || '').indexOf(code) !== -1) otherHas = true; });
+            if (otherHas) {
+                tabs.forEach(function(t) { t.classList.remove('active'); });
+                panelIds.forEach(function(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+                tabs.forEach(function(t) { if (t.dataset.seoTab === 'tab-portfolio') t.classList.add('active'); });
+                document.getElementById('tab-portfolio').style.display = '';
+                location.hash = 'tab-portfolio';
+                // Reset journal rows
+                rows.forEach(function(r) { r.style.opacity = '1'; r.style.background = ''; });
+            }
+        }
+    });
+
+    // Scroll to the table
+    var activePanel = document.querySelector('[data-seo-tab].active');
+    if (activePanel) {
+        var panelId = activePanel.dataset.seoTab;
+        var panel = document.getElementById(panelId);
+        if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Clear highlight after 6 seconds
+    setTimeout(function() {
+        ['journal-table', 'portfolio-table'].forEach(function(tableId) {
+            var table = document.getElementById(tableId);
+            if (!table) return;
+            table.querySelectorAll('tbody tr').forEach(function(row) {
+                row.style.opacity = '1';
+                row.style.background = '';
+            });
+        });
+    }, 6000);
 }
 
 function runPageSpeed() {
