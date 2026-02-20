@@ -251,6 +251,11 @@ a:hover { color: var(--accent-hover); }
     flex: 1;
     padding: 8px 0;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.sidebar-nav::-webkit-scrollbar {
+    display: none;
 }
 
 .sidebar-bottom {
