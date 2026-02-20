@@ -1,6 +1,6 @@
 # Velocty — Test Coverage Report
 
-> **Last run:** 2026-02-20 | **Result:** 308 passed, 0 failed | **Duration:** ~2.8s  
+> **Last run:** 2026-02-20 | **Result:** 322 passed, 0 failed | **Duration:** ~3.0s  
 > **Command:** `cargo test`
 
 ---
@@ -628,6 +628,25 @@
 |---|------|-------------|----------|-----|--------|
 | 299 | `render_css_vars_in_page_output` | Set colors + font in DB; build CSS vars from Setting::all | Custom values in CSS output | Matched | ✅ Pass |
 
+### 53. Image Optimization Settings (`db.rs`, `routes/admin/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 300 | `image_opt_seed_defaults_exist` | Verify all 5 image optimization settings seeded | All present with correct defaults | Matched | ✅ Pass |
+| 301 | `image_opt_max_dimension_disabled_by_default` | Check max_dimension defaults to 0 | `0` | `0` | ✅ Pass |
+| 302 | `image_opt_max_dimension_set_and_read` | Set to 2400, read back | `2400` | `2400` | ✅ Pass |
+| 303 | `image_opt_reencode_disabled_by_default` | Check reencode defaults to false | `false` | `false` | ✅ Pass |
+| 304 | `image_opt_reencode_enable` | Enable reencode, verify | `true` | `true` | ✅ Pass |
+| 305 | `image_opt_strip_metadata_disabled_by_default` | Check strip_metadata defaults to false | `false` | `false` | ✅ Pass |
+| 306 | `image_opt_strip_metadata_enable` | Enable strip_metadata, verify | `true` | `true` | ✅ Pass |
+| 307 | `image_opt_quality_default` | Check quality defaults to 85 | `85` | `85` | ✅ Pass |
+| 308 | `image_opt_quality_custom` | Set quality to 70, verify | `70` | `70` | ✅ Pass |
+| 309 | `image_opt_all_disabled_is_noop` | All three optimization settings off | All false/0 | Matched | ✅ Pass |
+| 310 | `image_opt_reencode_implies_strip` | Both reencode + strip enabled | Both true | Matched | ✅ Pass |
+| 311 | `image_opt_strip_without_reencode` | Strip on, reencode off | strip=true, reencode=false | Matched | ✅ Pass |
+| 312 | `image_opt_max_dimension_zero_means_disabled` | Set to 0, verify | `0` (no resize) | `0` | ✅ Pass |
+| 313 | `image_opt_webp_quality_setting_used` | Set quality to 60, verify | `60` | `60` | ✅ Pass |
+
 ---
 
 ## Running Tests
@@ -711,4 +730,5 @@ src/tests.rs
 ├── Typography: CSS Variables — Layout (9 tests)
 ├── Typography: CSS Variables — Lightbox & Grid (3 tests)
 ├── Typography: Font Links (14 tests)
-└── Typography: Render Integration (1 test)
+├── Typography: Render Integration (1 test)
+└── Image Optimization Settings (14 tests)

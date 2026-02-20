@@ -601,6 +601,9 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("images_thumb_large", "1024x1024"),
         ("images_quality", "85"),
         ("images_webp_convert", "false"),
+        ("images_max_dimension", "0"),
+        ("images_reencode", "false"),
+        ("images_strip_metadata", "false"),
         ("images_allowed_types", "jpg,jpeg,png,gif,webp,svg,tiff"),
         // Video
         ("video_upload_enabled", "false"),

@@ -243,7 +243,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 | **Portfolio** | Grid columns, likes, lightbox, image protection, animations |
 | **Comments** | Enable/disable, moderation mode, spam protection, rate limits |
 | **Typography** | Fonts, sizes, sources, per-element assignment |
-| **Media** | Image upload (max size, quality, WebP, thumbnails, HEIC/HEIF conversion), video upload (types, size, duration), media organization (6 folder structures) |
+| **Media** | Image upload (max size, quality, WebP, thumbnails, HEIC/HEIF conversion), image optimization (max dimension resize, JPEG/PNG re-encode, EXIF stripping), video upload (types, size, duration), media organization (6 folder structures) |
 | **SEO** | Title template, meta defaults, sitemap, structured data, robots.txt, webmaster verification, 7 analytics providers |
 | **Security** | Admin slug, auth method (password/magic link/passkey), MFA, passkey management, sessions, rate limits, captcha, anti-spam |
 | **Frontend** | Active design, back-to-top button |

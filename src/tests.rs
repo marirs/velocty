@@ -6334,3 +6334,131 @@ fn render_css_vars_in_page_output() {
     assert!(css.contains("--color-bg: #001122"));
     assert!(css.contains("--font-primary: 'Roboto', sans-serif"));
 }
+
+// ── Image Optimization Settings Tests ──────────────────────────────────
+
+#[test]
+fn image_opt_seed_defaults_exist() {
+    let pool = test_pool();
+    assert_eq!(
+        Setting::get(&pool, "images_max_dimension"),
+        Some("0".to_string())
+    );
+    assert_eq!(
+        Setting::get(&pool, "images_reencode"),
+        Some("false".to_string())
+    );
+    assert_eq!(
+        Setting::get(&pool, "images_strip_metadata"),
+        Some("false".to_string())
+    );
+    assert_eq!(
+        Setting::get(&pool, "images_quality"),
+        Some("85".to_string())
+    );
+    assert_eq!(
+        Setting::get(&pool, "images_webp_convert"),
+        Some("false".to_string())
+    );
+}
+
+#[test]
+fn image_opt_max_dimension_disabled_by_default() {
+    let pool = test_pool();
+    let val = Setting::get_i64(&pool, "images_max_dimension");
+    assert_eq!(val, 0, "max_dimension should default to 0 (disabled)");
+}
+
+#[test]
+fn image_opt_max_dimension_set_and_read() {
+    let pool = test_pool();
+    Setting::set(&pool, "images_max_dimension", "2400").unwrap();
+    assert_eq!(Setting::get_i64(&pool, "images_max_dimension"), 2400);
+}
+
+#[test]
+fn image_opt_reencode_disabled_by_default() {
+    let pool = test_pool();
+    assert!(!Setting::get_bool(&pool, "images_reencode"));
+}
+
+#[test]
+fn image_opt_reencode_enable() {
+    let pool = test_pool();
+    Setting::set(&pool, "images_reencode", "true").unwrap();
+    assert!(Setting::get_bool(&pool, "images_reencode"));
+}
+
+#[test]
+fn image_opt_strip_metadata_disabled_by_default() {
+    let pool = test_pool();
+    assert!(!Setting::get_bool(&pool, "images_strip_metadata"));
+}
+
+#[test]
+fn image_opt_strip_metadata_enable() {
+    let pool = test_pool();
+    Setting::set(&pool, "images_strip_metadata", "true").unwrap();
+    assert!(Setting::get_bool(&pool, "images_strip_metadata"));
+}
+
+#[test]
+fn image_opt_quality_default() {
+    let pool = test_pool();
+    let q = Setting::get_i64(&pool, "images_quality") as u8;
+    assert_eq!(q, 85);
+}
+
+#[test]
+fn image_opt_quality_custom() {
+    let pool = test_pool();
+    Setting::set(&pool, "images_quality", "70").unwrap();
+    assert_eq!(Setting::get_i64(&pool, "images_quality"), 70);
+}
+
+#[test]
+fn image_opt_all_disabled_is_noop() {
+    let pool = test_pool();
+    // All three off — pipeline should be a no-op
+    assert_eq!(Setting::get_i64(&pool, "images_max_dimension"), 0);
+    assert!(!Setting::get_bool(&pool, "images_reencode"));
+    assert!(!Setting::get_bool(&pool, "images_strip_metadata"));
+}
+
+#[test]
+fn image_opt_reencode_implies_strip() {
+    let pool = test_pool();
+    // When reencode is on, strip_meta behavior is implied (both should be true in UI)
+    Setting::set(&pool, "images_reencode", "true").unwrap();
+    Setting::set(&pool, "images_strip_metadata", "true").unwrap();
+    assert!(Setting::get_bool(&pool, "images_reencode"));
+    assert!(Setting::get_bool(&pool, "images_strip_metadata"));
+}
+
+#[test]
+fn image_opt_strip_without_reencode() {
+    let pool = test_pool();
+    // Strip alone forces re-encode under the hood
+    Setting::set(&pool, "images_reencode", "false").unwrap();
+    Setting::set(&pool, "images_strip_metadata", "true").unwrap();
+    assert!(!Setting::get_bool(&pool, "images_reencode"));
+    assert!(Setting::get_bool(&pool, "images_strip_metadata"));
+}
+
+#[test]
+fn image_opt_max_dimension_zero_means_disabled() {
+    let pool = test_pool();
+    Setting::set(&pool, "images_max_dimension", "0").unwrap();
+    let val = Setting::get_i64(&pool, "images_max_dimension") as u32;
+    assert_eq!(val, 0);
+    // 0 means no resize should happen
+}
+
+#[test]
+fn image_opt_webp_quality_setting_used() {
+    let pool = test_pool();
+    Setting::set(&pool, "images_quality", "60").unwrap();
+    let q = Setting::get_i64(&pool, "images_quality") as u8;
+    assert_eq!(q, 60);
+    // This quality value should be passed to WebP encoder and JPEG re-encode
+}

@@ -559,7 +559,12 @@ pub fn settings_save(
             "seo_clicky_enabled",
             "seo_umami_enabled",
         ],
-        "images" => &["images_webp_convert", "video_upload_enabled"],
+        "images" => &[
+            "images_webp_convert",
+            "images_reencode",
+            "images_strip_metadata",
+            "video_upload_enabled",
+        ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &[
             "design_site_search",

@@ -39,6 +39,19 @@
     </div>
 
     <div class="form-card">
+        <h3>Image Optimization</h3>
+        <div class="form-group">
+            <label for="images_max_dimension">Max Image Dimension (px)</label>
+            <input type="number" id="images_max_dimension" name="images_max_dimension" value="{{ settings.images_max_dimension | default(value='0') }}" min="0" max="10000" step="1">
+            <span class="form-help">Downscale images so the longest edge doesn't exceed this value. Set to 0 to keep original size. Common values: 1920, 2400, 3840.</span>
+        </div>
+        <label class="checkbox-item"><input type="checkbox" id="images_reencode" name="images_reencode" value="true" {% if settings.images_reencode | default(value='') == "true" %}checked{% endif %}> Re-encode JPEG/PNG on upload</label>
+        <span class="form-help" style="margin-left:24px;display:block;margin-top:2px">Re-encodes JPEGs at the configured quality and re-compresses PNGs. Significantly reduces file size for unoptimized uploads.</span>
+        <label class="checkbox-item" style="margin-top:10px" id="strip-meta-label"><input type="checkbox" id="images_strip_metadata" name="images_strip_metadata" value="true" {% if settings.images_strip_metadata | default(value='') == "true" %}checked{% endif %}{% if settings.images_reencode | default(value='') == "true" %} disabled{% endif %}> Strip EXIF metadata</label>
+        <span class="form-help" style="margin-left:24px;display:block;margin-top:2px" id="strip-meta-help">{% if settings.images_reencode | default(value='') == "true" %}EXIF metadata is automatically removed when re-encode is enabled.{% else %}Removes EXIF, GPS location, and camera data from uploaded images for privacy. Forces a re-encode of the image.{% endif %}</span>
+    </div>
+
+    <div class="form-card">
         <h3>Thumbnail Sizes</h3>
         <div class="form-group">
             <label for="images_thumb_small">Small</label>
@@ -102,6 +115,74 @@
             fs.disabled = !this.checked;
         });
     }
+})();
+
+// Re-encode ↔ Strip EXIF interaction
+(function() {
+    var reencCb = document.getElementById('images_reencode');
+    var stripCb = document.getElementById('images_strip_metadata');
+    var stripLabel = document.getElementById('strip-meta-label');
+    var stripHelp = document.getElementById('strip-meta-help');
+    if (!reencCb || !stripCb) return;
+
+    function updateStripState() {
+        if (reencCb.checked) {
+            stripCb.checked = true;
+            stripCb.disabled = true;
+            stripHelp.textContent = 'EXIF metadata is automatically removed when re-encode is enabled.';
+            stripLabel.style.opacity = '0.6';
+        } else {
+            stripCb.disabled = false;
+            stripHelp.textContent = 'Removes EXIF, GPS location, and camera data from uploaded images for privacy. Forces a re-encode of the image.';
+            stripLabel.style.opacity = '1';
+        }
+    }
+
+    reencCb.addEventListener('change', function() {
+        if (this.checked) {
+            // Show confirmation modal
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+            var modal = document.createElement('div');
+            modal.style.cssText = 'background:var(--bg-card,#1e1e2e);border:1px solid var(--border-subtle,#333);border-radius:12px;padding:24px;max-width:440px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.5)';
+            modal.innerHTML = '<h3 style="margin:0 0 12px;font-size:16px;color:var(--text-primary,#fff)">Re-encoding removes EXIF metadata</h3>'
+                + '<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:var(--text-secondary,#aaa)">'
+                + 'When images are re-encoded for compression, all embedded metadata (EXIF, GPS location, camera info, ICC colour profiles) is permanently removed from uploaded images.<br><br>'
+                + 'This will also enable <strong style="color:var(--text-primary,#fff)">Strip EXIF metadata</strong> automatically.</p>'
+                + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+                + '<button id="reenc-cancel" style="padding:8px 16px;border-radius:6px;border:1px solid var(--border-input,#444);background:transparent;color:var(--text-primary,#fff);cursor:pointer;font-size:13px">Cancel</button>'
+                + '<button id="reenc-confirm" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent,#e8913a);color:#fff;cursor:pointer;font-weight:600;font-size:13px">OK, Enable Both</button>'
+                + '</div>';
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            overlay.addEventListener('click', function(ev) {
+                if (ev.target === overlay) { reencCb.checked = false; overlay.remove(); }
+            });
+            document.getElementById('reenc-cancel').addEventListener('click', function() {
+                reencCb.checked = false;
+                overlay.remove();
+            });
+            document.getElementById('reenc-confirm').addEventListener('click', function() {
+                overlay.remove();
+                updateStripState();
+            });
+        } else {
+            updateStripState();
+        }
+    });
+})();
+
+// Before submit: re-enable disabled checkboxes so their values are submitted
+(function() {
+    var form = document.querySelector('form[action$="/settings/images"]');
+    if (!form) return;
+    form.addEventListener('submit', function() {
+        var stripCb = document.getElementById('images_strip_metadata');
+        if (stripCb && stripCb.disabled) { stripCb.disabled = false; }
+    });
 })();
 
 // HEIC/HEIF confirmation modal on save

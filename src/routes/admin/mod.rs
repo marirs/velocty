@@ -1,3 +1,4 @@
+use image::ImageEncoder;
 use rocket::fs::TempFile;
 
 use crate::db::DbPool;
@@ -98,12 +99,22 @@ pub(crate) async fn save_upload(
         return Some(filename);
     }
 
+    // ── Read image optimization settings once ──
+    let quality = {
+        let q = Setting::get_i64(pool, "images_quality") as u8;
+        if q == 0 {
+            85
+        } else {
+            q
+        }
+    };
+
     // ── HEIC/HEIF → JPG conversion (always, browsers can't display HEIC) ──
     if ext_lower == "heic" || ext_lower == "heif" {
         let jpg_filename = format!("{}_{}.jpg", prefix, uid);
         let jpg_dest = upload_dir.join(&jpg_filename);
 
-        let converted = convert_heic_to_jpg(&dest, &jpg_dest);
+        let converted = convert_heic_to_jpg(&dest, &jpg_dest, quality);
         // Remove the original HEIC file regardless
         let _ = std::fs::remove_file(&dest);
 
@@ -111,9 +122,14 @@ pub(crate) async fn save_upload(
             return None;
         }
 
+        // Run image optimization (resize / re-encode / strip EXIF)
+        optimize_image(pool, &jpg_dest, "jpg", quality);
+
         // If WebP conversion is enabled, convert the JPG to WebP
         if Setting::get_bool(pool, "images_webp_convert") {
-            if let Some(webp_name) = convert_to_webp_file(&jpg_dest, prefix, &uid, upload_dir) {
+            if let Some(webp_name) =
+                convert_to_webp_file(&jpg_dest, prefix, &uid, upload_dir, quality)
+            {
                 let _ = std::fs::remove_file(&jpg_dest);
                 return Some(webp_name);
             }
@@ -122,9 +138,12 @@ pub(crate) async fn save_upload(
         return Some(jpg_filename);
     }
 
+    // ── Image optimization (resize / re-encode / strip EXIF) ──
+    optimize_image(pool, &dest, &ext_lower, quality);
+
     // ── WebP conversion for other image types ──
     if Setting::get_bool(pool, "images_webp_convert") && ext_lower != "webp" && ext_lower != "svg" {
-        if let Some(webp_name) = convert_to_webp_file(&dest, prefix, &uid, upload_dir) {
+        if let Some(webp_name) = convert_to_webp_file(&dest, prefix, &uid, upload_dir, quality) {
             let _ = std::fs::remove_file(&dest);
             return Some(webp_name);
         }
@@ -133,11 +152,96 @@ pub(crate) async fn save_upload(
     Some(filename)
 }
 
+/// Optimize an image on disk: max dimension resize, re-encode JPEG/PNG, strip EXIF.
+/// This modifies the file in-place.
+fn optimize_image(pool: &DbPool, path: &std::path::Path, ext: &str, quality: u8) {
+    let max_dim = Setting::get_i64(pool, "images_max_dimension") as u32;
+    let reencode = Setting::get_bool(pool, "images_reencode");
+    let strip_meta = Setting::get_bool(pool, "images_strip_metadata");
+
+    // Nothing to do if all options are off
+    if max_dim == 0 && !reencode && !strip_meta {
+        return;
+    }
+
+    // Skip non-raster formats
+    if ext == "gif" || ext == "webp" || ext == "svg" {
+        return;
+    }
+
+    let img = match image::open(path) {
+        Ok(i) => i,
+        Err(_) => return,
+    };
+
+    let (w, h) = image::GenericImageView::dimensions(&img);
+    let needs_resize = max_dim > 0 && (w > max_dim || h > max_dim);
+    // strip_meta forces a re-encode (image crate drops EXIF on re-encode)
+    let needs_reencode = reencode || strip_meta;
+
+    if !needs_resize && !needs_reencode {
+        return;
+    }
+
+    let img = if needs_resize {
+        img.resize(max_dim, max_dim, image::imageops::FilterType::Lanczos3)
+    } else {
+        img
+    };
+
+    // Re-encode in the original format
+    match ext {
+        "jpg" | "jpeg" => {
+            let rgb = img.to_rgb8();
+            let file = match std::fs::File::create(path) {
+                Ok(f) => f,
+                Err(_) => return,
+            };
+            let mut buf = std::io::BufWriter::new(file);
+            let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, quality);
+            let _ = encoder.write_image(
+                &rgb,
+                img.width(),
+                img.height(),
+                image::ExtendedColorType::Rgb8,
+            );
+        }
+        "png" => {
+            let rgba = img.to_rgba8();
+            let file = match std::fs::File::create(path) {
+                Ok(f) => f,
+                Err(_) => return,
+            };
+            let buf = std::io::BufWriter::new(file);
+            let encoder = image::codecs::png::PngEncoder::new_with_quality(
+                buf,
+                image::codecs::png::CompressionType::Best,
+                image::codecs::png::FilterType::Adaptive,
+            );
+            let _ = encoder.write_image(
+                &rgba,
+                img.width(),
+                img.height(),
+                image::ExtendedColorType::Rgba8,
+            );
+        }
+        "tiff" => {
+            // Re-encode TIFF via the image crate
+            let _ = img.save(path);
+        }
+        _ => {
+            // Unknown raster format — save via image crate's auto-detection
+            let _ = img.save(path);
+        }
+    }
+}
+
 /// Convert HEIC/HEIF to JPG using system tools (sips on macOS, magick/heif-convert on Linux)
-fn convert_heic_to_jpg(src: &std::path::Path, dst: &std::path::Path) -> bool {
+fn convert_heic_to_jpg(src: &std::path::Path, dst: &std::path::Path, quality: u8) -> bool {
+    let q_str = quality.to_string();
     // Try sips (macOS built-in)
     if let Ok(status) = std::process::Command::new("sips")
-        .args(["-s", "format", "jpeg", "-s", "formatOptions", "85"])
+        .args(["-s", "format", "jpeg", "-s", "formatOptions", &q_str])
         .arg(src)
         .arg("--out")
         .arg(dst)
@@ -153,7 +257,7 @@ fn convert_heic_to_jpg(src: &std::path::Path, dst: &std::path::Path) -> bool {
     if let Ok(status) = std::process::Command::new("magick")
         .arg(src)
         .arg("-quality")
-        .arg("85")
+        .arg(&q_str)
         .arg(dst)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -184,12 +288,13 @@ fn convert_to_webp_file(
     prefix: &str,
     uid: &uuid::Uuid,
     upload_dir: &std::path::Path,
+    quality: u8,
 ) -> Option<String> {
     let img = image::open(src).ok()?;
     let (w, h) = image::GenericImageView::dimensions(&img);
     let rgba = img.to_rgba8();
     let encoder = webp::Encoder::from_rgba(&rgba, w, h);
-    let webp_data = encoder.encode(85.0);
+    let webp_data = encoder.encode(quality as f32);
     let webp_filename = format!("{}_{}.webp", prefix, uid);
     let webp_dest = upload_dir.join(&webp_filename);
     std::fs::write(&webp_dest, &*webp_data).ok()?;
