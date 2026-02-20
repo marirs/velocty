@@ -286,14 +286,17 @@ a:hover { color: var(--accent-hover); }
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 14px;
+    padding: 8px 8px;
     text-decoration: none;
     cursor: pointer;
-    transition: background 150ms;
+    transition: background 150ms, padding 150ms;
     border-radius: 6px;
     margin: 0 6px;
     position: relative;
     min-height: 40px;
+}
+.sidebar:hover .seo-health-widget {
+    padding: 8px 14px;
 }
 .seo-health-widget:hover {
     background: var(--bg-card-hover);
