@@ -416,6 +416,12 @@ fn render_with_shell(
         &build_cookie_consent_banner(&settings),
     );
 
+    // Rewrite /uploads/ URLs to /img/<token> proxy URLs
+    let proxy_secret = sg("image_proxy_secret", "");
+    if !proxy_secret.is_empty() {
+        html = crate::image_proxy::rewrite_upload_urls(&html, &proxy_secret);
+    }
+
     html
 }
 
@@ -514,6 +520,12 @@ pub fn render_legal_page(
             "{{cookie_consent}}",
             &build_cookie_consent_banner(&settings_v),
         );
+        // Rewrite /uploads/ URLs to /img/<token> proxy URLs
+        let proxy_secret = sg("image_proxy_secret", "");
+        if !proxy_secret.is_empty() {
+            html = crate::image_proxy::rewrite_upload_urls(&html, &proxy_secret);
+        }
+
         html
     };
     result

@@ -284,5 +284,6 @@ pub fn api_routes() -> Vec<rocket::Route> {
         api::set_theme,
         api::seo_check_post,
         api::seo_check_portfolio,
+        api::rotate_image_proxy_key,
     ]
 }

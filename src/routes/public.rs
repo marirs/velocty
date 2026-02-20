@@ -1,8 +1,13 @@
+use rocket::http::{ContentType, CookieJar, Header, Status};
 use rocket::response::content::{RawHtml, RawXml};
-use rocket::State;
+use rocket::response::{self, Responder, Response};
+use rocket::{Request, State};
 use serde_json::json;
+use std::io::Cursor;
+use std::path::Path;
 
 use crate::db::DbPool;
+use crate::image_proxy;
 use crate::models::category::Category;
 use crate::models::comment::Comment;
 use crate::models::portfolio::PortfolioItem;
@@ -10,7 +15,27 @@ use crate::models::post::Post;
 use crate::models::settings::{Setting, SettingsCache};
 use crate::models::tag::Tag;
 use crate::render;
+use crate::security::auth;
 use crate::seo;
+
+/// Response type for serving files with custom headers (caching, MIME, etc.)
+pub struct FileResponse {
+    pub bytes: Vec<u8>,
+    pub content_type: String,
+    pub cache_control: String,
+}
+
+impl<'r> Responder<'r, 'static> for FileResponse {
+    fn respond_to(self, _req: &'r Request<'_>) -> response::Result<'static> {
+        let ct = ContentType::parse_flexible(&self.content_type).unwrap_or(ContentType::Binary);
+        Response::build()
+            .header(ct)
+            .header(Header::new("Cache-Control", self.cache_control))
+            .header(Header::new("X-Content-Type-Options", "nosniff"))
+            .sized_body(self.bytes.len(), Cursor::new(self.bytes))
+            .ok()
+    }
+}
 
 // ── Dynamic catch-all router ─────────────────────────────
 // Reads slugs and enabled flags from the in-memory SettingsCache
@@ -389,6 +414,93 @@ pub fn terms_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
     Some(RawHtml(page_html))
 }
 
+// ── Image proxy: /img/<token> ─────────────────────────
+// Decodes the token, verifies HMAC, serves the file with caching headers.
+
+#[get("/img/<token>")]
+pub fn image_proxy_route(
+    pool: &State<DbPool>,
+    token: &str,
+) -> Result<FileResponse, Status> {
+    let settings = Setting::all(pool);
+    let secret = settings
+        .get("image_proxy_secret")
+        .cloned()
+        .unwrap_or_default();
+    if secret.is_empty() {
+        return Err(Status::NotFound);
+    }
+
+    let old_secret = settings
+        .get("image_proxy_secret_old")
+        .cloned()
+        .unwrap_or_default();
+    let old_expires = settings
+        .get("image_proxy_secret_old_expires")
+        .cloned()
+        .unwrap_or_default();
+    let path = image_proxy::decode_token_with_fallback(&secret, &old_secret, &old_expires, token)
+        .ok_or(Status::NotFound)?;
+
+    serve_file_from_path(&path, "public, max-age=31536000, immutable")
+}
+
+/// Serve /uploads/ files only for authenticated admin users.
+/// Public visitors get 404 — they should use /img/<token> proxy URLs instead.
+#[get("/uploads/<path..>")]
+pub fn serve_uploads(
+    pool: &State<DbPool>,
+    cookies: &CookieJar<'_>,
+    path: std::path::PathBuf,
+) -> Result<FileResponse, Status> {
+    let session_id = cookies
+        .get_private("velocty_session")
+        .map(|c| c.value().to_string());
+    let is_authenticated = session_id
+        .as_deref()
+        .and_then(|sid| auth::get_session_user(pool, sid))
+        .map(|u| u.is_active())
+        .unwrap_or(false);
+
+    if !is_authenticated {
+        return Err(Status::NotFound);
+    }
+
+    let upload_path = format!("/uploads/{}", path.display());
+    serve_file_from_path(&upload_path, "private, max-age=3600")
+}
+
+/// Shared helper: resolve an /uploads/... path to a file and serve it.
+fn serve_file_from_path(path: &str, cache_control: &str) -> Result<FileResponse, Status> {
+    if !path.starts_with("/uploads/") {
+        return Err(Status::NotFound);
+    }
+
+    let fs_path = format!("website/site{}", path);
+    let fs_path = Path::new(&fs_path);
+    if !fs_path.exists() || !fs_path.is_file() {
+        return Err(Status::NotFound);
+    }
+
+    // Prevent path traversal
+    let canonical = fs_path.canonicalize().map_err(|_| Status::NotFound)?;
+    let uploads_dir = Path::new("website/site/uploads")
+        .canonicalize()
+        .map_err(|_| Status::NotFound)?;
+    if !canonical.starts_with(&uploads_dir) {
+        return Err(Status::Forbidden);
+    }
+
+    let bytes = std::fs::read(&canonical).map_err(|_| Status::InternalServerError)?;
+    let mime = image_proxy::mime_from_extension(canonical.to_str().unwrap_or(""));
+
+    Ok(FileResponse {
+        bytes,
+        content_type: mime.to_string(),
+        cache_control: cache_control.to_string(),
+    })
+}
+
 pub fn root_routes() -> Vec<rocket::Route> {
     routes![
         dynamic_route_index,
@@ -401,6 +513,8 @@ pub fn root_routes() -> Vec<rocket::Route> {
         robots,
         privacy_page,
         terms_page,
+        image_proxy_route,
+        serve_uploads,
     ]
 }
 

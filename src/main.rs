@@ -15,6 +15,7 @@ mod boot;
 mod db;
 mod email;
 mod health;
+mod image_proxy;
 mod images;
 mod rate_limit;
 mod render;
@@ -149,7 +150,6 @@ fn rocket() -> _ {
         .attach(NoCacheAdmin)
         .attach(tasks::BackgroundTasks)
         .mount("/static", FileServer::from("website/static"))
-        .mount("/uploads", FileServer::from("website/site/uploads"))
         .mount("/", routes::public::root_routes())
         .mount(&admin_mount, routes::admin::routes())
         .mount(&admin_api_mount, routes::admin::api_routes())

@@ -5266,3 +5266,227 @@ fn render_journal_hidden_shows_plain_link() {
         "hidden mode should not have page_top filter div"
     );
 }
+
+// ═══════════════════════════════════════════════════════════
+// Image Proxy Tests
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn image_proxy_encode_decode_roundtrip() {
+    let secret = "test_secret_key_1234567890abcdef";
+    let path = "/uploads/2024/01/photo.jpg";
+    let token = crate::image_proxy::encode_token(secret, path);
+    let decoded = crate::image_proxy::decode_token(secret, &token);
+    assert_eq!(decoded, Some(path.to_string()));
+}
+
+#[test]
+fn image_proxy_tampered_token_rejected() {
+    let secret = "test_secret_key_1234567890abcdef";
+    let path = "/uploads/2024/01/photo.jpg";
+    let token = crate::image_proxy::encode_token(secret, path);
+    // Tamper with the signature
+    let tampered = format!("{}x", token);
+    assert_eq!(crate::image_proxy::decode_token(secret, &tampered), None);
+}
+
+#[test]
+fn image_proxy_wrong_secret_rejected() {
+    let secret = "correct_secret";
+    let path = "/uploads/photo.jpg";
+    let token = crate::image_proxy::encode_token(secret, path);
+    let decoded = crate::image_proxy::decode_token("wrong_secret", &token);
+    assert_eq!(decoded, None);
+}
+
+#[test]
+fn image_proxy_rewrite_upload_urls() {
+    let secret = "rewrite_test_secret";
+    let html = r#"<img src="/uploads/2024/photo.jpg"> and <a href="/uploads/doc.pdf">link</a>"#;
+    let rewritten = crate::image_proxy::rewrite_upload_urls(html, secret);
+
+    assert!(
+        !rewritten.contains("/uploads/"),
+        "rewritten HTML should not contain /uploads/"
+    );
+    assert!(
+        rewritten.contains("/img/"),
+        "rewritten HTML should contain /img/ proxy URLs"
+    );
+    // Verify the tokens are valid
+    let token1_start = rewritten.find("/img/").unwrap() + 5;
+    let token1_end = rewritten[token1_start..].find('"').unwrap() + token1_start;
+    let token1 = &rewritten[token1_start..token1_end];
+    let decoded = crate::image_proxy::decode_token(secret, token1);
+    assert_eq!(decoded, Some("/uploads/2024/photo.jpg".to_string()));
+}
+
+#[test]
+fn image_proxy_preserves_non_upload_urls() {
+    let secret = "preserve_test_secret";
+    let html = r#"<img src="/static/logo.png"> <a href="/blog/post">link</a>"#;
+    let rewritten = crate::image_proxy::rewrite_upload_urls(html, secret);
+    assert_eq!(html, rewritten, "non-upload URLs should be unchanged");
+}
+
+#[test]
+fn image_proxy_mime_detection() {
+    assert_eq!(
+        crate::image_proxy::mime_from_extension("photo.jpg"),
+        "image/jpeg"
+    );
+    assert_eq!(
+        crate::image_proxy::mime_from_extension("image.png"),
+        "image/png"
+    );
+    assert_eq!(
+        crate::image_proxy::mime_from_extension("pic.webp"),
+        "image/webp"
+    );
+    assert_eq!(
+        crate::image_proxy::mime_from_extension("doc.pdf"),
+        "application/pdf"
+    );
+    assert_eq!(
+        crate::image_proxy::mime_from_extension("unknown.xyz"),
+        "application/octet-stream"
+    );
+}
+
+#[test]
+fn image_proxy_render_rewrites_urls() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_slug", "portfolio"),
+        ],
+    );
+    // Create a portfolio item with an image path
+    let form = crate::models::portfolio::PortfolioForm {
+        title: "Test".into(),
+        slug: "test".into(),
+        description_json: None,
+        description_html: Some("desc".into()),
+        image_path: "2024/01/photo.jpg".into(),
+        thumbnail_path: None,
+        meta_title: None,
+        meta_description: None,
+        sell_enabled: None,
+        price: None,
+        purchase_note: None,
+        payment_provider: None,
+        download_file_path: None,
+        status: "published".into(),
+        published_at: None,
+        category_ids: None,
+        tag_ids: None,
+    };
+    PortfolioItem::create(&pool, &form).unwrap();
+
+    let items = PortfolioItem::published(&pool, 10, 0);
+    let categories = Category::list(&pool, Some("portfolio"));
+    let settings: HashMap<String, String> = Setting::all(&pool);
+    let settings_json = serde_json::to_value(&settings).unwrap();
+    let items_json = serde_json::to_value(&items).unwrap();
+    let cats_json = serde_json::to_value(&categories).unwrap();
+
+    let ctx = serde_json::json!({
+        "settings": settings_json,
+        "items": items_json,
+        "categories": cats_json,
+        "page_type": "portfolio_grid",
+    });
+
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+
+    // The rendered HTML should NOT contain raw /uploads/ paths in src attributes
+    assert!(
+        !html.contains("src=\"/uploads/"),
+        "rendered HTML should not expose raw /uploads/ paths"
+    );
+    // It should contain /img/ proxy URLs instead
+    assert!(
+        html.contains("/img/"),
+        "rendered HTML should use /img/ proxy URLs"
+    );
+}
+
+#[test]
+fn image_proxy_seed_generates_secret() {
+    let pool = test_pool();
+    let settings: HashMap<String, String> = Setting::all(&pool);
+    let secret = settings
+        .get("image_proxy_secret")
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !secret.is_empty(),
+        "seed_defaults should generate image_proxy_secret"
+    );
+    assert_eq!(secret.len(), 64, "secret should be 32 bytes = 64 hex chars");
+}
+
+#[test]
+fn image_proxy_dual_key_fallback() {
+    let old_secret = "old_secret_key";
+    let new_secret = "new_secret_key";
+    let path = "/uploads/photo.jpg";
+
+    // Token signed with old key
+    let old_token = crate::image_proxy::encode_token(old_secret, path);
+
+    // Should NOT decode with new key alone
+    assert_eq!(
+        crate::image_proxy::decode_token(new_secret, &old_token),
+        None
+    );
+
+    // Should decode with fallback when old key hasn't expired
+    let future = (chrono::Utc::now().naive_utc() + chrono::Duration::days(7))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let decoded =
+        crate::image_proxy::decode_token_with_fallback(new_secret, old_secret, &future, &old_token);
+    assert_eq!(decoded, Some(path.to_string()));
+
+    // Token signed with new key should decode directly (no fallback needed)
+    let new_token = crate::image_proxy::encode_token(new_secret, path);
+    let decoded =
+        crate::image_proxy::decode_token_with_fallback(new_secret, old_secret, &future, &new_token);
+    assert_eq!(decoded, Some(path.to_string()));
+}
+
+#[test]
+fn image_proxy_dual_key_expired_old_rejected() {
+    let old_secret = "old_secret_key";
+    let new_secret = "new_secret_key";
+    let path = "/uploads/photo.jpg";
+
+    let old_token = crate::image_proxy::encode_token(old_secret, path);
+
+    // Old key has expired (date in the past)
+    let past = (chrono::Utc::now().naive_utc() - chrono::Duration::days(1))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let decoded =
+        crate::image_proxy::decode_token_with_fallback(new_secret, old_secret, &past, &old_token);
+    assert_eq!(decoded, None, "expired old key should not decode");
+}
+
+#[test]
+fn image_proxy_dual_key_no_old_secret() {
+    let new_secret = "new_secret_key";
+    let path = "/uploads/photo.jpg";
+    let token = crate::image_proxy::encode_token(new_secret, path);
+
+    // Empty old secret — should still decode with current key
+    let decoded = crate::image_proxy::decode_token_with_fallback(new_secret, "", "", &token);
+    assert_eq!(decoded, Some(path.to_string()));
+
+    // Wrong token with no old secret — should fail
+    let bad_token = crate::image_proxy::encode_token("wrong", path);
+    let decoded = crate::image_proxy::decode_token_with_fallback(new_secret, "", "", &bad_token);
+    assert_eq!(decoded, None);
+}

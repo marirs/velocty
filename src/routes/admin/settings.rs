@@ -365,6 +365,7 @@ pub fn settings_save(
         "magic-link",
         "forgot-password",
         "reset-password",
+        "img",
     ];
 
     fn is_reserved(s: &str) -> bool {

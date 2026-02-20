@@ -60,6 +60,22 @@
         </div>
 
         <div class="form-card">
+            {% set rotation_active = settings.image_proxy_secret_old_expires is defined and settings.image_proxy_secret_old_expires != "" %}
+            <h3 style="display:flex;align-items:center;gap:8px">Image Proxy Key
+                <span id="rotate-key-pill" class="status-pill {% if rotation_active %}status-pill-warning{% else %}status-pill-success{% endif %}" {% if rotation_active %}title="Old key expires {{ settings.image_proxy_secret_old_expires }}"{% endif %}>{% if rotation_active %}Rotating{% else %}Active{% endif %}</span>
+            </h3>
+            <span class="form-help" style="margin-bottom:12px;display:block">All public image URLs are signed with an HMAC secret key. Rotating the key invalidates old URLs after a grace period.</span>
+            <div class="form-group">
+                <label for="image_proxy_rotation_days">Grace Period (days)</label>
+                <input type="number" id="image_proxy_rotation_days" name="image_proxy_rotation_days" value="{{ settings.image_proxy_rotation_days | default(value='7') }}" min="1" max="30" style="width:80px">
+                <span class="form-help">Old URLs remain valid for this many days after rotation.</span>
+            </div>
+            <div style="margin-top:12px">
+                <button type="button" class="btn btn-primary" id="btn-rotate-key" onclick="rotateImageProxyKey()" {% if rotation_active %}disabled{% endif %}>Rotate Key</button>
+            </div>
+        </div>
+
+        <div class="form-card">
             <h3>Login Captcha</h3>
             <label class="checkbox-item"><input type="checkbox" id="login_captcha_enabled" name="login_captcha_enabled" value="true" {% if settings.login_captcha_enabled == "true" %}checked{% endif %}> Enable Captcha on Login</label>
             <span class="form-help">Require a captcha challenge on the admin login page to prevent brute-force attacks.</span>
@@ -568,6 +584,38 @@
 
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
+
+<!-- Confirm Modal -->
+<div id="confirm-overlay" class="modal-overlay" style="display:none" onclick="confirmCancel()"></div>
+<div id="confirm-modal" class="modal" style="display:none;max-width:400px">
+    <div class="modal-header">
+        <h3 id="confirm-title">Confirm</h3>
+        <button type="button" class="modal-close" onclick="confirmCancel()">&times;</button>
+    </div>
+    <div class="modal-body">
+        <p id="confirm-message" style="font-size:14px;margin:0;color:var(--text-primary)"></p>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn" onclick="confirmCancel()">Cancel <span class="kbd">Esc</span></button>
+        <button type="button" class="btn btn-primary" id="confirm-ok-btn" onclick="confirmOk()">Confirm</button>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="display:none;position:fixed;top:20px;right:20px;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.3s"></div>
+
+<style>
+.modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000; }
+.modal { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;z-index:1001;width:90%;color:var(--text-primary); }
+.modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-subtle); }
+.modal-header h3 { margin:0;font-size:16px;color:var(--text-primary); }
+.modal-close { background:none;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;padding:0;line-height:1; }
+.modal-body { padding:20px; }
+.modal-footer { padding:12px 20px;border-top:1px solid var(--border-subtle); }
+.status-pill { display:inline-block;font-size:11px;font-weight:600;padding:2px 10px;border-radius:999px;letter-spacing:0.3px;vertical-align:middle; }
+.status-pill-success { background:rgba(34,197,94,0.15);color:#22c55e; }
+.status-pill-warning { background:rgba(245,158,11,0.15);color:#f59e0b; }
+</style>
 {% endblock content %}
 
 {% block scripts %}
@@ -785,6 +833,87 @@ function mfaDownloadFile() {
     var text = 'Velocty MFA Recovery Codes\n' + '='.repeat(30) + '\n\n' + mfaRecoveryCodes.join('\n') + '\n\nEach code can only be used once.\nStore these codes in a safe place.\n';
     var blob = new Blob([text], { type: 'text/plain' });
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'velocty-recovery-codes.txt'; a.click();
+}
+
+// ── Themed confirm modal ──
+var _confirmCallback = null;
+function showConfirm(title, message, btnLabel, btnClass, callback) {
+    _confirmCallback = callback;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    var okBtn = document.getElementById('confirm-ok-btn');
+    okBtn.textContent = btnLabel || 'Confirm';
+    okBtn.className = 'btn ' + (btnClass || 'btn-primary');
+    document.getElementById('confirm-overlay').style.display = '';
+    document.getElementById('confirm-modal').style.display = '';
+}
+function confirmOk() {
+    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-modal').style.display = 'none';
+    if (_confirmCallback) { _confirmCallback(); _confirmCallback = null; }
+}
+function confirmCancel() {
+    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-modal').style.display = 'none';
+    _confirmCallback = null;
+}
+document.addEventListener('keydown', function(e) {
+    var cm = document.getElementById('confirm-modal');
+    if (cm && cm.style.display !== 'none') {
+        if (e.key === 'Escape') { e.preventDefault(); confirmCancel(); }
+        if (e.key === 'Enter') { e.preventDefault(); confirmOk(); }
+    }
+});
+
+// ── Toast ──
+function showToast(message, type) {
+    var t = document.getElementById('toast');
+    t.textContent = message;
+    t.style.background = type === 'error' ? 'var(--danger)' : 'var(--success)';
+    t.style.color = '#fff';
+    t.style.display = '';
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function() {
+        t.style.opacity = '0';
+        setTimeout(function() { t.style.display = 'none'; }, 300);
+    }, 3000);
+}
+
+function rotateImageProxyKey() {
+    showConfirm('Rotate Image Proxy Key', 'Rotate the HMAC secret key? Old URLs will remain valid during the grace period.', 'Rotate', 'btn-primary', function() {
+        var btn = document.getElementById('btn-rotate-key');
+        btn.disabled = true;
+        btn.textContent = 'Rotating…';
+        var days = document.getElementById('image_proxy_rotation_days').value;
+        fetch('/' + adminSlug + '/settings/security', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'image_proxy_rotation_days=' + encodeURIComponent(days) + '&admin_slug=' + encodeURIComponent('{{ settings.admin_slug | default(value="admin") }}')
+        }).then(function() {
+            return fetch('/' + adminSlug + '/api/rotate-image-proxy-key', { method: 'POST' });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.textContent = 'Rotate Key';
+            if (d.ok) {
+                btn.disabled = true;
+                var pill = document.getElementById('rotate-key-pill');
+                pill.textContent = 'Rotating';
+                pill.className = 'status-pill status-pill-warning';
+                pill.title = 'Old key expires ' + d.expires;
+                showToast('Image proxy key rotated successfully', 'success');
+            } else {
+                btn.disabled = false;
+                showToast('Rotation failed: ' + (d.error || 'Unknown'), 'error');
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Rotate Key';
+            showToast('Network error during rotation', 'error');
+        });
+    });
 }
 
 function mfaDisable() {

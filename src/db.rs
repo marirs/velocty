@@ -806,6 +806,10 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("task_audit_log_max_age_days", "90"),
         ("task_analytics_cleanup_interval", "1440"),
         ("task_analytics_max_age_days", "365"),
+        // Image Proxy
+        ("image_proxy_secret_old", ""),
+        ("image_proxy_secret_old_expires", ""),
+        ("image_proxy_rotation_days", "7"),
     ];
 
     for (key, value) in &defaults {
@@ -813,6 +817,25 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?1, ?2)",
             params![key, value],
         )?;
+    }
+
+    // Seed image proxy secret (random 32-byte hex, generated once)
+    {
+        let exists: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM settings WHERE key = 'image_proxy_secret'",
+            [],
+            |row| row.get(0),
+        )?;
+        if exists == 0 {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            let bytes: [u8; 32] = rng.gen();
+            let secret = hex::encode(bytes);
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('image_proxy_secret', ?1)",
+                params![secret],
+            )?;
+        }
     }
 
     // Seed default design if none exists

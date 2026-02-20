@@ -4,11 +4,12 @@ use serde_json::Value;
 
 use crate::db::DbPool;
 use crate::models::analytics::PageView;
+use crate::models::audit::AuditEntry;
 use crate::models::portfolio::PortfolioItem;
 use crate::models::post::Post;
 use crate::models::settings::Setting;
 use crate::models::tag::Tag;
-use crate::security::auth::EditorUser;
+use crate::security::auth::{AdminUser, EditorUser};
 
 #[get("/stats/overview?<from>&<to>")]
 pub fn stats_overview(
@@ -309,4 +310,57 @@ pub fn seo_check_portfolio(_admin: EditorUser, pool: &State<DbPool>, id: i64) ->
         Some(&item.image_path),
         item.id,
     ))
+}
+
+/// Rotate the image proxy HMAC secret key.
+/// Copies current → old (with expiry), generates a new current key.
+#[post("/rotate-image-proxy-key")]
+pub fn rotate_image_proxy_key(admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    use rand::Rng;
+
+    let current_secret = Setting::get_or(pool, "image_proxy_secret", "");
+    if current_secret.is_empty() {
+        return Json(
+            serde_json::json!({ "ok": false, "error": "No image proxy secret configured" }),
+        );
+    }
+
+    let rotation_days: i64 = Setting::get_or(pool, "image_proxy_rotation_days", "7")
+        .parse()
+        .unwrap_or(7)
+        .clamp(1, 30);
+
+    let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::days(rotation_days);
+    let expires_str = expires_at.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Copy current key → old key with expiry
+    let _ = Setting::set(pool, "image_proxy_secret_old", &current_secret);
+    let _ = Setting::set(pool, "image_proxy_secret_old_expires", &expires_str);
+
+    // Generate new key
+    let mut rng = rand::thread_rng();
+    let bytes: [u8; 32] = rng.gen();
+    let new_secret = hex::encode(bytes);
+    let _ = Setting::set(pool, "image_proxy_secret", &new_secret);
+
+    AuditEntry::log(
+        pool,
+        Some(admin.user.id),
+        Some(&admin.user.display_name),
+        "rotate_image_proxy_key",
+        None,
+        None,
+        None,
+        Some(&format!(
+            "Image proxy key rotated. Old key expires: {}",
+            expires_str
+        )),
+        None,
+    );
+
+    Json(serde_json::json!({
+        "ok": true,
+        "expires": expires_str,
+        "rotation_days": rotation_days
+    }))
 }
