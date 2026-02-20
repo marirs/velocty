@@ -189,7 +189,7 @@ pub async fn upload_image(
     pool: &State<DbPool>,
     mut form: Form<ImageUploadForm<'_>>,
 ) -> Json<Value> {
-    if !super::is_allowed_image(&form.file, pool) {
+    if !super::is_allowed_media(&form.file, pool) {
         return Json(json!({ "error": "File type not allowed" }));
     }
     match save_upload(&mut form.file, "editor", pool).await {

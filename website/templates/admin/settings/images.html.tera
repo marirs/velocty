@@ -71,6 +71,7 @@
         <div class="form-group">
             <label for="video_max_duration">Max Duration (seconds, max 1800 = 30 min)</label>
             <input type="number" id="video_max_duration" name="video_max_duration" value="{{ settings.video_max_duration | default(value='1800') }}" min="1" max="1800">
+            <span class="form-help">Default: 1800 (30 min). Maximum: 1800 (30 min).</span>
         </div>
         </fieldset>
     </div>

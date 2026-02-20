@@ -105,7 +105,7 @@ pub fn settings_save(
     section: &str,
     form: Form<HashMap<String, String>>,
 ) -> Result<Flash<Redirect>, Flash<Redirect>> {
-    let data = form.into_inner();
+    let mut data = form.into_inner();
 
     // Validation rules: (enable_key, human_name, &[required_field_keys])
     let rules: Vec<(&str, &str, Vec<&str>)> = match section {
@@ -576,6 +576,20 @@ pub fn settings_save(
     };
     for key in checkbox_keys {
         let _ = Setting::set(pool, key, "false");
+    }
+
+    // Server-side clamp for video settings
+    if section == "images" {
+        if let Some(val) = data.get("video_max_duration") {
+            let n: i64 = val.parse().unwrap_or(1800);
+            let clamped = n.clamp(1, 1800);
+            data.insert("video_max_duration".to_string(), clamped.to_string());
+        }
+        if let Some(val) = data.get("video_max_upload_mb") {
+            let n: i64 = val.parse().unwrap_or(100);
+            let clamped = n.clamp(1, 2048);
+            data.insert("video_max_upload_mb".to_string(), clamped.to_string());
+        }
     }
 
     let _ = Setting::set_many(pool, &data);

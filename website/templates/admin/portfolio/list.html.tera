@@ -29,10 +29,13 @@
             {% for item in items %}
             <tr>
                 <td>
-                    {% if item.thumbnail_path %}
-                    <img src="/uploads/{{ item.thumbnail_path }}" alt="" class="table-thumb">
-                    {% elif item.image_path %}
-                    <img src="/uploads/{{ item.image_path }}" alt="" class="table-thumb">
+                    {% set media_path = item.thumbnail_path | default(value="") %}
+                    {% if media_path == "" %}{% set media_path = item.image_path %}{% endif %}
+                    {% set mext = media_path | split(pat=".") | last | lower %}
+                    {% if mext == "mp4" or mext == "webm" or mext == "mov" or mext == "avi" or mext == "mkv" or mext == "m4v" or mext == "ogv" %}
+                    <video src="/uploads/{{ media_path }}" muted preload="metadata" class="table-thumb" style="object-fit:cover"></video>
+                    {% elif media_path != "" %}
+                    <img src="/uploads/{{ media_path }}" alt="" class="table-thumb">
                     {% endif %}
                 </td>
                 <td><a href="/{{ admin_slug }}/portfolio/{{ item.id }}/edit">{{ item.title }}</a></td>
