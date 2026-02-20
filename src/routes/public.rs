@@ -418,10 +418,7 @@ pub fn terms_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
 // Decodes the token, verifies HMAC, serves the file with caching headers.
 
 #[get("/img/<token>")]
-pub fn image_proxy_route(
-    pool: &State<DbPool>,
-    token: &str,
-) -> Result<FileResponse, Status> {
+pub fn image_proxy_route(pool: &State<DbPool>, token: &str) -> Result<FileResponse, Status> {
     let settings = Setting::all(pool);
     let secret = settings
         .get("image_proxy_secret")

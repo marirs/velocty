@@ -869,7 +869,13 @@ fn build_categories_sidebar(context: &Value, start_open: bool) -> String {
             if slug.is_empty() {
                 continue;
             }
-            let active_class = if slug == active_slug && (page_type.starts_with("portfolio") || page_type == "homepage") { " active" } else { "" };
+            let active_class = if slug == active_slug
+                && (page_type.starts_with("portfolio") || page_type == "homepage")
+            {
+                " active"
+            } else {
+                ""
+            };
             html.push_str(&format!(
                 "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
                 slug_url(portfolio_slug, &format!("category/{}", slug)),
@@ -1090,7 +1096,11 @@ fn build_journal_categories_sidebar(context: &Value, start_open: bool) -> String
             if slug.is_empty() {
                 continue;
             }
-            let active_class = if slug == active_slug && page_type.starts_with("blog") { " active" } else { "" };
+            let active_class = if slug == active_slug && page_type.starts_with("blog") {
+                " active"
+            } else {
+                ""
+            };
             html.push_str(&format!(
                 "<a href=\"{}\" class=\"cat-link{}\">{}</a>\n",
                 slug_url(blog_slug, &format!("category/{}", slug)),

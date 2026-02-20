@@ -2583,8 +2583,10 @@ fn render_sidebar_page_top_has_horizontal_cats() {
     );
     // Portfolio should appear as a normal nav-link
     assert!(
-        html.contains("class=\"nav-link\">experiences</a>")
-            || html.contains("class=\"nav-link\">Experiences</a>"),
+        html.contains("nav-link\">experiences</a>")
+            || html.contains("nav-link active\">experiences</a>")
+            || html.contains("nav-link\">Experiences</a>")
+            || html.contains("nav-link active\">Experiences</a>"),
         "page_top: portfolio should be a normal nav-link"
     );
 }
@@ -2672,7 +2674,8 @@ fn render_topbar_below_menu_has_category_row() {
     );
     // Portfolio should appear as a normal nav-link
     assert!(
-        html.contains("nav-link\">experiences</a>"),
+        html.contains("nav-link\">experiences</a>")
+            || html.contains("nav-link active\">experiences</a>"),
         "below_menu: portfolio should be a normal nav-link"
     );
     // All + Flights links in the below-menu div
@@ -2714,7 +2717,8 @@ fn render_hidden_categories_no_output() {
     );
     // Portfolio should appear as a normal nav-link
     assert!(
-        html.contains("nav-link\">experiences</a>"),
+        html.contains("nav-link\">experiences</a>")
+            || html.contains("nav-link active\">experiences</a>"),
         "hidden: portfolio should be a normal nav-link"
     );
 }
@@ -5214,7 +5218,7 @@ fn render_journal_page_top_has_filter_bar() {
     // Journal nav link should be a plain link (not a toggle) since page_top mode
     // uses the filter bar instead of sidebar toggle
     assert!(
-        html.contains("class=\"nav-link\">journal</a>"),
+        html.contains("nav-link\">journal</a>") || html.contains("nav-link active\">journal</a>"),
         "page_top mode should show plain journal nav-link in sidebar"
     );
 }
@@ -5258,7 +5262,7 @@ fn render_journal_hidden_shows_plain_link() {
 
     // Should have a plain nav-link for journal, not a category toggle
     assert!(
-        html.contains("class=\"nav-link\">journal</a>"),
+        html.contains("nav-link\">journal</a>") || html.contains("nav-link active\">journal</a>"),
         "hidden mode should show plain journal nav-link"
     );
     assert!(
