@@ -372,7 +372,11 @@ pub fn settings_save(
         "magic-link",
         "forgot-password",
         "reset-password",
+        "passkey",
+        "passkeys",
         "img",
+        "tag",
+        "category",
     ];
 
     fn is_reserved(s: &str) -> bool {
