@@ -22,7 +22,6 @@
 <form method="post" action="/{{ admin_slug }}/settings/comments">
     <div class="form-card">
         <h3>Comment Settings</h3>
-        <label class="checkbox-item"><input type="checkbox" name="comments_enabled" value="true" {% if settings.comments_enabled == "true" %}checked{% endif %}> Enable comments globally</label>
         <label class="checkbox-item"><input type="checkbox" name="comments_on_blog" value="true" {% if settings.comments_on_blog == "true" %}checked{% endif %}> Comments on journal posts</label>
         <label class="checkbox-item"><input type="checkbox" name="comments_on_portfolio" value="true" {% if settings.comments_on_portfolio == "true" %}checked{% endif %}> Comments on portfolio items</label>
         <div class="form-group" style="margin-top:16px">

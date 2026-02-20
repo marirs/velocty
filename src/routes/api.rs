@@ -121,11 +121,6 @@ pub fn comment_submit(
     limiter: &State<RateLimiter>,
     form: Json<CommentSubmit>,
 ) -> Json<Value> {
-    // Check if comments are globally enabled
-    if !Setting::get_bool(pool, "comments_enabled") {
-        return Json(json!({"success": false, "error": "Comments are disabled"}));
-    }
-
     // Check per-content-type setting
     let ct = form.content_type.as_deref().unwrap_or("post");
     match ct {

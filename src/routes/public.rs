@@ -581,8 +581,7 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
     let categories = Category::for_content(pool, post.id, "post");
     let tags = Tag::for_content(pool, post.id, "post");
     let settings = Setting::all(pool);
-    let comments_enabled = settings.get("comments_enabled").map(|v| v.as_str()) == Some("true")
-        && settings.get("comments_on_blog").map(|v| v.as_str()) == Some("true");
+    let comments_enabled = settings.get("comments_on_blog").map(|v| v.as_str()) == Some("true");
     let comments = if comments_enabled {
         Comment::for_post(pool, post.id, "post")
     } else {
@@ -819,8 +818,8 @@ fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
     let categories = Category::for_content(pool, item.id, "portfolio");
     let tags = Tag::for_content(pool, item.id, "portfolio");
     let settings = Setting::all(pool);
-    let comments_enabled = settings.get("comments_enabled").map(|v| v.as_str()) == Some("true")
-        && settings.get("comments_on_portfolio").map(|v| v.as_str()) == Some("true");
+    let comments_enabled =
+        settings.get("comments_on_portfolio").map(|v| v.as_str()) == Some("true");
     let comments = if comments_enabled {
         Comment::for_post(pool, item.id, "portfolio")
     } else {
