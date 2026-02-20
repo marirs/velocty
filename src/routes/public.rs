@@ -331,6 +331,8 @@ pub fn archives_month(
                 published_at: row.get("published_at")?,
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
+                seo_score: row.get("seo_score").unwrap_or(-1),
+                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -639,6 +641,8 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
                 published_at: row.get("published_at")?,
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
+                seo_score: row.get("seo_score").unwrap_or(-1),
+                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
             })
         })
         .ok()?
@@ -704,6 +708,8 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
                 published_at: row.get("published_at")?,
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
+                seo_score: row.get("seo_score").unwrap_or(-1),
+                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
             })
         })
         .ok()?
@@ -921,6 +927,8 @@ fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
                 published_at: row.get("published_at")?,
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
+                seo_score: row.get("seo_score").unwrap_or(-1),
+                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
             })
         })
         .ok()?

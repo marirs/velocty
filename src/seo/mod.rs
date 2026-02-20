@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod audit;
 pub mod jsonld;
 pub mod meta;
 pub mod sitemap;

@@ -364,3 +364,145 @@ pub fn rotate_image_proxy_key(admin: AdminUser, pool: &State<DbPool>) -> Json<Va
         "rotation_days": rotation_days
     }))
 }
+
+/// Lightweight endpoint for sidebar widget — returns average SEO score
+#[get("/seo-score")]
+pub fn seo_score_summary(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+    let conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => return Json(serde_json::json!({"score": -1})),
+    };
+    let result: Result<(i64, i64), _> = conn.query_row(
+        "SELECT COALESCE(SUM(seo_score), 0), COUNT(*)
+         FROM (SELECT seo_score FROM posts WHERE seo_score >= 0
+               UNION ALL
+               SELECT seo_score FROM portfolio WHERE seo_score >= 0)",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    );
+    match result {
+        Ok((sum, count)) if count > 0 => {
+            Json(serde_json::json!({"score": sum / count, "count": count}))
+        }
+        _ => Json(serde_json::json!({"score": -1, "count": 0})),
+    }
+}
+
+/// Rescan SEO scores for all posts and portfolio items
+#[post("/seo-rescan")]
+pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+    let mut scanned = 0i32;
+
+    // Score all posts
+    let posts = Post::list(pool, None, 10000, 0);
+    for post in &posts {
+        let input = crate::seo::audit::SeoInput {
+            title: &post.title,
+            slug: &post.slug,
+            meta_title: post.meta_title.as_deref().unwrap_or(""),
+            meta_description: post.meta_description.as_deref().unwrap_or(""),
+            body_html: &post.content_html,
+            featured_image: post.featured_image.as_deref().unwrap_or(""),
+            content_type: "post",
+        };
+        let audit = crate::seo::audit::compute_score(&input);
+        let _ = Post::update_seo_score(
+            pool,
+            post.id,
+            audit.score,
+            &crate::seo::audit::issues_to_json(&audit.issues),
+        );
+        scanned += 1;
+    }
+
+    // Score all portfolio items
+    let items = PortfolioItem::list(pool, None, 10000, 0);
+    for item in &items {
+        let input = crate::seo::audit::SeoInput {
+            title: &item.title,
+            slug: &item.slug,
+            meta_title: item.meta_title.as_deref().unwrap_or(""),
+            meta_description: item.meta_description.as_deref().unwrap_or(""),
+            body_html: item.description_html.as_deref().unwrap_or(""),
+            featured_image: &item.image_path,
+            content_type: "portfolio",
+        };
+        let audit = crate::seo::audit::compute_score(&input);
+        let _ = PortfolioItem::update_seo_score(
+            pool,
+            item.id,
+            audit.score,
+            &crate::seo::audit::issues_to_json(&audit.issues),
+        );
+        scanned += 1;
+    }
+
+    AuditEntry::log(
+        pool,
+        Some(_admin.user.id),
+        Some(&_admin.user.display_name),
+        "seo_rescan",
+        None,
+        None,
+        Some(&format!("Rescanned {} items", scanned)),
+        None,
+        None,
+    );
+
+    Json(serde_json::json!({ "ok": true, "scanned": scanned }))
+}
+
+/// Fetch PageSpeed Insights for a URL (proxied to avoid CORS)
+#[get("/pagespeed?<url>")]
+pub fn pagespeed_fetch(_admin: EditorUser, pool: &State<DbPool>, url: &str) -> Json<Value> {
+    let api_key = Setting::get_or(pool, "seo_pagespeed_api_key", "");
+
+    // URL must be publicly accessible — localhost won't work
+    if url.contains("localhost") || url.contains("127.0.0.1") {
+        return Json(serde_json::json!({"error": "PageSpeed Insights requires a publicly accessible URL. localhost cannot be tested."}));
+    }
+
+    let encoded_url: String = url.bytes().map(|b| match b {
+        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b':' | b'/' => {
+            format!("{}", b as char)
+        }
+        _ => format!("%{:02X}", b),
+    }).collect();
+    let mut endpoint = format!(
+        "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={}&strategy=mobile&category=performance&category=accessibility&category=seo",
+        encoded_url
+    );
+    if !api_key.is_empty() {
+        endpoint.push_str(&format!("&key={}", api_key));
+    }
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return Json(serde_json::json!({"error": format!("HTTP client error: {}", e)})),
+    };
+
+    match client.get(&endpoint).send() {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.json::<Value>() {
+                Ok(data) => {
+                    if !status.is_success() {
+                        let msg = data
+                            .get("error")
+                            .and_then(|e| e.get("message"))
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown API error");
+                        Json(serde_json::json!({"error": format!("PageSpeed API error ({}): {}", status.as_u16(), msg)}))
+                    } else {
+                        Json(data)
+                    }
+                }
+                Err(_) => Json(serde_json::json!({"error": format!("Failed to parse PageSpeed response (HTTP {})", status.as_u16())})),
+            }
+        }
+        Err(e) => Json(serde_json::json!({"error": format!("Request failed: {}", e)})),
+    }
+}

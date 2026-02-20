@@ -201,6 +201,25 @@ pub async fn posts_create(
 
     match Post::create(pool, &post_form) {
         Ok(id) => {
+            // Auto-compute SEO score
+            {
+                let seo_input = crate::seo::audit::SeoInput {
+                    title: &form.title,
+                    slug: &form.slug,
+                    meta_title: form.meta_title.as_deref().unwrap_or(""),
+                    meta_description: form.meta_description.as_deref().unwrap_or(""),
+                    body_html: &form.content_html,
+                    featured_image: post_form.featured_image.as_deref().unwrap_or(""),
+                    content_type: "post",
+                };
+                let audit = crate::seo::audit::compute_score(&seo_input);
+                let _ = Post::update_seo_score(
+                    pool,
+                    id,
+                    audit.score,
+                    &crate::seo::audit::issues_to_json(&audit.issues),
+                );
+            }
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "post", cat_ids);
             }
@@ -303,6 +322,25 @@ pub async fn posts_update(
     };
 
     let _ = Post::update(pool, id, &post_form);
+    // Auto-compute SEO score
+    {
+        let seo_input = crate::seo::audit::SeoInput {
+            title: &form.title,
+            slug: &form.slug,
+            meta_title: form.meta_title.as_deref().unwrap_or(""),
+            meta_description: form.meta_description.as_deref().unwrap_or(""),
+            body_html: &form.content_html,
+            featured_image: post_form.featured_image.as_deref().unwrap_or(""),
+            content_type: "post",
+        };
+        let audit = crate::seo::audit::compute_score(&seo_input);
+        let _ = Post::update_seo_score(
+            pool,
+            id,
+            audit.score,
+            &crate::seo::audit::issues_to_json(&audit.issues),
+        );
+    }
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "post", cat_ids);
     }

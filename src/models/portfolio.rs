@@ -25,6 +25,8 @@ pub struct PortfolioItem {
     pub published_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub seo_score: i32,
+    pub seo_issues: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,6 +79,8 @@ impl PortfolioItem {
             published_at: row.get("published_at")?,
             created_at: row.get("created_at")?,
             updated_at: row.get("updated_at")?,
+            seo_score: row.get("seo_score").unwrap_or(-1),
+            seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
         })
     }
 
@@ -312,5 +316,20 @@ impl PortfolioItem {
             )
             .map_err(|e| e.to_string())?;
         Ok(count)
+    }
+
+    pub fn update_seo_score(
+        pool: &DbPool,
+        id: i64,
+        score: i32,
+        issues_json: &str,
+    ) -> Result<(), String> {
+        let conn = pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE portfolio SET seo_score = ?1, seo_issues = ?2 WHERE id = ?3",
+            params![score, issues_json, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
     }
 }

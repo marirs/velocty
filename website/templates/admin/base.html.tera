@@ -87,6 +87,14 @@
                 </a>
             </nav>
             <div class="sidebar-bottom">
+                <a href="/{{ admin_slug }}/seo-audit" class="seo-health-widget" title="Seo Audit">
+                    <svg viewBox="0 0 36 36" width="32" height="32" style="transform:rotate(-90deg);flex-shrink:0">
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--text-tertiary)" stroke-width="3" opacity="0.4"/>
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--text-tertiary)" stroke-width="3" stroke-dasharray="0, 100" stroke-linecap="round" class="seo-ring"/>
+                    </svg>
+                    <span class="seo-score-label">Seo Audit</span>
+                </a>
+                <div style="border-top:1px solid var(--border-subtle);margin:4px 12px"></div>
                 <div class="sidebar-user-row">
                     <a href="/{{ admin_slug }}/users" title="{{ settings.admin_display_name | default(value='Admin') }}" style="text-decoration:none">
                         <span class="user-avatar">{{ settings.admin_display_name | default(value='A') | truncate(length=1, end='') | upper }}</span>
@@ -192,6 +200,23 @@
         h = h % 12 || 12;
         el.textContent = months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear() + '  ' + h + ':' + pad(d.getMinutes()) + ' ' + ampm;
     });
+    // SEO health widget: load score via lightweight API
+    (function(){
+        var ring = document.querySelector('.seo-ring');
+        if (!ring) return;
+        var label = document.querySelector('.seo-score-label');
+        fetch('/{{ admin_slug }}/api/seo-score', { credentials: 'same-origin' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                var s = d.score;
+                if (s < 0) return;
+                ring.setAttribute('stroke-dasharray', s + ', 100');
+                var c = s >= 80 ? 'var(--success)' : s >= 50 ? 'var(--warning)' : 'var(--danger)';
+                ring.setAttribute('stroke', c);
+                if (label) label.textContent = 'Seo Audit ' + s;
+            })
+            .catch(function(){});
+    })();
     {% if flash_msg is defined and flash_msg %}
     (function(){
         var el = document.createElement('div');

@@ -11,6 +11,7 @@ pub mod dashboard;
 pub mod designs;
 pub mod firewall;
 pub mod health;
+pub mod seo_audit;
 pub mod import;
 pub mod media;
 pub mod portfolio;
@@ -331,6 +332,7 @@ pub fn routes() -> Vec<rocket::Route> {
         users::user_unlock,
         users::user_reset_password,
         users::user_delete,
+        seo_audit::seo_audit_dashboard,
     ]
 }
 
@@ -348,5 +350,8 @@ pub fn api_routes() -> Vec<rocket::Route> {
         api::seo_check_post,
         api::seo_check_portfolio,
         api::rotate_image_proxy_key,
+        api::seo_score_summary,
+        api::seo_rescan_all,
+        api::pagespeed_fetch,
     ]
 }

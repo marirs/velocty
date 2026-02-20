@@ -374,6 +374,26 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         conn.execute_batch("ALTER TABLE portfolio ADD COLUMN user_id INTEGER DEFAULT NULL;")?;
     }
 
+    // Add seo_score + seo_issues to posts if missing
+    let has_post_seo: bool = conn.prepare("SELECT seo_score FROM posts LIMIT 0").is_ok();
+    if !has_post_seo {
+        conn.execute_batch(
+            "ALTER TABLE posts ADD COLUMN seo_score INTEGER NOT NULL DEFAULT -1;
+             ALTER TABLE posts ADD COLUMN seo_issues TEXT NOT NULL DEFAULT '[]';",
+        )?;
+    }
+
+    // Add seo_score + seo_issues to portfolio if missing
+    let has_portfolio_seo: bool = conn
+        .prepare("SELECT seo_score FROM portfolio LIMIT 0")
+        .is_ok();
+    if !has_portfolio_seo {
+        conn.execute_batch(
+            "ALTER TABLE portfolio ADD COLUMN seo_score INTEGER NOT NULL DEFAULT -1;
+             ALTER TABLE portfolio ADD COLUMN seo_issues TEXT NOT NULL DEFAULT '[]';",
+        )?;
+    }
+
     // Add grapesjs_data to design_templates if missing (Phase 3: stores GrapesJS JSON for re-editing)
     let has_grapesjs_data: bool = conn
         .prepare("SELECT grapesjs_data FROM design_templates LIMIT 0")

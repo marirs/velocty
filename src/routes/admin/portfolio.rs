@@ -221,6 +221,25 @@ pub async fn portfolio_create(
 
     match PortfolioItem::create(pool, &pf) {
         Ok(id) => {
+            // Auto-compute SEO score
+            {
+                let seo_input = crate::seo::audit::SeoInput {
+                    title: &form.title,
+                    slug: &form.slug,
+                    meta_title: form.meta_title.as_deref().unwrap_or(""),
+                    meta_description: form.meta_description.as_deref().unwrap_or(""),
+                    body_html: form.description_html.as_deref().unwrap_or(""),
+                    featured_image: &pf.image_path,
+                    content_type: "portfolio",
+                };
+                let audit = crate::seo::audit::compute_score(&seo_input);
+                let _ = PortfolioItem::update_seo_score(
+                    pool,
+                    id,
+                    audit.score,
+                    &crate::seo::audit::issues_to_json(&audit.issues),
+                );
+            }
             if let Some(ref cat_ids) = form.category_ids {
                 let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
             }
@@ -338,6 +357,25 @@ pub async fn portfolio_update(
     };
 
     let _ = PortfolioItem::update(pool, id, &pf);
+    // Auto-compute SEO score
+    {
+        let seo_input = crate::seo::audit::SeoInput {
+            title: &form.title,
+            slug: &form.slug,
+            meta_title: form.meta_title.as_deref().unwrap_or(""),
+            meta_description: form.meta_description.as_deref().unwrap_or(""),
+            body_html: form.description_html.as_deref().unwrap_or(""),
+            featured_image: &pf.image_path,
+            content_type: "portfolio",
+        };
+        let audit = crate::seo::audit::compute_score(&seo_input);
+        let _ = PortfolioItem::update_seo_score(
+            pool,
+            id,
+            audit.score,
+            &crate::seo::audit::issues_to_json(&audit.issues),
+        );
+    }
     if let Some(ref cat_ids) = form.category_ids {
         let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
     }

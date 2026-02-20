@@ -29,6 +29,7 @@
     <button type="button" class="tab" data-seo-tab="tab-seo-cloudflare">Cloudflare{% if settings.seo_cloudflare_analytics_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-seo-tab="tab-seo-clicky">Clicky{% if settings.seo_clicky_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-seo-tab="tab-seo-umami">Umami{% if settings.seo_umami_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-seo-tab="tab-seo-audit">Audit</button>
 </div>
 
 <form method="post" action="/{{ admin_slug }}/settings/seo">
@@ -240,6 +241,19 @@
         </div>
     </div>
 
+    <!-- ── Audit ──────────────────────────────────────── -->
+    <div id="tab-seo-audit" style="display:none">
+        <div class="form-card">
+            <h3>SEO Audit Dashboard</h3>
+            <p class="text-muted" style="margin-bottom:16px">Configure API keys used by the <a href="/{{ admin_slug }}/seo-audit" style="color:var(--accent)">SEO Audit dashboard</a>.</p>
+            <div class="form-group">
+                <label for="seo_pagespeed_api_key">Google PageSpeed Insights API Key</label>
+                <input type="text" id="seo_pagespeed_api_key" name="seo_pagespeed_api_key" value="{{ settings.seo_pagespeed_api_key | default(value='') }}" placeholder="AIza...">
+                <span class="form-help">Optional. Without a key, requests are rate-limited. Get one free at <a href="https://developers.google.com/speed/docs/insights/v5/get-started" target="_blank" style="color:var(--accent)">Google Developers</a>.</span>
+            </div>
+        </div>
+    </div>
+
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
 {% endblock content %}
@@ -248,7 +262,7 @@
 <script>
 (function() {
     var tabs = document.querySelectorAll('[data-seo-tab]');
-    var panels = ['tab-seo-general','tab-seo-webmaster','tab-seo-ga','tab-seo-plausible','tab-seo-fathom','tab-seo-matomo','tab-seo-cloudflare','tab-seo-clicky','tab-seo-umami'];
+    var panels = ['tab-seo-general','tab-seo-webmaster','tab-seo-ga','tab-seo-plausible','tab-seo-fathom','tab-seo-matomo','tab-seo-cloudflare','tab-seo-clicky','tab-seo-umami','tab-seo-audit'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });

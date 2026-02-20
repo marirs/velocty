@@ -162,7 +162,11 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Custom robots.txt**
 - **Webmaster Tools** — verification codes for Google Search Console, Bing, Yandex, Pinterest, Baidu (auto-injected into `<head>`)
 - **Third-party Analytics** — Google Analytics (GA4), Plausible, Fathom, Matomo, Cloudflare Web Analytics, Clicky, Umami — each with enable/disable toggle (scripts auto-injected into visitor pages)
-- **All configurable** from Settings > SEO (tabbed: General, Webmaster Tools, plus per-provider analytics tabs)
+- **SEO Audit Dashboard** — `/admin/seo-audit` with overall health donut, score distribution, top issues, settings checklist, per-item sortable tables, and integrated Google PageSpeed Insights (performance, accessibility, SEO scores + Core Web Vitals)
+- **Auto SEO scoring** — every post and portfolio item is automatically scored on create/update across 6 categories (meta, content, headings, images, links, slug)
+- **Rescan All** — one-click bulk re-score of all published content
+- **Sidebar SEO widget** — colored donut ring in the admin sidebar showing overall SEO health at a glance
+- **All configurable** from Settings > SEO (tabbed: General, Webmaster Tools, per-provider analytics tabs, Audit)
 
 ### Analytics (Built-in, Privacy-First)
 
@@ -334,6 +338,9 @@ velocty/
 │   ├── db.rs                    # SQLite pool, migrations, seed defaults
 │   ├── analytics.rs             # Page view logging fairing, GeoIP
 │   ├── render.rs                # Design + content merge (with captcha widget injection)
+│   ├── seo/                     # SEO module
+│   │   ├── mod.rs               # Module root
+│   │   └── audit.rs             # SEO scoring engine (10-factor analysis, auto-score, rescan)
 │   ├── seo.rs                   # Meta tags, JSON-LD, sitemap
 │   ├── rss.rs                   # RSS/Atom feed generation
 │   ├── image_proxy.rs            # HMAC-signed image URL proxy with key rotation
@@ -379,8 +386,23 @@ velocty/
 │   │   └── oopspam.rs           # OOPSpam spam detection
 │   ├── models/                  # Data models (Post, Portfolio, Category, Order, User, etc.)
 │   └── routes/
-│       ├── admin.rs             # Admin panel routes
-│       ├── admin_api.rs         # Admin JSON API routes
+│       ├── admin/               # Admin panel routes (modular)
+│       │   ├── mod.rs           # Shared helpers, route registration
+│       │   ├── dashboard.rs     # Dashboard route
+│       │   ├── posts.rs         # Posts CRUD
+│       │   ├── portfolio.rs     # Portfolio CRUD
+│       │   ├── comments.rs      # Comments moderation
+│       │   ├── categories.rs    # Categories & tags CRUD
+│       │   ├── media.rs         # Media library & uploads
+│       │   ├── settings.rs      # Settings page & save
+│       │   ├── designs.rs       # Design management
+│       │   ├── import.rs        # WordPress & Velocty import
+│       │   ├── health.rs        # Health dashboard & tools
+│       │   ├── users.rs         # User management & MFA
+│       │   ├── firewall.rs      # Firewall dashboard & ban/unban
+│       │   ├── sales.rs         # Sales dashboard & orders
+│       │   ├── seo_audit.rs     # SEO Audit dashboard
+│       │   └── api.rs           # Admin JSON API (stats, SEO, PageSpeed)
 │       ├── api.rs               # Public API (likes, comments, portfolio filter)
 │       ├── public.rs            # Public-facing pages (blog, portfolio, archives)
 │       ├── ai/                  # AI API routes (suggest, generate, status)
@@ -417,6 +439,7 @@ velocty/
 - Archives page (posts grouped by year/month)
 - Dynamic URL slugs for blog and portfolio (configurable from settings)
 - SEO Check button on post/portfolio editors (10-point analysis with A–F grade)
+- SEO Audit Dashboard with auto-scoring, bulk rescan, PageSpeed Insights integration
 - Built-in SEO: meta fields, sitemap.xml, JSON-LD, OG/Twitter tags
 - Built-in analytics with D3.js dashboard
 - WordPress XML importer
