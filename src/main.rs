@@ -13,6 +13,7 @@ mod ai;
 mod analytics;
 mod boot;
 mod db;
+mod designs;
 mod email;
 mod health;
 mod image_proxy;

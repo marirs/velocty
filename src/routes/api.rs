@@ -150,14 +150,8 @@ pub fn comment_submit(
     if Setting::get_bool(pool, "comments_require_name") && form.author_name.trim().is_empty() {
         return Json(json!({"success": false, "error": "Name is required"}));
     }
-    if Setting::get_bool(pool, "comments_require_email")
-        && form.author_email.as_deref().unwrap_or("").trim().is_empty()
-    {
-        return Json(json!({"success": false, "error": "Email is required"}));
-    }
-
-    // Rate limit by author email or name
-    let rate_id = form.author_email.as_deref().unwrap_or(&form.author_name);
+    // Rate limit by author name (email no longer collected for privacy)
+    let rate_id = &form.author_name;
     let ip_hash = auth::hash_ip(rate_id);
     let rate_key = format!("comment:{}", ip_hash);
     let max_attempts = Setting::get_i64(pool, "comments_rate_limit").max(1) as u64;

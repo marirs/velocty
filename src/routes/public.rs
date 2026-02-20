@@ -14,6 +14,7 @@ use crate::models::portfolio::PortfolioItem;
 use crate::models::post::Post;
 use crate::models::settings::{Setting, SettingsCache};
 use crate::models::tag::Tag;
+use crate::models::user::User;
 use crate::render;
 use crate::security::auth;
 use crate::seo;
@@ -540,11 +541,28 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
     let settings = Setting::all(pool);
 
+    // Inject author_name into each post from the first admin user
+    let author_name = User::list_all(pool)
+        .into_iter()
+        .find(|u| u.role == "admin")
+        .map(|u| u.display_name)
+        .unwrap_or_default();
+    let posts_json: Vec<serde_json::Value> = posts
+        .iter()
+        .map(|p| {
+            let mut pj = serde_json::to_value(p).unwrap_or_default();
+            if let Some(obj) = pj.as_object_mut() {
+                obj.insert("author_name".to_string(), json!(author_name.clone()));
+            }
+            pj
+        })
+        .collect();
+
     let context = json!({
         "settings": settings,
         "nav_categories": nav_categories(pool),
         "nav_journal_categories": nav_journal_categories(pool),
-        "posts": posts,
+        "posts": posts_json,
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
@@ -580,9 +598,21 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         .as_ref()
         .and_then(|pa| Post::next_published(pool, pa));
 
+    // Get author name from the first admin user
+    let author_name = User::list_all(pool)
+        .into_iter()
+        .find(|u| u.role == "admin")
+        .map(|u| u.display_name)
+        .unwrap_or_default();
+
+    let mut post_json = serde_json::to_value(&post).unwrap_or_default();
+    if let Some(obj) = post_json.as_object_mut() {
+        obj.insert("author_name".to_string(), json!(author_name));
+    }
+
     let mut context = json!({
         "settings": settings,
-        "post": post,
+        "post": post_json,
         "categories": categories,
         "nav_categories": nav_categories(pool),
         "nav_journal_categories": nav_journal_categories(pool),

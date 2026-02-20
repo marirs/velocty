@@ -376,7 +376,13 @@ fn render_with_shell(
     html = html.replace("{{favicon_link}}", &build_favicon_link(&settings));
     html = html.replace("{{font_links}}", &font_links);
     html = html.replace("{{css_vars}}", &css_vars);
-    html = html.replace("{{base_css}}", BASE_CSS);
+    let full_base_css = format!(
+        "{}{}{}",
+        BASE_CSS,
+        crate::designs::journal::list_classic::css(),
+        crate::designs::journal::list_classic::list_css(),
+    );
+    html = html.replace("{{base_css}}", &full_base_css);
     html = html.replace("{{design_css}}", &design.style_css);
     html = html.replace("{{body_class}}", &body_class);
     html = html.replace("{{data_attrs}}", &data_attrs);
@@ -488,7 +494,13 @@ pub fn render_legal_page(
         html = html.replace("{{favicon_link}}", &build_favicon_link(&settings_v));
         html = html.replace("{{font_links}}", &font_links);
         html = html.replace("{{css_vars}}", &css_vars);
-        html = html.replace("{{base_css}}", BASE_CSS);
+        let full_base_css = format!(
+            "{}{}{}",
+            BASE_CSS,
+            crate::designs::journal::list_classic::css(),
+            crate::designs::journal::list_classic::list_css(),
+        );
+        html = html.replace("{{base_css}}", &full_base_css);
         html = html.replace("{{design_css}}", &design.style_css);
         html = html.replace("{{body_class}}", "");
         html = html.replace("{{data_attrs}}", "");
@@ -550,7 +562,7 @@ pub fn render_legal_page(
 
 /// Reusable comment display + form for blog and portfolio pages.
 /// Renders approved comments (threaded) and the submission form with captcha.
-fn build_comments_section(
+pub(crate) fn build_comments_section(
     context: &Value,
     settings: &Value,
     content_id: i64,
@@ -748,7 +760,12 @@ fn build_comments_section(
 }
 
 /// Render a single comment and its nested replies recursively.
-fn render_comment(html: &mut String, comment: &Value, all_replies: &[&Value], depth: usize) {
+pub(crate) fn render_comment(
+    html: &mut String,
+    comment: &Value,
+    all_replies: &[&Value],
+    depth: usize,
+) {
     let id = comment.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
     let name = comment
         .get("author_name")
@@ -1426,7 +1443,7 @@ fn build_social_links_inline(settings: &Value) -> String {
 
 /// Build share icons for sharing pages/site.
 /// Renders icon-only links (no text). Respects social_brand_colors setting.
-fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> String {
+pub(crate) fn build_share_buttons(settings: &Value, page_url: &str, page_title: &str) -> String {
     let sg = |key: &str| -> String {
         settings
             .get(key)
@@ -1738,7 +1755,7 @@ function loadAnalytics(){{document.querySelectorAll('script[data-consent="analyt
     )
 }
 
-fn format_date_iso8601(raw: &str, settings: &Value) -> String {
+pub(crate) fn format_date_iso8601(raw: &str, settings: &Value) -> String {
     let tz_name = settings
         .get("timezone")
         .and_then(|v| v.as_str())
@@ -1767,7 +1784,7 @@ fn format_date_iso8601(raw: &str, settings: &Value) -> String {
     }
 }
 
-fn format_date(raw: &str, settings: &Value) -> String {
+pub(crate) fn format_date(raw: &str, settings: &Value) -> String {
     let fmt = settings
         .get("date_format")
         .and_then(|v| v.as_str())
@@ -1799,7 +1816,7 @@ fn format_date(raw: &str, settings: &Value) -> String {
     }
 }
 
-fn count_words_html(html: &str) -> usize {
+pub(crate) fn count_words_html(html: &str) -> usize {
     // Strip HTML tags, then count whitespace-delimited words
     let mut text = String::with_capacity(html.len());
     let mut in_tag = false;
@@ -1816,7 +1833,7 @@ fn count_words_html(html: &str) -> usize {
     text.split_whitespace().count()
 }
 
-fn strip_html_to_text(html: &str) -> String {
+pub(crate) fn strip_html_to_text(html: &str) -> String {
     let mut text = String::with_capacity(html.len());
     let mut in_tag = false;
     for ch in html.chars() {
@@ -1842,7 +1859,7 @@ fn strip_html_to_text(html: &str) -> String {
         .replace("&hellip;", "…")
 }
 
-fn truncate_words(text: &str, max_words: usize) -> String {
+pub(crate) fn truncate_words(text: &str, max_words: usize) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.len() <= max_words {
         text.to_string()
@@ -1853,7 +1870,7 @@ fn truncate_words(text: &str, max_words: usize) -> String {
     }
 }
 
-fn build_pagination(current: i64, total: i64) -> String {
+pub(crate) fn build_pagination(current: i64, total: i64) -> String {
     let mut html = String::from(r#"<nav class="pagination">"#);
     if current > 1 {
         html.push_str(&format!(
@@ -2713,11 +2730,20 @@ fn render_blog_list(context: &Value) -> String {
 }
 
 fn render_blog_single(context: &Value) -> String {
+    // Delegate to design-specific renderer based on list style
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let list_style = settings
+        .get("blog_list_style")
+        .and_then(|v| v.as_str())
+        .unwrap_or("compact");
+    if list_style == "classic" {
+        return crate::designs::journal::list_classic::render_single(context);
+    }
+
     let post = match context.get("post") {
         Some(p) => p,
         None => return render_404(context),
     };
-    let settings = context.get("settings").cloned().unwrap_or_default();
     let sg = |key: &str, def: &str| -> String {
         settings
             .get(key)
@@ -3027,7 +3053,7 @@ fn urlencoding_simple(s: &str) -> String {
     result
 }
 
-fn html_escape(s: &str) -> String {
+pub(crate) fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -4381,75 +4407,6 @@ body.topbar-layout.footer-always-visible .site-footer {
 }
 .blog-masonry .blog-thumb img { width: 100%; height: auto; }
 
-/* Blog Classic list style */
-.blog-list.blog-classic {
-    max-width: 1100px;
-}
-.blog-classic .blog-item {
-    display: flex;
-    gap: 40px;
-    align-items: center;
-    padding-bottom: 40px;
-    margin-bottom: 40px;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-}
-.blog-classic .blog-item:last-of-type {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
-.blog-classic .blog-thumb {
-    flex: 0 0 50%;
-    max-width: 50%;
-}
-.blog-classic .blog-thumb img {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 4/3;
-    object-fit: cover;
-    display: block;
-}
-.blog-classic .blog-body {
-    flex: 1;
-    min-width: 0;
-}
-.blog-classic .blog-item h2 {
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1.35;
-    margin-bottom: 16px;
-}
-.blog-classic .blog-item h2 a {
-    color: var(--color-text);
-    text-decoration: none;
-}
-.blog-classic .blog-item h2 a:hover {
-    text-decoration: underline;
-}
-.blog-classic .blog-item .blog-excerpt {
-    font-size: 14px;
-    line-height: 1.7;
-    color: var(--color-text);
-    margin-bottom: 20px;
-}
-.blog-classic .blog-meta {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-text-secondary);
-    margin-top: 0;
-    margin-bottom: 0;
-}
-@media (max-width: 768px) {
-    .blog-classic .blog-item {
-        flex-direction: column;
-        gap: 16px;
-    }
-    .blog-classic .blog-thumb {
-        flex: none;
-        max-width: 100%;
-    }
-}
 
 /* Blog Editorial list style */
 .blog-list.blog-editorial .blog-item {
