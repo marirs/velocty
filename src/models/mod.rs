@@ -6,6 +6,7 @@ pub mod design;
 pub mod firewall;
 pub mod import;
 pub mod order;
+pub mod passkey;
 pub mod portfolio;
 pub mod post;
 pub mod settings;

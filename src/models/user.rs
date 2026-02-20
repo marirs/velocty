@@ -18,6 +18,8 @@ pub struct User {
     pub last_login_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub auth_method: String,
+    pub auth_method_fallback: String,
 }
 
 impl User {
@@ -39,11 +41,17 @@ impl User {
             last_login_at: row.get(10)?,
             created_at: row.get(11)?,
             updated_at: row.get(12)?,
+            auth_method: row
+                .get::<_, Option<String>>(13)?
+                .unwrap_or_else(|| "password".to_string()),
+            auth_method_fallback: row
+                .get::<_, Option<String>>(14)?
+                .unwrap_or_else(|| "password".to_string()),
         })
     }
 
     const SELECT_COLS: &'static str =
-        "id, email, password_hash, display_name, role, status, avatar, mfa_enabled, mfa_secret, mfa_recovery_codes, last_login_at, created_at, updated_at";
+        "id, email, password_hash, display_name, role, status, avatar, mfa_enabled, mfa_secret, mfa_recovery_codes, last_login_at, created_at, updated_at, auth_method, auth_method_fallback";
 
     // ── Lookups ──
 
@@ -332,6 +340,23 @@ impl User {
             "last_login_at": self.last_login_at,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "auth_method": self.auth_method,
+            "auth_method_fallback": self.auth_method_fallback,
         })
+    }
+
+    pub fn update_auth_method(
+        pool: &DbPool,
+        id: i64,
+        method: &str,
+        fallback: &str,
+    ) -> Result<(), String> {
+        let conn = pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE users SET auth_method = ?1, auth_method_fallback = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?3",
+            params![method, fallback, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
     }
 }

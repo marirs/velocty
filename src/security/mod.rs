@@ -6,6 +6,7 @@ pub mod hcaptcha;
 pub mod magic_link;
 pub mod mfa;
 pub mod oopspam;
+pub mod passkey;
 pub mod password_reset;
 pub mod recaptcha;
 pub mod turnstile;

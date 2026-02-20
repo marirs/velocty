@@ -5494,3 +5494,317 @@ fn image_proxy_dual_key_no_old_secret() {
     let decoded = crate::image_proxy::decode_token_with_fallback(new_secret, "", "", &bad_token);
     assert_eq!(decoded, None);
 }
+
+// ── Passkey Tests ──────────────────────────────────────
+
+use crate::models::passkey::UserPasskey;
+
+#[test]
+fn passkey_migration_creates_table() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    // Table should exist after migrations
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM user_passkeys", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn passkey_migration_adds_user_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    // auth_method and auth_method_fallback columns should exist
+    let _: String = conn
+        .query_row("SELECT auth_method FROM users LIMIT 0", [], |row| {
+            row.get(0)
+        })
+        .unwrap_or_default();
+    let _: String = conn
+        .query_row(
+            "SELECT auth_method_fallback FROM users LIMIT 0",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_default();
+}
+
+#[test]
+fn passkey_user_default_auth_method() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_user@test.com", "$2b$04$aaaa", "PK User", "admin");
+    let user = User::get_by_email(&pool, "pk_user@test.com").unwrap();
+    assert_eq!(user.auth_method, "password");
+    assert_eq!(user.auth_method_fallback, "password");
+}
+
+#[test]
+fn passkey_update_auth_method() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_auth@test.com", "$2b$04$aaaa", "PK Auth", "admin");
+    let user = User::get_by_email(&pool, "pk_auth@test.com").unwrap();
+    assert_eq!(user.auth_method, "password");
+
+    User::update_auth_method(&pool, user.id, "passkey", "password").unwrap();
+    let updated = User::get_by_id(&pool, user.id).unwrap();
+    assert_eq!(updated.auth_method, "passkey");
+    assert_eq!(updated.auth_method_fallback, "password");
+}
+
+#[test]
+fn passkey_crud_create_and_list() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_crud@test.com", "$2b$04$aaaa", "PK CRUD", "admin");
+    let user = User::get_by_email(&pool, "pk_crud@test.com").unwrap();
+
+    // Initially empty
+    let keys = UserPasskey::list_for_user(&pool, user.id);
+    assert!(keys.is_empty());
+    assert_eq!(UserPasskey::count_for_user(&pool, user.id), 0);
+
+    // Create a passkey
+    let id = UserPasskey::create(
+        &pool,
+        user.id,
+        "cred_id_1",
+        r#"{"test":"key"}"#,
+        0,
+        "[]",
+        "My YubiKey",
+    )
+    .unwrap();
+    assert!(id > 0);
+
+    let keys = UserPasskey::list_for_user(&pool, user.id);
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0].name, "My YubiKey");
+    assert_eq!(keys[0].credential_id, "cred_id_1");
+    assert_eq!(UserPasskey::count_for_user(&pool, user.id), 1);
+}
+
+#[test]
+fn passkey_get_by_credential_id() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_get@test.com", "$2b$04$aaaa", "PK Get", "admin");
+    let user = User::get_by_email(&pool, "pk_get@test.com").unwrap();
+
+    UserPasskey::create(&pool, user.id, "cred_abc", r#"{}"#, 0, "[]", "Key1").unwrap();
+
+    let found = UserPasskey::get_by_credential_id(&pool, "cred_abc");
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().name, "Key1");
+
+    let not_found = UserPasskey::get_by_credential_id(&pool, "nonexistent");
+    assert!(not_found.is_none());
+}
+
+#[test]
+fn passkey_update_sign_count() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_sign@test.com", "$2b$04$aaaa", "PK Sign", "admin");
+    let user = User::get_by_email(&pool, "pk_sign@test.com").unwrap();
+
+    UserPasskey::create(&pool, user.id, "cred_sign", r#"{}"#, 0, "[]", "Key").unwrap();
+    UserPasskey::update_sign_count(&pool, "cred_sign", 42).unwrap();
+
+    let pk = UserPasskey::get_by_credential_id(&pool, "cred_sign").unwrap();
+    assert_eq!(pk.sign_count, 42);
+}
+
+#[test]
+fn passkey_delete_single() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_del@test.com", "$2b$04$aaaa", "PK Del", "admin");
+    let user = User::get_by_email(&pool, "pk_del@test.com").unwrap();
+
+    let id1 = UserPasskey::create(&pool, user.id, "cred_d1", r#"{}"#, 0, "[]", "Key1").unwrap();
+    let _id2 = UserPasskey::create(&pool, user.id, "cred_d2", r#"{}"#, 0, "[]", "Key2").unwrap();
+
+    assert_eq!(UserPasskey::count_for_user(&pool, user.id), 2);
+
+    UserPasskey::delete(&pool, id1, user.id).unwrap();
+    assert_eq!(UserPasskey::count_for_user(&pool, user.id), 1);
+
+    // Can't delete someone else's key
+    let result = UserPasskey::delete(&pool, _id2, user.id + 999);
+    assert!(result.is_err());
+}
+
+#[test]
+fn passkey_delete_all_for_user() {
+    let pool = test_pool();
+    let _ = User::create(
+        &pool,
+        "pk_delall@test.com",
+        "$2b$04$aaaa",
+        "PK DelAll",
+        "admin",
+    );
+    let user = User::get_by_email(&pool, "pk_delall@test.com").unwrap();
+
+    UserPasskey::create(&pool, user.id, "cred_a1", r#"{}"#, 0, "[]", "A").unwrap();
+    UserPasskey::create(&pool, user.id, "cred_a2", r#"{}"#, 0, "[]", "B").unwrap();
+    assert_eq!(UserPasskey::count_for_user(&pool, user.id), 2);
+
+    UserPasskey::delete_all_for_user(&pool, user.id).unwrap();
+    assert_eq!(UserPasskey::count_for_user(&pool, user.id), 0);
+}
+
+#[test]
+fn passkey_unique_credential_id() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_uniq@test.com", "$2b$04$aaaa", "PK Uniq", "admin");
+    let user = User::get_by_email(&pool, "pk_uniq@test.com").unwrap();
+
+    UserPasskey::create(&pool, user.id, "cred_dup", r#"{}"#, 0, "[]", "Key1").unwrap();
+    let dup = UserPasskey::create(&pool, user.id, "cred_dup", r#"{}"#, 0, "[]", "Key2");
+    assert!(dup.is_err(), "duplicate credential_id should fail");
+}
+
+#[test]
+fn passkey_safe_json_includes_auth_fields() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_json@test.com", "$2b$04$aaaa", "PK Json", "admin");
+    let user = User::get_by_email(&pool, "pk_json@test.com").unwrap();
+    let json = user.safe_json();
+    assert_eq!(json["auth_method"], "password");
+    assert_eq!(json["auth_method_fallback"], "password");
+
+    User::update_auth_method(&pool, user.id, "passkey", "magic_link").unwrap();
+    let user2 = User::get_by_id(&pool, user.id).unwrap();
+    let json2 = user2.safe_json();
+    assert_eq!(json2["auth_method"], "passkey");
+    assert_eq!(json2["auth_method_fallback"], "magic_link");
+}
+
+#[test]
+fn passkey_auto_enable_on_first_registration() {
+    let pool = test_pool();
+    let _ = User::create(&pool, "pk_auto@test.com", "$2b$04$aaaa", "PK Auto", "admin");
+    let user = User::get_by_email(&pool, "pk_auto@test.com").unwrap();
+    assert_eq!(user.auth_method, "password");
+
+    // Simulate first passkey registration: create passkey, then auto-enable
+    UserPasskey::create(&pool, user.id, "cred_auto1", r#"{}"#, 0, "[]", "First").unwrap();
+    let count = UserPasskey::count_for_user(&pool, user.id);
+    if count == 1 {
+        let fallback = &user.auth_method;
+        User::update_auth_method(&pool, user.id, "passkey", fallback).unwrap();
+    }
+
+    let updated = User::get_by_id(&pool, user.id).unwrap();
+    assert_eq!(updated.auth_method, "passkey");
+    assert_eq!(updated.auth_method_fallback, "password");
+}
+
+#[test]
+fn passkey_auto_revert_on_last_deletion() {
+    let pool = test_pool();
+    let _ = User::create(
+        &pool,
+        "pk_revert@test.com",
+        "$2b$04$aaaa",
+        "PK Revert",
+        "admin",
+    );
+    let user = User::get_by_email(&pool, "pk_revert@test.com").unwrap();
+
+    // Set up: user has passkey enabled with password fallback
+    let pk_id = UserPasskey::create(&pool, user.id, "cred_rev1", r#"{}"#, 0, "[]", "Only").unwrap();
+    User::update_auth_method(&pool, user.id, "passkey", "password").unwrap();
+
+    let u = User::get_by_id(&pool, user.id).unwrap();
+    assert_eq!(u.auth_method, "passkey");
+
+    // Delete last passkey — should revert to fallback
+    UserPasskey::delete(&pool, pk_id, user.id).unwrap();
+    let remaining = UserPasskey::count_for_user(&pool, user.id);
+    if remaining == 0 {
+        User::update_auth_method(
+            &pool,
+            user.id,
+            &u.auth_method_fallback,
+            &u.auth_method_fallback,
+        )
+        .unwrap();
+    }
+
+    let reverted = User::get_by_id(&pool, user.id).unwrap();
+    assert_eq!(reverted.auth_method, "password");
+    assert_eq!(reverted.auth_method_fallback, "password");
+}
+
+#[test]
+fn passkey_no_revert_when_keys_remain() {
+    let pool = test_pool();
+    let _ = User::create(
+        &pool,
+        "pk_norev@test.com",
+        "$2b$04$aaaa",
+        "PK NoRev",
+        "admin",
+    );
+    let user = User::get_by_email(&pool, "pk_norev@test.com").unwrap();
+
+    let pk1 = UserPasskey::create(&pool, user.id, "cred_nr1", r#"{}"#, 0, "[]", "Key1").unwrap();
+    let _pk2 = UserPasskey::create(&pool, user.id, "cred_nr2", r#"{}"#, 0, "[]", "Key2").unwrap();
+    User::update_auth_method(&pool, user.id, "passkey", "password").unwrap();
+
+    // Delete one — should NOT revert since one remains
+    UserPasskey::delete(&pool, pk1, user.id).unwrap();
+    let remaining = UserPasskey::count_for_user(&pool, user.id);
+    assert_eq!(remaining, 1);
+
+    let u = User::get_by_id(&pool, user.id).unwrap();
+    assert_eq!(
+        u.auth_method, "passkey",
+        "should stay passkey with keys remaining"
+    );
+}
+
+#[test]
+fn passkey_security_store_and_take_reg_state() {
+    let pool = test_pool();
+    // store_reg_state / take_reg_state use settings table
+    let key = format!("passkey_reg_state_{}", 999);
+    Setting::set(&pool, &key, r#"{"test":"state"}"#).unwrap();
+    let val = Setting::get(&pool, &key);
+    assert!(val.is_some());
+    assert!(val.unwrap().contains("test"));
+
+    // Clear it
+    Setting::set(&pool, &key, "").unwrap();
+    let val2 = Setting::get(&pool, &key).unwrap_or_default();
+    assert!(val2.is_empty());
+}
+
+#[test]
+fn passkey_security_store_and_take_auth_state() {
+    let pool = test_pool();
+    let token = "test-token-abc";
+    let key = format!("passkey_auth_state_{}", token);
+    Setting::set(&pool, &key, r#"{"challenge":"xyz"}"#).unwrap();
+    let val = Setting::get(&pool, &key);
+    assert!(val.is_some());
+
+    // Simulate take (read + clear)
+    let data = Setting::get(&pool, &key).unwrap();
+    Setting::set(&pool, &key, "").unwrap();
+    assert!(data.contains("challenge"));
+    assert!(Setting::get(&pool, &key).unwrap_or_default().is_empty());
+}
+
+#[test]
+fn passkey_migration_idempotent() {
+    let pool = test_pool();
+    // Running migrations again should not fail
+    run_migrations(&pool).expect("Second migration run should succeed");
+    run_migrations(&pool).expect("Third migration run should succeed");
+    // Table should still be intact
+    let count: i64 = pool
+        .get()
+        .unwrap()
+        .query_row("SELECT COUNT(*) FROM user_passkeys", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+}

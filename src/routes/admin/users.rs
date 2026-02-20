@@ -485,3 +485,169 @@ pub fn mfa_recovery_codes(_admin: AdminUser) -> Json<Value> {
         serde_json::from_str(&_admin.user.mfa_recovery_codes).unwrap_or_default();
     Json(json!({ "ok": true, "codes": codes }))
 }
+
+// ── Passkey (WebAuthn) Management ───────────────────────
+
+#[get("/passkeys")]
+pub fn passkey_list(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+    use crate::models::passkey::UserPasskey;
+    let keys = UserPasskey::list_for_user(pool, _admin.user.id);
+    let list: Vec<Value> = keys
+        .iter()
+        .map(|k| {
+            json!({
+                "id": k.id,
+                "name": k.name,
+                "created_at": k.created_at,
+            })
+        })
+        .collect();
+    Json(json!({ "ok": true, "passkeys": list }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasskeyNameForm {
+    pub name: Option<String>,
+}
+
+#[post("/passkeys/register/start", format = "json", data = "<body>")]
+pub fn passkey_register_start(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<PasskeyNameForm>,
+) -> Json<Value> {
+    use crate::security::passkey;
+
+    let webauthn = match passkey::build_webauthn(pool) {
+        Ok(w) => w,
+        Err(e) => return Json(json!({ "ok": false, "error": e })),
+    };
+
+    // Deterministic user UUID from email for WebAuthn user handle
+    let user_id = uuid::Uuid::new_v4();
+    let existing = passkey::load_credentials(pool, _admin.user.id);
+    let exclude: Vec<webauthn_rs::prelude::CredentialID> =
+        existing.iter().map(|pk| pk.cred_id().clone()).collect();
+
+    match webauthn.start_passkey_registration(
+        user_id,
+        &_admin.user.email,
+        &_admin.user.display_name,
+        Some(exclude),
+    ) {
+        Ok((ccr, reg_state)) => {
+            passkey::store_reg_state(pool, _admin.user.id, &reg_state);
+            // Store the desired name for use in finish
+            let name = body.name.as_deref().unwrap_or("Passkey").to_string();
+            let name_key = format!("passkey_reg_name_{}", _admin.user.id);
+            let _ = Setting::set(pool, &name_key, &name);
+            Json(json!({ "ok": true, "options": ccr }))
+        }
+        Err(e) => Json(json!({ "ok": false, "error": format!("{}", e) })),
+    }
+}
+
+#[post("/passkeys/register/finish", format = "json", data = "<body>")]
+pub fn passkey_register_finish(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<Value>,
+) -> Json<Value> {
+    use crate::models::passkey::UserPasskey;
+    use crate::models::user::User;
+    use crate::security::passkey;
+
+    let webauthn = match passkey::build_webauthn(pool) {
+        Ok(w) => w,
+        Err(e) => return Json(json!({ "ok": false, "error": e })),
+    };
+
+    let reg_state = match passkey::take_reg_state(pool, _admin.user.id) {
+        Some(s) => s,
+        None => {
+            return Json(
+                json!({ "ok": false, "error": "No pending registration. Start registration first." }),
+            )
+        }
+    };
+
+    // Parse the browser's credential response
+    let reg: webauthn_rs::prelude::RegisterPublicKeyCredential =
+        match serde_json::from_value(body.into_inner()) {
+            Ok(r) => r,
+            Err(e) => {
+                return Json(json!({ "ok": false, "error": format!("Invalid credential: {}", e) }))
+            }
+        };
+
+    match webauthn.finish_passkey_registration(&reg, &reg_state) {
+        Ok(passkey_data) => {
+            let cred_id = base64::Engine::encode(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                passkey_data.cred_id().as_ref(),
+            );
+            let public_key_json =
+                serde_json::to_string(&passkey_data).unwrap_or_else(|_| "{}".to_string());
+
+            let name_key = format!("passkey_reg_name_{}", _admin.user.id);
+            let name = Setting::get_or(pool, &name_key, "Passkey");
+            let _ = Setting::set(pool, &name_key, "");
+
+            match UserPasskey::create(
+                pool,
+                _admin.user.id,
+                &cred_id,
+                &public_key_json,
+                0,
+                "[]",
+                &name,
+            ) {
+                Ok(_) => {
+                    // Auto-enable passkey as auth method on first registration
+                    let count = UserPasskey::count_for_user(pool, _admin.user.id);
+                    if count == 1 {
+                        // First passkey — save current method as fallback, switch to passkey
+                        let current = &_admin.user.auth_method;
+                        let fallback = if current == "passkey" {
+                            &_admin.user.auth_method_fallback
+                        } else {
+                            current
+                        };
+                        let _ = User::update_auth_method(pool, _admin.user.id, "passkey", fallback);
+                    }
+                    Json(json!({ "ok": true }))
+                }
+                Err(e) => Json(json!({ "ok": false, "error": format!("Failed to save: {}", e) })),
+            }
+        }
+        Err(e) => Json(json!({ "ok": false, "error": format!("Registration failed: {}", e) })),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasskeyDeleteForm {
+    pub id: i64,
+}
+
+#[post("/passkeys/delete", format = "json", data = "<body>")]
+pub fn passkey_delete(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    body: Json<PasskeyDeleteForm>,
+) -> Json<Value> {
+    use crate::models::passkey::UserPasskey;
+    use crate::models::user::User;
+
+    match UserPasskey::delete(pool, body.id, _admin.user.id) {
+        Ok(()) => {
+            // If no passkeys remain, auto-revert to fallback method
+            let remaining = UserPasskey::count_for_user(pool, _admin.user.id);
+            if remaining == 0 && _admin.user.auth_method == "passkey" {
+                let fallback = &_admin.user.auth_method_fallback;
+                let _ = User::update_auth_method(pool, _admin.user.id, fallback, fallback);
+            }
+            Json(json!({ "ok": true, "remaining": remaining }))
+        }
+        Err(e) => Json(json!({ "ok": false, "error": e })),
+    }
+}

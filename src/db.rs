@@ -443,6 +443,34 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
+    // ── Passkeys (WebAuthn) ──
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS user_passkeys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            credential_id TEXT UNIQUE NOT NULL,
+            public_key TEXT NOT NULL,
+            sign_count INTEGER NOT NULL DEFAULT 0,
+            transports TEXT NOT NULL DEFAULT '[]',
+            name TEXT NOT NULL DEFAULT 'Passkey',
+            created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_passkeys_user ON user_passkeys(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_passkeys_cred ON user_passkeys(credential_id);",
+    )?;
+
+    // Add auth_method and auth_method_fallback to users if missing
+    let has_auth_method: bool = conn
+        .prepare("SELECT auth_method FROM users LIMIT 0")
+        .is_ok();
+    if !has_auth_method {
+        conn.execute_batch(
+            "ALTER TABLE users ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'password';
+             ALTER TABLE users ADD COLUMN auth_method_fallback TEXT NOT NULL DEFAULT 'password';",
+        )?;
+    }
+
     Ok(())
 }
 

@@ -83,7 +83,14 @@ pub fn settings_page(
         "section": section,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
+        "current_user": _admin.user.safe_json(),
     });
+
+    // For security page, include passkey count
+    if section == "security" {
+        let pk_count = crate::models::passkey::UserPasskey::count_for_user(pool, _admin.user.id);
+        context["passkey_count"] = json!(pk_count);
+    }
 
     if let Some(ref f) = flash {
         context["flash_kind"] = json!(f.kind());

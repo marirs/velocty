@@ -2,6 +2,7 @@ pub mod login;
 pub mod logout;
 pub mod magic_link;
 pub mod mfa;
+pub mod passkey;
 pub mod password_reset;
 pub mod setup;
 
@@ -23,5 +24,8 @@ pub fn routes() -> Vec<rocket::Route> {
         setup::setup_page,
         setup::setup_submit,
         setup::test_mongo_connection,
+        passkey::passkey_check,
+        passkey::passkey_auth_start,
+        passkey::passkey_auth_finish,
     ]
 }
