@@ -75,6 +75,11 @@ pub(crate) async fn save_upload(
 
     let ext_lower = ext.to_lowercase();
 
+    // ── Video files: skip all image processing, just store as-is ──
+    if is_video_filename(&filename) {
+        return Some(filename);
+    }
+
     // ── HEIC/HEIF → JPG conversion (always, browsers can't display HEIC) ──
     if ext_lower == "heic" || ext_lower == "heif" {
         let jpg_filename = format!("{}_{}.jpg", prefix, uid);
@@ -173,15 +178,9 @@ fn convert_to_webp_file(
     Some(webp_filename)
 }
 
-/// Check if a file extension is in the allowed image types
-pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
-    let allowed = Setting::get(pool, "images_allowed_types")
-        .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
-    let allowed_list: Vec<&str> = allowed.split(',').map(|s| s.trim()).collect();
-
-    // Get extension from content type, then original filename (raw_name), then field name
-    let ext = file
-        .content_type()
+/// Extract the file extension from a TempFile (content-type → raw_name → field name)
+fn file_ext(file: &TempFile<'_>) -> String {
+    file.content_type()
         .and_then(|ct| ct.extension())
         .map(|e| e.to_string().to_lowercase())
         .or_else(|| {
@@ -195,9 +194,56 @@ pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
                 .and_then(|n| n.rsplit('.').next())
                 .map(|e| e.to_lowercase())
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
 
+/// Check if a file extension is in the allowed image types
+pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
+    let allowed = Setting::get(pool, "images_allowed_types")
+        .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
+    let allowed_list: Vec<&str> = allowed.split(',').map(|s| s.trim()).collect();
+    let ext = file_ext(file);
     allowed_list.iter().any(|a| a.eq_ignore_ascii_case(&ext))
+}
+
+/// Check if a file extension is a known video type from settings
+pub(crate) fn is_video_ext(ext: &str, pool: &DbPool) -> bool {
+    let allowed = Setting::get(pool, "video_allowed_types")
+        .unwrap_or_else(|| "mp4,webm,mov,avi,mkv".to_string());
+    allowed
+        .split(',')
+        .map(|s| s.trim())
+        .any(|a| a.eq_ignore_ascii_case(ext))
+}
+
+/// Check if a file is an allowed media type (image or video if video uploads enabled).
+/// Used for portfolio featured media where both image and video are accepted.
+pub(crate) fn is_allowed_media(file: &TempFile<'_>, pool: &DbPool) -> bool {
+    let ext = file_ext(file);
+    // Always check image types first
+    let img_allowed = Setting::get(pool, "images_allowed_types")
+        .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
+    if img_allowed
+        .split(',')
+        .map(|s| s.trim())
+        .any(|a| a.eq_ignore_ascii_case(&ext))
+    {
+        return true;
+    }
+    // If video uploads are enabled, also check video types
+    if Setting::get_or(pool, "video_upload_enabled", "false") == "true" {
+        return is_video_ext(&ext, pool);
+    }
+    false
+}
+
+/// Check if a filename has a video extension (for render-time detection)
+pub fn is_video_filename(filename: &str) -> bool {
+    let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
+    matches!(
+        ext.as_str(),
+        "mp4" | "webm" | "mov" | "avi" | "mkv" | "m4v" | "ogv"
+    )
 }
 
 pub fn routes() -> Vec<rocket::Route> {

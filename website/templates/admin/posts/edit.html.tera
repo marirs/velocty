@@ -161,6 +161,7 @@
         images_reuse_filename: false,
         file_picker_types: 'image',
         image_advtab: true,
+        media_live_embeds: true,
         link_default_target: '_blank',
         codesample_languages: [
             { text: 'HTML/XML', value: 'markup' },

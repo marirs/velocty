@@ -558,8 +558,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("video_upload_enabled", "false"),
         ("video_max_upload_mb", "100"),
         ("video_allowed_types", "mp4,webm,mov,avi,mkv"),
-        ("video_max_duration", "0"),
-        ("video_generate_thumbnail", "true"),
+        ("video_max_duration", "1800"),
         // Media Organization
         ("media_organization", "flat"),
         // SEO

@@ -170,7 +170,7 @@ pub async fn portfolio_create(
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
-                if !super::is_allowed_image(f, pool) {
+                if !super::is_allowed_media(f, pool) {
                     return Redirect::to(format!("{}/portfolio/new", admin_base(slug)));
                 }
                 save_upload(f, "portfolio", pool)
@@ -281,7 +281,7 @@ pub async fn portfolio_update(
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
-                if !super::is_allowed_image(f, pool) {
+                if !super::is_allowed_media(f, pool) {
                     return Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id));
                 }
                 save_upload(f, "portfolio", pool)

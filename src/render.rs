@@ -2083,10 +2083,29 @@ fn render_portfolio_grid(context: &Value) -> String {
             String::new()
         };
 
+        let is_video = crate::routes::admin::is_video_filename(image);
+        let media_tag = if is_video {
+            format!(
+                r#"<video src="/uploads/{}" autoplay muted loop playsinline preload="metadata"></video>"#,
+                image
+            )
+        } else {
+            format!(
+                r#"<img src="/uploads/{}" alt="{}" loading="lazy">"#,
+                image,
+                html_escape(title)
+            )
+        };
+        let media_type_attr = if is_video {
+            " data-media-type=\"video\""
+        } else {
+            ""
+        };
+
         html.push_str(&format!(
-            r#"<div class="{item_class}" data-categories="{cats_data}" data-price="{price}" data-sell="{sell}">
+            r#"<div class="{item_class}" data-categories="{cats_data}" data-price="{price}" data-sell="{sell}"{media_type}>
     <a href="{item_url}" class="portfolio-link" data-id="{item_id}" data-title="{title}" data-likes="{likes}" data-tags="{tag_data}" style="position:relative;display:block">
-        <img src="/uploads/{image}" alt="{title}" loading="lazy">
+        {media_tag}
         {price_badge}
         {heart_overlay}
     </a>"#,
@@ -2095,11 +2114,12 @@ fn render_portfolio_grid(context: &Value) -> String {
             item_url = item_url,
             item_id = item_id,
             title = html_escape(title),
-            image = image,
             likes = likes,
             tag_data = html_escape(&tag_data),
             price = item_price,
             sell = item_sell,
+            media_type = media_type_attr,
+            media_tag = media_tag,
             price_badge = price_badge_overlay,
             heart_overlay = heart_overlay,
         ));
@@ -3027,9 +3047,18 @@ const LIGHTBOX_JS: &str = r#"
     if (mode === 'lightbox') {
 
     const links = document.querySelectorAll('.portfolio-link');
-    let overlay, img, titleEl, tagsEl, likesEl, shareEl, buyEl, closeBtn, prevBtn, nextBtn;
+    let overlay, img, vid, titleEl, tagsEl, likesEl, shareEl, buyEl, closeBtn, prevBtn, nextBtn;
     let currentIndex = 0;
     const items = Array.from(links);
+
+    function isVideoItem(link) {
+        var gridItem = link.closest('.grid-item');
+        return gridItem && gridItem.dataset.mediaType === 'video';
+    }
+
+    function pauseVideo() {
+        if (vid && !vid.paused) { vid.pause(); }
+    }
 
     function createOverlay() {
         overlay = document.createElement('div');
@@ -3043,7 +3072,6 @@ const LIGHTBOX_JS: &str = r#"
         var hTop = !hIsBottom ? 'top:12px' : (sameCorner ? 'bottom:70px' : 'bottom:24px');
         var hLeft = hIsRight ? 'right:12px' : 'left:12px';
         var heartsHtml = showLikes ? '<div class="lb-likes" style="position:absolute;' + hTop + ';' + hLeft + ';z-index:10;cursor:pointer;user-select:none;color:#fff;font-size:14px;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:20px"></div>' : '';
-        // Nav arrows inside the image wrapper, vertically centered
         var navHtml = '';
         if (showNav) {
             navHtml = '<button class="lb-prev" style="color:' + navColor + '">' +
@@ -3060,6 +3088,7 @@ const LIGHTBOX_JS: &str = r#"
             '<div class="lb-content">' +
                 '<div class="lb-image-wrap">' +
                     '<img class="lb-image" src="" alt="">' +
+                    '<video class="lb-video" src="" controls playsinline style="display:none"></video>' +
                     navHtml +
                     buyHtml +
                     heartsHtml +
@@ -3070,6 +3099,7 @@ const LIGHTBOX_JS: &str = r#"
             '</div>';
         document.body.appendChild(overlay);
         img = overlay.querySelector('.lb-image');
+        vid = overlay.querySelector('.lb-video');
         titleEl = overlay.querySelector('.lb-title');
         tagsEl = overlay.querySelector('.lb-tags');
         likesEl = overlay.querySelector('.lb-likes');
@@ -3101,11 +3131,25 @@ const LIGHTBOX_JS: &str = r#"
 
     function open(index) {
         if (!overlay) createOverlay();
+        pauseVideo();
         currentIndex = index;
         var link = items[index];
-        var imgSrc = link.querySelector('img').src;
+        var isVid = isVideoItem(link);
+        var mediaSrc = isVid ? (link.querySelector('video') || {}).src : (link.querySelector('img') || {}).src;
+        if (!mediaSrc) mediaSrc = '';
         var itemTitle = link.dataset.title || '';
-        img.src = imgSrc;
+        if (isVid) {
+            img.style.display = 'none';
+            vid.style.display = '';
+            vid.src = mediaSrc;
+            vid.currentTime = 0;
+            vid.play().catch(function(){});
+        } else {
+            vid.style.display = 'none';
+            vid.src = '';
+            img.style.display = '';
+            img.src = mediaSrc;
+        }
         if (titleEl) titleEl.textContent = itemTitle;
         if (tagsEl) tagsEl.textContent = link.dataset.tags || '';
         if (likesEl) {
@@ -3147,6 +3191,7 @@ const LIGHTBOX_JS: &str = r#"
     }
 
     function close() {
+        pauseVideo();
         overlay.classList.remove('active');
         document.body.style.overflow = '';
     }
@@ -3229,19 +3274,28 @@ const LIGHTBOX_JS: &str = r#"
         for (var c = 0; c < cols; c++) { if (colHeights[c] > maxH) maxH = colHeights[c]; }
         grid.style.height = maxH + 'px';
     }
-    // Run masonry after all images load
+    // Run masonry after all images and videos are ready
     var masonryGrid = document.querySelector('.masonry-grid');
     if (masonryGrid) {
         var imgs = masonryGrid.querySelectorAll('img');
+        var vids = masonryGrid.querySelectorAll('video');
         var loaded = 0;
-        var total = imgs.length;
+        var total = imgs.length + vids.length;
         if (total === 0) { layoutMasonry(); }
         else {
+            function onMediaReady() { loaded++; if (loaded >= total) layoutMasonry(); }
             imgs.forEach(function(img) {
-                if (img.complete) { loaded++; if (loaded >= total) layoutMasonry(); }
+                if (img.complete) { onMediaReady(); }
                 else {
-                    img.addEventListener('load', function() { loaded++; if (loaded >= total) layoutMasonry(); });
-                    img.addEventListener('error', function() { loaded++; if (loaded >= total) layoutMasonry(); });
+                    img.addEventListener('load', onMediaReady);
+                    img.addEventListener('error', onMediaReady);
+                }
+            });
+            vids.forEach(function(v) {
+                if (v.readyState >= 1) { onMediaReady(); }
+                else {
+                    v.addEventListener('loadedmetadata', onMediaReady);
+                    v.addEventListener('error', onMediaReady);
                 }
             });
         }
@@ -3387,6 +3441,30 @@ h6 { font-size: var(--font-size-h6); }
     max-height: 78vh;
     object-fit: contain;
     border: 8px solid var(--lightbox-border-color);
+}
+
+.lb-video {
+    max-width: 80vw;
+    max-height: 78vh;
+    object-fit: contain;
+    border: 8px solid var(--lightbox-border-color);
+    background: #000;
+}
+
+/* Video in portfolio grid — match img sizing */
+.grid-item video {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+/* Responsive video embeds (YouTube/Vimeo in post body) */
+.mce-object-iframe, iframe[src*="youtube"], iframe[src*="vimeo"], iframe[src*="youtu.be"] {
+    aspect-ratio: 16/9;
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    border: none;
 }
 
 .lb-title {

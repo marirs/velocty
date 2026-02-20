@@ -555,7 +555,6 @@ pub fn settings_save(
         "images" => &[
             "images_webp_convert",
             "video_upload_enabled",
-            "video_generate_thumbnail",
         ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
         "design" => &[
