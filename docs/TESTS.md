@@ -1,6 +1,6 @@
 # Velocty — Test Coverage Report
 
-> **Last run:** 2026-02-20 | **Result:** 243 passed, 0 failed | **Duration:** ~2.0s  
+> **Last run:** 2026-02-20 | **Result:** 308 passed, 0 failed | **Duration:** ~2.8s  
 > **Command:** `cargo test`
 
 ---
@@ -16,6 +16,7 @@
 | `models/tag.rs` | 12 | 12 | **100%** |
 | `models/comment.rs` | 7 | 7 | **100%** |
 | `models/user.rs` | 22 | 21 | **95%** |
+| `models/passkey.rs` | 7 | 7 | **100%** |
 | `models/order.rs` | 21 | 19 | **90%** |
 | `models/audit.rs` | 6 | 6 | **100%** |
 | `models/firewall.rs` | 16 | 15 | **94%** |
@@ -34,7 +35,9 @@
 | `render.rs` | 3 | 3 | **100%** |
 | `image_proxy.rs` | 4 | 4 | **100%** |
 | `svg_sanitizer.rs` | 1 | 1 | **100%** |
-| **TOTAL** | **187** | **176** | **94%** |
+| `typography/mod.rs` | 2 | 2 | **100%** |
+| `security/passkey.rs` | 4 | 2 | **50%** |
+| **TOTAL** | **200** | **192** | **96%** |
 
 ### Not unit-testable (excluded from coverage)
 
@@ -42,6 +45,7 @@
 |--------|--------|
 | `security/auth.rs` — request guards (`AuthenticatedUser`, `AdminUser`, `EditorUser`, `AuthorUser`) | Require Rocket `FromRequest` context |
 | `security/mfa.rs` — cookie functions (`set_pending_cookie`, `take_pending_cookie`, `get_pending_cookie`) | Require Rocket `CookieJar` |
+| `security/passkey.rs` — `build_webauthn`, `load_credentials` | Require valid site_url + real WebAuthn credentials |
 | `seo/analytics.rs` — `build_analytics_scripts` | Pure function on `serde_json::Value`, no pool needed; tested indirectly via render |
 | `seo/webmaster.rs` — `build_webmaster_meta` | Pure function on `serde_json::Value`; tested indirectly via render |
 | `site.rs` | Feature-gated `multi-site`, touches filesystem |
@@ -534,6 +538,96 @@
 | 243 | `test_strips_iframe_element` | `<iframe src="...">` inside SVG | Element removed | No `iframe` | ✅ Pass |
 | 244 | `test_strips_embed_element` | `<embed src="...">` inside SVG | Element removed | No `embed` | ✅ Pass |
 
+### 46. Passkey: DB Migration & Model (`models/passkey.rs`, `models/user.rs`, `security/passkey.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 245 | `passkey_table_exists` | Query user_passkeys table | Table queryable | Count=0 | ✅ Pass |
+| 246 | `passkey_model_crud` | Create → list → get_by_credential_id → update_sign_count → delete | Full lifecycle | All assertions pass | ✅ Pass |
+| 247 | `passkey_count_for_user` | Create 2 passkeys; count | count=2 | `2` | ✅ Pass |
+| 248 | `passkey_delete_all_for_user` | Create 2 passkeys; delete_all; count | count=0 | `0` | ✅ Pass |
+| 249 | `passkey_unique_credential_id` | Create 2 passkeys with same credential_id | Second returns Err | `Err` | ✅ Pass |
+| 250 | `passkey_user_auth_method_fields` | Create user; check defaults; update auth_method | Default="password"; update works | Matched | ✅ Pass |
+| 251 | `passkey_auto_enable_on_first_registration` | Set auth_method to passkey on first passkey | auth_method="passkey", fallback="password" | Matched | ✅ Pass |
+| 252 | `passkey_auto_revert_on_last_deletion` | Delete last passkey; check revert | auth_method reverts to fallback | Matched | ✅ Pass |
+| 253 | `passkey_no_revert_when_passkeys_remain` | Delete 1 of 2 passkeys | auth_method stays "passkey" | `"passkey"` | ✅ Pass |
+| 254 | `passkey_safe_json_includes_auth_fields` | Call safe_json on user with passkey | auth_method and auth_method_fallback present | Present | ✅ Pass |
+| 255 | `passkey_multiple_users_independent` | Create passkeys for 2 users | Each user's count independent | Correct counts | ✅ Pass |
+| 256 | `passkey_from_row_defaults` | Create user without explicit auth_method | Defaults to "password" | `"password"` | ✅ Pass |
+| 257 | `passkey_update_auth_method_roundtrip` | Set to passkey then back to magic_link | Both updates persist | Matched | ✅ Pass |
+| 258 | `passkey_list_empty_for_new_user` | List passkeys for user with none | Empty vec | `len()=0` | ✅ Pass |
+| 259 | `passkey_delete_wrong_user_fails` | Delete passkey with wrong user_id | Returns Err | `Err` | ✅ Pass |
+| 260 | `passkey_store_and_take_reg_state` | Store reg state JSON; take it; verify cleared | JSON stored and cleared | Matched | ✅ Pass |
+| 261 | `passkey_migration_idempotent` | Run migrations 3 times | No errors | All succeed | ✅ Pass |
+
+### 47. Typography: CSS Variables — Colors (`typography/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 262 | `css_vars_default_colors` | Build CSS vars with empty settings | All 16 color defaults correct | Matched | ✅ Pass |
+| 263 | `css_vars_custom_colors` | Build CSS vars with all 16 custom colors | All custom values in output | Matched | ✅ Pass |
+
+### 48. Typography: CSS Variables — Fonts (`typography/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 264 | `css_vars_default_fonts_sitewide` | Default sitewide fonts | All families = Inter | Matched | ✅ Pass |
+| 265 | `css_vars_custom_fonts_sitewide` | Custom primary/heading with sitewide=true | Body/nav/buttons inherit primary | Matched | ✅ Pass |
+| 266 | `css_vars_per_element_fonts_no_sitewide` | Per-element fonts with sitewide=false | Each element uses its own font | Matched | ✅ Pass |
+| 267 | `css_vars_per_element_fonts_fallback_to_primary` | sitewide=false, no per-element set | Falls back to primary/heading | Matched | ✅ Pass |
+| 268 | `css_vars_independent_element_fonts` | logo, subheading, blockquote, list, footer, etc. | All 8 independent fonts correct | Matched | ✅ Pass |
+| 269 | `css_vars_default_font_sizes` | Default sizes for body, h1-h6, logo, nav, footer | All 11 defaults correct | Matched | ✅ Pass |
+| 270 | `css_vars_custom_font_sizes` | Custom sizes for body, h1, h2, logo, nav, line-height | All custom values in output | Matched | ✅ Pass |
+
+### 49. Typography: CSS Variables — Text & Layout (`typography/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 271 | `css_vars_text_transform_direction_alignment` | Custom uppercase, rtl, center | All 3 values correct | Matched | ✅ Pass |
+| 272 | `css_vars_text_defaults` | Default text-transform, direction, alignment | none, ltr, left | Matched | ✅ Pass |
+| 273 | `css_vars_layout_sidebar_left` | Sidebar position=left | `--sidebar-direction: row` | Matched | ✅ Pass |
+| 274 | `css_vars_layout_sidebar_right` | Sidebar position=right | `--sidebar-direction: row-reverse` | Matched | ✅ Pass |
+| 275 | `css_vars_layout_margins` | Custom margins 20/30/10/15 | All 4 margins with px suffix | Matched | ✅ Pass |
+| 276 | `css_vars_layout_margins_zero` | Default zero margins | All 4 = 0 (no px) | Matched | ✅ Pass |
+| 277 | `css_vars_layout_margins_with_px_suffix` | Margin "20px" input | No double px suffix | `20px` not `20pxpx` | ✅ Pass |
+| 278 | `css_vars_content_boundary_boxed` | Boundary=boxed | `--content-max-width: 1200px` | Matched | ✅ Pass |
+| 279 | `css_vars_content_boundary_full` | Boundary=full | `--content-max-width: none` | Matched | ✅ Pass |
+
+### 50. Typography: CSS Variables — Grid & Lightbox (`typography/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 280 | `css_vars_grid_columns` | Portfolio=4, blog=2 columns | Both grid vars correct | Matched | ✅ Pass |
+| 281 | `css_vars_lightbox_colors` | Custom border/title/tag/nav colors | All 4 lightbox color vars correct | Matched | ✅ Pass |
+| 282 | `css_vars_wraps_in_root_selector` | Build CSS vars | Starts with `:root {`, ends with `}` | Matched | ✅ Pass |
+
+### 51. Typography: Font Links (`typography/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 283 | `font_links_empty_when_no_providers` | No font providers enabled | Empty string | `""` | ✅ Pass |
+| 284 | `font_links_google_basic` | Google enabled + Roboto + Inter | Preconnect + both families in URL | Present | ✅ Pass |
+| 285 | `font_links_google_deduplicates` | Same font for primary + heading | Family appears only once | `count=1` | ✅ Pass |
+| 286 | `font_links_google_per_element_fonts_not_sitewide` | sitewide=false + per-element fonts | All unique families loaded | Present | ✅ Pass |
+| 287 | `font_links_google_independent_element_fonts` | logo=Pacifico, footer=Nunito | Both loaded via Google Fonts | Present | ✅ Pass |
+| 288 | `font_links_google_skips_system_fonts` | system-ui + Georgia | No Google Fonts link generated | Absent | ✅ Pass |
+| 289 | `font_links_google_skips_adobe_prefixed` | adobe-caslon-pro | Not sent to Google Fonts | Absent | ✅ Pass |
+| 290 | `font_links_adobe` | Adobe enabled + project ID | Typekit CSS link | Present | ✅ Pass |
+| 291 | `font_links_adobe_empty_project_id` | Adobe enabled + empty ID | No Typekit link | Absent | ✅ Pass |
+| 292 | `font_links_custom_font_face_woff2` | Custom font .woff2 | @font-face with woff2 format | Present | ✅ Pass |
+| 293 | `font_links_custom_font_face_ttf` | Custom font .ttf | format('truetype') | Present | ✅ Pass |
+| 294 | `font_links_custom_font_face_otf` | Custom font .otf | format('opentype') | Present | ✅ Pass |
+| 295 | `font_links_custom_font_missing_name_no_output` | Empty font name | No @font-face | Absent | ✅ Pass |
+| 296 | `font_links_custom_font_missing_file_no_output` | Empty filename | No @font-face | Absent | ✅ Pass |
+| 297 | `font_links_google_and_adobe_and_custom_combined` | All 3 providers | Google + Adobe + @font-face all present | Present | ✅ Pass |
+| 298 | `font_links_google_spaces_replaced_with_plus` | "Open Sans" | `family=Open+Sans` in URL | Correct encoding | ✅ Pass |
+
+### 52. Typography: Render Integration (`typography/mod.rs`)
+
+| # | Test | What it does | Expected | Got | Result |
+|---|------|-------------|----------|-----|--------|
+| 299 | `render_css_vars_in_page_output` | Set colors + font in DB; build CSS vars from Setting::all | Custom values in CSS output | Matched | ✅ Pass |
+
 ---
 
 ## Running Tests
@@ -610,4 +704,11 @@ src/tests.rs
 ├── Render: Journal Navigation (6 tests)
 ├── Render: Portfolio Lightbox Defaults (1 test)
 ├── Render: Upload Path Handling (3 tests)
-└── SVG Sanitizer (12 tests)
+├── SVG Sanitizer (12 tests)
+├── Passkey: DB & Model (17 tests)
+├── Typography: CSS Variables — Colors (2 tests)
+├── Typography: CSS Variables — Fonts (6 tests)
+├── Typography: CSS Variables — Layout (9 tests)
+├── Typography: CSS Variables — Lightbox & Grid (3 tests)
+├── Typography: Font Links (14 tests)
+└── Typography: Render Integration (1 test)

@@ -24,6 +24,7 @@ use crate::rss;
 use crate::security::auth;
 use crate::security::mfa;
 use crate::seo;
+use crate::typography;
 
 /// Atomic counter for unique shared-cache DB names so parallel tests don't collide.
 static TEST_DB_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -5807,4 +5808,529 @@ fn passkey_migration_idempotent() {
         .query_row("SELECT COUNT(*) FROM user_passkeys", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
+}
+
+// ── Typography & Color CSS Variables Tests ─────────────────────────────
+
+/// Helper: build a serde_json::Value from key-value pairs
+fn typo_settings(pairs: &[(&str, &str)]) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (k, v) in pairs {
+        map.insert(k.to_string(), serde_json::Value::String(v.to_string()));
+    }
+    serde_json::Value::Object(map)
+}
+
+#[test]
+fn css_vars_default_colors() {
+    let settings = typo_settings(&[]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--color-text: #111827"));
+    assert!(css.contains("--color-text-secondary: #6b7280"));
+    assert!(css.contains("--color-bg: #ffffff"));
+    assert!(css.contains("--color-accent: #3b82f6"));
+    assert!(css.contains("--color-link: #3b82f6"));
+    assert!(css.contains("--color-link-hover: #2563eb"));
+    assert!(css.contains("--color-border: #e5e7eb"));
+    assert!(css.contains("--color-logo-text: #111827"));
+    assert!(css.contains("--color-tagline: #6b7280"));
+    assert!(css.contains("--color-heading: #111827"));
+    assert!(css.contains("--color-subheading: #1f2937"));
+    assert!(css.contains("--color-caption: #374151"));
+    assert!(css.contains("--color-footer: #9ca3af"));
+    assert!(css.contains("--color-categories: #6b7280"));
+    assert!(css.contains("--color-tags: #6b7280"));
+    assert!(css.contains("--color-lightbox-categories: #AAAAAA"));
+}
+
+#[test]
+fn css_vars_custom_colors() {
+    let settings = typo_settings(&[
+        ("site_text_color", "#ff0000"),
+        ("site_background_color", "#000000"),
+        ("site_accent_color", "#00ff00"),
+        ("color_link", "#1122cc"),
+        ("color_link_hover", "#3344ee"),
+        ("color_border", "#aabbcc"),
+        ("color_logo_text", "#deadbe"),
+        ("color_tagline", "#cafe01"),
+        ("color_heading", "#abcdef"),
+        ("color_subheading", "#123456"),
+        ("color_caption", "#654321"),
+        ("color_footer", "#999888"),
+        ("color_categories", "#112233"),
+        ("color_tags", "#445566"),
+        ("color_lightbox_categories", "#778899"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--color-text: #ff0000"));
+    assert!(css.contains("--color-bg: #000000"));
+    assert!(css.contains("--color-accent: #00ff00"));
+    assert!(css.contains("--color-link: #1122cc"));
+    assert!(css.contains("--color-link-hover: #3344ee"));
+    assert!(css.contains("--color-border: #aabbcc"));
+    assert!(css.contains("--color-logo-text: #deadbe"));
+    assert!(css.contains("--color-tagline: #cafe01"));
+    assert!(css.contains("--color-heading: #abcdef"));
+    assert!(css.contains("--color-subheading: #123456"));
+    assert!(css.contains("--color-caption: #654321"));
+    assert!(css.contains("--color-footer: #999888"));
+    assert!(css.contains("--color-categories: #112233"));
+    assert!(css.contains("--color-tags: #445566"));
+    assert!(css.contains("--color-lightbox-categories: #778899"));
+}
+
+#[test]
+fn css_vars_default_fonts_sitewide() {
+    let settings = typo_settings(&[]);
+    let css = typography::build_css_variables(&settings);
+    // Default sitewide: all font families should be Inter
+    assert!(css.contains("--font-primary: 'Inter', sans-serif"));
+    assert!(css.contains("--font-heading: 'Inter', sans-serif"));
+    assert!(css.contains("--font-body: 'Inter', sans-serif"));
+    assert!(css.contains("--font-nav: 'Inter', sans-serif"));
+    assert!(css.contains("--font-buttons: 'Inter', sans-serif"));
+    assert!(css.contains("--font-captions: 'Inter', sans-serif"));
+}
+
+#[test]
+fn css_vars_custom_fonts_sitewide() {
+    let settings = typo_settings(&[
+        ("font_primary", "Roboto"),
+        ("font_heading", "Playfair Display"),
+        ("font_sitewide", "true"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--font-primary: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-heading: 'Playfair Display', sans-serif"));
+    // Sitewide: body/nav/buttons/captions inherit from primary
+    assert!(css.contains("--font-body: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-nav: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-buttons: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-captions: 'Roboto', sans-serif"));
+}
+
+#[test]
+fn css_vars_per_element_fonts_no_sitewide() {
+    let settings = typo_settings(&[
+        ("font_primary", "Roboto"),
+        ("font_heading", "Playfair Display"),
+        ("font_sitewide", "false"),
+        ("font_body", "Lato"),
+        ("font_headings", "Merriweather"),
+        ("font_navigation", "Montserrat"),
+        ("font_buttons", "Poppins"),
+        ("font_captions", "Source Sans Pro"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--font-body: 'Lato', sans-serif"));
+    assert!(css.contains("--font-heading: 'Merriweather', sans-serif"));
+    assert!(css.contains("--font-nav: 'Montserrat', sans-serif"));
+    assert!(css.contains("--font-buttons: 'Poppins', sans-serif"));
+    assert!(css.contains("--font-captions: 'Source Sans Pro', sans-serif"));
+}
+
+#[test]
+fn css_vars_per_element_fonts_fallback_to_primary() {
+    // When sitewide is false but per-element fonts are not set, fallback to primary/heading
+    let settings = typo_settings(&[
+        ("font_primary", "Roboto"),
+        ("font_heading", "Georgia"),
+        ("font_sitewide", "false"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--font-body: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-heading: 'Georgia', sans-serif"));
+    assert!(css.contains("--font-nav: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-buttons: 'Roboto', sans-serif"));
+    assert!(css.contains("--font-captions: 'Roboto', sans-serif"));
+}
+
+#[test]
+fn css_vars_independent_element_fonts() {
+    // logo, subheading, blockquote, list, footer, lightbox_title, categories, tags
+    // are always resolved independently of sitewide toggle
+    let settings = typo_settings(&[
+        ("font_primary", "Inter"),
+        ("font_heading", "Inter"),
+        ("font_logo", "Pacifico"),
+        ("font_subheading", "Oswald"),
+        ("font_blockquote", "Georgia"),
+        ("font_list", "Fira Sans"),
+        ("font_footer", "Nunito"),
+        ("font_lightbox_title", "Raleway"),
+        ("font_categories", "Open Sans"),
+        ("font_tags", "Ubuntu"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--font-logo: 'Pacifico', sans-serif"));
+    assert!(css.contains("--font-subheading: 'Oswald', sans-serif"));
+    assert!(css.contains("--font-blockquote: 'Georgia', sans-serif"));
+    assert!(css.contains("--font-list: 'Fira Sans', sans-serif"));
+    assert!(css.contains("--font-footer: 'Nunito', sans-serif"));
+    assert!(css.contains("--font-lb-title: 'Raleway', sans-serif"));
+    assert!(css.contains("--font-categories: 'Open Sans', sans-serif"));
+    assert!(css.contains("--font-tags: 'Ubuntu', sans-serif"));
+}
+
+#[test]
+fn css_vars_default_font_sizes() {
+    let settings = typo_settings(&[]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--font-size-body: 16px"));
+    assert!(css.contains("--font-size-h1: 2.5rem"));
+    assert!(css.contains("--font-size-h2: 2rem"));
+    assert!(css.contains("--font-size-h3: 1.75rem"));
+    assert!(css.contains("--font-size-h4: 1.5rem"));
+    assert!(css.contains("--font-size-h5: 1.25rem"));
+    assert!(css.contains("--font-size-h6: 1rem"));
+    assert!(css.contains("--font-size-logo: 1.5rem"));
+    assert!(css.contains("--font-size-nav: 14px"));
+    assert!(css.contains("--font-size-footer: 12px"));
+    assert!(css.contains("--line-height: 1.6"));
+}
+
+#[test]
+fn css_vars_custom_font_sizes() {
+    let settings = typo_settings(&[
+        ("font_size_body", "18px"),
+        ("font_size_h1", "3rem"),
+        ("font_size_h2", "2.5rem"),
+        ("font_size_logo", "2rem"),
+        ("font_size_nav", "16px"),
+        ("font_line_height", "1.8"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--font-size-body: 18px"));
+    assert!(css.contains("--font-size-h1: 3rem"));
+    assert!(css.contains("--font-size-h2: 2.5rem"));
+    assert!(css.contains("--font-size-logo: 2rem"));
+    assert!(css.contains("--font-size-nav: 16px"));
+    assert!(css.contains("--line-height: 1.8"));
+}
+
+#[test]
+fn css_vars_text_transform_direction_alignment() {
+    let settings = typo_settings(&[
+        ("font_text_transform", "uppercase"),
+        ("font_text_direction", "rtl"),
+        ("font_text_alignment", "center"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--text-transform: uppercase"));
+    assert!(css.contains("--text-direction: rtl"));
+    assert!(css.contains("--text-alignment: center"));
+}
+
+#[test]
+fn css_vars_text_defaults() {
+    let settings = typo_settings(&[]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--text-transform: none"));
+    assert!(css.contains("--text-direction: ltr"));
+    assert!(css.contains("--text-alignment: left"));
+}
+
+#[test]
+fn css_vars_layout_sidebar_left() {
+    let settings = typo_settings(&[("layout_sidebar_position", "left")]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--sidebar-direction: row"));
+}
+
+#[test]
+fn css_vars_layout_sidebar_right() {
+    let settings = typo_settings(&[("layout_sidebar_position", "right")]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--sidebar-direction: row-reverse"));
+}
+
+#[test]
+fn css_vars_layout_margins() {
+    let settings = typo_settings(&[
+        ("layout_margin_top", "20"),
+        ("layout_margin_bottom", "30"),
+        ("layout_margin_left", "10"),
+        ("layout_margin_right", "15"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--content-margin-top: 20px"));
+    assert!(css.contains("--content-margin-bottom: 30px"));
+    assert!(css.contains("--content-margin-left: 10px"));
+    assert!(css.contains("--content-margin-right: 15px"));
+}
+
+#[test]
+fn css_vars_layout_margins_zero() {
+    let settings = typo_settings(&[]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--content-margin-top: 0"));
+    assert!(css.contains("--content-margin-bottom: 0"));
+    assert!(css.contains("--content-margin-left: 0"));
+    assert!(css.contains("--content-margin-right: 0"));
+}
+
+#[test]
+fn css_vars_layout_margins_with_px_suffix() {
+    let settings = typo_settings(&[("layout_margin_top", "20px")]);
+    let css = typography::build_css_variables(&settings);
+    // Should strip existing px and re-add it
+    assert!(css.contains("--content-margin-top: 20px"));
+    assert!(!css.contains("--content-margin-top: 20pxpx"));
+}
+
+#[test]
+fn css_vars_content_boundary_boxed() {
+    let settings = typo_settings(&[("layout_content_boundary", "boxed")]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--content-max-width: 1200px"));
+}
+
+#[test]
+fn css_vars_content_boundary_full() {
+    let settings = typo_settings(&[("layout_content_boundary", "full")]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--content-max-width: none"));
+}
+
+#[test]
+fn css_vars_grid_columns() {
+    let settings = typo_settings(&[("portfolio_grid_columns", "4"), ("blog_grid_columns", "2")]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--grid-columns: 4"));
+    assert!(css.contains("--blog-grid-columns: 2"));
+}
+
+#[test]
+fn css_vars_lightbox_colors() {
+    let settings = typo_settings(&[
+        ("portfolio_lightbox_border_color", "#FF0000"),
+        ("portfolio_lightbox_title_color", "#00FF00"),
+        ("portfolio_lightbox_tag_color", "#0000FF"),
+        ("portfolio_lightbox_nav_color", "#FFFF00"),
+    ]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.contains("--lightbox-border-color: #FF0000"));
+    assert!(css.contains("--lightbox-title-color: #00FF00"));
+    assert!(css.contains("--lightbox-tag-color: #0000FF"));
+    assert!(css.contains("--lightbox-nav-color: #FFFF00"));
+}
+
+#[test]
+fn css_vars_wraps_in_root_selector() {
+    let settings = typo_settings(&[]);
+    let css = typography::build_css_variables(&settings);
+    assert!(css.starts_with(":root {"));
+    assert!(css.ends_with("}"));
+}
+
+// ── Font Links Tests ───────────────────────────────────────────────────
+
+#[test]
+fn font_links_empty_when_no_providers() {
+    let settings = typo_settings(&[]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.is_empty());
+}
+
+#[test]
+fn font_links_google_basic() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "Roboto"),
+        ("font_heading", "Inter"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("fonts.googleapis.com"));
+    assert!(html.contains("fonts.gstatic.com"));
+    assert!(html.contains("family=Roboto"));
+    assert!(html.contains("family=Inter"));
+}
+
+#[test]
+fn font_links_google_deduplicates() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "Roboto"),
+        ("font_heading", "Roboto"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    // Should only appear once
+    let count = html.matches("family=Roboto").count();
+    assert_eq!(count, 1);
+}
+
+#[test]
+fn font_links_google_per_element_fonts_not_sitewide() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "Roboto"),
+        ("font_heading", "Inter"),
+        ("font_sitewide", "false"),
+        ("font_body", "Lato"),
+        ("font_navigation", "Montserrat"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("family=Roboto"));
+    assert!(html.contains("family=Inter"));
+    assert!(html.contains("family=Lato"));
+    assert!(html.contains("family=Montserrat"));
+}
+
+#[test]
+fn font_links_google_independent_element_fonts() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "Inter"),
+        ("font_heading", "Inter"),
+        ("font_logo", "Pacifico"),
+        ("font_footer", "Nunito"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("family=Pacifico"));
+    assert!(html.contains("family=Nunito"));
+}
+
+#[test]
+fn font_links_google_skips_system_fonts() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "system-ui"),
+        ("font_heading", "Georgia, serif"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    // system-ui and Georgia are system fonts, should not generate Google Fonts link
+    assert!(!html.contains("fonts.googleapis.com"));
+}
+
+#[test]
+fn font_links_google_skips_adobe_prefixed() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "adobe-caslon-pro"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(!html.contains("adobe-caslon-pro"));
+}
+
+#[test]
+fn font_links_adobe() {
+    let settings = typo_settings(&[
+        ("font_adobe_enabled", "true"),
+        ("font_adobe_project_id", "abc123xyz"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("use.typekit.net/abc123xyz.css"));
+}
+
+#[test]
+fn font_links_adobe_empty_project_id() {
+    let settings = typo_settings(&[
+        ("font_adobe_enabled", "true"),
+        ("font_adobe_project_id", ""),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(!html.contains("typekit"));
+}
+
+#[test]
+fn font_links_custom_font_face_woff2() {
+    let settings = typo_settings(&[
+        ("font_custom_name", "MyCustomFont"),
+        ("font_custom_filename", "my-font.woff2"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("@font-face"));
+    assert!(html.contains("font-family: 'MyCustomFont'"));
+    assert!(html.contains("/uploads/fonts/my-font.woff2"));
+    assert!(html.contains("format('woff2')"));
+}
+
+#[test]
+fn font_links_custom_font_face_ttf() {
+    let settings = typo_settings(&[
+        ("font_custom_name", "MyFont"),
+        ("font_custom_filename", "my-font.ttf"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("format('truetype')"));
+}
+
+#[test]
+fn font_links_custom_font_face_otf() {
+    let settings = typo_settings(&[
+        ("font_custom_name", "MyFont"),
+        ("font_custom_filename", "my-font.otf"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("format('opentype')"));
+}
+
+#[test]
+fn font_links_custom_font_missing_name_no_output() {
+    let settings = typo_settings(&[
+        ("font_custom_name", ""),
+        ("font_custom_filename", "my-font.woff2"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(!html.contains("@font-face"));
+}
+
+#[test]
+fn font_links_custom_font_missing_file_no_output() {
+    let settings = typo_settings(&[("font_custom_name", "MyFont"), ("font_custom_filename", "")]);
+    let html = typography::build_font_links(&settings);
+    assert!(!html.contains("@font-face"));
+}
+
+#[test]
+fn font_links_google_and_adobe_and_custom_combined() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "Roboto"),
+        ("font_heading", "Roboto"),
+        ("font_adobe_enabled", "true"),
+        ("font_adobe_project_id", "xyz789"),
+        ("font_custom_name", "BrandFont"),
+        ("font_custom_filename", "brand.woff2"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("fonts.googleapis.com"));
+    assert!(html.contains("family=Roboto"));
+    assert!(html.contains("use.typekit.net/xyz789.css"));
+    assert!(html.contains("@font-face"));
+    assert!(html.contains("font-family: 'BrandFont'"));
+}
+
+#[test]
+fn font_links_google_spaces_replaced_with_plus() {
+    let settings = typo_settings(&[
+        ("font_google_enabled", "true"),
+        ("font_primary", "Open Sans"),
+    ]);
+    let html = typography::build_font_links(&settings);
+    assert!(html.contains("family=Open+Sans"));
+    assert!(!html.contains("family=Open Sans"));
+}
+
+// ── Render Integration: CSS vars appear in rendered output ─────────────
+
+#[test]
+fn render_css_vars_in_page_output() {
+    let pool = test_pool();
+    // Set some custom colors
+    Setting::set(&pool, "site_text_color", "#ff1234").unwrap();
+    Setting::set(&pool, "site_background_color", "#001122").unwrap();
+    Setting::set(&pool, "font_primary", "Roboto").unwrap();
+    // Build settings JSON the same way render.rs does
+    let all = Setting::all(&pool);
+    let settings_json: serde_json::Value = all
+        .iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+        .collect::<serde_json::Map<String, serde_json::Value>>()
+        .into();
+    let css = typography::build_css_variables(&settings_json);
+    assert!(css.contains("--color-text: #ff1234"));
+    assert!(css.contains("--color-bg: #001122"));
+    assert!(css.contains("--font-primary: 'Roboto', sans-serif"));
 }
