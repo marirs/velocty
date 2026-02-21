@@ -532,7 +532,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("blog_slug", ""),
         ("blog_posts_per_page", "10"),
         ("blog_display_type", "list"),
-        ("blog_grid_columns", "3"),
+        ("blog_grid_columns", "2"),
         ("blog_list_style", "wide"),
         ("blog_excerpt_words", "40"),
         ("blog_pagination_type", "classic"),
@@ -903,38 +903,6 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
-    // Data migration: remove 'local' from AI failover chain, ensure 'groq' is present
-    {
-        let chain: String = conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = 'ai_failover_chain'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or_else(|_| "ollama,openai,gemini,groq,cloudflare".to_string());
-
-        let mut providers: Vec<&str> = chain
-            .split(',')
-            .map(|s| s.trim())
-            .filter(|s| *s != "local" && !s.is_empty())
-            .collect();
-        if !providers.contains(&"groq") {
-            // Insert groq before cloudflare, or at the end
-            if let Some(pos) = providers.iter().position(|p| *p == "cloudflare") {
-                providers.insert(pos, "groq");
-            } else {
-                providers.push("groq");
-            }
-        }
-        let new_chain = providers.join(",");
-        if new_chain != chain {
-            conn.execute(
-                "UPDATE settings SET value = ?1 WHERE key = 'ai_failover_chain'",
-                params![new_chain],
-            )?;
-        }
-    }
-
     // Backfill legal page content if empty (fix for duplicate seed entries bug)
     for (key, value) in &defaults {
         if (*key == "privacy_policy_content" || *key == "terms_of_use_content") && !value.is_empty()
@@ -945,16 +913,6 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
             )?;
         }
     }
-
-    // Migrate legacy "true" for portfolio show categories/tags to "false" (Don't Show)
-    conn.execute(
-        "UPDATE settings SET value = 'false' WHERE key = 'portfolio_show_categories' AND value = 'true'",
-        [],
-    )?;
-    conn.execute(
-        "UPDATE settings SET value = 'false' WHERE key = 'portfolio_show_tags' AND value = 'true'",
-        [],
-    )?;
 
     // Add parent_id to comments for threaded replies
     let has_parent_id: bool = conn
