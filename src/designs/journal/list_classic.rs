@@ -242,7 +242,7 @@ pub fn render_single(context: &Value) -> String {
 
 /// Build the classic-style comments section.
 /// Uses letter-square avatars and a simplified form (name + comment only).
-fn build_classic_comments(context: &Value, settings: &Value, post_id: i64) -> String {
+pub(crate) fn build_classic_comments(context: &Value, settings: &Value, post_id: i64) -> String {
     let mut html = String::new();
 
     // Render existing comments
@@ -437,7 +437,7 @@ fn build_classic_comments(context: &Value, settings: &Value, post_id: i64) -> St
 }
 
 /// Render a single comment with letter-square avatar.
-fn render_classic_comment(
+pub(crate) fn render_classic_comment(
     html: &mut String,
     comment: &Value,
     all_replies: &[&Value],
@@ -500,7 +500,7 @@ fn render_classic_comment(
 }
 
 /// Extract initials from a name: "John Smith" → "JS", "Alice" → "A".
-fn author_initials(name: &str) -> String {
+pub(crate) fn author_initials(name: &str) -> String {
     let parts: Vec<&str> = name.split_whitespace().collect();
     match parts.len() {
         0 => "?".to_string(),
@@ -519,7 +519,7 @@ fn author_initials(name: &str) -> String {
 }
 
 /// Derive a consistent hue (0–360) from a name string for avatar color.
-fn name_hue(name: &str) -> u32 {
+pub(crate) fn name_hue(name: &str) -> u32 {
     let mut hash: u32 = 0;
     for b in name.bytes() {
         hash = hash.wrapping_mul(31).wrapping_add(b as u32);

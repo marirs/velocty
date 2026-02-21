@@ -553,6 +553,8 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
             let mut pj = serde_json::to_value(p).unwrap_or_default();
             if let Some(obj) = pj.as_object_mut() {
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
+                let cats = Category::for_content(pool, p.id, "post");
+                obj.insert("categories".to_string(), json!(cats));
             }
             pj
         })
@@ -689,11 +691,29 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         .unwrap_or(0);
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
+    let author_name = User::list_all(pool)
+        .into_iter()
+        .find(|u| u.role == "admin")
+        .map(|u| u.display_name)
+        .unwrap_or_default();
+    let posts_json: Vec<serde_json::Value> = posts
+        .iter()
+        .map(|p| {
+            let mut pj = serde_json::to_value(p).unwrap_or_default();
+            if let Some(obj) = pj.as_object_mut() {
+                obj.insert("author_name".to_string(), json!(author_name.clone()));
+                let cats = Category::for_content(pool, p.id, "post");
+                obj.insert("categories".to_string(), json!(cats));
+            }
+            pj
+        })
+        .collect();
+
     let context = json!({
         "settings": settings,
         "nav_categories": nav_categories(pool),
         "nav_journal_categories": nav_journal_categories(pool),
-        "posts": posts,
+        "posts": posts_json,
         "active_category": category,
         "current_page": current_page,
         "total_pages": total_pages,
@@ -756,11 +776,29 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
         .unwrap_or(0);
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
+    let author_name = User::list_all(pool)
+        .into_iter()
+        .find(|u| u.role == "admin")
+        .map(|u| u.display_name)
+        .unwrap_or_default();
+    let posts_json: Vec<serde_json::Value> = posts
+        .iter()
+        .map(|p| {
+            let mut pj = serde_json::to_value(p).unwrap_or_default();
+            if let Some(obj) = pj.as_object_mut() {
+                obj.insert("author_name".to_string(), json!(author_name.clone()));
+                let cats = Category::for_content(pool, p.id, "post");
+                obj.insert("categories".to_string(), json!(cats));
+            }
+            pj
+        })
+        .collect();
+
     let context = json!({
         "settings": settings,
         "nav_categories": nav_categories(pool),
         "nav_journal_categories": nav_journal_categories(pool),
-        "posts": posts,
+        "posts": posts_json,
         "active_tag": tag,
         "current_page": current_page,
         "total_pages": total_pages,
