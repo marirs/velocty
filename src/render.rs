@@ -450,6 +450,19 @@ fn render_with_shell(
         html = crate::image_proxy::rewrite_upload_urls(&html, &proxy_secret);
     }
 
+    // Prepend site comment header
+    let site_url = sg("site_url", "");
+    let comment = format!(
+        "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty\n-->\n",
+        if site_url.is_empty() {
+            "http://localhost:8000"
+        } else {
+            &site_url
+        },
+        html_escape(&design.name),
+    );
+    html.insert_str(0, &comment);
+
     html
 }
 
@@ -564,6 +577,19 @@ pub fn render_legal_page(
         if !proxy_secret.is_empty() {
             html = crate::image_proxy::rewrite_upload_urls(&html, &proxy_secret);
         }
+
+        // Prepend site comment header
+        let site_url = sg("site_url", "");
+        let comment = format!(
+            "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty\n-->\n",
+            if site_url.is_empty() {
+                "http://localhost:8000"
+            } else {
+                &site_url
+            },
+            html_escape(&design.name),
+        );
+        html.insert_str(0, &comment);
 
         html
     };
