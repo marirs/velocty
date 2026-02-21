@@ -3758,6 +3758,191 @@ fn render_blog_list_pagination_classic() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Render: Portfolio Pagination (classic, load_more, infinite)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_portfolio_pagination_classic() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_pagination_type", "classic"),
+        ],
+    );
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "items": [{"item":{"id":1,"title":"A","slug":"a","image_path":"a.jpg","thumbnail_path":"","likes":0,"sell_enabled":false,"price":0.0},"tags":[],"categories":[]}],
+        "current_page": 1,
+        "total_pages": 3,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("pagination"),
+        "classic should render pagination nav"
+    );
+    assert!(body.contains("page=2"), "classic should have page links");
+    assert!(
+        !body.contains("id=\"infinite-sentinel\""),
+        "classic should not have infinite sentinel"
+    );
+    assert!(
+        !body.contains("id=\"load-more-btn\""),
+        "classic should not have load-more button element"
+    );
+}
+
+#[test]
+fn render_portfolio_pagination_load_more() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_pagination_type", "load_more"),
+        ],
+    );
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "items": [{"item":{"id":1,"title":"A","slug":"a","image_path":"a.jpg","thumbnail_path":"","likes":0,"sell_enabled":false,"price":0.0},"tags":[],"categories":[]}],
+        "current_page": 1,
+        "total_pages": 3,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("id=\"load-more-btn\""),
+        "load_more should render load-more button element"
+    );
+    assert!(
+        !body.contains("id=\"infinite-sentinel\""),
+        "load_more should not have infinite sentinel"
+    );
+}
+
+#[test]
+fn render_portfolio_pagination_infinite() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_pagination_type", "infinite"),
+        ],
+    );
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "items": [{"item":{"id":1,"title":"A","slug":"a","image_path":"a.jpg","thumbnail_path":"","likes":0,"sell_enabled":false,"price":0.0},"tags":[],"categories":[]}],
+        "current_page": 1,
+        "total_pages": 3,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("id=\"infinite-sentinel\""),
+        "infinite should render sentinel div element"
+    );
+    assert!(
+        !body.contains("id=\"load-more-btn\""),
+        "infinite should not have load-more button element"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render: Container classes (JS pagination selector correctness)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn render_portfolio_grid_has_grid_container_class() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[
+            ("portfolio_enabled", "true"),
+            ("portfolio_display_type", "masonry"),
+        ],
+    );
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "items": [{"item":{"id":1,"title":"A","slug":"a","image_path":"a.jpg","thumbnail_path":"","likes":0,"sell_enabled":false,"price":0.0},"tags":[],"categories":[]}],
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "portfolio_grid",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "portfolio_grid", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("masonry-grid"),
+        "portfolio masonry should use masonry-grid container (JS selector target)"
+    );
+    assert!(
+        body.contains("grid-item"),
+        "portfolio items should use grid-item class (JS selector target)"
+    );
+}
+
+#[test]
+fn render_blog_list_has_blog_list_container_class() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[("blog_display_type", "list"), ("blog_list_style", "wide")],
+    );
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "posts": [{"title":"A","slug":"a","excerpt":"","content_html":"<p>hello</p>","published_at":"","featured_image":"","author_name":"","word_count":100}],
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "blog_list",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("blog-list"),
+        "journal list should use blog-list container (JS selector target)"
+    );
+}
+
+#[test]
+fn render_blog_list_items_are_articles() {
+    let pool = test_pool();
+    set_settings(
+        &pool,
+        &[("blog_display_type", "list"), ("blog_list_style", "wide")],
+    );
+    let settings = Setting::all(&pool);
+    let ctx = json!({
+        "settings": settings,
+        "posts": [{"title":"Test Post","slug":"test","excerpt":"","content_html":"<p>hello</p>","published_at":"2026-01-01","featured_image":"","author_name":"Alice","word_count":100}],
+        "current_page": 1,
+        "total_pages": 1,
+        "page_type": "blog_list",
+        "seo": "",
+    });
+    let html = render::render_page(&pool, "blog_list", &ctx);
+    let body = body_html(&html);
+    assert!(
+        body.contains("<article"),
+        "journal list items should be <article> elements (JS selector: .blog-list > article)"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
 // Render: Footer Behavior
 // ═══════════════════════════════════════════════════════════
 

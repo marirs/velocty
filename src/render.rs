@@ -2764,6 +2764,24 @@ const LIGHTBOX_JS: &str = r#"
         }
     }
 
+    // Detect container + item selectors for both portfolio and journal pages
+    var _pgGrid = document.querySelector('.masonry-grid, .css-grid');
+    var _pgBlog = document.querySelector('.blog-list');
+    var _pgContainer = _pgGrid || _pgBlog;
+    var _pgItemSel = _pgGrid ? '.grid-item' : '.blog-list > article';
+    var _pgIsMasonry = !!_pgGrid;
+
+    function _pgAppend(html, done) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        var newItems = tmp.querySelectorAll(_pgItemSel);
+        if (_pgContainer && newItems.length) {
+            newItems.forEach(function(el) { _pgContainer.appendChild(el); });
+            if (_pgIsMasonry) layoutMasonry();
+        }
+        if (done) done();
+    }
+
     // Load More button
     var loadMoreBtn = document.getElementById('load-more-btn');
     if (loadMoreBtn) {
@@ -2777,14 +2795,10 @@ const LIGHTBOX_JS: &str = r#"
             fetch(location.pathname + '?page=' + page, { headers: { 'Accept': 'text/html' } })
                 .then(function(r) { return r.text(); })
                 .then(function(html) {
-                    var tmp = document.createElement('div');
-                    tmp.innerHTML = html;
-                    var newItems = tmp.querySelectorAll('.grid-item');
-                    var grid = document.querySelector('.masonry-grid, .css-grid');
-                    newItems.forEach(function(el) { grid.appendChild(el); });
-                    layoutMasonry();
-                    if (page + 1 > total) { btn.style.display = 'none'; }
-                    else { btn.dataset.page = page + 1; btn.textContent = 'Load More'; btn.disabled = false; }
+                    _pgAppend(html, function() {
+                        if (page + 1 > total) { btn.style.display = 'none'; }
+                        else { btn.dataset.page = page + 1; btn.textContent = 'Load More'; btn.disabled = false; }
+                    });
                 })
                 .catch(function() { btn.textContent = 'Load More'; btn.disabled = false; });
         });
@@ -2803,15 +2817,11 @@ const LIGHTBOX_JS: &str = r#"
             fetch(location.pathname + '?page=' + page, { headers: { 'Accept': 'text/html' } })
                 .then(function(r) { return r.text(); })
                 .then(function(html) {
-                    var tmp = document.createElement('div');
-                    tmp.innerHTML = html;
-                    var newItems = tmp.querySelectorAll('.grid-item');
-                    var grid = document.querySelector('.masonry-grid, .css-grid');
-                    newItems.forEach(function(el) { grid.appendChild(el); });
-                    layoutMasonry();
-                    sentinel.dataset.page = page + 1;
-                    loading = false;
-                    if (page + 1 > total) infObs.disconnect();
+                    _pgAppend(html, function() {
+                        sentinel.dataset.page = page + 1;
+                        loading = false;
+                        if (page + 1 > total) infObs.disconnect();
+                    });
                 })
                 .catch(function() { loading = false; });
         }, { threshold: 0 });
