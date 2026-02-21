@@ -6525,3 +6525,202 @@ fn image_opt_webp_quality_setting_used() {
     assert_eq!(q, 60);
     // This quality value should be passed to WebP encoder and JPEG re-encode
 }
+
+// ═══════════════════════════════════════════════════════════
+// Seed Defaults — Blog & Portfolio Slugs
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn seed_defaults_blog_slug_is_homepage() {
+    let pool = test_pool();
+    let blog_slug = Setting::get_or(&pool, "blog_slug", "MISSING");
+    assert_eq!(
+        blog_slug, "",
+        "blog_slug should default to empty (homepage)"
+    );
+}
+
+#[test]
+fn seed_defaults_portfolio_slug_and_disabled() {
+    let pool = test_pool();
+    let portfolio_slug = Setting::get_or(&pool, "portfolio_slug", "MISSING");
+    assert_eq!(portfolio_slug, "portfolio");
+    let portfolio_enabled = Setting::get_or(&pool, "portfolio_enabled", "MISSING");
+    assert_eq!(
+        portfolio_enabled, "false",
+        "portfolio should be disabled by default"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Seed Defaults — Designs (Inkwell active, Oneguy exists)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn seed_defaults_inkwell_active_oneguy_exists() {
+    let pool = test_pool();
+    let active = Design::active(&pool).expect("should have an active design");
+    assert_eq!(
+        active.slug, "inkwell",
+        "Inkwell should be the default active design"
+    );
+
+    let oneguy = Design::find_by_slug(&pool, "oneguy");
+    assert!(oneguy.is_some(), "Oneguy design should exist");
+    assert!(
+        !oneguy.unwrap().is_active,
+        "Oneguy should not be active by default"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Portfolio Renderer — Oneguy (default/fallback)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn portfolio_render_grid_empty_items() {
+    let ctx = serde_json::json!({ "items": [] });
+    let html = crate::designs::oneguy::portfolio::render_grid(&ctx);
+    assert!(
+        html.contains("No portfolio items yet"),
+        "empty grid should show placeholder"
+    );
+}
+
+#[test]
+fn portfolio_render_grid_with_items() {
+    let ctx = serde_json::json!({
+        "items": [
+            {
+                "item": {
+                    "id": 1,
+                    "title": "Sunset",
+                    "slug": "sunset",
+                    "image_path": "sunset.jpg",
+                    "thumbnail_path": "",
+                    "likes": 5,
+                    "sell_enabled": false,
+                    "price": 0.0
+                },
+                "tags": [],
+                "categories": []
+            }
+        ],
+        "settings": {
+            "portfolio_slug": "portfolio",
+            "portfolio_display_type": "masonry",
+            "portfolio_show_tags": "false",
+            "portfolio_show_categories": "false",
+            "portfolio_enable_likes": "false",
+            "portfolio_fade_animation": "none",
+            "portfolio_border_style": "none",
+            "portfolio_show_title": "true"
+        },
+        "current_page": 1,
+        "total_pages": 1
+    });
+    let html = crate::designs::oneguy::portfolio::render_grid(&ctx);
+    assert!(
+        html.contains("masonry-grid"),
+        "should use masonry-grid class"
+    );
+    assert!(
+        html.contains("/portfolio/sunset"),
+        "should link to portfolio item"
+    );
+    assert!(html.contains("Sunset"), "should contain item title");
+}
+
+#[test]
+fn portfolio_render_grid_css_grid_mode() {
+    let ctx = serde_json::json!({
+        "items": [
+            {
+                "item": {
+                    "id": 1,
+                    "title": "A",
+                    "slug": "a",
+                    "image_path": "a.jpg",
+                    "thumbnail_path": "",
+                    "likes": 0,
+                    "sell_enabled": false,
+                    "price": 0.0
+                },
+                "tags": [],
+                "categories": []
+            }
+        ],
+        "settings": {
+            "portfolio_slug": "portfolio",
+            "portfolio_display_type": "grid",
+            "portfolio_show_tags": "false",
+            "portfolio_show_categories": "false",
+            "portfolio_enable_likes": "false",
+            "portfolio_fade_animation": "none",
+            "portfolio_border_style": "none",
+            "portfolio_show_title": "false"
+        },
+        "current_page": 1,
+        "total_pages": 1
+    });
+    let html = crate::designs::oneguy::portfolio::render_grid(&ctx);
+    assert!(
+        html.contains("css-grid"),
+        "display_type=grid should use css-grid class"
+    );
+}
+
+#[test]
+fn portfolio_render_single_valid() {
+    let ctx = serde_json::json!({
+        "item": {
+            "id": 42,
+            "title": "Mountain View",
+            "slug": "mountain-view",
+            "image_path": "mountain.jpg",
+            "description_html": "<p>A beautiful mountain.</p>",
+            "likes": 10,
+            "meta_description": ""
+        },
+        "tags": [
+            { "name": "Nature", "slug": "nature" }
+        ],
+        "categories": [
+            { "name": "Landscape", "slug": "landscape" }
+        ],
+        "settings": {
+            "portfolio_slug": "portfolio",
+            "portfolio_enable_likes": "true",
+            "portfolio_like_position": "top_right",
+            "portfolio_show_categories": "below_left",
+            "portfolio_show_tags": "below_left",
+            "share_icons_position": "none"
+        },
+        "commerce_enabled": false,
+        "comments_enabled": false
+    });
+    let html = crate::designs::oneguy::portfolio::render_single(&ctx);
+    assert!(
+        html.contains("portfolio-single"),
+        "should have portfolio-single wrapper"
+    );
+    assert!(html.contains("Mountain View"), "should contain title");
+    assert!(html.contains("mountain.jpg"), "should contain image path");
+    assert!(
+        html.contains("A beautiful mountain"),
+        "should contain description"
+    );
+    assert!(
+        html.contains("/portfolio/category/landscape"),
+        "should link to category"
+    );
+    assert!(html.contains("/portfolio/tag/nature"), "should link to tag");
+    assert!(html.contains("like-btn"), "should show like button");
+}
+
+#[test]
+fn portfolio_render_single_missing_item_returns_404() {
+    let ctx = serde_json::json!({ "settings": {} });
+    let html = crate::designs::oneguy::portfolio::render_single(&ctx);
+    assert!(html.contains("404"), "missing item should render 404");
+}
