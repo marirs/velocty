@@ -512,8 +512,37 @@ fn serve_file_from_path(path: &str, cache_control: &str) -> Result<FileResponse,
     })
 }
 
+// ── Search ────────────────────────────────────────────
+
+#[get("/search?<q>")]
+pub fn search_page(pool: &State<DbPool>, q: Option<String>) -> RawHtml<String> {
+    let settings = Setting::all(pool);
+    if settings.get("design_site_search").map(|v| v.as_str()) != Some("true") {
+        return RawHtml(String::new());
+    }
+    let query = q.as_deref().unwrap_or("").trim().to_string();
+    let results = if query.is_empty() {
+        vec![]
+    } else {
+        crate::models::search::search(pool, &query, 50)
+    };
+
+    let nav_cats = Category::list_nav_visible(pool, Some("portfolio"));
+    let nav_journal_cats = Category::list_nav_visible(pool, Some("post"));
+    let context = json!({
+        "settings": settings,
+        "nav_categories": nav_cats,
+        "nav_journal_categories": nav_journal_cats,
+        "page_type": "search",
+        "search_query": query,
+        "search_results": results,
+    });
+    RawHtml(render::render_page(pool, "search", &context))
+}
+
 pub fn root_routes() -> Vec<rocket::Route> {
     routes![
+        search_page,
         dynamic_route_index,
         dynamic_route_sub,
         dynamic_route_root,

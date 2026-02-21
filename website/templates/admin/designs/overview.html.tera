@@ -739,9 +739,30 @@
 
                     <div class="cz-sub-heading">Menu Items <small style="opacity:.5">(drag to reorder)</small></div>
                     <input type="hidden" name="nav_order" data-setting="nav_order" value="{{ settings.nav_order | default(value='portfolio,blog,contact') }}">
+                    <input type="hidden" id="search-nav-pos" name="search_nav_position" data-setting="search_nav_position" value="{{ settings.search_nav_position | default(value='after') }}">
+                    <input type="hidden" id="search-nav-enabled" name="design_site_search" data-setting="design_site_search" value="{{ settings.design_site_search | default(value='true') }}">
+
+                    <div id="search-slot-before" class="search-slot" data-pos="before"></div>
                     <div id="nav-sortable" class="nav-sortable">
                         <!-- Items injected by JS based on nav_order -->
                     </div>
+                    <div id="search-slot-after" class="search-slot" data-pos="after"></div>
+
+                    <template id="tpl-search-item">
+                        <div class="search-nav-item" id="search-nav-item">
+                            <div class="search-nav-row">
+                                <button type="button" class="search-pos-btn" id="search-pos-btn" title="Move search position">
+                                    <svg id="search-arrow-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                                </button>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <span class="search-nav-label">Search</span>
+                                <label class="toggle-switch-sm search-toggle" title="Show/hide search in navigation">
+                                    <input type="checkbox" id="search-vis-toggle">
+                                    <span class="toggle-slider-sm"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </template>
 
                     <!-- Hidden templates: JS clones these into the correct nav-sort-item -->
                     {% if settings.portfolio_enabled == "true" %}
@@ -1159,6 +1180,67 @@ function czToggle(btn) {
     }
 
     buildItems();
+})();
+
+// ── Search nav item: click-to-toggle position + visibility ──
+(function() {
+    var posInput = document.getElementById('search-nav-pos');
+    var enabledInput = document.getElementById('search-nav-enabled');
+    var tpl = document.getElementById('tpl-search-item');
+    if (!posInput || !enabledInput || !tpl) return;
+
+    var slotBefore = document.getElementById('search-slot-before');
+    var slotAfter = document.getElementById('search-slot-after');
+
+    // Clone template
+    var clone = tpl.content.cloneNode(true);
+    var item = clone.querySelector('.search-nav-item');
+    var posBtn = clone.querySelector('.search-pos-btn');
+    var arrowSvg = clone.querySelector('#search-arrow-svg');
+    var visToggle = clone.querySelector('#search-vis-toggle');
+
+    function render() {
+        var pos = posInput.value || 'after';
+        var enabled = enabledInput.value === 'true';
+
+        // Place in correct slot
+        var targetSlot = pos === 'before' ? slotBefore : slotAfter;
+        if (item.parentElement !== targetSlot) {
+            targetSlot.appendChild(item);
+        }
+
+        // Arrow direction: points toward where it will move
+        if (pos === 'before') {
+            arrowSvg.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+            posBtn.title = 'Move below navigation';
+        } else {
+            arrowSvg.innerHTML = '<polyline points="18 15 12 9 6 15"/>';
+            posBtn.title = 'Move above navigation';
+        }
+
+        // Visibility toggle
+        visToggle.checked = enabled;
+        item.classList.toggle('search-hidden', !enabled);
+    }
+
+    // Click arrow → toggle position
+    posBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var cur = posInput.value || 'after';
+        posInput.value = cur === 'after' ? 'before' : 'after';
+        item.classList.add('search-moving');
+        setTimeout(function() { item.classList.remove('search-moving'); }, 300);
+        render();
+    });
+
+    // Toggle checkbox → enable/disable
+    visToggle.addEventListener('change', function() {
+        enabledInput.value = this.checked ? 'true' : 'false';
+        render();
+    });
+
+    // Initial render
+    render();
 })();
 
 // ── Category nav visibility toggle (designer) ──
@@ -1741,6 +1823,35 @@ function saveCustomizer() {
 }
 .nav-sort-input:focus { outline:none; border-color:var(--accent); background:var(--bg-input); }
 .nav-sort-disabled { font-size:10px; color:var(--text-tertiary); flex-shrink:0; }
+/* Search nav item in customizer */
+.search-slot { min-height:0; transition:min-height .2s; }
+.search-nav-item {
+    display:flex; flex-direction:column;
+    padding:6px 10px; background:var(--bg-input); border:1px solid var(--border-input);
+    border-radius:6px; user-select:none; font-size:13px; color:var(--text-primary);
+    transition:border-color .25s, box-shadow .25s, opacity .25s, transform .25s;
+    margin:2px 0;
+}
+.search-nav-item:hover { border-color:var(--accent); box-shadow:0 0 0 2px rgba(var(--accent-rgb,59,130,246),.18); }
+.search-nav-item.search-hidden { opacity:.45; }
+.search-nav-item.search-hidden:hover { opacity:.65; }
+.search-nav-item.search-moving { transform:translateY(0); animation:searchSnap .25s ease; }
+@keyframes searchSnap { 0% { transform:translateY(0); opacity:.5; } 50% { transform:translateY(-4px); } 100% { transform:translateY(0); opacity:1; } }
+.search-nav-row { display:flex; align-items:center; gap:8px; }
+.search-nav-label { flex:1; }
+.search-pos-btn {
+    background:none; border:1px solid var(--border-input); border-radius:4px;
+    width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--text-tertiary); transition:color .15s, border-color .15s, background .15s;
+    flex-shrink:0; padding:0;
+}
+.search-pos-btn:hover { color:var(--accent); border-color:var(--accent); background:rgba(var(--accent-rgb,59,130,246),.06); }
+.search-toggle { flex-shrink:0; }
+
+/* Hover glow for all nav sortable items */
+@keyframes navGlow { 0%,100% { box-shadow:0 0 0 1px rgba(var(--accent-rgb,59,130,246),.12); } 50% { box-shadow:0 0 0 3px rgba(var(--accent-rgb,59,130,246),.22); } }
+.nav-sort-item:hover { border-color:var(--accent); animation:navGlow 1.5s ease infinite; }
+
 .nav-sort-cats { margin-top:6px; padding-top:6px; border-top:1px solid var(--border-input); }
 
 /* Category visibility toggles */

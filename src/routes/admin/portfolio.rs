@@ -118,6 +118,7 @@ pub fn portfolio_delete(
         .map(|p| p.title)
         .unwrap_or_default();
     let _ = PortfolioItem::delete(pool, id);
+    crate::models::search::remove_item(pool, "portfolio", id);
     AuditEntry::log(
         pool,
         Some(_admin.user.id),
@@ -256,6 +257,18 @@ pub async fn portfolio_create(
                     .collect();
                 let _ = Tag::set_for_content(pool, id, "portfolio", &tag_ids);
             }
+            // Update search index
+            crate::models::search::upsert_item(
+                pool,
+                "portfolio",
+                id,
+                &form.title,
+                form.description_html.as_deref().unwrap_or(""),
+                &form.slug,
+                Some(&pf.image_path),
+                pf.published_at.as_deref(),
+                final_status == "published",
+            );
             AuditEntry::log(
                 pool,
                 Some(_admin.user.id),
@@ -393,6 +406,18 @@ pub async fn portfolio_update(
             .collect();
         let _ = Tag::set_for_content(pool, id, "portfolio", &tag_ids);
     }
+    // Update search index
+    crate::models::search::upsert_item(
+        pool,
+        "portfolio",
+        id,
+        &form.title,
+        form.description_html.as_deref().unwrap_or(""),
+        &form.slug,
+        Some(&pf.image_path),
+        pf.published_at.as_deref(),
+        final_status == "published",
+    );
     AuditEntry::log(
         pool,
         Some(_admin.user.id),

@@ -39,6 +39,7 @@ fn render_with_shell(
         "blog_list" => render_blog_list(context, &design.slug),
         "blog_single" => render_blog_single(context, &design.slug),
         "archives" => render_archives(context),
+        "search" => render_search_page(context),
         "404" => render_404(context),
         _ => render_404(context),
     };
@@ -195,6 +196,22 @@ fn render_with_shell(
                 }
             }
             _ => {}
+        }
+    }
+
+    // Search icon in nav (if enabled)
+    if sg("design_site_search", "true") == "true" {
+        let search_active = if page_type == "search" { " active" } else { "" };
+        let search_html = format!(
+            "<a href=\"/search\" class=\"nav-link nav-search{}\" aria-label=\"Search\">\
+             <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg>\
+             </a>\n",
+            search_active
+        );
+        if sg("search_nav_position", "after") == "before" {
+            nav_links.insert_str(0, &search_html);
+        } else {
+            nav_links.push_str(&search_html);
         }
     }
 
@@ -2424,6 +2441,140 @@ fn render_archives(context: &Value) -> String {
     html
 }
 
+pub(crate) fn render_search_page(context: &Value) -> String {
+    let settings = context.get("settings").cloned().unwrap_or_default();
+    let query = context
+        .get("search_query")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let results = context
+        .get("search_results")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let blog_slug = settings
+        .get("blog_slug")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let portfolio_slug = settings
+        .get("portfolio_slug")
+        .and_then(|v| v.as_str())
+        .unwrap_or("portfolio");
+    let journal_enabled = settings
+        .get("journal_enabled")
+        .and_then(|v| v.as_str())
+        .unwrap_or("true")
+        == "true";
+    let portfolio_enabled = settings
+        .get("portfolio_enabled")
+        .and_then(|v| v.as_str())
+        .unwrap_or("false")
+        == "true";
+
+    let mut html = String::from("<div class=\"search-page\">");
+
+    // Search form
+    html.push_str(&format!(
+        "<h1 class=\"search-page-title\">Search</h1>\
+         <form class=\"search-form\" action=\"/search\" method=\"get\">\
+         <input type=\"text\" name=\"q\" value=\"{}\" placeholder=\"Search…\" class=\"search-input\" autofocus>\
+         <button type=\"submit\" class=\"search-btn\">\
+         <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg>\
+         </button></form>",
+        html_escape(query)
+    ));
+
+    if query.is_empty() {
+        html.push_str("</div>");
+        return html;
+    }
+
+    if results.is_empty() {
+        html.push_str(&format!(
+            "<p class=\"search-no-results\">No results found for <strong>{}</strong></p>",
+            html_escape(query)
+        ));
+        html.push_str("</div>");
+        return html;
+    }
+
+    // Split results by type
+    let mut posts: Vec<&Value> = vec![];
+    let mut portfolios: Vec<&Value> = vec![];
+    for r in &results {
+        match r.get("item_type").and_then(|v| v.as_str()) {
+            Some("post") => posts.push(r),
+            Some("portfolio") => portfolios.push(r),
+            _ => {}
+        }
+    }
+
+    let both_types =
+        journal_enabled && portfolio_enabled && !posts.is_empty() && !portfolios.is_empty();
+
+    html.push_str(&format!(
+        "<p class=\"search-summary\">{} result{} for <strong>{}</strong></p>",
+        results.len(),
+        if results.len() == 1 { "" } else { "s" },
+        html_escape(query)
+    ));
+
+    // Journal results
+    if !posts.is_empty() && journal_enabled {
+        if both_types {
+            html.push_str("<h2 class=\"search-section-title\">Journal</h2>");
+        }
+        html.push_str("<div class=\"search-results\">");
+        for r in &posts {
+            let title = r.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let slug = r.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let snippet = r.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
+            let date = r.get("date").and_then(|v| v.as_str()).unwrap_or("");
+            let href = slug_url(blog_slug, slug);
+            html.push_str(&format!(
+                "<a href=\"{}\" class=\"search-result\">\
+                 <h3 class=\"search-result-title\">{}</h3>\
+                 <p class=\"search-result-snippet\">{}</p>\
+                 <span class=\"search-result-meta\">{}</span>\
+                 </a>",
+                href,
+                html_escape(title),
+                html_escape(snippet),
+                html_escape(date)
+            ));
+        }
+        html.push_str("</div>");
+    }
+
+    // Portfolio results
+    if !portfolios.is_empty() && portfolio_enabled {
+        if both_types {
+            html.push_str("<h2 class=\"search-section-title\">Portfolio</h2>");
+        }
+        html.push_str("<div class=\"search-results\">");
+        for r in &portfolios {
+            let title = r.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let slug = r.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let snippet = r.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
+            let href = format!("/{}/{}", portfolio_slug, slug);
+            html.push_str(&format!(
+                "<a href=\"{}\" class=\"search-result\">\
+                 <h3 class=\"search-result-title\">{}</h3>\
+                 <p class=\"search-result-snippet\">{}</p>\
+                 </a>",
+                href,
+                html_escape(title),
+                html_escape(snippet),
+            ));
+        }
+        html.push_str("</div>");
+    }
+
+    html.push_str("</div>");
+    html
+}
+
 pub(crate) fn render_404(_context: &Value) -> String {
     r#"<div class="error-page">
     <h1>404</h1>
@@ -3093,6 +3244,55 @@ h6 { font-size: var(--font-size-h6); }
 .error-page h1 { font-size: 72px; color: var(--color-text-secondary); }
 .error-page p { margin-top: 12px; color: var(--color-text-secondary); }
 .error-page a { color: var(--color-accent); text-decoration: none; }
+
+/* ── Search Nav Icon ── */
+.nav-search { display: inline-flex; align-items: center; }
+.nav-search svg { vertical-align: middle; }
+
+/* ── Search Page ── */
+.search-page { max-width: 720px; margin: 0 auto; padding: 48px 20px; }
+.search-page-title { font-size: 28px; font-weight: 700; margin-bottom: 24px; }
+.search-form { display: flex; gap: 8px; margin-bottom: 32px; }
+.search-input {
+    flex: 1; padding: 10px 16px; font-size: 15px;
+    border: 1px solid rgba(0,0,0,.15); border-radius: 4px;
+    background: var(--color-bg); color: var(--color-text);
+    font-family: var(--font-body);
+}
+.search-input:focus { outline: none; border-color: var(--color-accent); }
+.search-btn {
+    padding: 10px 16px; border: 1px solid rgba(0,0,0,.15); border-radius: 4px;
+    background: var(--color-bg); color: var(--color-text); cursor: pointer;
+    display: flex; align-items: center;
+}
+.search-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.search-summary { font-size: 14px; color: var(--color-text-secondary); margin-bottom: 24px; }
+.search-no-results { font-size: 15px; color: var(--color-text-secondary); margin-top: 16px; }
+.search-section-title {
+    font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--color-text-secondary);
+    margin: 32px 0 16px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.search-results { display: flex; flex-direction: column; gap: 0; }
+.search-result {
+    display: block; padding: 20px 0; text-decoration: none;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.search-result:first-child { border-top: 1px solid rgba(0,0,0,.06); }
+.search-result:hover .search-result-title { color: var(--color-accent); }
+.search-result-title {
+    font-size: 17px; font-weight: 600; color: var(--color-text);
+    margin: 0 0 6px; line-height: 1.4; transition: color .2s;
+}
+.search-result-snippet {
+    font-size: 14px; color: var(--color-text-secondary);
+    line-height: 1.6; margin: 0;
+}
+.search-result-meta {
+    font-size: 12px; color: var(--color-text-secondary);
+    margin-top: 4px; display: inline-block;
+}
 "#;
 
 /// Oneguy shell HTML — the full page wrapper with {{placeholder}} tags.

@@ -381,6 +381,8 @@ pub fn settings_save(
         "img",
         "tag",
         "category",
+        "search",
+        "contact",
     ];
 
     fn is_reserved(s: &str) -> bool {

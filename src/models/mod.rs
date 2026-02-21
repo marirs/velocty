@@ -9,6 +9,7 @@ pub mod order;
 pub mod passkey;
 pub mod portfolio;
 pub mod post;
+pub mod search;
 pub mod settings;
 pub mod tag;
 pub mod user;

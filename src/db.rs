@@ -471,6 +471,14 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
+    // Drop the migration connection before FTS calls (avoids deadlock with max_size=1 pools)
+    drop(conn);
+
+    // FTS5 search index
+    crate::models::search::create_fts_table(pool).map_err(|e| e.to_string())?;
+    // Rebuild on startup to ensure index is in sync
+    let _ = crate::models::search::rebuild_index(pool);
+
     Ok(())
 }
 
@@ -521,6 +529,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("security_hcaptcha_secret_key", ""),
         // Visitors (Design)
         ("design_site_search", "true"),
+        ("search_nav_position", "after"),
         // Labels & Branding
         ("blog_label", "journal"),
         ("portfolio_label", "experiences"),

@@ -115,6 +115,7 @@ pub fn posts_delete(
         .map(|p| p.title)
         .unwrap_or_default();
     let _ = Post::delete(pool, id);
+    crate::models::search::remove_item(pool, "post", id);
     AuditEntry::log(
         pool,
         Some(_admin.user.id),
@@ -236,6 +237,18 @@ pub async fn posts_create(
                     .collect();
                 let _ = Tag::set_for_content(pool, id, "post", &tag_ids);
             }
+            // Update search index
+            crate::models::search::upsert_item(
+                pool,
+                "post",
+                id,
+                &form.title,
+                &form.content_html,
+                &form.slug,
+                post_form.featured_image.as_deref(),
+                post_form.published_at.as_deref(),
+                final_status == "published",
+            );
             AuditEntry::log(
                 pool,
                 Some(_admin.user.id),
@@ -358,6 +371,18 @@ pub async fn posts_update(
             .collect();
         let _ = Tag::set_for_content(pool, id, "post", &tag_ids);
     }
+    // Update search index
+    crate::models::search::upsert_item(
+        pool,
+        "post",
+        id,
+        &form.title,
+        &form.content_html,
+        &form.slug,
+        post_form.featured_image.as_deref(),
+        post_form.published_at.as_deref(),
+        final_status == "published",
+    );
     AuditEntry::log(
         pool,
         Some(_admin.user.id),
