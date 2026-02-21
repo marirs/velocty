@@ -77,6 +77,11 @@
         <label class="checkbox-item"><input type="checkbox" name="blog_show_date" value="true" {% if settings.blog_show_date == "true" %}checked{% endif %}> Show date</label>
         <label class="checkbox-item"><input type="checkbox" name="blog_show_reading_time" value="true" {% if settings.blog_show_reading_time == "true" %}checked{% endif %}> Show reading time</label>
         <label class="checkbox-item"><input type="checkbox" name="blog_featured_image_required" value="true" {% if settings.blog_featured_image_required == "true" %}checked{% endif %}> Require featured image</label>
+        <div class="form-group" style="margin-top:12px">
+            <label for="blog_written_by_label">Written By Label</label>
+            <input type="text" id="blog_written_by_label" name="blog_written_by_label" value="{{ settings.blog_written_by_label | default(value='By') }}" placeholder="By">
+            <span class="form-help">Text shown before the author name on single posts (e.g. "By", "Written by", "Words by").</span>
+        </div>
     </div>
 
     </fieldset>

@@ -342,8 +342,10 @@ pub fn render_single(context: &Value) -> String {
 
     // Written by section
     if show_author && !author.is_empty() {
+        let written_by_label = sg("blog_written_by_label", "By");
         html.push_str(&format!(
-            "<div class=\"bws-written-by\"><strong>Written by {}</strong></div>",
+            "<div class=\"bws-written-by\"><strong>{} {}</strong></div>",
+            html_escape(&written_by_label),
             html_escape(author)
         ));
     }

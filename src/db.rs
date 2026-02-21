@@ -540,6 +540,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("blog_show_date", "true"),
         ("blog_show_reading_time", "true"),
         ("blog_featured_image_required", "false"),
+        ("blog_written_by_label", "By"),
         // Portfolio
         ("portfolio_enabled", "false"),
         ("portfolio_slug", "portfolio"),

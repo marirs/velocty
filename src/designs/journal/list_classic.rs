@@ -123,15 +123,17 @@ pub fn render_single(context: &Value) -> String {
 
     // "Written by" section (only if show_author is enabled)
     if show_author && !author.is_empty() {
+        let written_by_label = sg("blog_written_by_label", "By");
         let initials = author_initials(author);
         let hue = name_hue(author);
         html.push_str(&format!(
             "<div class=\"bsc-author-box\">\
              <div class=\"bsc-author-avatar\" style=\"background:hsl({},45%,55%)\">{}</div>\
-             <div class=\"bsc-author-info\">Written by<br><strong>{}</strong></div>\
+             <div class=\"bsc-author-info\">{}<br><strong>{}</strong></div>\
              </div>",
             hue,
             html_escape(&initials),
+            html_escape(&written_by_label),
             html_escape(author),
         ));
     }
