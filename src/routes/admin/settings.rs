@@ -585,13 +585,7 @@ pub fn settings_save(
             "privacy_policy_enabled",
             "terms_of_use_enabled",
         ],
-        "social" => &[
-            "social_brand_colors",
-            "share_enabled",
-            "share_facebook",
-            "share_x",
-            "share_linkedin",
-        ],
+        "social" => &["social_brand_colors", "share_enabled"],
         _ => &[],
     };
     for key in checkbox_keys {

@@ -1361,15 +1361,32 @@ fn build_social_links(settings: &Value) -> String {
         ),
     ];
 
-    let collected: Vec<(String, String, &str, &str)> = platforms
+    // Build a lookup map from setting_key -> (label, icon, color)
+    let platform_map: std::collections::HashMap<&str, (&str, &str, &str)> = platforms
         .iter()
-        .filter_map(|&(key, label, icon, color)| {
-            let url = sg(key);
+        .map(|&(key, label, icon, color)| (key, (label, icon, color)))
+        .collect();
+
+    // Determine iteration order from social_order setting
+    let order_str = sg("social_order");
+    let ordered_keys: Vec<&str> = if order_str.is_empty() {
+        platforms.iter().map(|&(key, _, _, _)| key).collect()
+    } else {
+        order_str.split(',').map(|s| s.trim()).collect()
+    };
+
+    let collected: Vec<(String, String, &str, &str)> = ordered_keys
+        .iter()
+        .filter_map(|&order_key| {
+            // Map order key (e.g. "instagram") to setting key (e.g. "social_instagram")
+            let setting_key = format!("social_{}", order_key);
+            let url = sg(&setting_key);
             if url.is_empty() {
-                None
-            } else {
-                Some((label.to_string(), url, icon, color))
+                return None;
             }
+            platform_map
+                .get(setting_key.as_str())
+                .map(|&(label, icon, color)| (label.to_string(), url, icon, color))
         })
         .collect();
 
@@ -1483,15 +1500,31 @@ fn build_social_links_inline(settings: &Value) -> String {
         ),
     ];
 
-    let collected: Vec<(String, String, &str, &str)> = platforms
+    // Build a lookup map from setting_key -> (label, icon, color)
+    let platform_map: std::collections::HashMap<&str, (&str, &str, &str)> = platforms
         .iter()
-        .filter_map(|&(key, label, icon, color)| {
-            let url = sg(key);
+        .map(|&(key, label, icon, color)| (key, (label, icon, color)))
+        .collect();
+
+    // Determine iteration order from social_order setting
+    let order_str = sg("social_order");
+    let ordered_keys: Vec<&str> = if order_str.is_empty() {
+        platforms.iter().map(|&(key, _, _, _)| key).collect()
+    } else {
+        order_str.split(',').map(|s| s.trim()).collect()
+    };
+
+    let collected: Vec<(String, String, &str, &str)> = ordered_keys
+        .iter()
+        .filter_map(|&order_key| {
+            let setting_key = format!("social_{}", order_key);
+            let url = sg(&setting_key);
             if url.is_empty() {
-                None
-            } else {
-                Some((label.to_string(), url, icon, color))
+                return None;
             }
+            platform_map
+                .get(setting_key.as_str())
+                .map(|&(label, icon, color)| (label.to_string(), url, icon, color))
         })
         .collect();
 
@@ -1559,23 +1592,48 @@ pub(crate) fn build_share_buttons(settings: &Value, page_url: &str, page_title: 
         ),
     ];
 
+    // Build a lookup map from setting_key -> (label, url_tpl, icon, color)
+    let platform_map: std::collections::HashMap<&str, (&str, &str, &str, &str)> = platforms
+        .iter()
+        .map(|&(key, label, url_tpl, icon, color)| (key, (label, url_tpl, icon, color)))
+        .collect();
+
+    // Determine iteration order from share_order setting
+    let order_str = sg("share_order");
+    let ordered_keys: Vec<&str> = if order_str.is_empty() {
+        platforms.iter().map(|&(key, _, _, _, _)| key).collect()
+    } else {
+        order_str
+            .split(',')
+            .map(|s| s.trim())
+            .map(|s| match s {
+                "facebook" => "share_facebook",
+                "x" => "share_x",
+                "linkedin" => "share_linkedin",
+                other => other,
+            })
+            .collect()
+    };
+
     let mut icons = Vec::new();
-    for &(key, label, url_tpl, icon, color) in platforms {
-        if sg(key) != "true" {
+    for &setting_key in &ordered_keys {
+        if sg(setting_key) != "true" {
             continue;
         }
-        let href = url_tpl
-            .replace("{url}", &encoded_url)
-            .replace("{title}", &encoded_title);
-        let style = if brand_colors {
-            format!(" style=\"color:{}\"", color)
-        } else {
-            String::new()
-        };
-        icons.push(format!(
-            "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" class=\"share-icon\" title=\"{}\"{}>{}</a>",
-            href, label, style, icon
-        ));
+        if let Some(&(label, url_tpl, icon, color)) = platform_map.get(setting_key) {
+            let href = url_tpl
+                .replace("{url}", &encoded_url)
+                .replace("{title}", &encoded_title);
+            let style = if brand_colors {
+                format!(" style=\"color:{}\"", color)
+            } else {
+                String::new()
+            };
+            icons.push(format!(
+                "<a href=\"{}\" target=\"_blank\" rel=\"noopener\" class=\"share-icon\" title=\"{}\"{}>{}</a>",
+                href, label, style, icon
+            ));
+        }
     }
 
     if icons.is_empty() {

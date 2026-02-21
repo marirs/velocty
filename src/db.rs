@@ -531,6 +531,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("design_site_search", "true"),
         ("search_nav_position", "after"),
         ("design_powered_by", "false"),
+        ("social_order", "instagram,twitter,facebook,youtube,tiktok,linkedin,pinterest,behance,dribbble,github,vimeo,500px"),
+        ("share_order", "facebook,x,linkedin"),
         // Labels & Branding
         ("blog_label", "journal"),
         ("portfolio_label", "experiences"),
