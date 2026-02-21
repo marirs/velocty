@@ -555,6 +555,8 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
                 let cats = Category::for_content(pool, p.id, "post");
                 obj.insert("categories".to_string(), json!(cats));
+                let cc = Comment::for_post(pool, p.id, "post").len();
+                obj.insert("comment_count".to_string(), json!(cc));
             }
             pj
         })
@@ -704,6 +706,8 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
                 let cats = Category::for_content(pool, p.id, "post");
                 obj.insert("categories".to_string(), json!(cats));
+                let cc = Comment::for_post(pool, p.id, "post").len();
+                obj.insert("comment_count".to_string(), json!(cc));
             }
             pj
         })
@@ -789,6 +793,8 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
                 let cats = Category::for_content(pool, p.id, "post");
                 obj.insert("categories".to_string(), json!(cats));
+                let cc = Comment::for_post(pool, p.id, "post").len();
+                obj.insert("comment_count".to_string(), json!(cc));
             }
             pj
         })

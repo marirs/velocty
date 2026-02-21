@@ -377,13 +377,15 @@ fn render_with_shell(
     html = html.replace("{{font_links}}", &font_links);
     html = html.replace("{{css_vars}}", &css_vars);
     let full_base_css = format!(
-        "{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}",
         BASE_CSS,
         crate::designs::journal::list_classic::css(),
         crate::designs::journal::list_classic::list_css(),
         crate::designs::journal::list_compact::list_css(),
         crate::designs::journal::list_editorial::list_css(),
         crate::designs::journal::list_editorial::single_css(),
+        crate::designs::journal::list_wide::list_css(),
+        crate::designs::journal::list_wide::single_css(),
     );
     html = html.replace("{{base_css}}", &full_base_css);
     html = html.replace("{{design_css}}", &design.style_css);
@@ -498,13 +500,15 @@ pub fn render_legal_page(
         html = html.replace("{{font_links}}", &font_links);
         html = html.replace("{{css_vars}}", &css_vars);
         let full_base_css = format!(
-            "{}{}{}{}{}{}",
+            "{}{}{}{}{}{}{}{}",
             BASE_CSS,
             crate::designs::journal::list_classic::css(),
             crate::designs::journal::list_classic::list_css(),
             crate::designs::journal::list_compact::list_css(),
             crate::designs::journal::list_editorial::list_css(),
             crate::designs::journal::list_editorial::single_css(),
+            crate::designs::journal::list_wide::list_css(),
+            crate::designs::journal::list_wide::single_css(),
         );
         html = html.replace("{{base_css}}", &full_base_css);
         html = html.replace("{{design_css}}", &design.style_css);
@@ -2589,6 +2593,9 @@ fn render_blog_list(context: &Value) -> String {
     if display_type_peek == "list" && list_style_peek == "editorial" {
         return crate::designs::journal::list_editorial::render_list(context);
     }
+    if display_type_peek == "list" && list_style_peek == "wide" {
+        return crate::designs::journal::list_wide::render_list(context);
+    }
 
     let posts = match context.get("posts") {
         Some(Value::Array(p)) => p,
@@ -2767,6 +2774,9 @@ fn render_blog_single(context: &Value) -> String {
     }
     if list_style == "editorial" {
         return crate::designs::journal::list_editorial::render_single(context);
+    }
+    if list_style == "wide" {
+        return crate::designs::journal::list_wide::render_single(context);
     }
 
     let post = match context.get("post") {
