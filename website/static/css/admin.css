@@ -1064,12 +1064,15 @@ input[type="file"]::file-selector-button:hover {
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     cursor: grab;
-    transition: background 150ms, box-shadow 150ms;
+    transition: background 150ms, box-shadow 250ms, border-color 150ms;
     user-select: none;
 }
 
+@keyframes failoverGlow { 0%,100% { box-shadow:0 0 0 1px rgba(232,145,58,.12); } 50% { box-shadow:0 0 0 3px rgba(232,145,58,.22); } }
 .failover-item:hover {
     background: var(--bg-card-hover);
+    border-color: var(--accent);
+    animation: failoverGlow 1.5s ease infinite;
 }
 
 .failover-item.dragging {
