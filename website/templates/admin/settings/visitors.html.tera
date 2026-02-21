@@ -5,7 +5,7 @@
 
 <div class="settings-nav">
     <a href="/{{ admin_slug }}/settings/general" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Site</a>
-    <a href="/{{ admin_slug }}/settings/design" class="tab active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Visitors</a>
+    <a href="/{{ admin_slug }}/settings/visitors" class="tab active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a1.5 1.5 0 0 1 0 2.12l-7.07 7.07a1.5 1.5 0 0 1-2.12 0l-4.24-4.24a1.5 1.5 0 0 1 0-2.12l7.07-7.07a1.5 1.5 0 0 1 2.12 0z"/></svg>Visitors</a>
     <a href="/{{ admin_slug }}/settings/pages" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Pages</a>
     <a href="/{{ admin_slug }}/settings/comments" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comments</a>
     <a href="/{{ admin_slug }}/settings/typography" class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>Typography</a>
@@ -26,7 +26,7 @@
     <button type="button" class="tab" data-panel="panel-terms">Terms of Use{% if settings.terms_of_use_enabled == "true" %} <span class="status-dot enabled" style="margin-left:4px"></span>{% endif %}</button>
 </div>
 
-<form method="post" action="/{{ admin_slug }}/settings/design">
+<form method="post" action="/{{ admin_slug }}/settings/visitors">
 
     <!-- General Panel -->
     <div id="panel-general" class="sub-panel">
@@ -34,6 +34,7 @@
             <h3>UI Features</h3>
             <label class="checkbox-item"><input type="checkbox" name="design_site_search" value="true" {% if settings.design_site_search == "true" %}checked{% endif %}> Site Search <span class="status-dot {% if settings.design_site_search == 'true' %}dot-on{% else %}dot-off{% endif %}"></span></label>
             <label class="checkbox-item"><input type="checkbox" name="design_back_to_top" value="true" {% if settings.design_back_to_top == "true" %}checked{% endif %}> Show back-to-top button</label>
+            <label class="checkbox-item"><input type="checkbox" name="design_powered_by" value="true" {% if settings.design_powered_by == "true" %}checked{% endif %}> Proudly show "Powered using Velocty" statement</label>
         </div>
 
         <div class="form-card">
@@ -135,7 +136,7 @@ if (location.hash && document.getElementById(location.hash.substring(1))) {
     activatePanel(location.hash.substring(1));
 }
 // Append current hash to form action on submit
-document.querySelector('form[action*="settings/design"]').addEventListener('submit', function() {
+document.querySelector('form[action*="settings/visitors"]').addEventListener('submit', function() {
     var active = document.querySelector('.sub-tabs .tab.active');
     if (active) {
         var input = document.createElement('input');
@@ -198,7 +199,7 @@ if (location.hash === '#panel-privacy') setTimeout(function() { initTmce('privac
 if (location.hash === '#panel-terms') setTimeout(function() { initTmce('terms-content'); }, 100);
 
 // Ensure TinyMCE content is synced before form submit
-document.querySelector('form[action*="settings/design"]').addEventListener('submit', function() {
+document.querySelector('form[action*="settings/visitors"]').addEventListener('submit', function() {
     if (typeof tinymce !== 'undefined') tinymce.triggerSave();
 });
 </script>

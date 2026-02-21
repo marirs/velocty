@@ -530,6 +530,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         // Visitors (Design)
         ("design_site_search", "true"),
         ("search_nav_position", "after"),
+        ("design_powered_by", "false"),
         // Labels & Branding
         ("blog_label", "journal"),
         ("portfolio_label", "experiences"),

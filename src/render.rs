@@ -242,10 +242,12 @@ fn render_with_shell(
     let copyright_align = sg("copyright_alignment", "center");
     let social_footer_align = sg("footer_alignment", "center");
 
+    let powered_by = sg("design_powered_by", "false") == "true";
+
     let footer_inner = {
         let has_copyright = !copyright_text.is_empty();
         let has_social = !social_footer.is_empty();
-        if !has_copyright && !has_social {
+        if !has_copyright && !has_social && !powered_by {
             String::new()
         } else {
             let copyright_html = if has_copyright {
@@ -255,6 +257,11 @@ fn render_with_shell(
             };
             let social_html = if has_social {
                 format!("<span class=\"footer-social\">{}</span>", social_footer)
+            } else {
+                String::new()
+            };
+            let powered_html = if powered_by {
+                "<span class=\"footer-powered\">Powered using <a href=\"https://velocty.io\" target=\"_blank\" rel=\"noopener\">Velocty</a></span>".to_string()
             } else {
                 String::new()
             };
@@ -278,6 +285,10 @@ fn render_with_shell(
                     "right" => right.push_str(&social_html),
                     _ => left.push_str(&social_html),
                 }
+            }
+            // Powered by always goes to the right
+            if powered_by {
+                right.push_str(&powered_html);
             }
 
             format!(
@@ -3584,6 +3595,13 @@ pub const ONEGUY_DESIGN_CSS: &str = r#"
     white-space: nowrap;
 }
 .footer-copyright a { color: inherit; }
+.footer-powered {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+.footer-powered a { color: var(--color-accent); text-decoration: none; }
+.footer-powered a:hover { text-decoration: underline; }
 .footer-social {
     display: flex;
     align-items: center;

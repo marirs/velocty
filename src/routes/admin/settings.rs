@@ -48,7 +48,7 @@ pub fn settings_page(
         "images",
         "seo",
         "security",
-        "design",
+        "visitors",
         "social",
         "commerce",
         "paypal",
@@ -66,7 +66,7 @@ pub fn settings_page(
 
     let section_label = match section {
         "general" => "Site".to_string(),
-        "design" => "Visitors".to_string(),
+        "visitors" => "Visitors".to_string(),
         "pages" => "Pages".to_string(),
         "images" => "Media".to_string(),
         other => {
@@ -576,9 +576,10 @@ pub fn settings_save(
             "video_upload_enabled",
         ],
         "typography" => &["font_google_enabled", "font_adobe_enabled", "font_sitewide"],
-        "design" => &[
+        "visitors" => &[
             "design_site_search",
             "design_back_to_top",
+            "design_powered_by",
             "cookie_consent_enabled",
             "cookie_consent_show_reject",
             "privacy_policy_enabled",
