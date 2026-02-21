@@ -178,8 +178,8 @@
         </div>
         <div class="form-group">
             <label for="copyright_text">Copyright Text</label>
-            <input type="text" id="copyright_text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}" placeholder="Leave empty for default: © 2026 Site Name">
-            <span class="form-help">Custom copyright text for the sidebar footer. Leave empty for auto-generated.</span>
+            <input type="text" id="copyright_text" name="copyright_text" value="{{ settings.copyright_text | default(value='') }}">
+            <span class="form-help">Custom copyright text for the sidebar footer.</span>
         </div>
     </div>
 
