@@ -73,7 +73,7 @@ fn render_with_shell(
 
     // ── Navigation ──
     let nav_cats_mode = sg("portfolio_nav_categories", "under_link");
-    let _header_type_early = sg("layout_header_type", "sidebar");
+    let header_type = sg("layout_header_type", "sidebar");
     let portfolio_slug = sg("portfolio_slug", "portfolio");
     let portfolio_label = sg("portfolio_label", "experiences");
     let portfolio_enabled = sg("portfolio_enabled", "false") == "true";
@@ -81,7 +81,8 @@ fn render_with_shell(
     // categories_html: inline in nav (under_link for sidebar, submenu for topbar)
     let categories_html =
         if portfolio_enabled && (nav_cats_mode == "under_link" || nav_cats_mode == "submenu") {
-            let start_open = nav_cats_mode == "under_link"; // sidebar under_link starts open, topbar submenu starts closed
+            // sidebar under_link: start open; topbar submenu: start closed
+            let start_open = header_type == "sidebar" && nav_cats_mode == "under_link";
             build_categories_sidebar(context, start_open)
         } else {
             String::new()
@@ -120,7 +121,8 @@ fn render_with_shell(
     let journal_cats_mode = sg("journal_nav_categories", "hidden");
 
     let journal_categories_html = if blog_enabled && journal_cats_mode == "under_link" {
-        build_journal_categories_sidebar(context, true)
+        let start_open = header_type == "sidebar";
+        build_journal_categories_sidebar(context, start_open)
     } else {
         String::new()
     };
@@ -377,13 +379,15 @@ fn render_with_shell(
     html = html.replace("{{font_links}}", &font_links);
     html = html.replace("{{css_vars}}", &css_vars);
     let full_base_css = format!(
-        "{}{}{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}{}{}",
         BASE_CSS,
         crate::designs::oneguy::journal::list_classic::css(),
         crate::designs::oneguy::journal::list_classic::list_css(),
         crate::designs::oneguy::journal::list_compact::list_css(),
         crate::designs::oneguy::journal::list_editorial::list_css(),
         crate::designs::oneguy::journal::list_editorial::single_css(),
+        crate::designs::oneguy::journal::grid::css(),
+        crate::designs::oneguy::journal::grid::single_css(),
         crate::designs::inkwell::journal::list_css(),
         crate::designs::inkwell::journal::single_css(),
     );
@@ -513,13 +517,15 @@ pub fn render_legal_page(
         html = html.replace("{{font_links}}", &font_links);
         html = html.replace("{{css_vars}}", &css_vars);
         let full_base_css = format!(
-            "{}{}{}{}{}{}{}{}",
+            "{}{}{}{}{}{}{}{}{}{}",
             BASE_CSS,
             crate::designs::oneguy::journal::list_classic::css(),
             crate::designs::oneguy::journal::list_classic::list_css(),
             crate::designs::oneguy::journal::list_compact::list_css(),
             crate::designs::oneguy::journal::list_editorial::list_css(),
             crate::designs::oneguy::journal::list_editorial::single_css(),
+            crate::designs::oneguy::journal::grid::css(),
+            crate::designs::oneguy::journal::grid::single_css(),
             crate::designs::inkwell::journal::list_css(),
             crate::designs::inkwell::journal::single_css(),
         );
@@ -1972,7 +1978,6 @@ fn render_blog_list(context: &Value, design_slug: &str) -> String {
 
     // Container class based on display type
     let container_class = match display_type.as_str() {
-        "masonry" => "blog-list blog-masonry",
         "grid" => "blog-list blog-grid",
         _ => match list_style.as_str() {
             "editorial" => "blog-list blog-editorial",
@@ -2792,9 +2797,10 @@ const LIGHTBOX_JS: &str = r#"
 
     // Detect container + item selectors for both portfolio and journal pages
     var _pgGrid = document.querySelector('.masonry-grid, .css-grid');
+    var _pgBlogCards = document.querySelector('.bgrid-cards');
     var _pgBlog = document.querySelector('.blog-list');
-    var _pgContainer = _pgGrid || _pgBlog;
-    var _pgItemSel = _pgGrid ? '.grid-item' : '.blog-list > article';
+    var _pgContainer = _pgGrid || _pgBlogCards || _pgBlog;
+    var _pgItemSel = _pgGrid ? '.grid-item' : (_pgBlogCards ? 'article' : '.blog-list > article');
     var _pgIsMasonry = !!_pgGrid;
 
     function _pgAppend(html, done) {
@@ -3705,6 +3711,9 @@ body.topbar-layout.footer-always-visible .site-footer {
     max-width: 900px;
     padding: 28px 30px;
 }
+.blog-list.blog-grid {
+    max-width: none;
+}
 
 .blog-list > h1 {
     font-size: 18px;
@@ -3743,8 +3752,6 @@ body.topbar-layout.footer-always-visible .site-footer {
     height: auto;
     aspect-ratio: 4/3;
 }
-.blog-grid .blog-thumb-placeholder,
-.blog-masonry .blog-thumb-placeholder,
 .blog-editorial .blog-thumb-placeholder {
     width: 100%;
     height: 200px;
@@ -3776,36 +3783,6 @@ body.topbar-layout.footer-always-visible .site-footer {
     line-height: 1.6;
     text-align: justify;
 }
-
-/* Blog Grid mode */
-.blog-list.blog-grid {
-    display: grid;
-    grid-template-columns: repeat(var(--blog-grid-columns, 3), 1fr);
-    gap: 24px;
-    max-width: none;
-}
-.blog-grid .blog-item {
-    flex-direction: column;
-    gap: 8px;
-    border-bottom: none;
-    padding-bottom: 0;
-}
-.blog-grid .blog-thumb img { width: 100%; height: 200px; }
-
-/* Blog Masonry mode */
-.blog-list.blog-masonry {
-    column-count: var(--blog-grid-columns, 3);
-    column-gap: 24px;
-    max-width: none;
-}
-.blog-masonry .blog-item {
-    break-inside: avoid;
-    flex-direction: column;
-    gap: 8px;
-    border-bottom: none;
-    padding-bottom: 0;
-}
-.blog-masonry .blog-thumb img { width: 100%; height: auto; }
 
 
 /* Blog Editorial list style */
@@ -4186,7 +4163,10 @@ body.topbar-layout .site-wrapper { display: none; }
 .topbar-page .content {
     flex: 1;
     margin-left: 0;
-    padding: var(--grid-gap);
+    padding-top: var(--content-margin-top, var(--grid-gap));
+    padding-bottom: var(--content-margin-bottom, var(--grid-gap));
+    padding-left: var(--content-margin-left, var(--grid-gap));
+    padding-right: var(--content-margin-right, var(--grid-gap));
 }
 .topbar-page .site-footer {
     margin-top: auto;

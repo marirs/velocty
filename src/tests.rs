@@ -2658,12 +2658,12 @@ fn render_sidebar_under_link_has_toggle_open() {
     // Toggle should have "open" class (sidebar under_link starts open)
     assert!(
         html.contains("nav-category-toggle open"),
-        "under_link toggle should start open"
+        "under_link toggle should start open in sidebar"
     );
     // Subcategories div should also be open
     assert!(
         html.contains("nav-subcategories open"),
-        "under_link subcategories should start open"
+        "under_link subcategories should start open in sidebar"
     );
     // "All" link present
     assert!(html.contains(">All</a>"), "should have 'All' category link");
@@ -3607,22 +3607,6 @@ fn render_blog_list_grid_display() {
 }
 
 #[test]
-fn render_blog_list_masonry_display() {
-    let pool = test_pool();
-    // Activate Oneguy design — masonry display is an Oneguy feature
-    let oneguy = Design::find_by_slug(&pool, "oneguy").unwrap();
-    Design::activate(&pool, oneguy.id).unwrap();
-    set_settings(&pool, &[("blog_display_type", "masonry")]);
-    let ctx = render_blog_context(&pool);
-    let html = render::render_page(&pool, "blog_list", &ctx);
-    let body = body_html(&html);
-    assert!(
-        body.contains("blog-masonry"),
-        "masonry display type should produce blog-masonry class"
-    );
-}
-
-#[test]
 fn render_blog_list_default_list_display() {
     let pool = test_pool();
     set_settings(&pool, &[("blog_display_type", "list")]);
@@ -3636,10 +3620,6 @@ fn render_blog_list_default_list_display() {
     assert!(
         !body.contains("blog-grid"),
         "list display should not have blog-grid"
-    );
-    assert!(
-        !body.contains("blog-masonry"),
-        "list display should not have blog-masonry"
     );
 }
 
@@ -5502,13 +5482,14 @@ fn render_journal_sidebar_under_link_has_toggle() {
     let ctx = render_blog_nav_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
 
+    // Sidebar under_link starts open
     assert!(
         html.contains("nav-category-toggle open"),
-        "under_link toggle should start open"
+        "under_link toggle should start open in sidebar"
     );
     assert!(
         html.contains("nav-subcategories open"),
-        "under_link subcategories should start open"
+        "under_link subcategories should start open in sidebar"
     );
     assert!(html.contains(">All</a>"), "should have 'All' journal link");
     assert!(
