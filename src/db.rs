@@ -480,7 +480,7 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     let defaults = vec![
         // General
         ("site_name", "Velocty"),
-        ("site_caption", ""),
+        ("site_caption", "Not just another CMS"),
         ("site_logo", ""),
         ("site_favicon", ""),
         ("site_url", "http://localhost:8000"),
