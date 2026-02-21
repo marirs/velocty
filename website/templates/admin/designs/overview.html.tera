@@ -194,11 +194,14 @@
                     <div class="cz-field">
                         <label>Journal Display</label>
                         <select name="blog_display_type" data-setting="blog_display_type" onchange="czConditions()">
+                            {% if design.slug != "inkwell" %}
                             <option value="grid" {% if settings.blog_display_type is defined and settings.blog_display_type == "grid" %}selected{% endif %}>Grid</option>
                             <option value="masonry" {% if settings.blog_display_type is defined and settings.blog_display_type == "masonry" %}selected{% endif %}>Masonry</option>
+                            {% endif %}
                             <option value="list" {% if not settings.blog_display_type is defined or settings.blog_display_type == "list" %}selected{% endif %}>List</option>
                         </select>
                     </div>
+                    {% if design.slug != "inkwell" %}
                     <div class="cz-field" data-cz-show="blog_display_type=grid,blog_display_type=masonry">
                         <label>Journal Columns</label>
                         <select name="blog_grid_columns" data-setting="blog_grid_columns">
@@ -207,12 +210,15 @@
                             <option value="4" {% if settings.blog_grid_columns is defined and settings.blog_grid_columns == "4" %}selected{% endif %}>4</option>
                         </select>
                     </div>
+                    {% endif %}
                     <div class="cz-field" data-cz-show="blog_display_type=list">
                         <label>List Style</label>
                         <select name="blog_list_style" data-setting="blog_list_style">
+                            {% if design.slug != "inkwell" %}
                             <option value="compact" {% if not settings.blog_list_style is defined or settings.blog_list_style == "compact" %}selected{% endif %}>Compact</option>
                             <option value="classic" {% if settings.blog_list_style is defined and settings.blog_list_style == "classic" %}selected{% endif %}>Classic</option>
                             <option value="editorial" {% if settings.blog_list_style is defined and settings.blog_list_style == "editorial" %}selected{% endif %}>Editorial</option>
+                            {% endif %}
                             <option value="wide" {% if settings.blog_list_style is defined and settings.blog_list_style == "wide" %}selected{% endif %}>Wide</option>
                         </select>
                     </div>
@@ -1647,6 +1653,16 @@ function saveCustomizer() {
 .cz-field select:focus {
     outline: none;
     border-color: var(--accent);
+}
+.cz-readonly {
+    display: block;
+    padding: 7px 10px;
+    font-size: 13px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 5px;
+    color: var(--text-secondary);
+    opacity: .7;
 }
 .cz-color-row {
     display: flex;

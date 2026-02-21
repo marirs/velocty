@@ -36,8 +36,8 @@ fn render_with_shell(
     let body_html = match template_type {
         "homepage" | "portfolio_grid" => render_portfolio_grid(context),
         "portfolio_single" => render_portfolio_single(context),
-        "blog_list" => render_blog_list(context),
-        "blog_single" => render_blog_single(context),
+        "blog_list" => render_blog_list(context, &design.slug),
+        "blog_single" => render_blog_single(context, &design.slug),
         "archives" => render_archives(context),
         "404" => render_404(context),
         _ => render_404(context),
@@ -379,13 +379,13 @@ fn render_with_shell(
     let full_base_css = format!(
         "{}{}{}{}{}{}{}{}",
         BASE_CSS,
-        crate::designs::journal::list_classic::css(),
-        crate::designs::journal::list_classic::list_css(),
-        crate::designs::journal::list_compact::list_css(),
-        crate::designs::journal::list_editorial::list_css(),
-        crate::designs::journal::list_editorial::single_css(),
-        crate::designs::journal::list_wide::list_css(),
-        crate::designs::journal::list_wide::single_css(),
+        crate::designs::oneguy::journal::list_classic::css(),
+        crate::designs::oneguy::journal::list_classic::list_css(),
+        crate::designs::oneguy::journal::list_compact::list_css(),
+        crate::designs::oneguy::journal::list_editorial::list_css(),
+        crate::designs::oneguy::journal::list_editorial::single_css(),
+        crate::designs::inkwell::journal::list_css(),
+        crate::designs::inkwell::journal::single_css(),
     );
     html = html.replace("{{base_css}}", &full_base_css);
     html = html.replace("{{design_css}}", &design.style_css);
@@ -502,13 +502,13 @@ pub fn render_legal_page(
         let full_base_css = format!(
             "{}{}{}{}{}{}{}{}",
             BASE_CSS,
-            crate::designs::journal::list_classic::css(),
-            crate::designs::journal::list_classic::list_css(),
-            crate::designs::journal::list_compact::list_css(),
-            crate::designs::journal::list_editorial::list_css(),
-            crate::designs::journal::list_editorial::single_css(),
-            crate::designs::journal::list_wide::list_css(),
-            crate::designs::journal::list_wide::single_css(),
+            crate::designs::oneguy::journal::list_classic::css(),
+            crate::designs::oneguy::journal::list_classic::list_css(),
+            crate::designs::oneguy::journal::list_compact::list_css(),
+            crate::designs::oneguy::journal::list_editorial::list_css(),
+            crate::designs::oneguy::journal::list_editorial::single_css(),
+            crate::designs::inkwell::journal::list_css(),
+            crate::designs::inkwell::journal::single_css(),
         );
         html = html.replace("{{base_css}}", &full_base_css);
         html = html.replace("{{design_css}}", &design.style_css);
@@ -2576,25 +2576,19 @@ fn render_portfolio_single(context: &Value) -> String {
     html
 }
 
-fn render_blog_list(context: &Value) -> String {
-    // Delegate to design-specific renderer based on list style
-    let settings_peek = context.get("settings").cloned().unwrap_or_default();
-    let list_style_peek = settings_peek
-        .get("blog_list_style")
-        .and_then(|v| v.as_str())
-        .unwrap_or("compact");
-    let display_type_peek = settings_peek
-        .get("blog_display_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("grid");
-    if display_type_peek == "list" && list_style_peek == "compact" {
-        return crate::designs::journal::list_compact::render_list(context);
-    }
-    if display_type_peek == "list" && list_style_peek == "editorial" {
-        return crate::designs::journal::list_editorial::render_list(context);
-    }
-    if display_type_peek == "list" && list_style_peek == "wide" {
-        return crate::designs::journal::list_wide::render_list(context);
+fn render_blog_list(context: &Value, design_slug: &str) -> String {
+    // Delegate to design-specific renderer based on active design
+    match design_slug {
+        "inkwell" => {
+            return crate::designs::inkwell::journal::render_list(context);
+        }
+        "oneguy" => {
+            if let Some(html) = crate::designs::oneguy::journal::render_list(context) {
+                return html;
+            }
+            // fall through to default grid renderer
+        }
+        _ => {}
     }
 
     let posts = match context.get("posts") {
@@ -2762,23 +2756,22 @@ fn render_blog_list(context: &Value) -> String {
     html
 }
 
-fn render_blog_single(context: &Value) -> String {
-    // Delegate to design-specific renderer based on list style
-    let settings = context.get("settings").cloned().unwrap_or_default();
-    let list_style = settings
-        .get("blog_list_style")
-        .and_then(|v| v.as_str())
-        .unwrap_or("compact");
-    if list_style == "classic" {
-        return crate::designs::journal::list_classic::render_single(context);
-    }
-    if list_style == "editorial" {
-        return crate::designs::journal::list_editorial::render_single(context);
-    }
-    if list_style == "wide" {
-        return crate::designs::journal::list_wide::render_single(context);
+fn render_blog_single(context: &Value, design_slug: &str) -> String {
+    // Delegate to design-specific renderer based on active design
+    match design_slug {
+        "inkwell" => {
+            return crate::designs::inkwell::journal::render_single(context);
+        }
+        "oneguy" => {
+            if let Some(html) = crate::designs::oneguy::journal::render_single(context) {
+                return html;
+            }
+            // fall through to default renderer
+        }
+        _ => {}
     }
 
+    let settings = context.get("settings").cloned().unwrap_or_default();
     let post = match context.get("post") {
         Some(p) => p,
         None => return render_404(context),
@@ -4896,6 +4889,13 @@ body.topbar-layout .site-wrapper { display: none; }
     }
 }
 "#;
+
+/// Inkwell shell HTML — uses the same sidebar page structure as Oneguy.
+pub const INKWELL_SHELL_HTML: &str = ONEGUY_SHELL_HTML;
+
+/// Inkwell design CSS — shares the Oneguy layout CSS (sidebar, nav, footer, grids, portfolio, mobile).
+/// Journal-specific CSS is provided by the inkwell::journal module.
+pub const INKWELL_DESIGN_CSS: &str = ONEGUY_DESIGN_CSS;
 
 fn build_commerce_html(
     price: f64,

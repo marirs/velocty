@@ -52,11 +52,14 @@
         <div class="form-group">
             <label for="blog_display_type">Display Type</label>
             <select id="blog_display_type" name="blog_display_type" onchange="toggleBlogOptions()">
+                {% if active_design_slug != "inkwell" %}
                 <option value="grid" {% if settings.blog_display_type == "grid" %}selected{% endif %}>Grid</option>
                 <option value="masonry" {% if settings.blog_display_type == "masonry" %}selected{% endif %}>Masonry</option>
+                {% endif %}
                 <option value="list" {% if settings.blog_display_type == "list" %}selected{% endif %}>List</option>
             </select>
         </div>
+        {% if active_design_slug != "inkwell" %}
         <div class="form-group" id="blog-columns-group">
             <label for="blog_grid_columns">Columns</label>
             <select id="blog_grid_columns" name="blog_grid_columns">
@@ -65,12 +68,15 @@
                 <option value="4" {% if settings.blog_grid_columns == "4" %}selected{% endif %}>4</option>
             </select>
         </div>
+        {% endif %}
         <div class="form-group" id="blog-list-style-group">
             <label for="blog_list_style">List Style</label>
             <select id="blog_list_style" name="blog_list_style">
+                {% if active_design_slug != "inkwell" %}
                 <option value="compact" {% if settings.blog_list_style == "compact" %}selected{% endif %}>Compact</option>
                 <option value="classic" {% if settings.blog_list_style == "classic" %}selected{% endif %}>Classic</option>
                 <option value="editorial" {% if settings.blog_list_style == "editorial" %}selected{% endif %}>Editorial</option>
+                {% endif %}
                 <option value="wide" {% if settings.blog_list_style == "wide" %}selected{% endif %}>Wide</option>
             </select>
         </div>

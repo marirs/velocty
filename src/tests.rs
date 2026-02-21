@@ -1610,7 +1610,7 @@ fn user_list_paginated() {
 fn design_crud() {
     let pool = test_pool();
 
-    // seed_defaults creates an "Oneguy" design, so count starts at 1
+    // seed_defaults creates "Inkwell" + "Oneguy" designs, so count starts at 2
     let baseline = Design::list(&pool).len();
 
     let id = Design::create(&pool, "Custom Theme").unwrap();
@@ -3469,6 +3469,9 @@ fn render_blog_context(pool: &DbPool) -> serde_json::Value {
 #[test]
 fn render_blog_list_grid_display() {
     let pool = test_pool();
+    // Activate Oneguy design — grid display is an Oneguy feature
+    let oneguy = Design::find_by_slug(&pool, "oneguy").unwrap();
+    Design::activate(&pool, oneguy.id).unwrap();
     set_settings(&pool, &[("blog_display_type", "grid")]);
     let ctx = render_blog_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
@@ -3482,6 +3485,9 @@ fn render_blog_list_grid_display() {
 #[test]
 fn render_blog_list_masonry_display() {
     let pool = test_pool();
+    // Activate Oneguy design — masonry display is an Oneguy feature
+    let oneguy = Design::find_by_slug(&pool, "oneguy").unwrap();
+    Design::activate(&pool, oneguy.id).unwrap();
     set_settings(&pool, &[("blog_display_type", "masonry")]);
     let ctx = render_blog_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
@@ -3516,6 +3522,9 @@ fn render_blog_list_default_list_display() {
 #[test]
 fn render_blog_list_editorial_style() {
     let pool = test_pool();
+    // Activate Oneguy design — editorial style is an Oneguy feature
+    let oneguy = Design::find_by_slug(&pool, "oneguy").unwrap();
+    Design::activate(&pool, oneguy.id).unwrap();
     set_settings(
         &pool,
         &[
@@ -3535,6 +3544,9 @@ fn render_blog_list_editorial_style() {
 #[test]
 fn render_blog_list_classic_style() {
     let pool = test_pool();
+    // Activate Oneguy design — classic style is an Oneguy feature
+    let oneguy = Design::find_by_slug(&pool, "oneguy").unwrap();
+    Design::activate(&pool, oneguy.id).unwrap();
     set_settings(
         &pool,
         &[
@@ -3593,11 +3605,11 @@ fn render_blog_list_show_author() {
     let ctx = render_blog_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
     let body = body_html(&html);
+    // Inkwell wide renderer outputs author name in uppercase in bwd-meta
     assert!(
-        body.contains("blog-author"),
-        "show_author=true should render author"
+        body.contains("ALICE"),
+        "show_author=true should render author name"
     );
-    assert!(body.contains("Alice"), "author name should appear");
 }
 
 #[test]
@@ -3608,7 +3620,7 @@ fn render_blog_list_hide_author() {
     let html = render::render_page(&pool, "blog_list", &ctx);
     let body = body_html(&html);
     assert!(
-        !body.contains("blog-author"),
+        !body.contains("ALICE"),
         "show_author=false should hide author"
     );
 }
@@ -3620,10 +3632,8 @@ fn render_blog_list_show_date() {
     let ctx = render_blog_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
     let body = body_html(&html);
-    assert!(
-        body.contains("<time>"),
-        "show_date=true should render time element"
-    );
+    // Inkwell wide renderer outputs date in uppercase in bwd-meta
+    assert!(body.contains("2026"), "show_date=true should render date");
 }
 
 #[test]
@@ -3633,10 +3643,8 @@ fn render_blog_list_hide_date() {
     let ctx = render_blog_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
     let body = body_html(&html);
-    assert!(
-        !body.contains("<time>"),
-        "show_date=false should hide time element"
-    );
+    // Inkwell wide renderer would include date in bwd-meta; verify it's absent
+    assert!(!body.contains("JAN 15"), "show_date=false should hide date");
 }
 
 #[test]
@@ -3646,8 +3654,9 @@ fn render_blog_list_show_reading_time() {
     let ctx = render_blog_context(&pool);
     let html = render::render_page(&pool, "blog_list", &ctx);
     let body = body_html(&html);
+    // Inkwell wide renderer outputs reading time in uppercase
     assert!(
-        body.contains("min read"),
+        body.contains("MIN READ"),
         "show_reading_time=true should render reading time"
     );
 }
@@ -3660,7 +3669,7 @@ fn render_blog_list_hide_reading_time() {
     let html = render::render_page(&pool, "blog_list", &ctx);
     let body = body_html(&html);
     assert!(
-        !body.contains("min read"),
+        !body.contains("MIN READ"),
         "show_reading_time=false should hide reading time"
     );
 }

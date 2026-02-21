@@ -10,7 +10,7 @@
 <div class="design-grid">
     {% for design in designs %}
     <div class="design-card {% if design.is_active %}active{% endif %}" onclick="if(!event.target.closest('button,form'))window.location='/{{ admin_slug }}/designer/{{ design.slug }}'">
-        <!-- Left: Browser chrome + live preview -->
+        <!-- Left: Browser chrome + preview -->
         <div class="design-card-browser">
             <div class="browser-chrome">
                 <span class="browser-dot" style="background:#ff5f57"></span>
@@ -18,8 +18,75 @@
                 <span class="browser-dot" style="background:#28c840"></span>
             </div>
             <div class="design-card-preview">
+                {% if design.is_active %}
                 <iframe src="/" style="width:1280px;height:900px;border:none;transform:scale(0.32);transform-origin:top left;pointer-events:none;position:absolute;top:0;left:0"></iframe>
                 <div style="position:absolute;inset:0;cursor:pointer"></div>
+                {% elif design.slug == "inkwell" %}
+                <!-- Inkwell wireframe: wide journal layout -->
+                <svg viewBox="0 0 420 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
+                    <rect width="420" height="260" fill="#1e1e1e"/>
+                    <!-- Sidebar -->
+                    <rect x="0" y="0" width="90" height="260" fill="#181818"/>
+                    <rect x="16" y="20" width="40" height="6" rx="2" fill="#444"/>
+                    <rect x="16" y="32" width="56" height="3" rx="1" fill="#333"/>
+                    <rect x="16" y="50" width="48" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="16" y="58" width="44" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="16" y="66" width="50" height="3" rx="1" fill="#3a3a3a"/>
+                    <!-- Wide card 1: full-width image -->
+                    <rect x="104" y="14" width="302" height="90" rx="2" fill="#2a2a2a"/>
+                    <rect x="104" y="14" width="302" height="56" rx="2" fill="#333"/>
+                    <!-- Two-column body -->
+                    <rect x="112" y="78" width="80" height="6" rx="2" fill="#555"/>
+                    <rect x="112" y="88" width="28" height="1" fill="#e8913a"/>
+                    <rect x="200" y="78" width="190" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="200" y="84" width="170" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="200" y="90" width="150" height="3" rx="1" fill="#3a3a3a"/>
+                    <!-- Meta line -->
+                    <rect x="200" y="100" width="60" height="2" rx="1" fill="#444"/>
+                    <!-- Wide card 2 -->
+                    <rect x="104" y="118" width="302" height="90" rx="2" fill="#2a2a2a"/>
+                    <rect x="104" y="118" width="302" height="56" rx="2" fill="#383838"/>
+                    <rect x="112" y="182" width="70" height="6" rx="2" fill="#555"/>
+                    <rect x="112" y="192" width="28" height="1" fill="#e8913a"/>
+                    <rect x="200" y="182" width="180" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="200" y="188" width="160" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="200" y="194" width="140" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="200" y="204" width="55" height="2" rx="1" fill="#444"/>
+                    <!-- Label -->
+                    <text x="210" y="250" font-family="system-ui,sans-serif" font-size="9" fill="#555" text-anchor="middle">Journal · List + Wide</text>
+                </svg>
+                {% elif design.slug == "oneguy" %}
+                <!-- Oneguy wireframe: sidebar + portfolio grid -->
+                <svg viewBox="0 0 420 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
+                    <rect width="420" height="260" fill="#1e1e1e"/>
+                    <!-- Sidebar -->
+                    <rect x="0" y="0" width="90" height="260" fill="#181818"/>
+                    <rect x="16" y="20" width="40" height="6" rx="2" fill="#444"/>
+                    <rect x="16" y="32" width="56" height="3" rx="1" fill="#333"/>
+                    <rect x="16" y="50" width="48" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="16" y="58" width="44" height="3" rx="1" fill="#3a3a3a"/>
+                    <rect x="16" y="66" width="50" height="3" rx="1" fill="#3a3a3a"/>
+                    <!-- Portfolio masonry grid -->
+                    <rect x="104" y="14" width="95" height="80" rx="3" fill="#333"/>
+                    <rect x="207" y="14" width="95" height="55" rx="3" fill="#383838"/>
+                    <rect x="310" y="14" width="95" height="70" rx="3" fill="#2e2e2e"/>
+                    <rect x="104" y="102" width="95" height="60" rx="3" fill="#383838"/>
+                    <rect x="207" y="77" width="95" height="85" rx="3" fill="#2e2e2e"/>
+                    <rect x="310" y="92" width="95" height="70" rx="3" fill="#333"/>
+                    <rect x="104" y="170" width="95" height="75" rx="3" fill="#2e2e2e"/>
+                    <rect x="207" y="170" width="95" height="60" rx="3" fill="#333"/>
+                    <rect x="310" y="170" width="95" height="75" rx="3" fill="#383838"/>
+                    <!-- Label -->
+                    <text x="210" y="250" font-family="system-ui,sans-serif" font-size="9" fill="#555" text-anchor="middle">Portfolio · Masonry Grid</text>
+                </svg>
+                {% else %}
+                <!-- Generic wireframe for unknown designs -->
+                <svg viewBox="0 0 420 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
+                    <rect width="420" height="260" fill="#1e1e1e"/>
+                    <rect x="20" y="20" width="380" height="220" rx="4" fill="#2a2a2a" stroke="#333" stroke-width="1"/>
+                    <text x="210" y="135" font-family="system-ui,sans-serif" font-size="12" fill="#555" text-anchor="middle">{{ design.name }}</text>
+                </svg>
+                {% endif %}
             </div>
         </div>
         <!-- Right: Info panel -->
@@ -31,11 +98,20 @@
             <p class="design-card-desc">{{ design.description }}</p>
             {% endif %}
             <div class="design-card-tags">
+                {% if design.slug == "inkwell" %}
+                <span class="design-tag">Wide Layout</span>
+                <span class="design-tag">Journal</span>
+                <span class="design-tag">Roboto</span>
+                <span class="design-tag">Comments</span>
+                {% elif design.slug == "oneguy" %}
                 <span class="design-tag">Sidebar Nav</span>
                 <span class="design-tag">Masonry Grid</span>
                 <span class="design-tag">Blog</span>
                 <span class="design-tag">Lightbox</span>
                 <span class="design-tag">Commerce</span>
+                {% else %}
+                <span class="design-tag">Custom</span>
+                {% endif %}
             </div>
             <div class="design-card-actions" onclick="event.stopPropagation()">
                 {% if design.is_active %}
@@ -190,6 +266,29 @@
     padding-top: 12px;
 }
 
+.design-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateX(40px);
+    transition: opacity .3s, transform .3s;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.design-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+.design-toast-success { background: var(--success, #28c840); }
+.design-toast-error { background: var(--danger, #ff5f57); }
+
 @media (max-width: 720px) {
     .design-grid { grid-template-columns: 1fr; }
     .design-card { flex-direction: column; }
@@ -197,4 +296,18 @@
     .design-card-preview { height: 220px; }
 }
 </style>
+{% if flash_msg %}
+<div id="design-toast" class="design-toast design-toast-{{ flash_kind | default(value='success') }}">
+    {{ flash_msg }}
+</div>
+<script>
+(function(){
+    var t = document.getElementById('design-toast');
+    if (!t) return;
+    setTimeout(function(){ t.classList.add('show'); }, 50);
+    setTimeout(function(){ t.classList.remove('show'); }, 3500);
+    setTimeout(function(){ t.remove(); }, 4000);
+})();
+</script>
+{% endif %}
 {% endblock content %}

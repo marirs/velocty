@@ -2,7 +2,7 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 
-use crate::render::{ONEGUY_DESIGN_CSS, ONEGUY_SHELL_HTML};
+use crate::render::{INKWELL_DESIGN_CSS, INKWELL_SHELL_HTML, ONEGUY_DESIGN_CSS, ONEGUY_SHELL_HTML};
 
 pub type DbPool = Pool<SqliteConnectionManager>;
 
@@ -529,11 +529,11 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("copyright_text", ""),
         // Journal
         ("journal_enabled", "true"),
-        ("blog_slug", "journal"),
+        ("blog_slug", ""),
         ("blog_posts_per_page", "10"),
-        ("blog_display_type", "grid"),
+        ("blog_display_type", "list"),
         ("blog_grid_columns", "3"),
-        ("blog_list_style", "compact"),
+        ("blog_list_style", "wide"),
         ("blog_excerpt_words", "40"),
         ("blog_pagination_type", "classic"),
         ("blog_show_author", "true"),
@@ -572,8 +572,8 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("comments_require_name", "true"),
         ("comments_require_email", "false"),
         // Fonts
-        ("font_primary", "Inter"),
-        ("font_heading", "Inter"),
+        ("font_primary", "Roboto"),
+        ("font_heading", "Roboto"),
         ("font_source", "google"),
         ("font_size_body", "16px"),
         ("font_size_h1", "2.5rem"),
@@ -889,12 +889,16 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Seed default design if none exists
+    // Seed default designs if none exist
     let design_count: i64 = conn.query_row("SELECT COUNT(*) FROM designs", [], |row| row.get(0))?;
 
     if design_count == 0 {
         conn.execute(
             "INSERT INTO designs (name, slug, description, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 1)",
+            params!["Inkwell", "inkwell", "A modern, wide-format journal theme with clean typography and generous whitespace. Full-width images, two-column single posts, and a refined reading experience.", "", INKWELL_DESIGN_CSS],
+        )?;
+        conn.execute(
+            "INSERT INTO designs (name, slug, description, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 0)",
             params!["Oneguy", "oneguy", "A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself.", "", ONEGUY_DESIGN_CSS],
         )?;
     }
@@ -1104,6 +1108,27 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute(
         "UPDATE designs SET description = ?1 WHERE slug = 'oneguy' AND description = ''",
         params!["A clean, sidebar-driven portfolio theme for photographers and illustrators. Fixed navigation, masonry and grid layouts, minimal journal — designed to let your work speak for itself."],
+    )?;
+
+    // Ensure Inkwell design exists (migration for existing databases)
+    {
+        let inkwell_exists: bool = conn.query_row(
+            "SELECT COUNT(*) FROM designs WHERE slug = 'inkwell'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )? > 0;
+        if !inkwell_exists {
+            conn.execute(
+                "INSERT INTO designs (name, slug, description, layout_html, style_css, is_active) VALUES (?1, ?2, ?3, ?4, ?5, 0)",
+                params!["Inkwell", "inkwell", "A modern, wide-format journal theme with clean typography and generous whitespace. Full-width images, two-column single posts, and a refined reading experience.", INKWELL_SHELL_HTML, INKWELL_DESIGN_CSS],
+            )?;
+        }
+    }
+
+    // Keep Inkwell design in sync with the binary constants
+    conn.execute(
+        "UPDATE designs SET layout_html = ?1, style_css = ?2 WHERE slug = 'inkwell'",
+        params![INKWELL_SHELL_HTML, INKWELL_DESIGN_CSS],
     )?;
 
     // Keep Oneguy design in sync with the binary constants

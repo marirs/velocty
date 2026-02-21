@@ -1,4 +1,4 @@
-use rocket::response::Redirect;
+use rocket::response::{Flash, Redirect};
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
@@ -15,15 +15,25 @@ use crate::AdminSlug;
 // ── Design List ──────────────────────────────────────────
 
 #[get("/designer")]
-pub fn designs_list(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
+pub fn designs_list(
+    _admin: AdminUser,
+    pool: &State<DbPool>,
+    slug: &State<AdminSlug>,
+    flash: Option<rocket::request::FlashMessage<'_>>,
+) -> Template {
     let designs = Design::list(pool);
 
-    let context = json!({
+    let mut context = json!({
         "page_title": "Designer",
         "designs": designs,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
     });
+
+    if let Some(ref f) = flash {
+        context["flash_kind"] = json!(f.kind());
+        context["flash_msg"] = json!(f.message());
+    }
 
     Template::render("admin/designs/list", &context)
 }
@@ -36,9 +46,9 @@ pub fn design_activate(
     pool: &State<DbPool>,
     slug: &State<AdminSlug>,
     id: i64,
-) -> Redirect {
+) -> Flash<Redirect> {
     let name = Design::find_by_id(pool, id)
-        .map(|d| d.name)
+        .map(|d| d.name.clone())
         .unwrap_or_default();
     let _ = Design::activate(pool, id);
     AuditEntry::log(
@@ -52,7 +62,10 @@ pub fn design_activate(
         None,
         None,
     );
-    Redirect::to(format!("{}/designer", admin_base(slug)))
+    Flash::success(
+        Redirect::to(format!("{}/designer", admin_base(slug))),
+        format!("{} is activated", name),
+    )
 }
 
 // ── Design Overview (live preview) ───────────────────────

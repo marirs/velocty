@@ -78,12 +78,16 @@ pub fn settings_page(
         }
     };
 
+    let active_design_slug = crate::models::design::Design::active(pool)
+        .map(|d| d.slug)
+        .unwrap_or_default();
     let mut context = json!({
         "page_title": format!("Settings — {}", section_label),
         "section": section,
         "admin_slug": slug.0,
         "settings": Setting::all(pool),
         "current_user": _admin.user.safe_json(),
+        "active_design_slug": active_design_slug,
     });
 
     // For security page, include passkey count

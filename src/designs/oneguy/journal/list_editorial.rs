@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::designs::journal::list_classic::build_classic_comments;
+use crate::designs::common::build_classic_comments;
 use crate::render::{
     build_pagination, build_share_buttons, count_words_html, format_date, format_date_iso8601,
     html_escape, strip_html_to_text, truncate_words,
