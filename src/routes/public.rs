@@ -570,7 +570,7 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some("Blog"), None, "/blog"),
+        "seo": seo::build_meta(pool, Some("Blog"), None, &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), "")),
     });
 
     RawHtml(render::render_page(pool, "blog_list", &context))
@@ -627,7 +627,7 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
             pool,
             post.meta_title.as_deref().or(Some(&post.title)),
             post.meta_description.as_deref(),
-            &format!("/blog/{}", post.slug),
+            &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), &post.slug),
         ),
     });
 
@@ -722,7 +722,7 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some(&category.name), None, &format!("/blog/category/{}", slug)),
+        "seo": seo::build_meta(pool, Some(&category.name), None, &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), &format!("category/{}", slug))),
     });
 
     Some(RawHtml(render::render_page(pool, "blog_list", &context)))
@@ -809,7 +809,7 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some(&tag.name), None, &format!("/blog/tag/{}", slug)),
+        "seo": seo::build_meta(pool, Some(&tag.name), None, &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), &format!("tag/{}", slug))),
     });
 
     Some(RawHtml(render::render_page(pool, "blog_list", &context)))
@@ -847,7 +847,7 @@ fn do_portfolio_grid(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "portfolio_grid",
-        "seo": seo::build_meta(pool, Some("Portfolio"), None, "/portfolio"),
+        "seo": seo::build_meta(pool, Some("Portfolio"), None, &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), "")),
     });
 
     RawHtml(render::render_page(pool, "portfolio_grid", &context))
@@ -897,7 +897,7 @@ fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
             pool,
             item.meta_title.as_deref().or(Some(&item.title)),
             item.meta_description.as_deref(),
-            &format!("/portfolio/{}", item.slug),
+            &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), &item.slug),
         ),
     });
 
@@ -943,7 +943,7 @@ fn do_portfolio_by_category(
         "current_page": current_page,
         "total_pages": ((PortfolioItem::count(pool, Some("published")) as f64 / per_page as f64).ceil() as i64),
         "page_type": "portfolio_grid",
-        "seo": seo::build_meta(pool, Some(&category.name), None, &format!("/portfolio/category/{}", slug)),
+        "seo": seo::build_meta(pool, Some(&category.name), None, &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), &format!("category/{}", slug))),
     });
 
     Some(RawHtml(render::render_page(
@@ -1041,7 +1041,7 @@ fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "portfolio_grid",
-        "seo": seo::build_meta(pool, Some(&tag.name), None, &format!("/portfolio/tag/{}", slug)),
+        "seo": seo::build_meta(pool, Some(&tag.name), None, &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), &format!("tag/{}", slug))),
     });
 
     Some(RawHtml(render::render_page(

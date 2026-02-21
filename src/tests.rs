@@ -2335,6 +2335,130 @@ fn seo_build_meta_no_og_twitter() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// SEO: Canonical URL slug correctness
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn slug_url_empty_slug_root() {
+    // Empty blog_slug means journal is at /
+    assert_eq!(render::slug_url("", ""), "/");
+}
+
+#[test]
+fn slug_url_empty_slug_with_sub() {
+    // Empty blog_slug + post slug → /my-post
+    assert_eq!(render::slug_url("", "my-post"), "/my-post");
+}
+
+#[test]
+fn slug_url_empty_slug_with_nested_sub() {
+    // Empty blog_slug + category path → /category/nature
+    assert_eq!(render::slug_url("", "category/nature"), "/category/nature");
+}
+
+#[test]
+fn slug_url_named_slug_root() {
+    // portfolio_slug = "portfolio" → /portfolio
+    assert_eq!(render::slug_url("portfolio", ""), "/portfolio");
+}
+
+#[test]
+fn slug_url_named_slug_with_sub() {
+    // portfolio_slug + item slug → /portfolio/sunset
+    assert_eq!(render::slug_url("portfolio", "sunset"), "/portfolio/sunset");
+}
+
+#[test]
+fn slug_url_named_slug_with_nested_sub() {
+    assert_eq!(
+        render::slug_url("portfolio", "category/landscape"),
+        "/portfolio/category/landscape"
+    );
+}
+
+#[test]
+fn seo_canonical_blog_empty_slug() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "seo_canonical_base", "https://example.com").unwrap();
+    Setting::set(&pool, "blog_slug", "").unwrap();
+    // Blog list canonical should be site root
+    let path = render::slug_url(&Setting::get_or(&pool, "blog_slug", "journal"), "");
+    let meta = seo::build_meta(&pool, Some("Blog"), None, &path);
+    assert!(
+        meta.contains("href=\"https://example.com/\""),
+        "blog canonical with empty slug should be site root, got: {}",
+        meta
+    );
+}
+
+#[test]
+fn seo_canonical_blog_named_slug() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "seo_canonical_base", "https://example.com").unwrap();
+    Setting::set(&pool, "blog_slug", "journal").unwrap();
+    let path = render::slug_url(&Setting::get_or(&pool, "blog_slug", "journal"), "");
+    let meta = seo::build_meta(&pool, Some("Blog"), None, &path);
+    assert!(
+        meta.contains("href=\"https://example.com/journal\""),
+        "blog canonical with named slug should use /journal, got: {}",
+        meta
+    );
+}
+
+#[test]
+fn seo_canonical_blog_single_empty_slug() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "seo_canonical_base", "https://example.com").unwrap();
+    Setting::set(&pool, "blog_slug", "").unwrap();
+    let path = render::slug_url(
+        &Setting::get_or(&pool, "blog_slug", "journal"),
+        "hello-world",
+    );
+    let meta = seo::build_meta(&pool, Some("Hello"), None, &path);
+    assert!(
+        meta.contains("href=\"https://example.com/hello-world\""),
+        "single post canonical with empty blog_slug should be /hello-world, got: {}",
+        meta
+    );
+}
+
+#[test]
+fn seo_canonical_portfolio_slug() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "seo_canonical_base", "https://example.com").unwrap();
+    Setting::set(&pool, "portfolio_slug", "portfolio").unwrap();
+    let path = render::slug_url(&Setting::get_or(&pool, "portfolio_slug", "portfolio"), "");
+    let meta = seo::build_meta(&pool, Some("Portfolio"), None, &path);
+    assert!(
+        meta.contains("href=\"https://example.com/portfolio\""),
+        "portfolio canonical should use /portfolio, got: {}",
+        meta
+    );
+}
+
+#[test]
+fn seo_canonical_portfolio_single() {
+    let pool = test_pool();
+    Setting::set(&pool, "site_url", "https://example.com").unwrap();
+    Setting::set(&pool, "seo_canonical_base", "https://example.com").unwrap();
+    Setting::set(&pool, "portfolio_slug", "work").unwrap();
+    let path = render::slug_url(
+        &Setting::get_or(&pool, "portfolio_slug", "portfolio"),
+        "sunset",
+    );
+    let meta = seo::build_meta(&pool, Some("Sunset"), None, &path);
+    assert!(
+        meta.contains("href=\"https://example.com/work/sunset\""),
+        "portfolio single canonical should use custom slug, got: {}",
+        meta
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
 // SEO: Sitemap + robots.txt
 // ═══════════════════════════════════════════════════════════
 
