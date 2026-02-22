@@ -59,8 +59,8 @@ pub fn portfolio_new(
     let categories = store.category_list(Some("portfolio"));
     let tags = store.tag_list();
 
-    let ai_enabled = store.setting_get_bool("ai_enabled");
-    let ai_has_vision = store.setting_get_bool("ai_has_vision");
+    let ai_enabled = crate::ai::is_enabled(&**store.inner());
+    let ai_has_vision = crate::ai::has_vision_provider(&**store.inner());
     let context = json!({
         "page_title": "New Portfolio Item",
         "admin_slug": slug.0,
@@ -87,8 +87,8 @@ pub fn portfolio_edit(
     let item_categories = store.category_for_content(id, "portfolio");
     let item_tags = store.tag_for_content(id, "portfolio");
 
-    let ai_enabled = store.setting_get_bool("ai_enabled");
-    let ai_has_vision = store.setting_get_bool("ai_has_vision");
+    let ai_enabled = crate::ai::is_enabled(&**store.inner());
+    let ai_has_vision = crate::ai::has_vision_provider(&**store.inner());
     let context = json!({
         "page_title": "Edit Portfolio Item",
         "item": item,
