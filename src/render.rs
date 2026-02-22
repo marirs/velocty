@@ -44,10 +44,19 @@ fn render_with_shell(design: &Design, template_type: &str, context: &Value) -> S
         .get("site_name")
         .and_then(|v| v.as_str())
         .unwrap_or("Velocty");
-    let site_name_display = settings
+    let site_name_display_raw = settings
         .get("site_name_display")
         .and_then(|v| v.as_str())
         .unwrap_or("text");
+    let has_logo = settings
+        .get("site_logo")
+        .and_then(|v| v.as_str())
+        .map_or(false, |s| !s.is_empty());
+    let site_name_display = if site_name_display_raw == "logo" && !has_logo {
+        "text"
+    } else {
+        site_name_display_raw
+    };
     let site_name = if site_name_display == "none" || site_name_display == "logo" {
         ""
     } else {
@@ -420,8 +429,24 @@ fn render_with_shell(design: &Design, template_type: &str, context: &Value) -> S
     html = html.replace("{{data_attrs}}", &data_attrs);
     html = html.replace("{{wrapper_classes}}", &wrapper_classes);
     html = html.replace("{{logo_html}}", &build_logo_html(&settings));
-    html = html.replace("{{site_name}}", &html_escape(site_name));
-    html = html.replace("{{tagline}}", &html_escape(site_tagline));
+    let site_name_html = if site_name.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<h1 class=\"site-name\"><a href=\"/\">{}</a></h1>",
+            html_escape(site_name)
+        )
+    };
+    html = html.replace("{{site_name_html}}", &site_name_html);
+    let tagline_html = if site_tagline.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<p class=\"site-tagline\">{}</p>",
+            html_escape(site_tagline)
+        )
+    };
+    html = html.replace("{{tagline_html}}", &tagline_html);
     html = html.replace("{{categories_below_menu}}", &categories_below_menu);
     html = html.replace("{{nav_links}}", &nav_links);
     html = html.replace("{{share_sidebar}}", &share_sidebar);
@@ -558,21 +583,43 @@ pub fn render_legal_page(
         html = html.replace("{{data_attrs}}", "");
         html = html.replace("{{wrapper_classes}}", "");
         html = html.replace("{{logo_html}}", &build_logo_html(&settings_v));
-        let site_name_display = sg("site_name_display", "text");
+        let site_name_display_raw = sg("site_name_display", "text");
         let site_name_raw = sg("site_name", "Velocty");
+        let has_logo = settings_v
+            .get("site_logo")
+            .and_then(|v| v.as_str())
+            .map_or(false, |s| !s.is_empty());
+        let site_name_display = if site_name_display_raw == "logo" && !has_logo {
+            "text".to_string()
+        } else {
+            site_name_display_raw
+        };
         let site_name = if site_name_display == "none" || site_name_display == "logo" {
             String::new()
         } else {
             site_name_raw
         };
-        html = html.replace("{{site_name}}", &html_escape(&site_name));
+        let site_name_html = if site_name.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<h1 class=\"site-name\"><a href=\"/\">{}</a></h1>",
+                html_escape(&site_name)
+            )
+        };
+        html = html.replace("{{site_name_html}}", &site_name_html);
         let tagline_on = sg("site_tagline_enabled", "true") != "false";
         let tagline = if tagline_on {
             sg("site_caption", "")
         } else {
             String::new()
         };
-        html = html.replace("{{tagline}}", &html_escape(&tagline));
+        let tagline_html = if tagline.is_empty() {
+            String::new()
+        } else {
+            format!("<p class=\"site-tagline\">{}</p>", html_escape(&tagline))
+        };
+        html = html.replace("{{tagline_html}}", &tagline_html);
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
@@ -1687,13 +1734,8 @@ fn build_logo_html(settings: &Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    // In "none" mode, no logo image shown
-    if display == "none" {
-        return String::new();
-    }
-
-    // Only show logo image if one is uploaded
-    if logo.is_empty() {
+    // Only show logo image when display mode is explicitly "logo"
+    if display != "logo" || logo.is_empty() {
         return String::new();
     }
 
@@ -3385,8 +3427,8 @@ pub const ONEGUY_SHELL_HTML: &str = r#"<!DOCTYPE html>
             <div class="sidebar-top">
                 <div class="site-logo">
                     {{logo_html}}
-                    <h1 class="site-name"><a href="/">{{site_name}}</a></h1>
-                    <p class="site-tagline">{{tagline}}</p>
+                    {{site_name_html}}
+                    {{tagline_html}}
                 </div>
                 <nav class="category-nav">
                     {{nav_links}}
@@ -3437,8 +3479,8 @@ pub const ONEGUY_TOPBAR_SHELL_HTML: &str = r#"<!DOCTYPE html>
         <div class="topbar-inner">
             <div class="topbar-brand">
                 {{logo_html}}
-                <h1 class="site-name"><a href="/">{{site_name}}</a></h1>
-                <p class="site-tagline">{{tagline}}</p>
+                {{site_name_html}}
+                {{tagline_html}}
             </div>
             <nav class="topbar-nav">
                 {{nav_links}}
@@ -3813,6 +3855,7 @@ body.topbar-layout.footer-always-visible .site-footer {
 .grid-item {
     break-inside: avoid;
     margin-bottom: var(--grid-gap);
+    padding: 6px;
     position: relative;
     overflow: hidden;
     border-radius: 6px;
@@ -3897,34 +3940,90 @@ body.topbar-layout.footer-always-visible .site-footer {
 .item-hover-content a { color: #fff; text-decoration: none; }
 .item-hover-content a:hover { text-decoration: underline; }
 
-/* Corner overlays (bottom_left, bottom_right) — always visible */
-.item-meta-bottom_left,
-.item-meta-bottom_right {
-    position: absolute;
-    z-index: 2;
-    padding: 5px 10px;
-    font-size: 11px;
-    background: rgba(0,0,0,.55);
+/* Hover overlay: pill/button overrides for dark background */
+.item-hover-content .tag-pill-outline {
+    border-color: rgba(255,255,255,.6);
     color: #fff;
-    pointer-events: auto;
 }
-.item-meta-bottom_left a,
-.item-meta-bottom_right a { color: #fff; text-decoration: none; }
-.item-meta-bottom_left a:hover,
-.item-meta-bottom_right a:hover { text-decoration: underline; }
-.item-meta-bottom_left { bottom: 0; left: 0; border-radius: 0 4px 0 0; }
-.item-meta-bottom_right { bottom: 0; right: 0; border-radius: 4px 0 0 0; }
+.item-hover-content a {
+    border-color: rgba(255,255,255,.6) !important;
+    color: #fff !important;
+}
+
+/* Tag outline pills */
+.tag-pill-outline {
+    display: inline-block;
+    padding: 2px 10px;
+    border: 1px solid var(--color-text-secondary, #999);
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--color-text-secondary, #888);
+    line-height: 1.6;
+    white-space: nowrap;
+}
 
 /* Below modes (outside portfolio-link, under image) */
+.item-below-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+.item-below-row.item-below-stacked {
+    flex-direction: column;
+    gap: 4px;
+}
+.item-below-row.item-below-stacked .item-meta-below_left { text-align: left; }
+.item-below-row.item-below-stacked .item-meta-below_right { text-align: right; width: 100%; }
+.item-below-row .item-meta-below_left { flex: 1; text-align: left; }
+.item-below-row .item-meta-below_right { flex: 1; text-align: right; }
 .item-meta-below_left { text-align: left; }
 .item-meta-below_right { text-align: right; }
 .item-categories.item-meta-below_left,
 .item-categories.item-meta-below_right {
-    padding: 4px 0 2px;
+    padding: 2px 0;
 }
 .item-tags.item-meta-below_left,
 .item-tags.item-meta-below_right {
-    padding: 4px 0 8px;
+    padding: 2px 0;
+}
+/* Category outline buttons */
+.item-categories a,
+.portfolio-categories a {
+    display: inline-block;
+    padding: 3px 12px;
+    border: 1px solid var(--color-text-secondary, #999);
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary, #888);
+    text-decoration: none;
+    white-space: nowrap;
+    line-height: 1.6;
+    transition: border-color 0.2s, color 0.2s;
+}
+.item-categories a:hover,
+.portfolio-categories a:hover {
+    border-color: var(--color-text, #333);
+    color: var(--color-text, #333);
+    text-decoration: none;
+}
+
+/* Single page meta row */
+.portfolio-single-meta-row .tag-pill-outline {
+    font-size: 12px;
+    padding: 3px 12px;
+}
+.portfolio-single-meta-row .portfolio-categories a {
+    font-size: 11px;
+    padding: 2px 10px;
 }
 
 .grid-item.fade-in {
@@ -3963,8 +4062,9 @@ body.topbar-layout.footer-always-visible .site-footer {
 .item-title {
     font-family: var(--font-body, var(--font-primary));
     font-size: 13px;
+    font-weight: 700;
     color: var(--color-text);
-    padding: 6px 0 2px;
+    padding: 6px 8px 2px;
     text-align: left;
 }
 
@@ -4156,7 +4256,7 @@ body.topbar-layout.footer-always-visible .site-footer {
     padding: 28px 30px;
 }
 
-.portfolio-image img { width: 100%; display: block; margin-bottom: 8px; }
+.portfolio-image img { width: 100%; display: block; }
 
 .portfolio-images .portfolio-image { margin-bottom: 16px; }
 
@@ -4170,13 +4270,7 @@ body.topbar-layout.footer-always-visible .site-footer {
 .like-btn { cursor: pointer; font-size: 18px; user-select: none; transition: color 0.2s; }
 .like-btn.liked { color: #e74c3c; }
 .lb-likes.liked { color: #e74c3c !important; }
-.portfolio-categories a {
-    font-size: 12px;
-    color: var(--color-text-secondary);
-    margin-right: 8px;
-    text-decoration: none;
-}
-.portfolio-categories a:hover { text-decoration: underline; }
+.portfolio-single .share-icons { border-top: none; }
 
 .portfolio-description {
     line-height: 1.8;

@@ -3361,11 +3361,11 @@ fn render_portfolio_tags_hover() {
         body.contains("item-tags item-meta-hover"),
         "hover: tag overlay class"
     );
-    assert!(body.contains(">Aerial</a>"), "hover: tag name rendered");
+    assert!(body.contains(">#Aerial</span>"), "hover: tag name rendered");
 }
 
 #[test]
-fn render_portfolio_cats_bottom_left() {
+fn render_portfolio_cats_bottom_left_fallback() {
     let pool = test_pool();
     set_settings(
         &pool,
@@ -3379,13 +3379,13 @@ fn render_portfolio_cats_bottom_left() {
     let body = body_html(&html);
 
     assert!(
-        body.contains("item-categories item-meta-bottom_left"),
-        "bottom_left overlay class"
+        body.contains("item-categories item-meta-below_left"),
+        "bottom_left should fallback to below_left"
     );
 }
 
 #[test]
-fn render_portfolio_cats_bottom_right() {
+fn render_portfolio_cats_bottom_right_fallback() {
     let pool = test_pool();
     set_settings(
         &pool,
@@ -3399,8 +3399,8 @@ fn render_portfolio_cats_bottom_right() {
     let body = body_html(&html);
 
     assert!(
-        body.contains("item-categories item-meta-bottom_right"),
-        "bottom_right overlay class"
+        body.contains("item-categories item-meta-below_right"),
+        "bottom_right should fallback to below_right"
     );
 }
 
@@ -3466,8 +3466,11 @@ fn render_portfolio_tags_below_left() {
         body.contains("item-tags item-meta-below_left"),
         "below_left tag class"
     );
-    assert!(body.contains(">Aerial</a>"), "below_left: tag name");
-    assert!(body.contains(">Golden Hour</a>"), "below_left: second tag");
+    assert!(body.contains(">#Aerial</span>"), "below_left: tag name");
+    assert!(
+        body.contains(">#Golden Hour</span>"),
+        "below_left: second tag"
+    );
 }
 
 #[test]
@@ -7004,7 +7007,7 @@ fn portfolio_render_single_valid() {
         html.contains("/portfolio/category/landscape"),
         "should link to category"
     );
-    assert!(html.contains("/portfolio/tag/nature"), "should link to tag");
+    assert!(html.contains(">#Nature</span>"), "should show tag as pill");
     assert!(html.contains("like-btn"), "should show like button");
 }
 

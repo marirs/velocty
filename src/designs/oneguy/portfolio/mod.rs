@@ -30,17 +30,17 @@ pub fn render_grid(context: &Value) -> String {
     };
     let display_type = sg("portfolio_display_type", "masonry");
     let show_tags_mode_raw = sg("portfolio_show_tags", "false");
-    let show_tags_mode = if show_tags_mode_raw == "true" {
-        "below_left".to_string()
-    } else {
-        show_tags_mode_raw
+    let show_tags_mode = match show_tags_mode_raw.as_str() {
+        "true" | "bottom_left" => "below_left".to_string(),
+        "bottom_right" => "below_right".to_string(),
+        other => other.to_string(),
     };
     let show_tags = show_tags_mode != "false";
     let show_cats_mode_raw = sg("portfolio_show_categories", "false");
-    let show_cats_mode = if show_cats_mode_raw == "true" {
-        "below_left".to_string()
-    } else {
-        show_cats_mode_raw
+    let show_cats_mode = match show_cats_mode_raw.as_str() {
+        "true" | "bottom_left" => "below_left".to_string(),
+        "bottom_right" => "below_right".to_string(),
+        other => other.to_string(),
     };
     let show_cats = show_cats_mode != "false";
     let show_likes_enabled = sg("portfolio_enable_likes", "true") == "true";
@@ -88,15 +88,6 @@ pub fn render_grid(context: &Value) -> String {
         border_class
     );
 
-    // Determine if we need overlay positioning on the link
-    let _cats_is_overlay = matches!(
-        show_cats_mode.as_str(),
-        "hover" | "bottom_left" | "bottom_right"
-    );
-    let _tags_is_overlay = matches!(
-        show_tags_mode.as_str(),
-        "hover" | "bottom_left" | "bottom_right"
-    );
     let cats_is_below = matches!(show_cats_mode.as_str(), "below_left" | "below_right");
     let tags_is_below = matches!(show_tags_mode.as_str(), "below_left" | "below_right");
 
@@ -165,7 +156,7 @@ pub fn render_grid(context: &Value) -> String {
                         })
                         .collect();
                     if !cat_strs.is_empty() {
-                        cat_strs.join(" · ")
+                        cat_strs.join(" ")
                     } else {
                         String::new()
                     }
@@ -179,7 +170,7 @@ pub fn render_grid(context: &Value) -> String {
             String::new()
         };
 
-        // Build tag inner HTML (just the links, no wrapper div)
+        // Build tag inner HTML (non-linkable outline pills)
         let tags_inner = if show_tags {
             if let Some(tag_list) = tags {
                 if !tag_list.is_empty() {
@@ -187,16 +178,14 @@ pub fn render_grid(context: &Value) -> String {
                         .iter()
                         .filter_map(|t| {
                             let name = t.get("name").and_then(|v| v.as_str())?;
-                            let tslug = t.get("slug").and_then(|v| v.as_str())?;
                             Some(format!(
-                                "<a href=\"{}\">{}</a>",
-                                slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
+                                "<span class=\"tag-pill-outline\">#{}</span>",
                                 html_escape(name)
                             ))
                         })
                         .collect();
                     if !tag_strs.is_empty() {
-                        tag_strs.join(" · ")
+                        tag_strs.join(" ")
                     } else {
                         String::new()
                     }
@@ -303,7 +292,7 @@ pub fn render_grid(context: &Value) -> String {
             heart_overlay = heart_overlay,
         ));
 
-        // Hover overlay: shared container with dimmed background, centered content
+        // Hover overlay
         let cats_is_hover = show_cats_mode == "hover";
         let tags_is_hover = show_tags_mode == "hover";
         if (cats_is_hover && !cats_inner.is_empty()) || (tags_is_hover && !tags_inner.is_empty()) {
@@ -324,32 +313,6 @@ pub fn render_grid(context: &Value) -> String {
             html.push_str("</div></div>");
         }
 
-        // Corner overlays (bottom_left, bottom_right) — always visible, positioned in corners
-        if show_cats_mode == "bottom_left" && !cats_inner.is_empty() {
-            html.push_str(&format!(
-                "<div class=\"item-categories item-meta-bottom_left\">{}</div>",
-                cats_inner
-            ));
-        }
-        if show_cats_mode == "bottom_right" && !cats_inner.is_empty() {
-            html.push_str(&format!(
-                "<div class=\"item-categories item-meta-bottom_right\">{}</div>",
-                cats_inner
-            ));
-        }
-        if show_tags_mode == "bottom_left" && !tags_inner.is_empty() {
-            html.push_str(&format!(
-                "<div class=\"item-tags item-meta-bottom_left\">{}</div>",
-                tags_inner
-            ));
-        }
-        if show_tags_mode == "bottom_right" && !tags_inner.is_empty() {
-            html.push_str(&format!(
-                "<div class=\"item-tags item-meta-bottom_right\">{}</div>",
-                tags_inner
-            ));
-        }
-
         // Title below image
         if show_title && !title.is_empty() {
             html.push_str(&format!(
@@ -366,20 +329,33 @@ pub fn render_grid(context: &Value) -> String {
             ));
         }
 
-        // Below-image categories
-        if cats_is_below && !cats_inner.is_empty() {
-            html.push_str(&format!(
-                "<div class=\"item-categories item-meta-{}\">{}</div>",
-                show_cats_mode, cats_inner
-            ));
-        }
-
-        // Below-image tags
-        if tags_is_below && !tags_inner.is_empty() {
-            html.push_str(&format!(
-                "<div class=\"item-tags item-meta-{}\">{}</div>",
-                show_tags_mode, tags_inner
-            ));
+        // Below-image categories & tags
+        let has_below_cats = cats_is_below && !cats_inner.is_empty();
+        let has_below_tags = tags_is_below && !tags_inner.is_empty();
+        if has_below_cats || has_below_tags {
+            let same_side = has_below_cats
+                && has_below_tags
+                && show_cats_mode
+                    .ends_with(show_tags_mode.split('_').next_back().unwrap_or("left"));
+            let row_class = if same_side {
+                "item-below-row item-below-stacked"
+            } else {
+                "item-below-row"
+            };
+            html.push_str(&format!("<div class=\"{}\">", row_class));
+            if has_below_tags {
+                html.push_str(&format!(
+                    "<div class=\"item-tags item-meta-{}\">{}</div>",
+                    show_tags_mode, tags_inner
+                ));
+            }
+            if has_below_cats {
+                html.push_str(&format!(
+                    "<div class=\"item-categories item-meta-{}\">{}</div>",
+                    show_cats_mode, cats_inner
+                ));
+            }
+            html.push_str("</div>");
         }
 
         html.push_str("</div>\n");
@@ -443,8 +419,20 @@ pub fn render_single(context: &Value) -> String {
             .to_string()
     };
     let show_likes = sg("portfolio_enable_likes", "true") == "true";
-    let show_cats = sg("portfolio_show_categories", "false") != "false";
-    let show_tags = sg("portfolio_show_tags", "false") != "false";
+    let show_cats_mode_raw = sg("portfolio_show_categories", "false");
+    let show_cats_mode = match show_cats_mode_raw.as_str() {
+        "true" | "bottom_left" => "below_left".to_string(),
+        "bottom_right" => "below_right".to_string(),
+        other => other.to_string(),
+    };
+    let show_cats = show_cats_mode != "false";
+    let show_tags_mode_raw = sg("portfolio_show_tags", "false");
+    let show_tags_mode = match show_tags_mode_raw.as_str() {
+        "true" | "bottom_left" => "below_left".to_string(),
+        "bottom_right" => "below_right".to_string(),
+        other => other.to_string(),
+    };
+    let show_tags = show_tags_mode != "false";
     let portfolio_slug = sg("portfolio_slug", "portfolio");
 
     let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
@@ -531,13 +519,124 @@ pub fn render_single(context: &Value) -> String {
         r#"<div class="portfolio-image" style="position:relative">
         <img src="/uploads/{image}" alt="{title}">
         {like_overlay}
-    </div>
-    {share_below_image}"#,
+    </div>"#,
         image = image,
         title = html_escape(title),
         like_overlay = like_overlay,
-        share_below_image = share_below_image,
     ));
+
+    // Categories & tags — immediately below image, before everything else
+    // Determine alignment from the position mode
+    let cats_align = if show_cats_mode.contains("right") {
+        "right"
+    } else {
+        "left"
+    };
+    let tags_align = if show_tags_mode.contains("right") {
+        "right"
+    } else {
+        "left"
+    };
+
+    let cats_html = if show_cats {
+        if let Some(cats) = categories {
+            if !cats.is_empty() {
+                let cat_strs: Vec<String> = cats
+                    .iter()
+                    .filter_map(|c| {
+                        let name = c.get("name").and_then(|v| v.as_str())?;
+                        let cslug = c.get("slug").and_then(|v| v.as_str())?;
+                        Some(format!(
+                            "<a href=\"{}\">{}</a>",
+                            slug_url(&portfolio_slug, &format!("category/{}", cslug)),
+                            html_escape(name)
+                        ))
+                    })
+                    .collect();
+                if !cat_strs.is_empty() {
+                    cat_strs.join(" ")
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let tags_html = if show_tags {
+        if let Some(tag_list) = tags {
+            if !tag_list.is_empty() {
+                let tag_strs: Vec<String> = tag_list
+                    .iter()
+                    .filter_map(|t| {
+                        let name = t.get("name").and_then(|v| v.as_str())?;
+                        Some(format!(
+                            "<span class=\"tag-pill-outline\">#{}</span>",
+                            html_escape(name)
+                        ))
+                    })
+                    .collect();
+                if !tag_strs.is_empty() {
+                    tag_strs.join(" ")
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    if !cats_html.is_empty() || !tags_html.is_empty() {
+        let same_side = !cats_html.is_empty() && !tags_html.is_empty() && cats_align == tags_align;
+        let flex_dir = if same_side { "column" } else { "row" };
+        let justify = if same_side {
+            if cats_align == "right" {
+                "align-items:flex-end"
+            } else {
+                "align-items:flex-start"
+            }
+        } else {
+            "justify-content:space-between;align-items:baseline"
+        };
+        html.push_str(&format!(
+            "<div class=\"portfolio-single-meta-row\" style=\"display:flex;flex-direction:{};{};gap:8px;margin:12px 0;font-size:13px\">",
+            flex_dir, justify
+        ));
+        if !tags_html.is_empty() {
+            html.push_str(&format!(
+                "<div class=\"portfolio-tags\" style=\"text-align:{}\">{}</div>",
+                tags_align, tags_html
+            ));
+        }
+        if !cats_html.is_empty() {
+            html.push_str(&format!(
+                "<div class=\"portfolio-categories\" style=\"text-align:{};{}\">{}</div>",
+                cats_align,
+                if tags_html.is_empty() && cats_align == "right" {
+                    "margin-left:auto"
+                } else {
+                    ""
+                },
+                cats_html
+            ));
+        }
+        html.push_str("</div>");
+    }
+
+    // Share buttons: below_image position
+    if !share_below_image.is_empty() {
+        html.push_str(&share_below_image);
+    }
 
     // Commerce: below_image position
     if commerce_pos == "below_image" && !commerce_html.is_empty() {
@@ -550,46 +649,6 @@ pub fn render_single(context: &Value) -> String {
     </div>"#,
         title = html_escape(title),
     ));
-
-    if show_cats {
-        if let Some(cats) = categories {
-            if !cats.is_empty() {
-                html.push_str(r#"<div class="portfolio-categories">"#);
-                for cat in cats {
-                    let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                    let slug = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
-                    html.push_str(&format!(
-                        "<a href=\"{}\">{}</a>",
-                        slug_url(&portfolio_slug, &format!("category/{}", slug)),
-                        html_escape(name)
-                    ));
-                }
-                html.push_str("</div>");
-            }
-        }
-    }
-
-    if show_tags {
-        if let Some(tag_list) = tags {
-            if !tag_list.is_empty() {
-                html.push_str(r#"<div class="item-tags" style="margin-bottom:12px">"#);
-                let tag_strs: Vec<String> = tag_list
-                    .iter()
-                    .filter_map(|t| {
-                        let name = t.get("name").and_then(|v| v.as_str())?;
-                        let tslug = t.get("slug").and_then(|v| v.as_str())?;
-                        Some(format!(
-                            "<a href=\"{}\">{}</a>",
-                            slug_url(&portfolio_slug, &format!("tag/{}", tslug)),
-                            html_escape(name)
-                        ))
-                    })
-                    .collect();
-                html.push_str(&tag_strs.join(" · "));
-                html.push_str("</div>");
-            }
-        }
-    }
 
     if !desc.is_empty() {
         html.push_str(&format!(
