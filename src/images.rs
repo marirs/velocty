@@ -3,8 +3,7 @@ use image::GenericImageView;
 use std::fs;
 use std::path::Path;
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 /// Result of processing an uploaded image
 pub struct ProcessedImage {
@@ -14,16 +13,19 @@ pub struct ProcessedImage {
 
 /// Save an uploaded image, generate thumbnails, optionally convert to WebP
 pub fn process_upload(
-    pool: &DbPool,
+    store: &dyn Store,
     file_bytes: &[u8],
     original_filename: &str,
 ) -> Result<ProcessedImage, String> {
-    let storage_path = Setting::get_or(pool, "images_storage_path", "website/site/uploads/");
-    let quality = Setting::get_i64(pool, "images_quality") as u8;
+    let storage_path = store.setting_get_or("images_storage_path", "website/site/uploads/");
+    let quality: u8 = store
+        .setting_get_or("images_quality", "85")
+        .parse()
+        .unwrap_or(85);
     let quality = if quality == 0 { 85 } else { quality };
 
     // Parse thumbnail sizes
-    let thumb_medium = Setting::get_or(pool, "images_thumb_medium", "300x300");
+    let thumb_medium = store.setting_get_or("images_thumb_medium", "300x300");
     let (thumb_w, thumb_h) = parse_dimensions(&thumb_medium);
 
     // Generate unique filename
@@ -49,7 +51,7 @@ pub fn process_upload(
     thumbnail.save(&thumb_full).map_err(|e| e.to_string())?;
 
     // WebP conversion (if enabled)
-    let webp_enabled = Setting::get_bool(pool, "images_webp_convert");
+    let webp_enabled = store.setting_get_or("images_webp_convert", "false") == "true";
     if webp_enabled {
         let webp_name = format!("{}.webp", uuid::Uuid::new_v4());
         let webp_full = format!("{}{}", storage_path, webp_name);
@@ -64,10 +66,10 @@ pub fn process_upload(
 
 /// Generate multiple thumbnail sizes for an image
 pub fn generate_thumbnails(
-    pool: &DbPool,
+    store: &dyn Store,
     image_path: &str,
 ) -> Result<Vec<(String, String)>, String> {
-    let storage_path = Setting::get_or(pool, "images_storage_path", "website/site/uploads/");
+    let storage_path = store.setting_get_or("images_storage_path", "website/site/uploads/");
     let full_path = format!("{}{}", storage_path, image_path);
 
     let img = image::open(&full_path).map_err(|e| e.to_string())?;
@@ -75,15 +77,15 @@ pub fn generate_thumbnails(
     let sizes = vec![
         (
             "small",
-            Setting::get_or(pool, "images_thumb_small", "150x150"),
+            store.setting_get_or("images_thumb_small", "150x150"),
         ),
         (
             "medium",
-            Setting::get_or(pool, "images_thumb_medium", "300x300"),
+            store.setting_get_or("images_thumb_medium", "300x300"),
         ),
         (
             "large",
-            Setting::get_or(pool, "images_thumb_large", "1024x1024"),
+            store.setting_get_or("images_thumb_large", "1024x1024"),
         ),
     ];
 
@@ -125,14 +127,18 @@ fn parse_dimensions(s: &str) -> (u32, u32) {
 }
 
 /// Check if file size is within the configured limit
-pub fn check_file_size(pool: &DbPool, size_bytes: usize) -> bool {
-    let max_mb = Setting::get_i64(pool, "images_max_upload_mb").max(1) as usize;
+pub fn check_file_size(store: &dyn Store, size_bytes: usize) -> bool {
+    let max_mb: usize = store
+        .setting_get_or("images_max_upload_mb", "10")
+        .parse()
+        .unwrap_or(10)
+        .max(1);
     size_bytes <= max_mb * 1024 * 1024
 }
 
 /// Delete an image and its thumbnails
-pub fn delete_image(pool: &DbPool, image_path: &str) -> Result<(), String> {
-    let storage_path = Setting::get_or(pool, "images_storage_path", "website/site/uploads/");
+pub fn delete_image(store: &dyn Store, image_path: &str) -> Result<(), String> {
+    let storage_path = store.setting_get_or("images_storage_path", "website/site/uploads/");
 
     let full_path = format!("{}{}", storage_path, image_path);
     let _ = fs::remove_file(&full_path);

@@ -1,13 +1,13 @@
+use std::sync::Arc;
+
 use rocket::response::Redirect;
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
 
 use super::admin_base;
-use crate::db::DbPool;
-use crate::models::comment::Comment;
-use crate::models::settings::Setting;
 use crate::security::auth::EditorUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Comments ───────────────────────────────────────────
@@ -15,7 +15,7 @@ use crate::AdminSlug;
 #[get("/comments?<status>&<page>")]
 pub fn comments_list(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
@@ -24,8 +24,8 @@ pub fn comments_list(
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
-    let comments = Comment::list(pool, status.as_deref(), per_page, offset);
-    let total = Comment::count(pool, status.as_deref());
+    let comments = store.comment_list(status.as_deref(), per_page, offset);
+    let total = store.comment_count(status.as_deref());
     let total_pages = ((total as f64) / (per_page as f64)).ceil() as i64;
 
     let context = json!({
@@ -35,12 +35,12 @@ pub fn comments_list(
         "total_pages": total_pages,
         "total": total,
         "status_filter": status,
-        "count_all": Comment::count(pool, None),
-        "count_pending": Comment::count(pool, Some("pending")),
-        "count_approved": Comment::count(pool, Some("approved")),
-        "count_spam": Comment::count(pool, Some("spam")),
+        "count_all": store.comment_count(None),
+        "count_pending": store.comment_count(Some("pending")),
+        "count_approved": store.comment_count(Some("approved")),
+        "count_spam": store.comment_count(Some("spam")),
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
     });
 
     Template::render("admin/comments/list", &context)
@@ -49,32 +49,32 @@ pub fn comments_list(
 #[post("/comments/<id>/approve")]
 pub fn comment_approve(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Redirect {
-    let _ = Comment::update_status(pool, id, "approved");
+    let _ = store.comment_update_status(id, "approved");
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/spam")]
 pub fn comment_spam(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Redirect {
-    let _ = Comment::update_status(pool, id, "spam");
+    let _ = store.comment_update_status(id, "spam");
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }
 
 #[post("/comments/<id>/delete")]
 pub fn comment_delete(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Redirect {
-    let _ = Comment::delete(pool, id);
+    let _ = store.comment_delete(id);
     Redirect::to(format!("{}/comments", admin_base(slug)))
 }

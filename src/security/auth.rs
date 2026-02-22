@@ -2,12 +2,11 @@ use chrono::{Duration, Utc};
 use rocket::http::{Cookie, CookieJar, Status};
 use rocket::request::{FromRequest, Outcome, Request};
 use rocket::State;
-use rusqlite::params;
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
 use crate::models::user::User;
+use crate::store::Store;
 
 const SESSION_COOKIE: &str = "velocty_session";
 
@@ -151,11 +150,14 @@ impl<'r> FromRequest<'r> for AuthorUser {
 // ── Shared session resolution ──
 
 async fn resolve_session_user(request: &Request<'_>) -> Option<User> {
-    let pool = request.guard::<&State<DbPool>>().await.succeeded()?;
+    let store = request
+        .guard::<&State<Arc<dyn Store>>>()
+        .await
+        .succeeded()?;
     let cookies = request.cookies();
     let session_id = cookies.get_private(SESSION_COOKIE)?.value().to_string();
 
-    match get_session_user(pool, &session_id) {
+    match store.session_get_user(&session_id) {
         Some(user) if user.is_active() => Some(user),
         _ => {
             cookies.remove_private(Cookie::from(SESSION_COOKIE));
@@ -177,68 +179,34 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 // ── Session management ──
 
 pub fn create_session(
-    pool: &DbPool,
+    store: &dyn Store,
     user_id: i64,
     ip: Option<&str>,
     ua: Option<&str>,
 ) -> Result<String, String> {
-    let conn = pool.get().map_err(|e| e.to_string())?;
-
-    let expiry_hours = Setting::get_i64(pool, "session_expiry_hours").max(1);
+    let expiry_hours = store.setting_get_i64("session_expiry_hours").max(1);
     let session_id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().naive_utc();
     let expires = now + Duration::hours(expiry_hours);
+    let expires_str = expires.format("%Y-%m-%d %H:%M:%S").to_string();
 
-    conn.execute(
-        "INSERT INTO sessions (id, user_id, created_at, expires_at, ip_address, user_agent)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![session_id, user_id, now, expires, ip, ua],
-    )
-    .map_err(|e| e.to_string())?;
+    store.session_create_full(user_id, &session_id, &expires_str, ip, ua)?;
 
     Ok(session_id)
 }
 
 /// Validate a session and return the associated user
-pub fn get_session_user(pool: &DbPool, session_id: &str) -> Option<User> {
-    let conn = pool.get().ok()?;
-    let now = Utc::now().naive_utc();
-
-    let user_id: i64 = conn
-        .query_row(
-            "SELECT user_id FROM sessions WHERE id = ?1 AND expires_at > ?2 AND user_id IS NOT NULL",
-            params![session_id, now],
-            |row| row.get(0),
-        )
-        .ok()?;
-
-    User::get_by_id(pool, user_id)
+pub fn get_session_user(store: &dyn Store, session_id: &str) -> Option<User> {
+    store.session_get_user(session_id)
 }
 
 /// Legacy: validate session exists (for backward compat during migration)
-pub fn validate_session(pool: &DbPool, session_id: &str) -> bool {
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-
-    let now = Utc::now().naive_utc();
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sessions WHERE id = ?1 AND expires_at > ?2",
-            params![session_id, now],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    count > 0
+pub fn validate_session(store: &dyn Store, session_id: &str) -> bool {
+    store.session_validate(session_id)
 }
 
-pub fn destroy_session(pool: &DbPool, session_id: &str) -> Result<(), String> {
-    let conn = pool.get().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+pub fn destroy_session(store: &dyn Store, session_id: &str) -> Result<(), String> {
+    store.session_delete(session_id)
 }
 
 pub fn set_session_cookie(cookies: &CookieJar<'_>, session_id: &str) {
@@ -259,31 +227,13 @@ pub fn hash_ip(ip: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-pub fn cleanup_expired_sessions(pool: &DbPool) -> Result<(), String> {
-    let conn = pool.get().map_err(|e| e.to_string())?;
-    let now = Utc::now().naive_utc();
-    conn.execute("DELETE FROM sessions WHERE expires_at < ?1", params![now])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+pub fn cleanup_expired_sessions(store: &dyn Store) {
+    store.session_cleanup_expired();
 }
 
-pub fn check_login_rate_limit(pool: &DbPool, ip: &str) -> bool {
-    let max_attempts = Setting::get_i64(pool, "login_rate_limit").max(1);
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-
+pub fn check_login_rate_limit(store: &dyn Store, ip: &str) -> bool {
+    let max_attempts = store.setting_get_i64("login_rate_limit").max(1);
     let ip_hash = hash_ip(ip);
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sessions
-             WHERE ip_address = ?1
-             AND created_at > datetime('now', '-15 minutes')",
-            params![ip_hash],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
+    let count = store.session_count_recent_by_ip(&ip_hash, 15);
     count < max_attempts
 }

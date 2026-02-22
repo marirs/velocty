@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Complete — Velocty</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="icon" type="image/png" href="/static/images/favicon.png">
+</head>
+<body class="login-page">
+    <div class="setup-card" style="text-align:center;padding:48px 32px">
+        <div class="setup-logo">
+            <img src="/static/images/logo-transparent.png" alt="Velocty" style="height:36px;width:auto;margin-bottom:12px">
+        </div>
+
+        <div style="margin:24px 0">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <h2 style="margin:0 0 8px 0;font-size:22px">Setup Complete!</h2>
+            <p class="text-muted" style="font-size:14px;margin:0 0 8px 0">
+                Your database ({{ db_backend }}) has been configured and your admin account created.
+            </p>
+            <p class="text-muted" style="font-size:13px;margin:0 0 24px 0">
+                Please <strong>restart Velocty</strong> to load the full application.
+            </p>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:16px;margin-bottom:24px;text-align:left">
+            <p style="font-size:13px;margin:0 0 8px 0;color:#aaa">To restart, stop the current process and run:</p>
+            <code style="display:block;background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:6px;font-size:13px;color:#e8913a">
+                cargo run --release
+            </code>
+        </div>
+
+        <p class="text-muted" style="font-size:12px;margin:0">
+            After restart, visit <a href="/{{ admin_slug }}/login" style="color:#e8913a">/{{ admin_slug }}/login</a> to sign in.
+        </p>
+    </div>
+</body>
+</html>

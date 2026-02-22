@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rocket::data::{Data, ToByteUnit};
 use rocket::response::{Flash, Redirect};
 use rocket::State;
@@ -5,23 +7,25 @@ use rocket_dyn_templates::Template;
 use serde_json::json;
 
 use super::admin_base;
-use crate::db::DbPool;
-use crate::models::import::Import;
-use crate::models::settings::Setting;
 use crate::security::auth::AdminUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Import ─────────────────────────────────────────────
 
 #[get("/import")]
-pub fn import_page(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
-    let history = Import::list(pool);
+pub fn import_page(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+    slug: &State<AdminSlug>,
+) -> Template {
+    let history = store.import_list();
 
     let context = json!({
         "page_title": "Import",
         "history": history,
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
     });
 
     Template::render("admin/import/index", &context)
@@ -32,7 +36,7 @@ pub fn import_page(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSl
 #[post("/import/wordpress", data = "<data>")]
 pub async fn import_wordpress(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     data: Data<'_>,
 ) -> Redirect {
@@ -42,8 +46,9 @@ pub async fn import_wordpress(
         _ => return Redirect::to(format!("{}/import", admin_base(slug))),
     };
 
+    let s: &dyn Store = &**store.inner();
     let xml_content = String::from_utf8_lossy(&bytes).to_string();
-    let _ = crate::import::wordpress::import_wxr(pool, &xml_content);
+    let _ = crate::import::wordpress::import_wxr(s, &xml_content);
     Redirect::to(format!("{}/import", admin_base(slug)))
 }
 
@@ -52,7 +57,7 @@ pub async fn import_wordpress(
 #[post("/import/velocty", data = "<data>")]
 pub async fn import_velocty(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     data: Data<'_>,
 ) -> Flash<Redirect> {
@@ -77,15 +82,7 @@ pub async fn import_velocty(
         }
     };
 
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(e) => {
-            return Flash::error(
-                Redirect::to(format!("{}/import", admin_base(slug))),
-                format!("DB error: {}", e),
-            )
-        }
-    };
+    let s: &dyn Store = &**store.inner();
 
     let mut imported_posts = 0u64;
     let mut imported_portfolio = 0u64;
@@ -99,10 +96,13 @@ pub async fn import_velocty(
             let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let slug_val = cat.get("slug").and_then(|v| v.as_str()).unwrap_or("");
             if !name.is_empty() {
-                let _ = conn.execute(
-                    "INSERT OR IGNORE INTO categories (name, slug) VALUES (?1, ?2)",
-                    rusqlite::params![name, slug_val],
-                );
+                if s.category_find_by_slug(slug_val).is_none() {
+                    let _ = s.category_create(&crate::models::category::CategoryForm {
+                        name: name.to_string(),
+                        slug: slug_val.to_string(),
+                        r#type: "post".to_string(),
+                    });
+                }
                 imported_categories += 1;
             }
         }
@@ -112,12 +112,8 @@ pub async fn import_velocty(
     if let Some(tags) = export.get("tags").and_then(|v| v.as_array()) {
         for tag in tags {
             let name = tag.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let slug_val = tag.get("slug").and_then(|v| v.as_str()).unwrap_or("");
             if !name.is_empty() {
-                let _ = conn.execute(
-                    "INSERT OR IGNORE INTO tags (name, slug) VALUES (?1, ?2)",
-                    rusqlite::params![name, slug_val],
-                );
+                let _ = s.tag_find_or_create(name);
                 imported_tags += 1;
             }
         }
@@ -138,26 +134,41 @@ pub async fn import_velocty(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("draft");
-            let created_at = post
-                .get("created_at")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let updated_at = post
-                .get("updated_at")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            if !title.is_empty() {
-                let _ = conn.execute(
-                    "INSERT OR IGNORE INTO posts (title, slug, body, excerpt, featured_image, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    rusqlite::params![title, slug_val, body, excerpt, featured_image, status, created_at, updated_at],
-                );
+            if !title.is_empty() && s.post_find_by_slug(slug_val).is_none() {
+                let form = crate::models::post::PostForm {
+                    title: title.to_string(),
+                    slug: slug_val.to_string(),
+                    content_json: "{}".to_string(),
+                    content_html: body.to_string(),
+                    excerpt: if excerpt.is_empty() {
+                        None
+                    } else {
+                        Some(excerpt.to_string())
+                    },
+                    featured_image: if featured_image.is_empty() {
+                        None
+                    } else {
+                        Some(featured_image.to_string())
+                    },
+                    meta_title: None,
+                    meta_description: None,
+                    status: status.to_string(),
+                    published_at: None,
+                    category_ids: None,
+                    tag_ids: None,
+                };
+                let _ = s.post_create(&form);
                 imported_posts += 1;
             }
         }
     }
 
     // Import portfolio items
-    if let Some(items) = export.get("portfolio_items").and_then(|v| v.as_array()) {
+    if let Some(items) = export
+        .get("portfolio")
+        .or_else(|| export.get("portfolio_items"))
+        .and_then(|v| v.as_array())
+    {
         for item in items {
             let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
             let slug_val = item.get("slug").and_then(|v| v.as_str()).unwrap_or("");
@@ -173,19 +184,27 @@ pub async fn import_velocty(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("draft");
-            let created_at = item
-                .get("created_at")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let updated_at = item
-                .get("updated_at")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            if !title.is_empty() {
-                let _ = conn.execute(
-                    "INSERT OR IGNORE INTO portfolio_items (title, slug, description, image_path, status, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    rusqlite::params![title, slug_val, description, image_path, status, created_at, updated_at],
-                );
+            if !title.is_empty() && s.portfolio_find_by_slug(slug_val).is_none() {
+                let form = crate::models::portfolio::PortfolioForm {
+                    title: title.to_string(),
+                    slug: slug_val.to_string(),
+                    description_json: None,
+                    description_html: Some(description.to_string()),
+                    image_path: image_path.to_string(),
+                    thumbnail_path: None,
+                    meta_title: None,
+                    meta_description: None,
+                    sell_enabled: None,
+                    price: None,
+                    purchase_note: None,
+                    payment_provider: None,
+                    download_file_path: None,
+                    status: status.to_string(),
+                    published_at: None,
+                    category_ids: None,
+                    tag_ids: None,
+                };
+                let _ = s.portfolio_create(&form);
                 imported_portfolio += 1;
             }
         }
@@ -208,15 +227,23 @@ pub async fn import_velocty(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("pending");
-            let created_at = comment
-                .get("created_at")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
             if post_id > 0 && !body.is_empty() {
-                let _ = conn.execute(
-                    "INSERT OR IGNORE INTO comments (post_id, author_name, author_email, body, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                    rusqlite::params![post_id, author_name, author_email, body, status, created_at],
-                );
+                let form = crate::models::comment::CommentForm {
+                    post_id,
+                    content_type: Some("post".to_string()),
+                    author_name: author_name.to_string(),
+                    author_email: if author_email.is_empty() {
+                        None
+                    } else {
+                        Some(author_email.to_string())
+                    },
+                    body: body.to_string(),
+                    honeypot: None,
+                    parent_id: None,
+                };
+                if let Ok(cid) = s.comment_create(&form) {
+                    let _ = s.comment_update_status(cid, status);
+                }
                 imported_comments += 1;
             }
         }
@@ -235,22 +262,20 @@ pub async fn import_velocty(
             let key = setting.get("key").and_then(|v| v.as_str()).unwrap_or("");
             let value = setting.get("value").and_then(|v| v.as_str()).unwrap_or("");
             if !key.is_empty() && !skip_keys.contains(&key) {
-                let _ = Setting::set(pool, key, value);
+                let _ = s.setting_set(key, value);
             }
         }
     }
 
     // Log import
-    let _ = conn.execute(
-        "INSERT INTO imports (source, filename, posts_count, portfolio_count, comments_count, skipped_count, imported_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))",
-        rusqlite::params![
-            "velocty",
-            "velocty_export.json",
-            imported_posts,
-            imported_portfolio,
-            imported_comments,
-            0i64,
-        ],
+    let _ = s.import_create(
+        "velocty",
+        Some("velocty_export.json"),
+        imported_posts as i64,
+        imported_portfolio as i64,
+        imported_comments as i64,
+        0i64,
+        None,
     );
 
     Flash::success(

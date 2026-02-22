@@ -29,3 +29,12 @@ pub fn routes() -> Vec<rocket::Route> {
         passkey::passkey_auth_finish,
     ]
 }
+
+/// Minimal routes for setup-only mode (no DB configured yet).
+pub fn setup_only_routes() -> Vec<rocket::Route> {
+    routes![
+        setup::setup_page_no_db,
+        setup::setup_submit_no_db,
+        setup::test_mongo_connection,
+    ]
+}

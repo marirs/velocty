@@ -17,13 +17,14 @@ use crate::site::{self, RegistryPool, SitePoolManager};
 pub fn health_page(
     registry: &State<RegistryPool>,
     cookies: &CookieJar<'_>,
-    pool: &State<crate::db::DbPool>,
+    store: &State<std::sync::Arc<dyn crate::store::Store>>,
 ) -> Result<Template, Redirect> {
     if !is_super_authenticated(registry, cookies) {
         return Err(Redirect::to("/super/login"));
     }
 
-    let report = crate::health::gather(pool);
+    let s: &dyn crate::store::Store = &**store.inner();
+    let report = crate::health::gather(None, s);
     let sites = site::list_sites(registry);
     let mut ctx = HashMap::new();
     ctx.insert(

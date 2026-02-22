@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::serde::json::Json;
@@ -7,10 +9,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::save_upload;
-use crate::db::DbPool;
-use crate::models::audit::AuditEntry;
-use crate::models::settings::Setting;
 use crate::security::auth::AdminUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Users Management ─────────────────────────────────────────
@@ -18,20 +18,18 @@ use crate::AdminSlug;
 #[get("/users?<role>&<page>")]
 pub fn users_list(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     role: Option<String>,
     page: Option<i64>,
 ) -> Template {
-    use crate::models::user::User;
-
     let per_page = 20i64;
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
-    let settings = Setting::all(pool);
-    let users = User::list_paginated(pool, role.as_deref(), per_page, offset);
-    let total = User::count_filtered(pool, role.as_deref());
+    let settings = store.setting_all();
+    let users = store.user_list_paginated(role.as_deref(), per_page, offset);
+    let total = store.user_count_filtered(role.as_deref());
     let total_pages = ((total as f64) / (per_page as f64)).ceil() as i64;
     let users_json: Vec<serde_json::Value> = users.iter().map(|u| u.safe_json()).collect();
 
@@ -45,11 +43,11 @@ pub fn users_list(
         "total_pages": total_pages,
         "total": total,
         "role_filter": role,
-        "count_all": User::count(pool),
-        "count_admin": User::count_by_role(pool, "admin"),
-        "count_editor": User::count_by_role(pool, "editor"),
-        "count_author": User::count_by_role(pool, "author"),
-        "count_subscriber": User::count_by_role(pool, "subscriber"),
+        "count_all": store.user_count(),
+        "count_admin": store.user_count_by_role("admin"),
+        "count_editor": store.user_count_by_role("editor"),
+        "count_author": store.user_count_by_role("author"),
+        "count_subscriber": store.user_count_by_role("subscriber"),
     });
     Template::render("admin/users", &context)
 }
@@ -65,10 +63,9 @@ pub struct UserCreateForm {
 #[post("/api/users/create", format = "json", data = "<form>")]
 pub fn user_create(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     form: Json<UserCreateForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
     use crate::security::auth;
 
     let email = form.email.trim();
@@ -90,10 +87,9 @@ pub fn user_create(
         Err(e) => return Json(json!({"success": false, "error": e})),
     };
 
-    match User::create(pool, email, &hash, display_name, role) {
+    match store.user_create(email, &hash, display_name, role) {
         Ok(id) => {
-            AuditEntry::log(
-                pool,
+            store.audit_log(
                 Some(_admin.user.id),
                 Some(&_admin.user.display_name),
                 "create",
@@ -122,13 +118,12 @@ pub struct UserUpdateForm {
 #[post("/api/users/update", format = "json", data = "<form>")]
 pub fn user_update(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     form: Json<UserUpdateForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
     use crate::security::auth;
 
-    let user = match User::get_by_id(pool, form.id) {
+    let user = match store.user_get_by_id(form.id) {
         Some(u) => u,
         None => return Json(json!({"success": false, "error": "User not found"})),
     };
@@ -140,12 +135,12 @@ pub fn user_update(
             return Json(json!({"success": false, "error": "Invalid role"}));
         }
         // Prevent demoting the last admin
-        if user.role == "admin" && role != "admin" && User::count_by_role(pool, "admin") <= 1 {
+        if user.role == "admin" && role != "admin" && store.user_count_by_role("admin") <= 1 {
             return Json(
                 json!({"success": false, "error": "Cannot change role of the last admin"}),
             );
         }
-        if let Err(e) = User::update_role(pool, form.id, role) {
+        if let Err(e) = store.user_update_role(form.id, role) {
             return Json(json!({"success": false, "error": e}));
         }
     }
@@ -156,7 +151,7 @@ pub fn user_update(
         None => user.avatar.clone(),
     };
     if avatar != user.avatar {
-        let _ = User::update_avatar(pool, form.id, &avatar);
+        let _ = store.user_update_avatar(form.id, &avatar);
     }
 
     // Update profile fields if provided
@@ -172,16 +167,16 @@ pub fn user_update(
         .unwrap_or(&user.display_name)
         .trim()
         .to_string();
-    if let Err(e) = User::update_profile(pool, form.id, &display_name, &email, &avatar) {
+    if let Err(e) = store.user_update_profile(form.id, &display_name, &email, &avatar) {
         return Json(json!({"success": false, "error": e}));
     }
 
     // Sync to settings if this is the current logged-in user
     if form.id == _admin.user.id {
-        let _ = Setting::set(pool, "admin_email", &email);
-        let _ = Setting::set(pool, "admin_display_name", &display_name);
+        let _ = store.setting_set("admin_email", &email);
+        let _ = store.setting_set("admin_display_name", &display_name);
         if avatar != user.avatar {
-            let _ = Setting::set(pool, "admin_avatar", &avatar);
+            let _ = store.setting_set("admin_avatar", &avatar);
         }
     }
 
@@ -197,7 +192,7 @@ pub fn user_update(
                 Ok(h) => h,
                 Err(e) => return Json(json!({"success": false, "error": e})),
             };
-            if let Err(e) = User::update_password(pool, form.id, &hash) {
+            if let Err(e) = store.user_update_password(form.id, &hash) {
                 return Json(json!({"success": false, "error": e}));
             }
         }
@@ -215,25 +210,23 @@ pub struct AvatarUploadForm<'f> {
 #[post("/api/users/avatar", data = "<form>")]
 pub async fn user_avatar_upload(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     mut form: Form<AvatarUploadForm<'_>>,
 ) -> Json<Value> {
-    use crate::models::user::User;
-
-    let user = match User::get_by_id(pool, form.user_id) {
+    let user = match store.user_get_by_id(form.user_id) {
         Some(u) => u,
         None => return Json(json!({"success": false, "error": "User not found"})),
     };
 
-    match save_upload(&mut form.file, "avatar", pool).await {
+    match save_upload(&mut form.file, "avatar", &**store.inner()).await {
         Some(filename) => {
             let avatar_url = format!("/uploads/{}", filename);
-            if let Err(e) = User::update_avatar(pool, user.id, &avatar_url) {
+            if let Err(e) = store.user_update_avatar(user.id, &avatar_url) {
                 return Json(json!({"success": false, "error": e}));
             }
             // Sync to settings if this is the current user
             if user.id == _admin.user.id {
-                let _ = Setting::set(pool, "admin_avatar", &avatar_url);
+                let _ = store.setting_set("admin_avatar", &avatar_url);
             }
             Json(json!({"success": true, "avatar": avatar_url}))
         }
@@ -251,26 +244,24 @@ pub struct UserActionForm {
 #[post("/api/users/lock", format = "json", data = "<form>")]
 pub fn user_lock(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     form: Json<UserActionForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
-
     if form.id == _admin.user.id {
         return Json(json!({"success": false, "error": "Cannot lock yourself"}));
     }
-    if let Some(u) = User::get_by_id(pool, form.id) {
-        if u.role == "admin" && User::count_by_role(pool, "admin") <= 1 {
+    if let Some(u) = store.user_get_by_id(form.id) {
+        if u.role == "admin" && store.user_count_by_role("admin") <= 1 {
             return Json(json!({"success": false, "error": "Cannot lock the last admin"}));
         }
     }
-    let target_name = User::get_by_id(pool, form.id)
+    let target_name = store
+        .user_get_by_id(form.id)
         .map(|u| u.display_name)
         .unwrap_or_default();
-    match User::lock(pool, form.id) {
+    match store.user_lock(form.id) {
         Ok(_) => {
-            AuditEntry::log(
-                pool,
+            store.audit_log(
                 Some(_admin.user.id),
                 Some(&_admin.user.display_name),
                 "lock",
@@ -289,18 +280,16 @@ pub fn user_lock(
 #[post("/api/users/unlock", format = "json", data = "<form>")]
 pub fn user_unlock(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     form: Json<UserActionForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
-
-    let target_name = User::get_by_id(pool, form.id)
+    let target_name = store
+        .user_get_by_id(form.id)
         .map(|u| u.display_name)
         .unwrap_or_default();
-    match User::unlock(pool, form.id) {
+    match store.user_unlock(form.id) {
         Ok(_) => {
-            AuditEntry::log(
-                pool,
+            store.audit_log(
                 Some(_admin.user.id),
                 Some(&_admin.user.display_name),
                 "unlock",
@@ -319,13 +308,12 @@ pub fn user_unlock(
 #[post("/api/users/reset-password", format = "json", data = "<form>")]
 pub fn user_reset_password(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     form: Json<UserActionForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
     use crate::security::{auth, password_reset};
 
-    let user = match User::get_by_id(pool, form.id) {
+    let user = match store.user_get_by_id(form.id) {
         Some(u) => u,
         None => return Json(json!({"success": false, "error": "User not found"})),
     };
@@ -336,16 +324,16 @@ pub fn user_reset_password(
         Err(e) => return Json(json!({"success": false, "error": e})),
     };
 
-    if let Err(e) = User::update_password(pool, user.id, &hash) {
+    if let Err(e) = store.user_update_password(user.id, &hash) {
         return Json(json!({"success": false, "error": e}));
     }
 
     // Send the temp password via email in a background thread
-    let pool_clone = pool.inner().clone();
+    let store_clone = Arc::clone(store.inner());
     let email = user.email.clone();
     let pw = temp_pw.clone();
     std::thread::spawn(move || {
-        if let Err(e) = password_reset::send_admin_reset_email(&pool_clone, &email, &pw) {
+        if let Err(e) = password_reset::send_admin_reset_email(store_clone.as_ref(), &email, &pw) {
             log::error!(
                 "Failed to send admin password reset email to {}: {}",
                 email,
@@ -360,26 +348,24 @@ pub fn user_reset_password(
 #[post("/api/users/delete", format = "json", data = "<form>")]
 pub fn user_delete(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     form: Json<UserActionForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
-
     if form.id == _admin.user.id {
         return Json(json!({"success": false, "error": "Cannot delete yourself"}));
     }
-    if let Some(u) = User::get_by_id(pool, form.id) {
-        if u.role == "admin" && User::count_by_role(pool, "admin") <= 1 {
+    if let Some(u) = store.user_get_by_id(form.id) {
+        if u.role == "admin" && store.user_count_by_role("admin") <= 1 {
             return Json(json!({"success": false, "error": "Cannot delete the last admin"}));
         }
     }
-    let target_name = User::get_by_id(pool, form.id)
+    let target_name = store
+        .user_get_by_id(form.id)
         .map(|u| u.display_name)
         .unwrap_or_default();
-    match User::delete(pool, form.id) {
+    match store.user_delete(form.id) {
         Ok(_) => {
-            AuditEntry::log(
-                pool,
+            store.audit_log(
                 Some(_admin.user.id),
                 Some(&_admin.user.display_name),
                 "delete",
@@ -398,8 +384,8 @@ pub fn user_delete(
 // ── MFA Setup / Disable (per-user) ──────────────────────
 
 #[post("/mfa/setup", format = "json")]
-pub fn mfa_setup(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let site_name = Setting::get_or(pool, "site_name", "Velocty");
+pub fn mfa_setup(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let site_name = store.setting_get_or("site_name", "Velocty");
 
     let secret = crate::security::mfa::generate_secret();
     let qr = match crate::security::mfa::qr_data_uri(&secret, &site_name, &_admin.user.email) {
@@ -409,7 +395,7 @@ pub fn mfa_setup(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
 
     // Store the pending secret temporarily in settings keyed by user_id
     let pending_key = format!("mfa_pending_secret_{}", _admin.user.id);
-    let _ = Setting::set(pool, &pending_key, &secret);
+    let _ = store.setting_set(&pending_key, &secret);
 
     Json(json!({ "ok": true, "qr": qr, "secret": secret }))
 }
@@ -422,13 +408,11 @@ pub struct MfaVerifyForm {
 #[post("/mfa/verify", format = "json", data = "<body>")]
 pub fn mfa_verify(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<MfaVerifyForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
-
     let pending_key = format!("mfa_pending_secret_{}", _admin.user.id);
-    let pending = Setting::get_or(pool, &pending_key, "");
+    let pending = store.setting_get_or(&pending_key, "");
     if pending.is_empty() {
         return Json(json!({ "ok": false, "error": "No pending MFA setup. Start setup first." }));
     }
@@ -441,13 +425,13 @@ pub fn mfa_verify(
     let recovery_codes = crate::security::mfa::generate_recovery_codes();
     let codes_json = serde_json::to_string(&recovery_codes).unwrap_or_else(|_| "[]".to_string());
 
-    let _ = User::update_mfa(pool, _admin.user.id, true, &pending, &codes_json);
-    let _ = Setting::set(pool, &pending_key, "");
+    let _ = store.user_update_mfa(_admin.user.id, true, &pending, &codes_json);
+    let _ = store.setting_set(&pending_key, "");
 
     // Keep settings in sync for backward compat
-    let _ = Setting::set(pool, "mfa_secret", &pending);
-    let _ = Setting::set(pool, "mfa_enabled", "true");
-    let _ = Setting::set(pool, "mfa_recovery_codes", &codes_json);
+    let _ = store.setting_set("mfa_secret", &pending);
+    let _ = store.setting_set("mfa_enabled", "true");
+    let _ = store.setting_set("mfa_recovery_codes", &codes_json);
 
     Json(json!({ "ok": true, "recovery_codes": recovery_codes }))
 }
@@ -455,11 +439,9 @@ pub fn mfa_verify(
 #[post("/mfa/disable", format = "json", data = "<body>")]
 pub fn mfa_disable(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<MfaVerifyForm>,
 ) -> Json<Value> {
-    use crate::models::user::User;
-
     if !_admin.user.mfa_enabled || _admin.user.mfa_secret.is_empty() {
         return Json(json!({ "ok": false, "error": "MFA is not enabled." }));
     }
@@ -469,12 +451,12 @@ pub fn mfa_disable(
         return Json(json!({ "ok": false, "error": "Invalid code. MFA was not disabled." }));
     }
 
-    let _ = User::update_mfa(pool, _admin.user.id, false, "", "[]");
+    let _ = store.user_update_mfa(_admin.user.id, false, "", "[]");
 
     // Keep settings in sync for backward compat
-    let _ = Setting::set(pool, "mfa_enabled", "false");
-    let _ = Setting::set(pool, "mfa_secret", "");
-    let _ = Setting::set(pool, "mfa_recovery_codes", "[]");
+    let _ = store.setting_set("mfa_enabled", "false");
+    let _ = store.setting_set("mfa_secret", "");
+    let _ = store.setting_set("mfa_recovery_codes", "[]");
 
     Json(json!({ "ok": true }))
 }
@@ -489,9 +471,8 @@ pub fn mfa_recovery_codes(_admin: AdminUser) -> Json<Value> {
 // ── Passkey (WebAuthn) Management ───────────────────────
 
 #[get("/passkeys")]
-pub fn passkey_list(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    use crate::models::passkey::UserPasskey;
-    let keys = UserPasskey::list_for_user(pool, _admin.user.id);
+pub fn passkey_list(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let keys = store.passkey_list_for_user(_admin.user.id);
     let list: Vec<Value> = keys
         .iter()
         .map(|k| {
@@ -513,19 +494,20 @@ pub struct PasskeyNameForm {
 #[post("/passkeys/register/start", format = "json", data = "<body>")]
 pub fn passkey_register_start(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<PasskeyNameForm>,
 ) -> Json<Value> {
     use crate::security::passkey;
+    let s: &dyn Store = &**store.inner();
 
-    let webauthn = match passkey::build_webauthn(pool) {
+    let webauthn = match passkey::build_webauthn(s) {
         Ok(w) => w,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
 
     // Deterministic user UUID from email for WebAuthn user handle
     let user_id = uuid::Uuid::new_v4();
-    let existing = passkey::load_credentials(pool, _admin.user.id);
+    let existing = passkey::load_credentials(s, _admin.user.id);
     let exclude: Vec<webauthn_rs::prelude::CredentialID> =
         existing.iter().map(|pk| pk.cred_id().clone()).collect();
 
@@ -536,11 +518,11 @@ pub fn passkey_register_start(
         Some(exclude),
     ) {
         Ok((ccr, reg_state)) => {
-            passkey::store_reg_state(pool, _admin.user.id, &reg_state);
+            passkey::store_reg_state(s, _admin.user.id, &reg_state);
             // Store the desired name for use in finish
             let name = body.name.as_deref().unwrap_or("Passkey").to_string();
             let name_key = format!("passkey_reg_name_{}", _admin.user.id);
-            let _ = Setting::set(pool, &name_key, &name);
+            let _ = store.setting_set(&name_key, &name);
             Json(json!({ "ok": true, "options": ccr }))
         }
         Err(e) => Json(json!({ "ok": false, "error": format!("{}", e) })),
@@ -550,20 +532,19 @@ pub fn passkey_register_start(
 #[post("/passkeys/register/finish", format = "json", data = "<body>")]
 pub fn passkey_register_finish(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<Value>,
 ) -> Json<Value> {
-    use crate::models::passkey::UserPasskey;
-    use crate::models::user::User;
     use crate::security::passkey;
+    let s: &dyn Store = &**store.inner();
 
-    let webauthn = match passkey::build_webauthn(pool) {
+    let webauthn = match passkey::build_webauthn(s) {
         Ok(w) => w,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
 
-    let reg_state = match passkey::take_reg_state(pool, _admin.user.id) {
-        Some(s) => s,
+    let reg_state = match passkey::take_reg_state(s, _admin.user.id) {
+        Some(st) => st,
         None => {
             return Json(
                 json!({ "ok": false, "error": "No pending registration. Start registration first." }),
@@ -590,21 +571,13 @@ pub fn passkey_register_finish(
                 serde_json::to_string(&passkey_data).unwrap_or_else(|_| "{}".to_string());
 
             let name_key = format!("passkey_reg_name_{}", _admin.user.id);
-            let name = Setting::get_or(pool, &name_key, "Passkey");
-            let _ = Setting::set(pool, &name_key, "");
+            let name = store.setting_get_or(&name_key, "Passkey");
+            let _ = store.setting_set(&name_key, "");
 
-            match UserPasskey::create(
-                pool,
-                _admin.user.id,
-                &cred_id,
-                &public_key_json,
-                0,
-                "[]",
-                &name,
-            ) {
+            match store.passkey_create(_admin.user.id, &cred_id, &public_key_json, 0, "[]", &name) {
                 Ok(_) => {
                     // Auto-enable passkey as auth method on first registration
-                    let count = UserPasskey::count_for_user(pool, _admin.user.id);
+                    let count = store.passkey_count_for_user(_admin.user.id);
                     if count == 1 {
                         // First passkey — save current method as fallback, switch to passkey
                         let current = &_admin.user.auth_method;
@@ -613,7 +586,7 @@ pub fn passkey_register_finish(
                         } else {
                             current
                         };
-                        let _ = User::update_auth_method(pool, _admin.user.id, "passkey", fallback);
+                        let _ = store.user_update_auth_method(_admin.user.id, "passkey", fallback);
                     }
                     Json(json!({ "ok": true }))
                 }
@@ -632,19 +605,16 @@ pub struct PasskeyDeleteForm {
 #[post("/passkeys/delete", format = "json", data = "<body>")]
 pub fn passkey_delete(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<PasskeyDeleteForm>,
 ) -> Json<Value> {
-    use crate::models::passkey::UserPasskey;
-    use crate::models::user::User;
-
-    match UserPasskey::delete(pool, body.id, _admin.user.id) {
+    match store.passkey_delete(body.id, _admin.user.id) {
         Ok(()) => {
             // If no passkeys remain, auto-revert to fallback method
-            let remaining = UserPasskey::count_for_user(pool, _admin.user.id);
+            let remaining = store.passkey_count_for_user(_admin.user.id);
             if remaining == 0 && _admin.user.auth_method == "passkey" {
                 let fallback = &_admin.user.auth_method_fallback;
-                let _ = User::update_auth_method(pool, _admin.user.id, fallback, fallback);
+                let _ = store.user_update_auth_method(_admin.user.id, fallback, fallback);
             }
             Json(json!({ "ok": true, "remaining": remaining }))
         }

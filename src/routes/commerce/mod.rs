@@ -6,16 +6,15 @@ pub mod square;
 pub mod stripe;
 pub mod twocheckout;
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::{DownloadToken, License, Order};
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
-use std::collections::HashMap;
+use crate::store::Store;
 
 // ── Shared Helpers ──────────────────────────────────────
 
@@ -68,29 +67,22 @@ pub fn generate_license_key() -> String {
 /// After a payment provider confirms, this creates the order + download token + license + sends email.
 /// Returns JSON with download_token, license_key, etc.
 pub fn finalize_order(
-    pool: &DbPool,
+    store: &dyn Store,
     order_id: i64,
     provider_order_id: &str,
     buyer_email: &str,
     buyer_name: &str,
 ) -> Result<Value, String> {
-    let order = Order::find_by_id(pool, order_id).ok_or("Order not found")?;
+    let order = store.order_find_by_id(order_id).ok_or("Order not found")?;
     if order.status != "pending" {
         return Err("Order already completed".to_string());
     }
 
-    let _ = Order::update_provider_order_id(pool, order.id, provider_order_id);
-    let _ = Order::update_status(pool, order.id, "completed");
+    let _ = store.order_update_provider_order_id(order.id, provider_order_id);
+    let _ = store.order_update_status(order.id, "completed");
+    let _ = store.order_update_buyer_info(order.id, buyer_email, buyer_name);
 
-    // Update buyer info
-    if let Ok(conn) = pool.get() {
-        let _ = conn.execute(
-            "UPDATE orders SET buyer_email = ?1, buyer_name = ?2 WHERE id = ?3",
-            rusqlite::params![buyer_email, buyer_name, order.id],
-        );
-    }
-
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let settings: HashMap<String, String> = store.setting_all();
     let max_downloads: i64 = settings
         .get("downloads_max_per_purchase")
         .and_then(|v| v.parse().ok())
@@ -102,40 +94,39 @@ pub fn finalize_order(
 
     let token = generate_token();
     let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::hours(expiry_hours);
-    DownloadToken::create(pool, order.id, &token, max_downloads, expires_at)?;
+    store.download_token_create(order.id, &token, max_downloads, expires_at)?;
 
     let license_key = generate_license_key();
-    License::create(pool, order.id, &license_key)?;
+    store.license_create(order.id, &license_key)?;
 
     // Send email in background
-    let item = PortfolioItem::find_by_id(pool, order.portfolio_id);
+    let item = store.portfolio_find_by_id(order.portfolio_id);
     let base = site_url(&settings);
     let download_url = format!("{}/download/{}", base, token);
     let cur = currency(&settings);
-    std::thread::spawn({
-        let pool = pool.clone();
-        let email = buyer_email.to_string();
-        let title = item.as_ref().map(|i| i.title.clone()).unwrap_or_default();
-        let note = item
-            .as_ref()
-            .map(|i| i.purchase_note.clone())
-            .unwrap_or_default();
-        let lk = license_key.clone();
-        let amt = order.amount;
-        let cur = cur.clone();
-        let dl = download_url.clone();
-        move || {
-            crate::email::send_purchase_email(
-                &pool,
-                &email,
-                &title,
-                &note,
-                &dl,
-                Some(&lk),
-                amt,
-                &cur,
-            );
-        }
+    // We need the settings for the email — pass them via the thread
+    let email = buyer_email.to_string();
+    let title = item.as_ref().map(|i| i.title.clone()).unwrap_or_default();
+    let note = item
+        .as_ref()
+        .map(|i| i.purchase_note.clone())
+        .unwrap_or_default();
+    let lk = license_key.clone();
+    let amt = order.amount;
+    let cur = cur.clone();
+    let dl = download_url.clone();
+    let settings_clone = settings.clone();
+    std::thread::spawn(move || {
+        crate::email::send_purchase_email_with_settings(
+            &settings_clone,
+            &email,
+            &title,
+            &note,
+            &dl,
+            Some(&lk),
+            amt,
+            &cur,
+        );
     });
 
     Ok(json!({
@@ -149,22 +140,22 @@ pub fn finalize_order(
 
 /// Create a pending order for a given provider + item, returns (order_id, price, currency).
 pub fn create_pending_order(
-    pool: &DbPool,
+    store: &dyn Store,
     portfolio_id: i64,
     provider: &str,
     buyer_email: &str,
 ) -> Result<(i64, f64, String), String> {
-    let item = PortfolioItem::find_by_id(pool, portfolio_id)
+    let item = store
+        .portfolio_find_by_id(portfolio_id)
         .filter(|i| i.sell_enabled)
         .ok_or("Item not available for purchase")?;
     let price = item
         .price
         .filter(|&p| p > 0.0)
         .ok_or("Item has no price set")?;
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let settings: HashMap<String, String> = store.setting_all();
     let cur = currency(&settings);
-    let order_id = Order::create(
-        pool,
+    let order_id = store.order_create(
         item.id,
         buyer_email,
         "",
@@ -191,10 +182,11 @@ pub fn urlencoding(s: &str) -> String {
 // ── Download page: Validate token and show download UI ─
 
 #[get("/download/<token>")]
-pub fn download_page(pool: &State<DbPool>, token: &str) -> rocket_dyn_templates::Template {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn download_page(store: &State<Arc<dyn Store>>, token: &str) -> rocket_dyn_templates::Template {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
 
-    let dl_token = match DownloadToken::find_by_token(pool, token) {
+    let dl_token = match s.download_token_find_by_token(token) {
         Some(t) => t,
         None => {
             return rocket_dyn_templates::Template::render(
@@ -223,7 +215,7 @@ pub fn download_page(pool: &State<DbPool>, token: &str) -> rocket_dyn_templates:
         );
     }
 
-    let order = match Order::find_by_id(pool, dl_token.order_id) {
+    let order = match s.order_find_by_id(dl_token.order_id) {
         Some(o) if o.status == "completed" => o,
         _ => {
             return rocket_dyn_templates::Template::render(
@@ -236,7 +228,7 @@ pub fn download_page(pool: &State<DbPool>, token: &str) -> rocket_dyn_templates:
         }
     };
 
-    let item = match PortfolioItem::find_by_id(pool, order.portfolio_id) {
+    let item = match s.portfolio_find_by_id(order.portfolio_id) {
         Some(i) => i,
         None => {
             return rocket_dyn_templates::Template::render(
@@ -249,7 +241,7 @@ pub fn download_page(pool: &State<DbPool>, token: &str) -> rocket_dyn_templates:
         }
     };
 
-    let license = License::find_by_order(pool, order.id);
+    let license = s.license_find_by_order(order.id);
 
     rocket_dyn_templates::Template::render(
         "download",
@@ -273,10 +265,11 @@ pub fn download_page(pool: &State<DbPool>, token: &str) -> rocket_dyn_templates:
 
 #[get("/download/<token>/file")]
 pub fn download_file(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     token: &str,
 ) -> Result<rocket::response::Redirect, Json<Value>> {
-    let dl_token = match DownloadToken::find_by_token(pool, token) {
+    let s: &dyn Store = &**store.inner();
+    let dl_token = match s.download_token_find_by_token(token) {
         Some(t) => t,
         None => {
             return Err(Json(
@@ -291,18 +284,18 @@ pub fn download_file(
         ));
     }
 
-    let order = match Order::find_by_id(pool, dl_token.order_id) {
+    let order = match s.order_find_by_id(dl_token.order_id) {
         Some(o) if o.status == "completed" => o,
         _ => return Err(Json(json!({ "ok": false, "error": "Order not completed" }))),
     };
 
-    let item = match PortfolioItem::find_by_id(pool, order.portfolio_id) {
+    let item = match s.portfolio_find_by_id(order.portfolio_id) {
         Some(i) => i,
         None => return Err(Json(json!({ "ok": false, "error": "Item not found" }))),
     };
 
     // Increment download count
-    let _ = DownloadToken::increment_download(pool, dl_token.id);
+    let _ = s.download_token_increment(dl_token.id);
 
     // Serve download_file_path if set, otherwise fall back to the featured image
     let file_url = if !item.download_file_path.is_empty() {
@@ -317,22 +310,26 @@ pub fn download_file(
 
 #[get("/download/<token>/license")]
 pub fn download_license(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     token: &str,
 ) -> Result<(rocket::http::ContentType, String), Json<Value>> {
-    let dl_token = DownloadToken::find_by_token(pool, token)
+    let s: &dyn Store = &**store.inner();
+    let dl_token = s
+        .download_token_find_by_token(token)
         .ok_or_else(|| Json(json!({ "ok": false, "error": "Invalid download link" })))?;
 
-    let order = Order::find_by_id(pool, dl_token.order_id)
+    let order = s
+        .order_find_by_id(dl_token.order_id)
         .filter(|o| o.status == "completed")
         .ok_or_else(|| Json(json!({ "ok": false, "error": "Order not found" })))?;
 
-    let item = PortfolioItem::find_by_id(pool, order.portfolio_id)
+    let item = s
+        .portfolio_find_by_id(order.portfolio_id)
         .ok_or_else(|| Json(json!({ "ok": false, "error": "Item not found" })))?;
 
-    let license = License::find_by_order(pool, order.id);
+    let license = s.license_find_by_order(order.id);
 
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let settings: HashMap<String, String> = s.setting_all();
     let site_name = settings
         .get("site_name")
         .cloned()
@@ -370,25 +367,17 @@ pub struct CheckPurchaseRequest {
 }
 
 #[post("/api/checkout/check", format = "json", data = "<body>")]
-pub fn check_purchase(pool: &State<DbPool>, body: Json<CheckPurchaseRequest>) -> Json<Value> {
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => return Json(json!({ "ok": false, "purchased": false })),
-    };
+pub fn check_purchase(
+    store: &State<Arc<dyn Store>>,
+    body: Json<CheckPurchaseRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
 
     // Find a completed order for this email + portfolio item
-    let result: Option<i64> = conn
-        .query_row(
-            "SELECT id FROM orders WHERE portfolio_id = ?1 AND buyer_email = ?2 AND status = 'completed' ORDER BY created_at DESC LIMIT 1",
-            rusqlite::params![body.portfolio_id, body.email],
-            |row| row.get(0),
-        )
-        .ok();
-
-    match result {
-        Some(order_id) => {
-            let dl_token = DownloadToken::find_by_order(pool, order_id);
-            let license = License::find_by_order(pool, order_id);
+    match s.order_find_completed_by_email_and_portfolio(&body.email, body.portfolio_id) {
+        Some(order) => {
+            let dl_token = s.download_token_find_by_order(order.id);
+            let license = s.license_find_by_order(order.id);
 
             let token_valid = dl_token.as_ref().map(|t| t.is_valid()).unwrap_or(false);
 
@@ -416,11 +405,12 @@ pub struct GenericCaptureRequest {
 
 #[post("/api/checkout/capture", format = "json", data = "<body>")]
 pub fn generic_capture_order(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<GenericCaptureRequest>,
 ) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
     match finalize_order(
-        pool,
+        s,
         body.order_id,
         &body.provider_order_id,
         &body.buyer_email,

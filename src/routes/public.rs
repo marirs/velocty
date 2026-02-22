@@ -5,19 +5,14 @@ use rocket::{Request, State};
 use serde_json::json;
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Arc;
 
-use crate::db::DbPool;
 use crate::image_proxy;
-use crate::models::category::Category;
-use crate::models::comment::Comment;
-use crate::models::portfolio::PortfolioItem;
-use crate::models::post::Post;
-use crate::models::settings::{Setting, SettingsCache};
-use crate::models::tag::Tag;
-use crate::models::user::User;
+use crate::models::settings::SettingsCache;
 use crate::render;
 use crate::security::auth;
 use crate::seo;
+use crate::store::Store;
 
 /// Response type for serving files with custom headers (caching, MIME, etc.)
 pub struct FileResponse {
@@ -48,39 +43,44 @@ impl<'r> Responder<'r, 'static> for FileResponse {
 
 #[get("/?<page>", rank = 89)]
 pub fn dynamic_route_index(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     cache: &State<SettingsCache>,
     page: Option<i64>,
 ) -> Option<RawHtml<String>> {
-    dispatch_root(pool, cache, None, page)
+    dispatch_root(&**store.inner(), cache, None, page)
 }
 
 #[get("/<first>/<rest..>?<page>", rank = 90)]
 pub fn dynamic_route_sub(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     cache: &State<SettingsCache>,
     first: &str,
     rest: std::path::PathBuf,
     page: Option<i64>,
 ) -> Option<RawHtml<String>> {
     let rest_str = rest.to_string_lossy();
-    dispatch_root(pool, cache, Some(&format!("{}/{}", first, rest_str)), page)
+    dispatch_root(
+        &**store.inner(),
+        cache,
+        Some(&format!("{}/{}", first, rest_str)),
+        page,
+    )
 }
 
 #[get("/<first>?<page>", rank = 91)]
 pub fn dynamic_route_root(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     cache: &State<SettingsCache>,
     first: &str,
     page: Option<i64>,
 ) -> Option<RawHtml<String>> {
-    dispatch_root(pool, cache, Some(first), page)
+    dispatch_root(&**store.inner(), cache, Some(first), page)
 }
 
 /// Core dispatcher: resolves the full path against cached slugs and enabled flags.
 /// `path` is None for "/", or Some("journal"), Some("journal/my-post"), Some("category/foo"), etc.
 fn dispatch_root(
-    pool: &DbPool,
+    store: &dyn Store,
     cache: &SettingsCache,
     path: Option<&str>,
     page: Option<i64>,
@@ -116,14 +116,14 @@ fn dispatch_root(
     // Try blog: strip blog_slug prefix
     if journal_enabled {
         if let Some(rest) = strip_slug_prefix(path, &blog_slug) {
-            return dispatch_blog(pool, rest, page);
+            return dispatch_blog(store, rest, page);
         }
     }
 
     // Try portfolio: strip portfolio_slug prefix
     if portfolio_enabled {
         if let Some(rest) = strip_slug_prefix(path, &portfolio_slug) {
-            return dispatch_portfolio(pool, rest, page);
+            return dispatch_portfolio(store, rest, page);
         }
     }
 
@@ -148,252 +148,129 @@ fn strip_slug_prefix<'a>(path: &'a str, slug: &str) -> Option<&'a str> {
     None
 }
 
-fn dispatch_blog(pool: &DbPool, rest: &str, page: Option<i64>) -> Option<RawHtml<String>> {
+fn dispatch_blog(store: &dyn Store, rest: &str, page: Option<i64>) -> Option<RawHtml<String>> {
     if rest.is_empty() {
-        return Some(do_blog_list(pool, page));
+        return Some(do_blog_list(store, page));
     }
     let parts: Vec<&str> = rest.splitn(2, '/').collect();
     match parts.as_slice() {
-        ["category", slug] => do_blog_by_category(pool, slug, page),
-        ["tag", slug] => do_blog_by_tag(pool, slug, page),
-        [slug] => do_blog_single(pool, slug),
+        ["category", slug] => do_blog_by_category(store, slug, page),
+        ["tag", slug] => do_blog_by_tag(store, slug, page),
+        [slug] => do_blog_single(store, slug),
         _ => None,
     }
 }
 
-fn dispatch_portfolio(pool: &DbPool, rest: &str, page: Option<i64>) -> Option<RawHtml<String>> {
+fn dispatch_portfolio(store: &dyn Store, rest: &str, page: Option<i64>) -> Option<RawHtml<String>> {
     if rest.is_empty() {
-        return Some(do_portfolio_grid(pool, page));
+        return Some(do_portfolio_grid(store, page));
     }
     let parts: Vec<&str> = rest.splitn(2, '/').collect();
     match parts.as_slice() {
-        ["category", slug] => do_portfolio_by_category(pool, slug, page),
-        ["tag", slug] => do_portfolio_by_tag(pool, slug, page),
-        [slug] => do_portfolio_single(pool, slug),
+        ["category", slug] => do_portfolio_by_category(store, slug, page),
+        ["tag", slug] => do_portfolio_by_tag(store, slug, page),
+        [slug] => do_portfolio_single(store, slug),
         _ => None,
     }
 }
 
 /// Portfolio nav categories for the sidebar — called by non-portfolio routes
 /// so the sidebar always shows the portfolio category tree.
-fn nav_categories(pool: &DbPool) -> Vec<Category> {
-    Category::list_nav_visible(pool, Some("portfolio"))
+fn nav_categories(store: &dyn Store) -> Vec<crate::models::category::Category> {
+    store.category_list_nav_visible(Some("portfolio"))
 }
 
 /// Journal nav categories for the sidebar.
-fn nav_journal_categories(pool: &DbPool) -> Vec<Category> {
-    Category::list_nav_visible(pool, Some("post"))
+fn nav_journal_categories(store: &dyn Store) -> Vec<crate::models::category::Category> {
+    store.category_list_nav_visible(Some("post"))
 }
 
 // ── Archives ──────────────────────────────────────────
 
 #[get("/archives")]
-pub fn archives(pool: &State<DbPool>) -> RawHtml<String> {
-    let settings = Setting::all(pool);
+pub fn archives(store: &State<Arc<dyn Store>>) -> RawHtml<String> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
 
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => {
-            return RawHtml(render::render_page(
-                pool,
-                "archives",
-                &json!({
-                    "settings": settings,
-                    "nav_categories": nav_categories(pool),
-                    "nav_journal_categories": nav_journal_categories(pool),
-                    "archives": [],
-                    "page_type": "archives",
-                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-                }),
-            ));
-        }
-    };
-
-    let mut stmt = match conn.prepare(
-        "SELECT strftime('%Y', published_at) as year, strftime('%m', published_at) as month,
-                COUNT(*) as count
-         FROM posts WHERE status = 'published' AND published_at IS NOT NULL
-         GROUP BY year, month ORDER BY year DESC, month DESC",
-    ) {
-        Ok(s) => s,
-        Err(_) => {
-            return RawHtml(render::render_page(
-                pool,
-                "archives",
-                &json!({
-                    "settings": settings,
-                    "nav_categories": nav_categories(pool),
-                    "nav_journal_categories": nav_journal_categories(pool),
-                    "archives": [],
-                    "page_type": "archives",
-                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-                }),
-            ));
-        }
-    };
-
-    let archive_entries: Vec<serde_json::Value> = stmt
-        .query_map([], |row| {
-            let year: String = row.get(0)?;
-            let month: String = row.get(1)?;
-            let count: i64 = row.get(2)?;
-            Ok(json!({
-                "year": year,
-                "month": month,
-                "count": count,
-            }))
-        })
-        .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default();
+    let archive_entries: Vec<serde_json::Value> = s
+        .post_archives()
+        .into_iter()
+        .map(|(year, month, count)| json!({ "year": year, "month": month, "count": count }))
+        .collect();
 
     let context = json!({
         "settings": settings,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(s),
+        "nav_journal_categories": nav_journal_categories(s),
         "archives": archive_entries,
         "page_type": "archives",
-        "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
+        "seo": seo::build_meta(s, Some("Archives"), None, "/archives"),
     });
 
-    RawHtml(render::render_page(pool, "archives", &context))
+    RawHtml(render::render_page(s, "archives", &context))
 }
 
 #[get("/archives/<year>/<month>?<page>")]
 pub fn archives_month(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     year: &str,
     month: &str,
     page: Option<i64>,
 ) -> RawHtml<String> {
-    let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
+    let s: &dyn Store = &**store.inner();
+    let per_page = s.setting_get_i64("blog_posts_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
-    let settings = Setting::all(pool);
+    let settings = s.setting_all();
 
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => {
-            return RawHtml(render::render_page(
-                pool,
-                "blog_list",
-                &json!({
-                    "settings": settings,
-                    "nav_categories": nav_categories(pool),
-                    "nav_journal_categories": nav_journal_categories(pool),
-                    "posts": [],
-                    "current_page": 1,
-                    "total_pages": 1,
-                    "page_type": "blog_list",
-                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-                }),
-            ));
-        }
-    };
-
-    let mut stmt = match conn.prepare(
-        "SELECT * FROM posts
-         WHERE status = 'published'
-           AND strftime('%Y', published_at) = ?1
-           AND strftime('%m', published_at) = ?2
-         ORDER BY published_at DESC LIMIT ?3 OFFSET ?4",
-    ) {
-        Ok(s) => s,
-        Err(_) => {
-            return RawHtml(render::render_page(
-                pool,
-                "blog_list",
-                &json!({
-                    "settings": settings,
-                    "nav_categories": nav_categories(pool),
-                    "nav_journal_categories": nav_journal_categories(pool),
-                    "posts": [],
-                    "current_page": 1,
-                    "total_pages": 1,
-                    "page_type": "blog_list",
-                    "seo": seo::build_meta(pool, Some("Archives"), None, "/archives"),
-                }),
-            ));
-        }
-    };
-
-    let posts: Vec<Post> = stmt
-        .query_map(rusqlite::params![year, month, per_page, offset], |row| {
-            Ok(Post {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                slug: row.get("slug")?,
-                content_json: row.get("content_json")?,
-                content_html: row.get("content_html")?,
-                excerpt: row.get("excerpt")?,
-                featured_image: row.get("featured_image")?,
-                meta_title: row.get("meta_title")?,
-                meta_description: row.get("meta_description")?,
-                status: row.get("status")?,
-                published_at: row.get("published_at")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                seo_score: row.get("seo_score").unwrap_or(-1),
-                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
-            })
-        })
-        .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default();
-
-    let total: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM posts
-             WHERE status = 'published'
-               AND strftime('%Y', published_at) = ?1
-               AND strftime('%m', published_at) = ?2",
-            rusqlite::params![year, month],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let posts = s.post_by_year_month(year, month, per_page, offset);
+    let total = s.post_count_by_year_month(year, month);
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
     let title = format!("Archives: {}/{}", year, month);
     let context = json!({
         "settings": settings,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(s),
+        "nav_journal_categories": nav_journal_categories(s),
         "posts": posts,
         "current_page": current_page,
         "total_pages": total_pages,
         "archive_year": year,
         "archive_month": month,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some(&title), None, &format!("/archives/{}/{}", year, month)),
+        "seo": seo::build_meta(s, Some(&title), None, &format!("/archives/{}/{}", year, month)),
     });
 
-    RawHtml(render::render_page(pool, "blog_list", &context))
+    RawHtml(render::render_page(s, "blog_list", &context))
 }
 
 // ── RSS Feed ───────────────────────────────────────────
 
 #[get("/feed")]
-pub fn rss_feed(pool: &State<DbPool>) -> RawXml<String> {
-    RawXml(crate::rss::generate_feed(pool))
+pub fn rss_feed(store: &State<Arc<dyn Store>>) -> RawXml<String> {
+    RawXml(crate::rss::generate_feed(&**store.inner()))
 }
 
 // ── Sitemap ────────────────────────────────────────────
 
 #[get("/sitemap.xml")]
-pub fn sitemap(pool: &State<DbPool>) -> Option<RawXml<String>> {
-    seo::sitemap::generate_sitemap(pool).map(RawXml)
+pub fn sitemap(store: &State<Arc<dyn Store>>) -> Option<RawXml<String>> {
+    seo::sitemap::generate_sitemap(&**store.inner()).map(RawXml)
 }
 
 // ── Robots.txt ─────────────────────────────────────────
 
 #[get("/robots.txt")]
-pub fn robots(pool: &State<DbPool>) -> String {
-    seo::sitemap::generate_robots(pool)
+pub fn robots(store: &State<Arc<dyn Store>>) -> String {
+    seo::sitemap::generate_robots(&**store.inner())
 }
 
 // ── Privacy Policy ─────────────────────────────────────
 
 #[get("/privacy")]
-pub fn privacy_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
-    let settings = Setting::all(pool);
+pub fn privacy_page(store: &State<Arc<dyn Store>>) -> Option<RawHtml<String>> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
     if settings.get("privacy_policy_enabled").map(|v| v.as_str()) != Some("true") {
         return None;
     }
@@ -401,15 +278,16 @@ pub fn privacy_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
         .get("privacy_policy_content")
         .cloned()
         .unwrap_or_default();
-    let page_html = render::render_legal_page(pool, &settings, "Privacy Policy", &html_body);
+    let page_html = render::render_legal_page(s, &settings, "Privacy Policy", &html_body);
     Some(RawHtml(page_html))
 }
 
 // ── Terms of Use ──────────────────────────────────────
 
 #[get("/terms")]
-pub fn terms_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
-    let settings = Setting::all(pool);
+pub fn terms_page(store: &State<Arc<dyn Store>>) -> Option<RawHtml<String>> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
     if settings.get("terms_of_use_enabled").map(|v| v.as_str()) != Some("true") {
         return None;
     }
@@ -417,7 +295,7 @@ pub fn terms_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
         .get("terms_of_use_content")
         .cloned()
         .unwrap_or_default();
-    let page_html = render::render_legal_page(pool, &settings, "Terms of Use", &html_body);
+    let page_html = render::render_legal_page(s, &settings, "Terms of Use", &html_body);
     Some(RawHtml(page_html))
 }
 
@@ -425,8 +303,12 @@ pub fn terms_page(pool: &State<DbPool>) -> Option<RawHtml<String>> {
 // Decodes the token, verifies HMAC, serves the file with caching headers.
 
 #[get("/img/<token>")]
-pub fn image_proxy_route(pool: &State<DbPool>, token: &str) -> Result<FileResponse, Status> {
-    let settings = Setting::all(pool);
+pub fn image_proxy_route(
+    store: &State<Arc<dyn Store>>,
+    token: &str,
+) -> Result<FileResponse, Status> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
     let secret = settings
         .get("image_proxy_secret")
         .cloned()
@@ -453,16 +335,17 @@ pub fn image_proxy_route(pool: &State<DbPool>, token: &str) -> Result<FileRespon
 /// Public visitors get 404 — they should use /img/<token> proxy URLs instead.
 #[get("/uploads/<path..>")]
 pub fn serve_uploads(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     cookies: &CookieJar<'_>,
     path: std::path::PathBuf,
 ) -> Result<FileResponse, Status> {
+    let s: &dyn Store = &**store.inner();
     let session_id = cookies
         .get_private("velocty_session")
         .map(|c| c.value().to_string());
     let is_authenticated = session_id
         .as_deref()
-        .and_then(|sid| auth::get_session_user(pool, sid))
+        .and_then(|sid| auth::get_session_user(s, sid))
         .map(|u| u.is_active())
         .unwrap_or(false);
 
@@ -515,8 +398,9 @@ fn serve_file_from_path(path: &str, cache_control: &str) -> Result<FileResponse,
 // ── Search ────────────────────────────────────────────
 
 #[get("/search?<q>")]
-pub fn search_page(pool: &State<DbPool>, q: Option<String>) -> RawHtml<String> {
-    let settings = Setting::all(pool);
+pub fn search_page(store: &State<Arc<dyn Store>>, q: Option<String>) -> RawHtml<String> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
     if settings.get("design_site_search").map(|v| v.as_str()) != Some("true") {
         return RawHtml(String::new());
     }
@@ -524,11 +408,11 @@ pub fn search_page(pool: &State<DbPool>, q: Option<String>) -> RawHtml<String> {
     let results = if query.is_empty() {
         vec![]
     } else {
-        crate::models::search::search(pool, &query, 50)
+        s.search_query(&query, 50)
     };
 
-    let nav_cats = Category::list_nav_visible(pool, Some("portfolio"));
-    let nav_journal_cats = Category::list_nav_visible(pool, Some("post"));
+    let nav_cats = s.category_list_nav_visible(Some("portfolio"));
+    let nav_journal_cats = s.category_list_nav_visible(Some("post"));
     let context = json!({
         "settings": settings,
         "nav_categories": nav_cats,
@@ -537,7 +421,7 @@ pub fn search_page(pool: &State<DbPool>, q: Option<String>) -> RawHtml<String> {
         "search_query": query,
         "search_results": results,
     });
-    RawHtml(render::render_page(pool, "search", &context))
+    RawHtml(render::render_page(s, "search", &context))
 }
 
 pub fn root_routes() -> Vec<rocket::Route> {
@@ -560,18 +444,19 @@ pub fn root_routes() -> Vec<rocket::Route> {
 
 // ── Internal dispatch functions (called by catch-all) ────
 
-fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
-    let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
+fn do_blog_list(store: &dyn Store, page: Option<i64>) -> RawHtml<String> {
+    let per_page = store.setting_get_i64("blog_posts_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
-    let posts = Post::published(pool, per_page, offset);
-    let total = Post::count(pool, Some("published"));
+    let posts = store.post_list(Some("published"), per_page, offset);
+    let total = store.post_count(Some("published"));
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
-    let settings = Setting::all(pool);
+    let settings = store.setting_all();
 
     // Inject author_name into each post from the first admin user
-    let author_name = User::list_all(pool)
+    let author_name = store
+        .user_list_all()
         .into_iter()
         .find(|u| u.role == "admin")
         .map(|u| u.display_name)
@@ -582,9 +467,9 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
             let mut pj = serde_json::to_value(p).unwrap_or_default();
             if let Some(obj) = pj.as_object_mut() {
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
-                let cats = Category::for_content(pool, p.id, "post");
+                let cats = store.category_for_content(p.id, "post");
                 obj.insert("categories".to_string(), json!(cats));
-                let cc = Comment::for_post(pool, p.id, "post").len();
+                let cc = store.comment_for_post(p.id, "post").len();
                 obj.insert("comment_count".to_string(), json!(cc));
             }
             pj
@@ -593,30 +478,30 @@ fn do_blog_list(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
 
     let context = json!({
         "settings": settings,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(store),
+        "nav_journal_categories": nav_journal_categories(store),
         "posts": posts_json,
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some("Blog"), None, &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), "")),
+        "seo": seo::build_meta(store, Some("Blog"), None, &render::slug_url(&store.setting_get_or("blog_slug", "journal"), "")),
     });
 
-    RawHtml(render::render_page(pool, "blog_list", &context))
+    RawHtml(render::render_page(store, "blog_list", &context))
 }
 
-fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
-    let post = Post::find_by_slug(pool, slug)?;
+fn do_blog_single(store: &dyn Store, slug: &str) -> Option<RawHtml<String>> {
+    let post = store.post_find_by_slug(slug)?;
     if post.status != "published" {
         return None;
     }
 
-    let categories = Category::for_content(pool, post.id, "post");
-    let tags = Tag::for_content(pool, post.id, "post");
-    let settings = Setting::all(pool);
+    let categories = store.category_for_content(post.id, "post");
+    let tags = store.tag_for_content(post.id, "post");
+    let settings = store.setting_all();
     let comments_enabled = settings.get("comments_on_blog").map(|v| v.as_str()) == Some("true");
     let comments = if comments_enabled {
-        Comment::for_post(pool, post.id, "post")
+        store.comment_for_post(post.id, "post")
     } else {
         vec![]
     };
@@ -624,14 +509,15 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
     let prev_post = post
         .published_at
         .as_ref()
-        .and_then(|pa| Post::prev_published(pool, pa));
+        .and_then(|pa| store.post_prev_published(pa));
     let next_post = post
         .published_at
         .as_ref()
-        .and_then(|pa| Post::next_published(pool, pa));
+        .and_then(|pa| store.post_next_published(pa));
 
     // Get author name from the first admin user
-    let author_name = User::list_all(pool)
+    let author_name = store
+        .user_list_all()
         .into_iter()
         .find(|u| u.role == "admin")
         .map(|u| u.display_name)
@@ -646,17 +532,17 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         "settings": settings,
         "post": post_json,
         "categories": categories,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(store),
+        "nav_journal_categories": nav_journal_categories(store),
         "tags": tags,
         "comments": comments,
         "comments_enabled": comments_enabled,
         "page_type": "blog_single",
         "seo": seo::build_meta(
-            pool,
+            store,
             post.meta_title.as_deref().or(Some(&post.title)),
             post.meta_description.as_deref(),
-            &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), &post.slug),
+            &render::slug_url(&store.setting_get_or("blog_slug", "journal"), &post.slug),
         ),
     });
 
@@ -667,62 +553,26 @@ fn do_blog_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         context["next_post"] = json!({"title": next.title, "slug": next.slug});
     }
 
-    Some(RawHtml(render::render_page(pool, "blog_single", &context)))
+    Some(RawHtml(render::render_page(store, "blog_single", &context)))
 }
 
-fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtml<String>> {
-    let category = Category::find_by_slug(pool, slug)?;
-    let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
+fn do_blog_by_category(
+    store: &dyn Store,
+    slug: &str,
+    page: Option<i64>,
+) -> Option<RawHtml<String>> {
+    let category = store.category_find_by_slug(slug)?;
+    let per_page = store.setting_get_i64("blog_posts_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
-    let settings = Setting::all(pool);
+    let settings = store.setting_all();
 
-    let conn = pool.get().ok()?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT p.* FROM posts p
-             JOIN content_categories cc ON cc.content_id = p.id AND cc.content_type = 'post'
-             WHERE cc.category_id = ?1 AND p.status = 'published'
-             ORDER BY p.published_at DESC LIMIT ?2 OFFSET ?3",
-        )
-        .ok()?;
-
-    let posts: Vec<Post> = stmt
-        .query_map(rusqlite::params![category.id, per_page, offset], |row| {
-            Ok(Post {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                slug: row.get("slug")?,
-                content_json: row.get("content_json")?,
-                content_html: row.get("content_html")?,
-                excerpt: row.get("excerpt")?,
-                featured_image: row.get("featured_image")?,
-                meta_title: row.get("meta_title")?,
-                meta_description: row.get("meta_description")?,
-                status: row.get("status")?,
-                published_at: row.get("published_at")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                seo_score: row.get("seo_score").unwrap_or(-1),
-                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
-            })
-        })
-        .ok()?
-        .filter_map(|r| r.ok())
-        .collect();
-
-    let total: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM posts p
-             JOIN content_categories cc ON cc.content_id = p.id AND cc.content_type = 'post'
-             WHERE cc.category_id = ?1 AND p.status = 'published'",
-            rusqlite::params![category.id],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let posts = store.post_by_category(category.id, per_page, offset);
+    let total = store.post_count_by_category(category.id);
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
-    let author_name = User::list_all(pool)
+    let author_name = store
+        .user_list_all()
         .into_iter()
         .find(|u| u.role == "admin")
         .map(|u| u.display_name)
@@ -733,9 +583,9 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
             let mut pj = serde_json::to_value(p).unwrap_or_default();
             if let Some(obj) = pj.as_object_mut() {
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
-                let cats = Category::for_content(pool, p.id, "post");
+                let cats = store.category_for_content(p.id, "post");
                 obj.insert("categories".to_string(), json!(cats));
-                let cc = Comment::for_post(pool, p.id, "post").len();
+                let cc = store.comment_for_post(p.id, "post").len();
                 obj.insert("comment_count".to_string(), json!(cc));
             }
             pj
@@ -744,72 +594,32 @@ fn do_blog_by_category(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
 
     let context = json!({
         "settings": settings,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(store),
+        "nav_journal_categories": nav_journal_categories(store),
         "posts": posts_json,
         "active_category": category,
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some(&category.name), None, &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), &format!("category/{}", slug))),
+        "seo": seo::build_meta(store, Some(&category.name), None, &render::slug_url(&store.setting_get_or("blog_slug", "journal"), &format!("category/{}", slug))),
     });
 
-    Some(RawHtml(render::render_page(pool, "blog_list", &context)))
+    Some(RawHtml(render::render_page(store, "blog_list", &context)))
 }
 
-fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtml<String>> {
-    let tag = Tag::find_by_slug(pool, slug)?;
-    let per_page = Setting::get_i64(pool, "blog_posts_per_page").max(1);
+fn do_blog_by_tag(store: &dyn Store, slug: &str, page: Option<i64>) -> Option<RawHtml<String>> {
+    let tag = store.tag_find_by_slug(slug)?;
+    let per_page = store.setting_get_i64("blog_posts_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
-    let settings = Setting::all(pool);
+    let settings = store.setting_all();
 
-    let conn = pool.get().ok()?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT p.* FROM posts p
-             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'post'
-             WHERE ct.tag_id = ?1 AND p.status = 'published'
-             ORDER BY p.published_at DESC LIMIT ?2 OFFSET ?3",
-        )
-        .ok()?;
-
-    let posts: Vec<Post> = stmt
-        .query_map(rusqlite::params![tag.id, per_page, offset], |row| {
-            Ok(Post {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                slug: row.get("slug")?,
-                content_json: row.get("content_json")?,
-                content_html: row.get("content_html")?,
-                excerpt: row.get("excerpt")?,
-                featured_image: row.get("featured_image")?,
-                meta_title: row.get("meta_title")?,
-                meta_description: row.get("meta_description")?,
-                status: row.get("status")?,
-                published_at: row.get("published_at")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                seo_score: row.get("seo_score").unwrap_or(-1),
-                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
-            })
-        })
-        .ok()?
-        .filter_map(|r| r.ok())
-        .collect();
-
-    let total: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM posts p
-             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'post'
-             WHERE ct.tag_id = ?1 AND p.status = 'published'",
-            rusqlite::params![tag.id],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let posts = store.post_by_tag(tag.id, per_page, offset);
+    let total = store.post_count_by_tag(tag.id);
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
-    let author_name = User::list_all(pool)
+    let author_name = store
+        .user_list_all()
         .into_iter()
         .find(|u| u.role == "admin")
         .map(|u| u.display_name)
@@ -820,9 +630,9 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
             let mut pj = serde_json::to_value(p).unwrap_or_default();
             if let Some(obj) = pj.as_object_mut() {
                 obj.insert("author_name".to_string(), json!(author_name.clone()));
-                let cats = Category::for_content(pool, p.id, "post");
+                let cats = store.category_for_content(p.id, "post");
                 obj.insert("categories".to_string(), json!(cats));
-                let cc = Comment::for_post(pool, p.id, "post").len();
+                let cc = store.comment_for_post(p.id, "post").len();
                 obj.insert("comment_count".to_string(), json!(cc));
             }
             pj
@@ -831,35 +641,35 @@ fn do_blog_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtm
 
     let context = json!({
         "settings": settings,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(store),
+        "nav_journal_categories": nav_journal_categories(store),
         "posts": posts_json,
         "active_tag": tag,
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "blog_list",
-        "seo": seo::build_meta(pool, Some(&tag.name), None, &render::slug_url(&Setting::get_or(pool, "blog_slug", "journal"), &format!("tag/{}", slug))),
+        "seo": seo::build_meta(store, Some(&tag.name), None, &render::slug_url(&store.setting_get_or("blog_slug", "journal"), &format!("tag/{}", slug))),
     });
 
-    Some(RawHtml(render::render_page(pool, "blog_list", &context)))
+    Some(RawHtml(render::render_page(store, "blog_list", &context)))
 }
 
-fn do_portfolio_grid(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
-    let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
+fn do_portfolio_grid(store: &dyn Store, page: Option<i64>) -> RawHtml<String> {
+    let per_page = store.setting_get_i64("portfolio_items_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
-    let items = PortfolioItem::published(pool, per_page, offset);
-    let total = PortfolioItem::count(pool, Some("published"));
+    let items = store.portfolio_list(Some("published"), per_page, offset);
+    let total = store.portfolio_count(Some("published"));
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
-    let categories = Category::list_nav_visible(pool, Some("portfolio"));
-    let settings = Setting::all(pool);
+    let categories = store.category_list_nav_visible(Some("portfolio"));
+    let settings = store.setting_all();
 
     let items_with_meta: Vec<serde_json::Value> = items
         .iter()
         .map(|item| {
-            let tags = Tag::for_content(pool, item.id, "portfolio");
-            let cats = Category::for_content(pool, item.id, "portfolio");
+            let tags = store.tag_for_content(item.id, "portfolio");
+            let cats = store.category_for_content(item.id, "portfolio");
             json!({
                 "item": item,
                 "tags": tags,
@@ -872,29 +682,29 @@ fn do_portfolio_grid(pool: &DbPool, page: Option<i64>) -> RawHtml<String> {
         "settings": settings,
         "items": items_with_meta,
         "categories": categories,
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_journal_categories": nav_journal_categories(store),
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "portfolio_grid",
-        "seo": seo::build_meta(pool, Some("Portfolio"), None, &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), "")),
+        "seo": seo::build_meta(store, Some("Portfolio"), None, &render::slug_url(&store.setting_get_or("portfolio_slug", "portfolio"), "")),
     });
 
-    RawHtml(render::render_page(pool, "portfolio_grid", &context))
+    RawHtml(render::render_page(store, "portfolio_grid", &context))
 }
 
-fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
-    let item = PortfolioItem::find_by_slug(pool, slug)?;
+fn do_portfolio_single(store: &dyn Store, slug: &str) -> Option<RawHtml<String>> {
+    let item = store.portfolio_find_by_slug(slug)?;
     if item.status != "published" {
         return None;
     }
 
-    let categories = Category::for_content(pool, item.id, "portfolio");
-    let tags = Tag::for_content(pool, item.id, "portfolio");
-    let settings = Setting::all(pool);
+    let categories = store.category_for_content(item.id, "portfolio");
+    let tags = store.tag_for_content(item.id, "portfolio");
+    let settings = store.setting_all();
     let comments_enabled =
         settings.get("comments_on_portfolio").map(|v| v.as_str()) == Some("true");
     let comments = if comments_enabled {
-        Comment::for_post(pool, item.id, "portfolio")
+        store.comment_for_post(item.id, "portfolio")
     } else {
         vec![]
     };
@@ -915,46 +725,46 @@ fn do_portfolio_single(pool: &DbPool, slug: &str) -> Option<RawHtml<String>> {
         "settings": settings,
         "item": item,
         "categories": categories,
-        "nav_categories": nav_categories(pool),
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_categories": nav_categories(store),
+        "nav_journal_categories": nav_journal_categories(store),
         "tags": tags,
         "comments": comments,
         "comments_enabled": comments_enabled,
         "page_type": "portfolio_single",
         "commerce_enabled": any_commerce && item.sell_enabled && item.price.unwrap_or(0.0) > 0.0,
         "seo": seo::build_meta(
-            pool,
+            store,
             item.meta_title.as_deref().or(Some(&item.title)),
             item.meta_description.as_deref(),
-            &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), &item.slug),
+            &render::slug_url(&store.setting_get_or("portfolio_slug", "portfolio"), &item.slug),
         ),
     });
 
     Some(RawHtml(render::render_page(
-        pool,
+        store,
         "portfolio_single",
         &context,
     )))
 }
 
 fn do_portfolio_by_category(
-    pool: &DbPool,
+    store: &dyn Store,
     slug: &str,
     page: Option<i64>,
 ) -> Option<RawHtml<String>> {
-    let category = Category::find_by_slug(pool, slug)?;
-    let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
+    let category = store.category_find_by_slug(slug)?;
+    let per_page = store.setting_get_i64("portfolio_items_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
-    let items = PortfolioItem::by_category(pool, slug, per_page, offset);
-    let categories = Category::list_nav_visible(pool, Some("portfolio"));
-    let settings = Setting::all(pool);
+    let items = store.portfolio_by_category(slug, per_page, offset);
+    let categories = store.category_list_nav_visible(Some("portfolio"));
+    let settings = store.setting_all();
 
     let items_with_meta: Vec<serde_json::Value> = items
         .iter()
         .map(|item| {
-            let tags = Tag::for_content(pool, item.id, "portfolio");
-            let cats = Category::for_content(pool, item.id, "portfolio");
+            let tags = store.tag_for_content(item.id, "portfolio");
+            let cats = store.category_for_content(item.id, "portfolio");
             json!({
                 "item": item,
                 "tags": tags,
@@ -967,81 +777,40 @@ fn do_portfolio_by_category(
         "settings": settings,
         "items": items_with_meta,
         "categories": categories,
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_journal_categories": nav_journal_categories(store),
         "active_category": category,
         "current_page": current_page,
-        "total_pages": ((PortfolioItem::count(pool, Some("published")) as f64 / per_page as f64).ceil() as i64),
+        "total_pages": ((store.portfolio_count(Some("published")) as f64 / per_page as f64).ceil() as i64),
         "page_type": "portfolio_grid",
-        "seo": seo::build_meta(pool, Some(&category.name), None, &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), &format!("category/{}", slug))),
+        "seo": seo::build_meta(store, Some(&category.name), None, &render::slug_url(&store.setting_get_or("portfolio_slug", "portfolio"), &format!("category/{}", slug))),
     });
 
     Some(RawHtml(render::render_page(
-        pool,
+        store,
         "portfolio_grid",
         &context,
     )))
 }
 
-fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<RawHtml<String>> {
-    let tag = Tag::find_by_slug(pool, slug)?;
-    let per_page = Setting::get_i64(pool, "portfolio_items_per_page").max(1);
+fn do_portfolio_by_tag(
+    store: &dyn Store,
+    slug: &str,
+    page: Option<i64>,
+) -> Option<RawHtml<String>> {
+    let tag = store.tag_find_by_slug(slug)?;
+    let per_page = store.setting_get_i64("portfolio_items_per_page").max(1);
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
-    let categories = Category::list_nav_visible(pool, Some("portfolio"));
-    let settings = Setting::all(pool);
+    let categories = store.category_list_nav_visible(Some("portfolio"));
+    let settings = store.setting_all();
 
-    let conn = pool.get().ok()?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT p.* FROM portfolio p
-             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'portfolio'
-             WHERE ct.tag_id = ?1 AND p.status = 'published'
-             ORDER BY p.created_at DESC LIMIT ?2 OFFSET ?3",
-        )
-        .ok()?;
-
-    let items: Vec<PortfolioItem> = stmt
-        .query_map(rusqlite::params![tag.id, per_page, offset], |row| {
-            let sell_raw: i64 = row.get("sell_enabled")?;
-            Ok(PortfolioItem {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                slug: row.get("slug")?,
-                description_json: row.get("description_json")?,
-                description_html: row.get("description_html")?,
-                image_path: row.get("image_path")?,
-                thumbnail_path: row.get("thumbnail_path")?,
-                meta_title: row.get("meta_title")?,
-                meta_description: row.get("meta_description")?,
-                sell_enabled: sell_raw != 0,
-                price: row.get("price")?,
-                purchase_note: row
-                    .get::<_, Option<String>>("purchase_note")?
-                    .unwrap_or_default(),
-                payment_provider: row
-                    .get::<_, Option<String>>("payment_provider")?
-                    .unwrap_or_default(),
-                download_file_path: row
-                    .get::<_, Option<String>>("download_file_path")?
-                    .unwrap_or_default(),
-                likes: row.get("likes")?,
-                status: row.get("status")?,
-                published_at: row.get("published_at")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                seo_score: row.get("seo_score").unwrap_or(-1),
-                seo_issues: row.get("seo_issues").unwrap_or_else(|_| "[]".to_string()),
-            })
-        })
-        .ok()?
-        .filter_map(|r| r.ok())
-        .collect();
+    let items = store.portfolio_by_tag(tag.id, per_page, offset);
 
     let items_with_meta: Vec<serde_json::Value> = items
         .iter()
         .map(|item| {
-            let tags = Tag::for_content(pool, item.id, "portfolio");
-            let cats = Category::for_content(pool, item.id, "portfolio");
+            let tags = store.tag_for_content(item.id, "portfolio");
+            let cats = store.category_for_content(item.id, "portfolio");
             json!({
                 "item": item,
                 "tags": tags,
@@ -1050,31 +819,23 @@ fn do_portfolio_by_tag(pool: &DbPool, slug: &str, page: Option<i64>) -> Option<R
         })
         .collect();
 
-    let total: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM portfolio p
-             JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'portfolio'
-             WHERE ct.tag_id = ?1 AND p.status = 'published'",
-            rusqlite::params![tag.id],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let total = store.portfolio_count_by_tag(tag.id);
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
     let context = json!({
         "settings": settings,
         "items": items_with_meta,
         "categories": categories,
-        "nav_journal_categories": nav_journal_categories(pool),
+        "nav_journal_categories": nav_journal_categories(store),
         "active_tag": tag,
         "current_page": current_page,
         "total_pages": total_pages,
         "page_type": "portfolio_grid",
-        "seo": seo::build_meta(pool, Some(&tag.name), None, &render::slug_url(&Setting::get_or(pool, "portfolio_slug", "portfolio"), &format!("tag/{}", slug))),
+        "seo": seo::build_meta(store, Some(&tag.name), None, &render::slug_url(&store.setting_get_or("portfolio_slug", "portfolio"), &format!("tag/{}", slug))),
     });
 
     Some(RawHtml(render::render_page(
-        pool,
+        store,
         "portfolio_grid",
         &context,
     )))

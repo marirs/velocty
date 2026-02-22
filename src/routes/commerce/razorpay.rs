@@ -1,12 +1,12 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::Order;
-use crate::models::settings::Setting;
-use std::collections::HashMap;
+use crate::store::Store;
 
 use super::{create_pending_order, finalize_order};
 
@@ -20,10 +20,11 @@ pub struct RazorpayCreateRequest {
 
 #[post("/api/checkout/razorpay/create", format = "json", data = "<body>")]
 pub fn razorpay_create_order(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<RazorpayCreateRequest>,
 ) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings
         .get("commerce_razorpay_enabled")
         .map(|v| v.as_str())
@@ -41,7 +42,7 @@ pub fn razorpay_create_order(
     }
 
     let (order_id, price, cur) = match create_pending_order(
-        pool,
+        s,
         body.portfolio_id,
         "razorpay",
         body.buyer_email.as_deref().unwrap_or(""),
@@ -69,7 +70,7 @@ pub fn razorpay_create_order(
         Ok(r) => {
             let body: Value = r.json().unwrap_or_default();
             if let Some(rp_order_id) = body.get("id").and_then(|v| v.as_str()) {
-                let _ = Order::update_provider_order_id(pool, order_id, rp_order_id);
+                let _ = s.order_update_provider_order_id(order_id, rp_order_id);
                 Json(json!({
                     "ok": true,
                     "order_id": order_id,
@@ -104,8 +105,12 @@ pub struct RazorpayVerifyRequest {
 }
 
 #[post("/api/checkout/razorpay/verify", format = "json", data = "<body>")]
-pub fn razorpay_verify(pool: &State<DbPool>, body: Json<RazorpayVerifyRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn razorpay_verify(
+    store: &State<Arc<dyn Store>>,
+    body: Json<RazorpayVerifyRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let key_secret = settings
         .get("razorpay_key_secret")
         .cloned()
@@ -127,7 +132,7 @@ pub fn razorpay_verify(pool: &State<DbPool>, body: Json<RazorpayVerifyRequest>) 
     }
 
     match finalize_order(
-        pool,
+        s,
         body.order_id,
         &body.razorpay_payment_id,
         &body.buyer_email,

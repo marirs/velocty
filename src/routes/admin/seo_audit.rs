@@ -1,31 +1,30 @@
+use std::sync::Arc;
+
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
 
-use crate::db::DbPool;
-use crate::models::portfolio::PortfolioItem;
-use crate::models::post::Post;
-use crate::models::settings::Setting;
 use crate::security::auth::EditorUser;
+use crate::store::Store;
 
 #[get("/seo-audit")]
 pub fn seo_audit_dashboard(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<super::AdminSlug>,
 ) -> Template {
-    let settings = Setting::all(pool);
+    let settings = store.setting_all();
     let journal_enabled = settings.get("journal_enabled").map(|v| v.as_str()) == Some("true");
     let portfolio_enabled = settings.get("portfolio_enabled").map(|v| v.as_str()) == Some("true");
 
     // Gather all posts and portfolio items
     let posts = if journal_enabled {
-        Post::list(pool, None, 10000, 0)
+        store.post_list(None, 10000, 0)
     } else {
         vec![]
     };
     let items = if portfolio_enabled {
-        PortfolioItem::list(pool, None, 10000, 0)
+        store.portfolio_list(None, 10000, 0)
     } else {
         vec![]
     };

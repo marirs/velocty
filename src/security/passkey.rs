@@ -4,14 +4,12 @@ use webauthn_rs::prelude::*;
 use webauthn_rs::Webauthn;
 use webauthn_rs::WebauthnBuilder;
 
-use crate::db::DbPool;
-use crate::models::passkey::UserPasskey;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 /// Build a Webauthn instance from the site's settings.
 /// RP ID = domain extracted from site_url, Origin = site_url.
-pub fn build_webauthn(pool: &DbPool) -> Result<Arc<Webauthn>, String> {
-    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
+pub fn build_webauthn(store: &dyn Store) -> Result<Arc<Webauthn>, String> {
+    let site_url = store.setting_get_or("site_url", "http://localhost:8000");
     let url = url::Url::parse(&site_url).map_err(|e| format!("Invalid site_url: {}", e))?;
 
     let host = url.host_str().ok_or("No host in site_url")?.to_string();
@@ -40,8 +38,8 @@ pub fn build_webauthn(pool: &DbPool) -> Result<Arc<Webauthn>, String> {
 
 /// Load existing credentials for a user (for exclusion during registration
 /// and for authentication).
-pub fn load_credentials(pool: &DbPool, user_id: i64) -> Vec<Passkey> {
-    let rows = UserPasskey::list_for_user(pool, user_id);
+pub fn load_credentials(store: &dyn Store, user_id: i64) -> Vec<Passkey> {
+    let rows = store.passkey_list_for_user(user_id);
     rows.iter()
         .filter_map(|pk| {
             let cred: Passkey = serde_json::from_str(&pk.public_key).ok()?;
@@ -51,18 +49,18 @@ pub fn load_credentials(pool: &DbPool, user_id: i64) -> Vec<Passkey> {
 }
 
 /// Store a registration challenge in settings (keyed by user_id).
-pub fn store_reg_state(pool: &DbPool, user_id: i64, state: &PasskeyRegistration) {
+pub fn store_reg_state(store: &dyn Store, user_id: i64, state: &PasskeyRegistration) {
     let key = format!("passkey_reg_state_{}", user_id);
     if let Ok(json) = serde_json::to_string(state) {
-        let _ = Setting::set(pool, &key, &json);
+        let _ = store.setting_set(&key, &json);
     }
 }
 
 /// Retrieve and clear a registration challenge.
-pub fn take_reg_state(pool: &DbPool, user_id: i64) -> Option<PasskeyRegistration> {
+pub fn take_reg_state(store: &dyn Store, user_id: i64) -> Option<PasskeyRegistration> {
     let key = format!("passkey_reg_state_{}", user_id);
-    let json = Setting::get(pool, &key)?;
-    let _ = Setting::set(pool, &key, "");
+    let json = store.setting_get(&key)?;
+    let _ = store.setting_set(&key, "");
     if json.is_empty() {
         return None;
     }
@@ -70,18 +68,18 @@ pub fn take_reg_state(pool: &DbPool, user_id: i64) -> Option<PasskeyRegistration
 }
 
 /// Store an authentication challenge in settings (keyed by pending token).
-pub fn store_auth_state(pool: &DbPool, token: &str, state: &PasskeyAuthentication) {
+pub fn store_auth_state(store: &dyn Store, token: &str, state: &PasskeyAuthentication) {
     let key = format!("passkey_auth_state_{}", token);
     if let Ok(json) = serde_json::to_string(state) {
-        let _ = Setting::set(pool, &key, &json);
+        let _ = store.setting_set(&key, &json);
     }
 }
 
 /// Retrieve and clear an authentication challenge.
-pub fn take_auth_state(pool: &DbPool, token: &str) -> Option<PasskeyAuthentication> {
+pub fn take_auth_state(store: &dyn Store, token: &str) -> Option<PasskeyAuthentication> {
     let key = format!("passkey_auth_state_{}", token);
-    let json = Setting::get(pool, &key)?;
-    let _ = Setting::set(pool, &key, "");
+    let json = store.setting_get(&key)?;
+    let _ = store.setting_set(&key, "");
     if json.is_empty() {
         return None;
     }

@@ -1,20 +1,21 @@
 use rocket::response::Redirect;
 use rocket::State;
+use std::sync::Arc;
 
-use crate::db::DbPool;
 use crate::security::auth;
+use crate::store::Store;
 use crate::AdminSlug;
 
 use super::login::needs_setup;
 
 #[get("/logout")]
 pub fn logout(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
     cookies: &rocket::http::CookieJar<'_>,
 ) -> Redirect {
     if let Some(cookie) = cookies.get_private("velocty_session") {
-        let _ = auth::destroy_session(pool, cookie.value());
+        let _ = auth::destroy_session(&**store.inner(), cookie.value());
     }
     auth::clear_session_cookie(cookies);
     Redirect::to(format!("/{}/login", admin_slug.0))
@@ -25,10 +26,10 @@ pub fn logout(
 #[get("/<_path..>", rank = 99)]
 pub fn admin_redirect_to_login(
     _path: std::path::PathBuf,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
 ) -> Redirect {
-    if needs_setup(pool) {
+    if needs_setup(&**store.inner()) {
         Redirect::to(format!("/{}/setup", admin_slug.0))
     } else {
         Redirect::to(format!("/{}/login", admin_slug.0))

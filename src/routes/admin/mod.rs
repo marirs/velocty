@@ -1,8 +1,7 @@
 use image::ImageEncoder;
 use rocket::fs::TempFile;
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 use crate::AdminSlug;
 
 pub mod api;
@@ -45,7 +44,7 @@ pub(crate) fn resolve_status(status: &str, published_at: &Option<String>) -> Str
 pub(crate) async fn save_upload(
     file: &mut TempFile<'_>,
     prefix: &str,
-    pool: &DbPool,
+    store: &dyn Store,
 ) -> Option<String> {
     // Try content-type extension first, then original filename (raw_name), then field name
     let ext = file
@@ -101,7 +100,7 @@ pub(crate) async fn save_upload(
 
     // ── Read image optimization settings once ──
     let quality = {
-        let q = Setting::get_i64(pool, "images_quality") as u8;
+        let q = store.setting_get_i64("images_quality") as u8;
         if q == 0 {
             85
         } else {
@@ -123,10 +122,10 @@ pub(crate) async fn save_upload(
         }
 
         // Run image optimization (resize / re-encode / strip EXIF)
-        optimize_image(pool, &jpg_dest, "jpg", quality);
+        optimize_image(store, &jpg_dest, "jpg", quality);
 
         // If WebP conversion is enabled, convert the JPG to WebP
-        if Setting::get_bool(pool, "images_webp_convert") {
+        if store.setting_get_bool("images_webp_convert") {
             if let Some(webp_name) =
                 convert_to_webp_file(&jpg_dest, prefix, &uid, upload_dir, quality)
             {
@@ -139,10 +138,10 @@ pub(crate) async fn save_upload(
     }
 
     // ── Image optimization (resize / re-encode / strip EXIF) ──
-    optimize_image(pool, &dest, &ext_lower, quality);
+    optimize_image(store, &dest, &ext_lower, quality);
 
     // ── WebP conversion for other image types ──
-    if Setting::get_bool(pool, "images_webp_convert") && ext_lower != "webp" && ext_lower != "svg" {
+    if store.setting_get_bool("images_webp_convert") && ext_lower != "webp" && ext_lower != "svg" {
         if let Some(webp_name) = convert_to_webp_file(&dest, prefix, &uid, upload_dir, quality) {
             let _ = std::fs::remove_file(&dest);
             return Some(webp_name);
@@ -154,10 +153,10 @@ pub(crate) async fn save_upload(
 
 /// Optimize an image on disk: max dimension resize, re-encode JPEG/PNG, strip EXIF.
 /// This modifies the file in-place.
-fn optimize_image(pool: &DbPool, path: &std::path::Path, ext: &str, quality: u8) {
-    let max_dim = Setting::get_i64(pool, "images_max_dimension") as u32;
-    let reencode = Setting::get_bool(pool, "images_reencode");
-    let strip_meta = Setting::get_bool(pool, "images_strip_metadata");
+fn optimize_image(store: &dyn Store, path: &std::path::Path, ext: &str, quality: u8) {
+    let max_dim = store.setting_get_i64("images_max_dimension") as u32;
+    let reencode = store.setting_get_bool("images_reencode");
+    let strip_meta = store.setting_get_bool("images_strip_metadata");
 
     // Nothing to do if all options are off
     if max_dim == 0 && !reencode && !strip_meta {
@@ -321,8 +320,9 @@ fn file_ext(file: &TempFile<'_>) -> String {
 }
 
 /// Check if a file extension is in the allowed image types
-pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
-    let allowed = Setting::get(pool, "images_allowed_types")
+pub(crate) fn is_allowed_image(file: &TempFile<'_>, store: &dyn Store) -> bool {
+    let allowed = store
+        .setting_get("images_allowed_types")
         .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
     let allowed_list: Vec<&str> = allowed.split(',').map(|s| s.trim()).collect();
     let ext = file_ext(file);
@@ -330,8 +330,9 @@ pub(crate) fn is_allowed_image(file: &TempFile<'_>, pool: &DbPool) -> bool {
 }
 
 /// Check if a file extension is a known video type from settings
-pub(crate) fn is_video_ext(ext: &str, pool: &DbPool) -> bool {
-    let allowed = Setting::get(pool, "video_allowed_types")
+pub(crate) fn is_video_ext(ext: &str, store: &dyn Store) -> bool {
+    let allowed = store
+        .setting_get("video_allowed_types")
         .unwrap_or_else(|| "mp4,webm,mov,avi,mkv".to_string());
     allowed
         .split(',')
@@ -341,10 +342,11 @@ pub(crate) fn is_video_ext(ext: &str, pool: &DbPool) -> bool {
 
 /// Check if a file is an allowed media type (image or video if video uploads enabled).
 /// Used for portfolio featured media where both image and video are accepted.
-pub(crate) fn is_allowed_media(file: &TempFile<'_>, pool: &DbPool) -> bool {
+pub(crate) fn is_allowed_media(file: &TempFile<'_>, store: &dyn Store) -> bool {
     let ext = file_ext(file);
     // Always check image types first
-    let img_allowed = Setting::get(pool, "images_allowed_types")
+    let img_allowed = store
+        .setting_get("images_allowed_types")
         .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
     if img_allowed
         .split(',')
@@ -354,8 +356,8 @@ pub(crate) fn is_allowed_media(file: &TempFile<'_>, pool: &DbPool) -> bool {
         return true;
     }
     // If video uploads are enabled, also check video types
-    if Setting::get_or(pool, "video_upload_enabled", "false") == "true" {
-        return is_video_ext(&ext, pool);
+    if store.setting_get_or("video_upload_enabled", "false") == "true" {
+        return is_video_ext(&ext, store);
     }
     false
 }

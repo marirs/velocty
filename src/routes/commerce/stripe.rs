@@ -5,11 +5,10 @@ use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::Order;
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::store::Store;
 
 use super::{create_pending_order, finalize_order, site_url};
 
@@ -61,8 +60,12 @@ pub struct StripeCreateRequest {
 }
 
 #[post("/api/checkout/stripe/create", format = "json", data = "<body>")]
-pub fn stripe_create_session(pool: &State<DbPool>, body: Json<StripeCreateRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn stripe_create_session(
+    store: &State<Arc<dyn Store>>,
+    body: Json<StripeCreateRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings.get("commerce_stripe_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "Stripe is not enabled" }));
     }
@@ -75,7 +78,7 @@ pub fn stripe_create_session(pool: &State<DbPool>, body: Json<StripeCreateReques
     }
 
     let (order_id, price, cur) = match create_pending_order(
-        pool,
+        s,
         body.portfolio_id,
         "stripe",
         body.buyer_email.as_deref().unwrap_or(""),
@@ -83,7 +86,7 @@ pub fn stripe_create_session(pool: &State<DbPool>, body: Json<StripeCreateReques
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+    let item = match s.portfolio_find_by_id(body.portfolio_id) {
         Some(i) => i,
         None => return Json(json!({ "ok": false, "error": "Item not found" })),
     };
@@ -120,7 +123,7 @@ pub fn stripe_create_session(pool: &State<DbPool>, body: Json<StripeCreateReques
             let body: Value = r.json().unwrap_or_default();
             if let Some(url) = body.get("url").and_then(|v| v.as_str()) {
                 let session_id = body.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                let _ = Order::update_provider_order_id(pool, order_id, session_id);
+                let _ = s.order_update_provider_order_id(order_id, session_id);
                 Json(
                     json!({ "ok": true, "order_id": order_id, "checkout_url": url, "session_id": session_id }),
                 )
@@ -141,11 +144,12 @@ pub fn stripe_create_session(pool: &State<DbPool>, body: Json<StripeCreateReques
 
 #[get("/api/stripe/success?<session_id>&<order_id>")]
 pub fn stripe_success(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     session_id: &str,
     order_id: i64,
 ) -> rocket::response::Redirect {
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let secret_key = settings
         .get("stripe_secret_key")
         .cloned()
@@ -181,7 +185,7 @@ pub fn stripe_success(
             .and_then(|e| e.as_str())
             .unwrap_or("");
 
-        if let Ok(result) = finalize_order(pool, order_id, session_id, buyer_email, "") {
+        if let Ok(result) = finalize_order(s, order_id, session_id, buyer_email, "") {
             if let Some(token) = result.get("download_token").and_then(|t| t.as_str()) {
                 return rocket::response::Redirect::to(format!("/download/{}", token));
             }
@@ -224,8 +228,13 @@ fn verify_stripe_signature(payload: &[u8], sig_header: &str, secret: &str) -> bo
 }
 
 #[post("/api/stripe/webhook", data = "<body>")]
-pub fn stripe_webhook(pool: &State<DbPool>, sig: StripeSignature, body: RawBody) -> Status {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn stripe_webhook(
+    store: &State<Arc<dyn Store>>,
+    sig: StripeSignature,
+    body: RawBody,
+) -> Status {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let webhook_secret = settings
         .get("stripe_webhook_secret")
         .cloned()
@@ -276,7 +285,7 @@ pub fn stripe_webhook(pool: &State<DbPool>, sig: StripeSignature, body: RawBody)
             .unwrap_or("");
 
         if let Ok(order_id) = order_id_str.parse::<i64>() {
-            let _ = finalize_order(pool, order_id, session_id, buyer_email, "");
+            let _ = finalize_order(s, order_id, session_id, buyer_email, "");
         }
     }
 

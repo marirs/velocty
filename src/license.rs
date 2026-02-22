@@ -1,5 +1,4 @@
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 /// Generate a license.txt file content for a purchased digital download.
 ///
@@ -13,13 +12,13 @@ use crate::models::settings::Setting;
 /// <license body from settings>
 /// ```
 pub fn generate_license_txt(
-    pool: &DbPool,
+    store: &dyn Store,
     item_title: &str,
     transaction_id: &str,
     purchase_date: &str,
 ) -> String {
-    let display_name = Setting::get_or(pool, "admin_display_name", "Admin");
-    let license_body = Setting::get_or(pool, "downloads_license_template", "");
+    let display_name = store.setting_get_or("admin_display_name", "Admin");
+    let license_body = store.setting_get_or("downloads_license_template", "");
 
     format!(
         "License for: {}\nPurchased from: {}\nTransaction: {}\nDate: {}\n--------------------------------------------------\n{}",

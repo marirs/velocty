@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::response::Redirect;
@@ -7,13 +9,9 @@ use serde_json::json;
 
 use super::admin_base;
 use super::save_upload;
-use crate::db::DbPool;
-use crate::models::audit::AuditEntry;
-use crate::models::category::Category;
-use crate::models::portfolio::{PortfolioForm, PortfolioItem};
-use crate::models::settings::Setting;
-use crate::models::tag::Tag;
+use crate::models::portfolio::PortfolioForm;
 use crate::security::auth::AuthorUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Portfolio ──────────────────────────────────────────
@@ -21,7 +19,7 @@ use crate::AdminSlug;
 #[get("/portfolio?<status>&<page>")]
 pub fn portfolio_list(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
@@ -30,8 +28,8 @@ pub fn portfolio_list(
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
-    let items = PortfolioItem::list(pool, status.as_deref(), per_page, offset);
-    let total = PortfolioItem::count(pool, status.as_deref());
+    let items = store.portfolio_list(status.as_deref(), per_page, offset);
+    let total = store.portfolio_count(status.as_deref());
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
     let context = json!({
@@ -41,12 +39,12 @@ pub fn portfolio_list(
         "total_pages": total_pages,
         "total": total,
         "status_filter": status,
-        "count_all": PortfolioItem::count(pool, None),
-        "count_published": PortfolioItem::count(pool, Some("published")),
-        "count_draft": PortfolioItem::count(pool, Some("draft")),
-        "count_scheduled": PortfolioItem::count(pool, Some("scheduled")),
+        "count_all": store.portfolio_count(None),
+        "count_published": store.portfolio_count(Some("published")),
+        "count_draft": store.portfolio_count(Some("draft")),
+        "count_scheduled": store.portfolio_count(Some("scheduled")),
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
     });
 
     Template::render("admin/portfolio/list", &context)
@@ -55,20 +53,20 @@ pub fn portfolio_list(
 #[get("/portfolio/new")]
 pub fn portfolio_new(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
 ) -> Template {
-    let categories = Category::list(pool, Some("portfolio"));
-    let tags = Tag::list(pool);
+    let categories = store.category_list(Some("portfolio"));
+    let tags = store.tag_list();
 
-    let ai_enabled = crate::ai::is_enabled(pool);
-    let ai_has_vision = crate::ai::has_vision_provider(pool);
+    let ai_enabled = store.setting_get_bool("ai_enabled");
+    let ai_has_vision = store.setting_get_bool("ai_has_vision");
     let context = json!({
         "page_title": "New Portfolio Item",
         "admin_slug": slug.0,
         "categories": categories,
         "tags": tags,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "ai_enabled": ai_enabled,
         "ai_has_vision": ai_has_vision,
     });
@@ -79,18 +77,18 @@ pub fn portfolio_new(
 #[get("/portfolio/<id>/edit")]
 pub fn portfolio_edit(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Option<Template> {
-    let item = PortfolioItem::find_by_id(pool, id)?;
-    let categories = Category::list(pool, Some("portfolio"));
-    let tags = Tag::list(pool);
-    let item_categories = Category::for_content(pool, id, "portfolio");
-    let item_tags = Tag::for_content(pool, id, "portfolio");
+    let item = store.portfolio_find_by_id(id)?;
+    let categories = store.category_list(Some("portfolio"));
+    let tags = store.tag_list();
+    let item_categories = store.category_for_content(id, "portfolio");
+    let item_tags = store.tag_for_content(id, "portfolio");
 
-    let ai_enabled = crate::ai::is_enabled(pool);
-    let ai_has_vision = crate::ai::has_vision_provider(pool);
+    let ai_enabled = store.setting_get_bool("ai_enabled");
+    let ai_has_vision = store.setting_get_bool("ai_has_vision");
     let context = json!({
         "page_title": "Edit Portfolio Item",
         "item": item,
@@ -99,7 +97,7 @@ pub fn portfolio_edit(
         "item_categories": item_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "item_tags": item_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "ai_enabled": ai_enabled,
         "ai_has_vision": ai_has_vision,
     });
@@ -110,17 +108,17 @@ pub fn portfolio_edit(
 #[post("/portfolio/<id>/delete")]
 pub fn portfolio_delete(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Redirect {
-    let title = PortfolioItem::find_by_id(pool, id)
+    let title = store
+        .portfolio_find_by_id(id)
         .map(|p| p.title)
         .unwrap_or_default();
-    let _ = PortfolioItem::delete(pool, id);
-    crate::models::search::remove_item(pool, "portfolio", id);
-    AuditEntry::log(
-        pool,
+    let _ = store.portfolio_delete(id);
+    store.search_remove_item("portfolio", id);
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "delete",
@@ -158,7 +156,7 @@ pub struct PortfolioFormData<'f> {
 #[post("/portfolio/new", data = "<form>")]
 pub async fn portfolio_create(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     mut form: Form<PortfolioFormData<'_>>,
 ) -> Redirect {
@@ -171,10 +169,10 @@ pub async fn portfolio_create(
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
-                if !super::is_allowed_media(f, pool) {
+                if !super::is_allowed_media(f, &**store.inner()) {
                     return Redirect::to(format!("{}/portfolio/new", admin_base(slug)));
                 }
-                save_upload(f, "portfolio", pool)
+                save_upload(f, "portfolio", &**store.inner())
                     .await
                     .unwrap_or_else(|| "placeholder.jpg".to_string())
             }
@@ -220,7 +218,7 @@ pub async fn portfolio_create(
         ..pf
     };
 
-    match PortfolioItem::create(pool, &pf) {
+    match store.portfolio_create(&pf) {
         Ok(id) => {
             // Auto-compute SEO score
             {
@@ -234,15 +232,14 @@ pub async fn portfolio_create(
                     content_type: "portfolio",
                 };
                 let audit = crate::seo::audit::compute_score(&seo_input);
-                let _ = PortfolioItem::update_seo_score(
-                    pool,
+                let _ = store.portfolio_update_seo_score(
                     id,
                     audit.score,
                     &crate::seo::audit::issues_to_json(&audit.issues),
                 );
             }
             if let Some(ref cat_ids) = form.category_ids {
-                let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
+                let _ = store.category_set_for_content(id, "portfolio", cat_ids);
             }
             if let Some(ref names) = form.tag_names {
                 let tag_ids: Vec<i64> = names
@@ -252,14 +249,13 @@ pub async fn portfolio_create(
                         if n.is_empty() {
                             return None;
                         }
-                        Tag::find_or_create(pool, n).ok()
+                        store.tag_find_or_create(n).ok()
                     })
                     .collect();
-                let _ = Tag::set_for_content(pool, id, "portfolio", &tag_ids);
+                let _ = store.tag_set_for_content(id, "portfolio", &tag_ids);
             }
             // Update search index
-            crate::models::search::upsert_item(
-                pool,
+            store.search_upsert_item(
                 "portfolio",
                 id,
                 &form.title,
@@ -269,8 +265,7 @@ pub async fn portfolio_create(
                 pf.published_at.as_deref(),
                 final_status == "published",
             );
-            AuditEntry::log(
-                pool,
+            store.audit_log(
                 Some(_admin.user.id),
                 Some(&_admin.user.display_name),
                 "create",
@@ -299,7 +294,7 @@ pub async fn portfolio_create(
 #[post("/portfolio/<id>/edit", data = "<form>")]
 pub async fn portfolio_update(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
     mut form: Form<PortfolioFormData<'_>>,
@@ -313,14 +308,15 @@ pub async fn portfolio_update(
     } else {
         match form.image.as_mut() {
             Some(f) if f.len() > 0 => {
-                if !super::is_allowed_media(f, pool) {
+                if !super::is_allowed_media(f, &**store.inner()) {
                     return Redirect::to(format!("{}/portfolio/{}/edit", admin_base(slug), id));
                 }
-                save_upload(f, "portfolio", pool)
+                save_upload(f, "portfolio", &**store.inner())
                     .await
                     .unwrap_or_else(|| "placeholder.jpg".to_string())
             }
-            _ => PortfolioItem::find_by_id(pool, id)
+            _ => store
+                .portfolio_find_by_id(id)
                 .map(|e| e.image_path)
                 .unwrap_or_else(|| "placeholder.jpg".to_string()),
         }
@@ -352,7 +348,8 @@ pub async fn portfolio_update(
                 .clone()
                 .filter(|s| !s.is_empty())
                 .or_else(|| {
-                    PortfolioItem::find_by_id(pool, id)
+                    store
+                        .portfolio_find_by_id(id)
                         .and_then(|p| p.published_at)
                         .map(|d| d.format("%Y-%m-%dT%H:%M").to_string())
                         .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string()))
@@ -369,7 +366,7 @@ pub async fn portfolio_update(
         ..pf
     };
 
-    let _ = PortfolioItem::update(pool, id, &pf);
+    let _ = store.portfolio_update(id, &pf);
     // Auto-compute SEO score
     {
         let seo_input = crate::seo::audit::SeoInput {
@@ -382,15 +379,14 @@ pub async fn portfolio_update(
             content_type: "portfolio",
         };
         let audit = crate::seo::audit::compute_score(&seo_input);
-        let _ = PortfolioItem::update_seo_score(
-            pool,
+        let _ = store.portfolio_update_seo_score(
             id,
             audit.score,
             &crate::seo::audit::issues_to_json(&audit.issues),
         );
     }
     if let Some(ref cat_ids) = form.category_ids {
-        let _ = Category::set_for_content(pool, id, "portfolio", cat_ids);
+        let _ = store.category_set_for_content(id, "portfolio", cat_ids);
     }
     {
         let tag_names_str = form.tag_names.as_deref().unwrap_or("");
@@ -401,14 +397,13 @@ pub async fn portfolio_update(
                 if n.is_empty() {
                     return None;
                 }
-                Tag::find_or_create(pool, n).ok()
+                store.tag_find_or_create(n).ok()
             })
             .collect();
-        let _ = Tag::set_for_content(pool, id, "portfolio", &tag_ids);
+        let _ = store.tag_set_for_content(id, "portfolio", &tag_ids);
     }
     // Update search index
-    crate::models::search::upsert_item(
-        pool,
+    store.search_upsert_item(
         "portfolio",
         id,
         &form.title,
@@ -418,8 +413,7 @@ pub async fn portfolio_update(
         pf.published_at.as_deref(),
         final_status == "published",
     );
-    AuditEntry::log(
-        pool,
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "update",

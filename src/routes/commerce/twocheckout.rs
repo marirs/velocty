@@ -1,14 +1,13 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::{DownloadToken, Order};
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
-use std::collections::HashMap;
+use crate::store::Store;
 
 use super::{create_pending_order, finalize_order, site_url, urlencoding};
 
@@ -22,10 +21,11 @@ pub struct TwoCheckoutCreateRequest {
 
 #[post("/api/checkout/2checkout/create", format = "json", data = "<body>")]
 pub fn twocheckout_create(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<TwoCheckoutCreateRequest>,
 ) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings
         .get("commerce_2checkout_enabled")
         .map(|v| v.as_str())
@@ -43,7 +43,7 @@ pub fn twocheckout_create(
     let is_sandbox = settings.get("twocheckout_mode").map(|v| v.as_str()) != Some("live");
 
     let (order_id, price, cur) = match create_pending_order(
-        pool,
+        s,
         body.portfolio_id,
         "2checkout",
         body.buyer_email.as_deref().unwrap_or(""),
@@ -51,7 +51,7 @@ pub fn twocheckout_create(
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+    let item = match s.portfolio_find_by_id(body.portfolio_id) {
         Some(i) => i,
         None => return Json(json!({ "ok": false, "error": "Item not found" })),
     };
@@ -74,13 +74,17 @@ pub fn twocheckout_create(
 // ── 2Checkout: Return redirect ──────────────────────────
 
 #[get("/api/2checkout/return?<order_id>")]
-pub fn twocheckout_return(pool: &State<DbPool>, order_id: i64) -> rocket::response::Redirect {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn twocheckout_return(
+    store: &State<Arc<dyn Store>>,
+    order_id: i64,
+) -> rocket::response::Redirect {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
-    if let Some(order) = Order::find_by_id(pool, order_id) {
+    if let Some(order) = s.order_find_by_id(order_id) {
         if order.status == "pending" {
             if let Ok(result) = finalize_order(
-                pool,
+                s,
                 order_id,
                 &format!("2co_{}", order_id),
                 &order.buyer_email,
@@ -91,7 +95,7 @@ pub fn twocheckout_return(pool: &State<DbPool>, order_id: i64) -> rocket::respon
                 }
             }
         } else if order.status == "completed" {
-            if let Some(dl) = DownloadToken::find_by_order(pool, order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order_id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }
@@ -119,10 +123,11 @@ pub struct TwoCheckoutIpn {
     data = "<body>"
 )]
 pub fn twocheckout_webhook(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: rocket::form::Form<TwoCheckoutIpn>,
 ) -> Status {
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let secret_key = settings
         .get("twocheckout_secret_key")
         .cloned()
@@ -163,7 +168,7 @@ pub fn twocheckout_webhook(
         if let Ok(oid) = order_id_str.parse::<i64>() {
             let email = body.customer_email.as_deref().unwrap_or("");
             let name = body.customer_name.as_deref().unwrap_or("");
-            let _ = finalize_order(pool, oid, sale_id, email, name);
+            let _ = finalize_order(s, oid, sale_id, email, name);
         }
     }
 

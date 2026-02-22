@@ -6,11 +6,11 @@ use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
-use crate::models::user::User;
+use std::sync::Arc;
+
 use crate::rate_limit::RateLimiter;
 use crate::security::{self, auth, magic_link, mfa};
+use crate::store::Store;
 use crate::AdminSlug;
 
 use super::login::inject_captcha_context;
@@ -27,35 +27,36 @@ pub struct MagicLinkForm {
 
 #[get("/magic-link")]
 pub fn magic_link_page(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
 ) -> Result<NoCacheTemplate, Redirect> {
-    // Only show if magic_link login method is enabled
-    let login_method = Setting::get_or(pool, "login_method", "password");
+    let s: &dyn Store = &**store.inner();
+    let login_method = s.setting_get_or("login_method", "password");
     if login_method != "magic_link" {
         return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
     let mut ctx: HashMap<String, String> = HashMap::new();
     ctx.insert(
         "admin_theme".to_string(),
-        Setting::get_or(pool, "admin_theme", "dark"),
+        s.setting_get_or("admin_theme", "dark"),
     );
     ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-    inject_captcha_context(pool, &mut ctx);
+    inject_captcha_context(s, &mut ctx);
     Ok(NoCacheTemplate(Template::render("admin/magic_link", &ctx)))
 }
 
 #[post("/magic-link", data = "<form>")]
 pub fn magic_link_submit(
     form: Form<MagicLinkForm>,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
     limiter: &State<RateLimiter>,
     client_ip: auth::ClientIp,
 ) -> Result<Template, Template> {
-    let theme = Setting::get_or(pool, "admin_theme", "dark");
+    let s: &dyn Store = &**store.inner();
+    let theme = s.setting_get_or("admin_theme", "dark");
 
-    let login_method = Setting::get_or(pool, "login_method", "password");
+    let login_method = s.setting_get_or("login_method", "password");
     if login_method != "magic_link" {
         let mut ctx = HashMap::new();
         ctx.insert(
@@ -69,7 +70,7 @@ pub fn magic_link_submit(
 
     // Verify login captcha
     let captcha_token = form.captcha_token.as_deref().unwrap_or("");
-    match security::verify_login_captcha(pool, captcha_token, None) {
+    match security::verify_login_captcha(s, captcha_token, None) {
         Ok(false) => {
             let mut ctx = HashMap::new();
             ctx.insert(
@@ -78,7 +79,7 @@ pub fn magic_link_submit(
             );
             ctx.insert("admin_theme".to_string(), theme.clone());
             ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
-            inject_captcha_context(pool, &mut ctx);
+            inject_captcha_context(s, &mut ctx);
             return Err(Template::render("admin/magic_link", &ctx));
         }
         Err(e) => log::warn!("Login captcha error (allowing): {}", e),
@@ -98,7 +99,7 @@ pub fn magic_link_submit(
         return Err(Template::render("admin/magic_link", &ctx));
     }
 
-    let admin_email = Setting::get_or(pool, "admin_email", "");
+    let admin_email = s.setting_get_or("admin_email", "");
 
     // Always show success message to prevent email enumeration
     let mut ctx = HashMap::new();
@@ -111,9 +112,9 @@ pub fn magic_link_submit(
 
     // Only actually send if the email matches a known user
     if !admin_email.is_empty() && form.email.trim() == admin_email {
-        match magic_link::create_token(pool, form.email.trim()) {
+        match magic_link::create_token(s, form.email.trim()) {
             Ok(token) => {
-                if let Err(e) = magic_link::send_magic_link_email(pool, &admin_email, &token) {
+                if let Err(e) = magic_link::send_magic_link_email(s, &admin_email, &token) {
                     log::error!("Failed to send magic link email: {}", e);
                 }
             }
@@ -131,16 +132,17 @@ pub fn magic_link_submit(
 #[get("/magic-link/verify?<token>")]
 pub fn magic_link_verify(
     token: &str,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
     cookies: &CookieJar<'_>,
 ) -> Result<Redirect, Template> {
-    let theme = Setting::get_or(pool, "admin_theme", "dark");
+    let s: &dyn Store = &**store.inner();
+    let theme = s.setting_get_or("admin_theme", "dark");
 
-    match magic_link::verify_token(pool, token) {
+    match magic_link::verify_token(s, token) {
         Ok(email) => {
             // Look up the user by email
-            let user = match User::get_by_email(pool, &email) {
+            let user = match s.user_get_by_email(&email) {
                 Some(u) => u,
                 None => {
                     let mut ctx = HashMap::new();
@@ -170,8 +172,8 @@ pub fn magic_link_verify(
             }
 
             // Create session directly
-            let _ = User::touch_last_login(pool, user.id);
-            match auth::create_session(pool, user.id, None, None) {
+            let _ = s.user_touch_last_login(user.id);
+            match auth::create_session(s, user.id, None, None) {
                 Ok(session_id) => {
                     auth::set_session_cookie(cookies, &session_id);
                     Ok(Redirect::to(format!("/{}", admin_slug.0)))

@@ -482,10 +482,10 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
-    let conn = pool.get()?;
-
-    let defaults = vec![
+/// Returns the full list of default settings as (key, value) pairs.
+/// Shared by both SqliteStore and MongoStore seed logic.
+pub fn default_settings() -> Vec<(&'static str, &'static str)> {
+    vec![
         // General
         ("site_name", "Velocty"),
         ("site_caption", "Not just another CMS"),
@@ -873,7 +873,13 @@ pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         ("image_proxy_secret_old", ""),
         ("image_proxy_secret_old_expires", ""),
         ("image_proxy_rotation_days", "7"),
-    ];
+    ]
+}
+
+pub fn seed_defaults(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
+    let conn = pool.get()?;
+
+    let defaults = default_settings();
 
     for (key, value) in &defaults {
         conn.execute(

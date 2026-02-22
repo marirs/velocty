@@ -29,10 +29,10 @@ The database backend is chosen during the first-run setup wizard and stored in `
 
 | | SQLite | MongoDB |
 |---|---|---|
-| **Per-site storage** | `website/sites/<uuid>/db/velocty.db` | One database per site in the same cluster |
-| **Central registry** | `website/sites.db` | `velocty_registry` database |
+| **Per-site storage** | `website/sites/<uuid>/db/velocty.db` | `velocty_site_<uuid>` database per site |
+| **Central registry** | `website/sites.db` (always SQLite) | `website/sites.db` (always SQLite) |
 | **Isolation** | Separate files per site | Separate databases per site |
-| **Backup** | Copy individual `.db` files | `mongodump --db <site_db>` |
+| **Backup** | Copy individual `.db` files | `mongodump --db velocty_site_<uuid>` |
 | **Best for** | Small deployments, few sites | Production, many sites, high availability |
 
 MongoDB is especially compelling for multi-site because:
@@ -118,21 +118,22 @@ CREATE TABLE super_sessions (
 Request (Host: example.com)
     │
     ▼
-┌─────────────────────────────┐
-│  SiteResolver Fairing       │
-│  1. Read Host header        │
-│  2. Lookup in sites.db      │
-│  3. Check site status       │
-│  4. Get/create DbPool       │
-│  5. Inject SiteContext       │
-└─────────────────────────────┘
+┌───────────────────────────────────┐
+│  SiteResolver Fairing             │
+│  1. Read Host header              │
+│  2. Lookup in sites.db            │
+│  3. Check site status             │
+│  4. Get/create Arc<dyn Store>     │
+│     via SiteStoreManager          │
+│  5. Inject SiteContext            │
+└───────────────────────────────────┘
     │
     ▼
-┌─────────────────────────────┐
-│  Route Handler              │
-│  Uses SiteContext.pool       │
-│  instead of global DbPool   │
-└─────────────────────────────┘
+┌───────────────────────────────────┐
+│  Route Handler                     │
+│  Uses SiteContext.store            │
+│  (Arc<dyn Store> — backend-agnostic)│
+└───────────────────────────────────┘
 ```
 
 ### Key Types
@@ -152,42 +153,40 @@ pub struct Site {
 /// Injected per-request based on Host header
 pub struct SiteContext {
     pub site: Site,             // Full site record from registry
-    pub pool: DbPool,           // Site-specific DB pool
+    pub store: Arc<dyn Store>,  // Site-specific Store (SQLite or MongoDB)
     pub uploads_dir: String,    // "website/sites/<uuid>/uploads"
 }
 
-/// Manages per-site connection pools (cached, not re-created per request)
+/// Manages per-site Store instances (cached, not re-created per request)
+pub struct SiteStoreManager {
+    stores: DashMap<String, Arc<dyn Store>>,  // site slug (UUID) -> Store
+}
+
+/// Legacy: manages per-site SQLite pools for health tools only
 pub struct SitePoolManager {
-    pools: DashMap<String, DbPool>,  // site slug (UUID) -> pool
+    pools: DashMap<String, DbPool>,  // site slug (UUID) -> pool (SQLite only)
 }
 ```
 
-### Conditional Compilation
+### Per-Site Store Creation
+
+`create_site_store(slug)` reads `velocty.toml` to determine the backend:
 
 ```rust
-// In route handlers — works for both single-site and multi-site:
-
-#[cfg(not(feature = "multi-site"))]
-fn get_pool(pool: &State<DbPool>) -> &DbPool {
-    pool.inner()
+fn create_site_store(slug: &str) -> Result<Arc<dyn Store>, String> {
+    match read_backend() {
+        "mongodb" => {
+            // Each site gets its own MongoDB database: velocty_site_<slug>
+            let db_name = format!("velocty_site_{}", slug);
+            Ok(Arc::new(MongoStore::new(uri, &db_name)?))
+        }
+        _ => {
+            // Each site gets its own SQLite file
+            let db_path = format!("website/sites/{}/db/velocty.db", slug);
+            Ok(Arc::new(SqliteStore::new(init_pool_at(&db_path)?)))
+        }
+    }
 }
-
-#[cfg(feature = "multi-site")]
-fn get_pool(site: &SiteContext) -> &DbPool {
-    &site.pool
-}
-```
-
-Or more practically, use a trait:
-
-```rust
-pub trait PoolProvider {
-    fn pool(&self) -> &DbPool;
-    fn uploads_dir(&self) -> &str;
-}
-
-// Single-site: implemented on State<DbPool>
-// Multi-site: implemented on SiteContext
 ```
 
 ---
@@ -250,7 +249,7 @@ Available tools (per-site):
 | **Unused Tags Cleanup** | ✓ | ✓ | `/unused-tags` |
 | **Export Content** | ✓ | ✓ | `/export-content` |
 
-Each tool POSTs to `/super/health/tool/<site_id>/<tool>`. The route resolves the site ID to its slug via the registry, gets the site's `DbPool` from `SitePoolManager`, and runs the tool. Orphan scan/delete use the per-site uploads path (`website/sites/<uuid>/uploads`).
+Each tool POSTs to `/super/health/tool/<site_id>/<tool>`. The route resolves the site ID to its slug via the registry, gets the site's `Arc<dyn Store>` from `SiteStoreManager` (or `SitePoolManager` for SQLite-specific tools like vacuum). Orphan scan/delete use the per-site uploads path (`website/sites/<uuid>/uploads`).
 
 Per-site admin tools (`/<admin_slug>/health`) work identically in both single-site and multi-site modes — they always operate on the current site.
 
@@ -355,11 +354,11 @@ On every startup, `boot::migrate_to_site_layout()` checks if the old flat layout
 
 | Component | Single-site | Multi-site |
 |---|---|---|
-| `src/main.rs` | Single `DbPool` in state | `SitePoolManager` + `SiteResolver` fairing |
-| `src/db.rs` | `init_pool()` → one DB | `init_pool(path)` → per-site DB |
-| `src/routes/super_admin.rs` | Not compiled | Full super-admin routes |
-| `src/site.rs` | Not compiled | `SiteContext`, `SitePoolManager`, `SiteResolver` |
-| Route handlers | `pool: &State<DbPool>` | `site: SiteContext` (via request guard) |
+| `src/main.rs` | `Arc<dyn Store>` in state | + `SiteStoreManager` + `SiteResolver` fairing |
+| `src/store/` | Single Store instance | `create_site_store()` → per-site Store |
+| `src/routes/super_admin/` | Not compiled | Full super-admin routes |
+| `src/site.rs` | Not compiled | `SiteContext`, `SiteStoreManager`, `SiteResolver` |
+| Route handlers | `store: &State<Arc<dyn Store>>` | `site: SiteContext` (via request guard) |
 | Templates | No change | `super/` templates added |
 | Uploads FileServer | Global `/uploads/` | Per-site via fairing rewrite |
 
@@ -375,4 +374,4 @@ dashmap = { version = "5", optional = true }
 multi-site = ["dashmap"]
 ```
 
-`DashMap` provides a concurrent hashmap for caching per-site connection pools without a mutex bottleneck.
+`DashMap` provides a concurrent hashmap for caching per-site `Arc<dyn Store>` instances without a mutex bottleneck.

@@ -1,22 +1,21 @@
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 use super::html_escape;
 
 /// Build meta tags HTML string for a page
 pub fn build_meta(
-    pool: &DbPool,
+    store: &dyn Store,
     title: Option<&str>,
     description: Option<&str>,
     path: &str,
 ) -> String {
-    let site_name = Setting::get_or(pool, "site_name", "Velocty");
-    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
-    let title_template = Setting::get_or(pool, "seo_title_template", "{{title}} — {{site_name}}");
-    let default_desc = Setting::get_or(pool, "seo_default_description", "");
-    let og_enabled = Setting::get_bool(pool, "seo_open_graph");
-    let twitter_enabled = Setting::get_bool(pool, "seo_twitter_cards");
-    let canonical_base = Setting::get_or(pool, "seo_canonical_base", &site_url);
+    let site_name = store.setting_get_or("site_name", "Velocty");
+    let site_url = store.setting_get_or("site_url", "http://localhost:8000");
+    let title_template = store.setting_get_or("seo_title_template", "{{title}} — {{site_name}}");
+    let default_desc = store.setting_get_or("seo_default_description", "");
+    let og_enabled = store.setting_get_bool("seo_open_graph");
+    let twitter_enabled = store.setting_get_bool("seo_twitter_cards");
+    let canonical_base = store.setting_get_or("seo_canonical_base", &site_url);
 
     let page_title = match title {
         Some(t) => title_template

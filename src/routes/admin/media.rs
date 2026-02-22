@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::response::Redirect;
@@ -8,10 +10,8 @@ use serde_json::{json, Value};
 
 use super::admin_base;
 use super::save_upload;
-use crate::db::DbPool;
-use crate::models::audit::AuditEntry;
-use crate::models::settings::Setting;
 use crate::security::auth::{AdminUser, AuthorUser, EditorUser};
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Media Library ───────────────────────────────────────
@@ -33,7 +33,7 @@ pub struct MediaFile {
 pub fn media_library(
     _admin: EditorUser,
     slug: &State<AdminSlug>,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     page: Option<usize>,
     filter: Option<String>,
 ) -> Template {
@@ -42,14 +42,13 @@ pub fn media_library(
     let current_page = page.unwrap_or(1).max(1);
 
     // Build allowed extension sets from settings
-    let img_allowed = Setting::get(pool, "images_allowed_types")
-        .unwrap_or_else(|| "jpg,jpeg,png,gif,webp,svg,tiff".to_string());
+    let img_allowed =
+        store.setting_get_or("images_allowed_types", "jpg,jpeg,png,gif,webp,svg,tiff");
     let img_exts: Vec<String> = img_allowed
         .split(',')
         .map(|s| s.trim().to_lowercase())
         .collect();
-    let vid_allowed = Setting::get(pool, "video_allowed_types")
-        .unwrap_or_else(|| "mp4,webm,mov,avi,mkv".to_string());
+    let vid_allowed = store.setting_get_or("video_allowed_types", "mp4,webm,mov,avi,mkv");
     let vid_exts: Vec<String> = vid_allowed
         .split(',')
         .map(|s| s.trim().to_lowercase())
@@ -162,7 +161,7 @@ pub fn media_library(
         "disk_pct": disk_pct,
         "current_page": current_page,
         "total_pages": total_pages,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
     });
 
     Template::render("admin/media/list", &context)
@@ -171,15 +170,14 @@ pub fn media_library(
 #[post("/media/<filename>/delete")]
 pub fn media_delete(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     filename: &str,
 ) -> Redirect {
     let path = std::path::Path::new("website/site/uploads").join(filename);
     if path.is_file() {
         let _ = std::fs::remove_file(&path);
-        AuditEntry::log(
-            pool,
+        store.audit_log(
             Some(_admin.user.id),
             Some(&_admin.user.display_name),
             "delete",
@@ -203,13 +201,13 @@ pub struct ImageUploadForm<'f> {
 #[post("/upload/image", data = "<form>")]
 pub async fn upload_image(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     mut form: Form<ImageUploadForm<'_>>,
 ) -> Json<Value> {
-    if !super::is_allowed_media(&form.file, pool) {
+    if !super::is_allowed_media(&form.file, &**store.inner()) {
         return Json(json!({ "error": "File type not allowed" }));
     }
-    match save_upload(&mut form.file, "editor", pool).await {
+    match save_upload(&mut form.file, "editor", &**store.inner()).await {
         Some(filename) => Json(json!({ "location": format!("/uploads/{}", filename) })),
         None => Json(json!({ "error": "Upload failed" })),
     }
@@ -226,7 +224,7 @@ pub struct FontUploadForm<'f> {
 #[post("/upload/font", data = "<form>")]
 pub async fn upload_font(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     mut form: Form<FontUploadForm<'_>>,
 ) -> Json<Value> {
     let font_name = form.font_name.trim().to_string();
@@ -263,8 +261,8 @@ pub async fn upload_font(
 
     match form.file.persist_to(&dest).await {
         Ok(_) => {
-            let _ = Setting::set(pool, "font_custom_name", &font_name);
-            let _ = Setting::set(pool, "font_custom_filename", &filename);
+            let _ = store.setting_set("font_custom_name", &font_name);
+            let _ = store.setting_set("font_custom_filename", &filename);
             Json(json!({ "success": true, "font_name": font_name, "filename": filename }))
         }
         Err(e) => Json(json!({ "error": format!("Upload failed: {}", e) })),

@@ -5,10 +5,10 @@ use rocket::State;
 use rocket_dyn_templates::Template;
 use serde::{Deserialize, Serialize};
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
-use crate::models::user::User;
+use std::sync::Arc;
+
 use crate::security::auth;
+use crate::store::Store;
 use crate::AdminSlug;
 
 use super::super::NoCacheTemplate;
@@ -49,10 +49,10 @@ pub struct SetupForm {
 
 #[get("/setup")]
 pub fn setup_page(
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
 ) -> Result<NoCacheTemplate, Redirect> {
-    if !needs_setup(pool) {
+    if !needs_setup(&**store.inner()) {
         return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
     let ctx = SetupContext {
@@ -75,10 +75,11 @@ pub fn setup_page(
 #[post("/setup", data = "<form>")]
 pub fn setup_submit(
     form: Form<SetupForm>,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
 ) -> Result<Redirect, Template> {
-    if !needs_setup(pool) {
+    let s: &dyn Store = &**store.inner();
+    if !needs_setup(s) {
         return Ok(Redirect::to(format!("/{}/login", admin_slug.0)));
     }
 
@@ -215,7 +216,7 @@ pub fn setup_submit(
         .map_err(|_| make_err("Failed to hash password.", &form))?;
 
     // Create admin user in users table
-    match User::create(pool, form.admin_email.trim(), &hash, "Admin", "admin") {
+    match s.user_create(form.admin_email.trim(), &hash, "Admin", "admin") {
         Ok(_) => {}
         Err(e) => {
             return Err(make_err(
@@ -226,13 +227,237 @@ pub fn setup_submit(
     }
 
     // Also keep admin_email in settings for backward compat and display
-    let _ = Setting::set(pool, "site_name", form.site_name.trim());
-    let _ = Setting::set(pool, "admin_email", form.admin_email.trim());
-    let _ = Setting::set(pool, "admin_password_hash", &hash);
-    let _ = Setting::set(pool, "setup_completed", "true");
-    let _ = Setting::set(pool, "db_backend", &form.db_backend);
+    let _ = s.setting_set("site_name", form.site_name.trim());
+    let _ = s.setting_set("admin_email", form.admin_email.trim());
+    let _ = s.setting_set("admin_password_hash", &hash);
+    let _ = s.setting_set("setup_completed", "true");
+    let _ = s.setting_set("db_backend", &form.db_backend);
 
     Ok(Redirect::to(format!("/{}/login", admin_slug.0)))
+}
+
+// ── Setup-only mode (no DB configured yet) ─────────────────────────
+
+#[get("/setup")]
+pub fn setup_page_no_db(admin_slug: &State<AdminSlug>) -> NoCacheTemplate {
+    let ctx = SetupContext {
+        error: None,
+        admin_slug: admin_slug.0.clone(),
+        site_name: "Velocty".to_string(),
+        admin_email: String::new(),
+        db_backend: "sqlite".to_string(),
+        mongo_uri: "mongodb://localhost:27017".to_string(),
+        mongo_db_name: "velocty".to_string(),
+        mongo_auth_enabled: String::new(),
+        mongo_auth_mechanism: "scram_sha256".to_string(),
+        mongo_username: String::new(),
+        mongo_password: String::new(),
+        mongo_auth_db: "admin".to_string(),
+    };
+    NoCacheTemplate(Template::render("admin/setup", &ctx))
+}
+
+#[post("/setup", data = "<form>")]
+pub fn setup_submit_no_db(
+    form: Form<SetupForm>,
+    admin_slug: &State<AdminSlug>,
+) -> Result<Template, Template> {
+    let make_err = |msg: &str, form: &SetupForm| {
+        let ctx = SetupContext {
+            error: Some(msg.to_string()),
+            admin_slug: admin_slug.0.clone(),
+            site_name: form.site_name.clone(),
+            admin_email: form.admin_email.clone(),
+            db_backend: form.db_backend.clone(),
+            mongo_uri: form.mongo_uri.clone().unwrap_or_default(),
+            mongo_db_name: form.mongo_db_name.clone().unwrap_or_default(),
+            mongo_auth_enabled: form.mongo_auth_enabled.clone().unwrap_or_default(),
+            mongo_auth_mechanism: form
+                .mongo_auth_mechanism
+                .clone()
+                .unwrap_or_else(|| "scram_sha256".to_string()),
+            mongo_username: form.mongo_username.clone().unwrap_or_default(),
+            mongo_password: form.mongo_password.clone().unwrap_or_default(),
+            mongo_auth_db: form
+                .mongo_auth_db
+                .clone()
+                .unwrap_or_else(|| "admin".to_string()),
+        };
+        Template::render("admin/setup", &ctx)
+    };
+
+    // ── Validate DB backend ──
+    if form.db_backend != "sqlite" && form.db_backend != "mongodb" {
+        return Err(make_err("Please select a database backend.", &form));
+    }
+    if form.db_backend == "mongodb" {
+        let uri = form.mongo_uri.as_deref().unwrap_or("").trim();
+        let db_name = form.mongo_db_name.as_deref().unwrap_or("").trim();
+        if uri.is_empty() {
+            return Err(make_err("MongoDB connection URI is required.", &form));
+        }
+        if db_name.is_empty() {
+            return Err(make_err("MongoDB database name is required.", &form));
+        }
+        if form.mongo_auth_enabled.as_deref() == Some("true") {
+            let mech = form
+                .mongo_auth_mechanism
+                .as_deref()
+                .unwrap_or("scram_sha256");
+            if mech != "x509" && mech != "aws" {
+                if form
+                    .mongo_username
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(make_err(
+                        "MongoDB username is required for the selected auth mechanism.",
+                        &form,
+                    ));
+                }
+                if form
+                    .mongo_password
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(make_err(
+                        "MongoDB password is required for the selected auth mechanism.",
+                        &form,
+                    ));
+                }
+            }
+        }
+    }
+
+    // ── Validate form fields ──
+    if form.admin_email.trim().is_empty() {
+        return Err(make_err("Email is required.", &form));
+    }
+    if form.password.len() < 8 {
+        return Err(make_err("Password must be at least 8 characters.", &form));
+    }
+    if form.password != form.confirm_password {
+        return Err(make_err("Passwords do not match.", &form));
+    }
+    if form.accept_terms.as_deref() != Some("true") {
+        return Err(make_err(
+            "You must accept the Terms of Use and Privacy Policy.",
+            &form,
+        ));
+    }
+
+    // ── Write velocty.toml ──
+    let toml_content = if form.db_backend == "mongodb" {
+        let mut toml = format!(
+            "[database]\nbackend = \"mongodb\"\nuri = \"{}\"\nname = \"{}\"\n",
+            form.mongo_uri
+                .as_deref()
+                .unwrap_or("mongodb://localhost:27017")
+                .trim(),
+            form.mongo_db_name.as_deref().unwrap_or("velocty").trim(),
+        );
+        if form.mongo_auth_enabled.as_deref() == Some("true") {
+            let mech = form
+                .mongo_auth_mechanism
+                .as_deref()
+                .unwrap_or("scram_sha256")
+                .trim();
+            let auth_db = form.mongo_auth_db.as_deref().unwrap_or("admin").trim();
+            toml.push_str(&format!(
+                "\n[database.auth]\nmechanism = \"{}\"\nauth_db = \"{}\"\n",
+                mech, auth_db
+            ));
+            let user = form.mongo_username.as_deref().unwrap_or("").trim();
+            let pass = form.mongo_password.as_deref().unwrap_or("").trim();
+            if !user.is_empty() {
+                toml.push_str(&format!("username = \"{}\"\n", user));
+            }
+            if !pass.is_empty() {
+                toml.push_str(&format!("password = \"{}\"\n", pass));
+            }
+        }
+        toml
+    } else {
+        "[database]\nbackend = \"sqlite\"\npath = \"website/site/db/velocty.db\"\n".to_string()
+    };
+    if let Err(e) = std::fs::write("velocty.toml", &toml_content) {
+        return Err(make_err(&format!("Failed to write config: {}", e), &form));
+    }
+
+    // ── Create the Store based on chosen backend ──
+    let store: Box<dyn crate::store::Store> = if form.db_backend == "mongodb" {
+        let uri = form
+            .mongo_uri
+            .as_deref()
+            .unwrap_or("mongodb://localhost:27017")
+            .trim();
+        let db_name = form.mongo_db_name.as_deref().unwrap_or("velocty").trim();
+        match crate::store::mongo::MongoStore::new(uri, db_name) {
+            Ok(ms) => Box::new(ms),
+            Err(e) => {
+                // Remove the velocty.toml we just wrote since we can't connect
+                let _ = std::fs::remove_file("velocty.toml");
+                return Err(make_err(
+                    &format!("Failed to connect to MongoDB: {}", e),
+                    &form,
+                ));
+            }
+        }
+    } else {
+        match crate::store::sqlite::SqliteStore::new_at("website/site/db/velocty.db") {
+            Ok(ss) => Box::new(ss),
+            Err(e) => {
+                let _ = std::fs::remove_file("velocty.toml");
+                return Err(make_err(
+                    &format!("Failed to initialize SQLite: {}", e),
+                    &form,
+                ));
+            }
+        }
+    };
+
+    // ── Run migrations and seed defaults ──
+    if let Err(e) = store.run_migrations() {
+        let _ = std::fs::remove_file("velocty.toml");
+        return Err(make_err(&format!("Failed to run migrations: {}", e), &form));
+    }
+    if let Err(e) = store.seed_defaults() {
+        let _ = std::fs::remove_file("velocty.toml");
+        return Err(make_err(&format!("Failed to seed defaults: {}", e), &form));
+    }
+
+    // ── Create admin user via Store trait ──
+    let hash = match auth::hash_password(&form.password) {
+        Ok(h) => h,
+        Err(_) => return Err(make_err("Failed to hash password.", &form)),
+    };
+    if let Err(e) = store.user_create(form.admin_email.trim(), &hash, "Admin", "admin") {
+        let _ = std::fs::remove_file("velocty.toml");
+        return Err(make_err(
+            &format!("Failed to create admin user: {}", e),
+            &form,
+        ));
+    }
+
+    // ── Save settings via Store trait ──
+    let _ = store.setting_set("site_name", form.site_name.trim());
+    let _ = store.setting_set("admin_email", form.admin_email.trim());
+    let _ = store.setting_set("admin_password_hash", &hash);
+    let _ = store.setting_set("setup_completed", "true");
+    let _ = store.setting_set("db_backend", &form.db_backend);
+
+    // ── Show restart message ──
+    Ok(Template::render(
+        "admin/setup_complete",
+        serde_json::json!({
+            "admin_slug": admin_slug.0,
+            "db_backend": form.db_backend,
+        }),
+    ))
 }
 
 // ── MongoDB Connection Test ─────────────────────────────────────────

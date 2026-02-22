@@ -1,15 +1,16 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::form::Form;
 use rocket::response::{Flash, Redirect};
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
-use std::collections::HashMap;
 
 use super::admin_base;
-use crate::db::DbPool;
-use crate::models::audit::AuditEntry;
-use crate::models::settings::{Setting, SettingsCache};
+use crate::models::settings::SettingsCache;
 use crate::security::auth::AdminUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Settings ───────────────────────────────────────────
@@ -17,7 +18,7 @@ use crate::AdminSlug;
 #[get("/settings/<section>")]
 pub fn settings_page(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     section: &str,
     flash: Option<rocket::request::FlashMessage<'_>>,
@@ -78,21 +79,19 @@ pub fn settings_page(
         }
     };
 
-    let active_design_slug = crate::models::design::Design::active(pool)
-        .map(|d| d.slug)
-        .unwrap_or_default();
+    let active_design_slug = store.design_active().map(|d| d.slug).unwrap_or_default();
     let mut context = json!({
         "page_title": format!("Settings — {}", section_label),
         "section": section,
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "current_user": _admin.user.safe_json(),
         "active_design_slug": active_design_slug,
     });
 
     // For security page, include passkey count
     if section == "security" {
-        let pk_count = crate::models::passkey::UserPasskey::count_for_user(pool, _admin.user.id);
+        let pk_count = store.passkey_count_for_user(_admin.user.id);
         context["passkey_count"] = json!(pk_count);
     }
 
@@ -110,7 +109,7 @@ pub fn settings_page(
 #[post("/settings/<section>", data = "<form>")]
 pub fn settings_save(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     cache: &State<SettingsCache>,
     section: &str,
@@ -350,7 +349,7 @@ pub fn settings_save(
         ];
         let any_email = email_keys
             .iter()
-            .any(|k| Setting::get_or(pool, k, "false") == "true");
+            .any(|k| store.setting_get_or(k, "false") == "true");
         if !any_email {
             errors.push("Magic Link login requires at least one email provider to be enabled in Email settings".to_string());
         }
@@ -399,8 +398,8 @@ pub fn settings_save(
                         new_admin
                     ));
                 }
-                let cur_blog = Setting::get_or(pool, "blog_slug", "journal");
-                let cur_portfolio = Setting::get_or(pool, "portfolio_slug", "portfolio");
+                let cur_blog = store.setting_get_or("blog_slug", "journal");
+                let cur_portfolio = store.setting_get_or("portfolio_slug", "portfolio");
                 if new_admin == cur_blog {
                     errors.push("Admin Slug cannot be the same as the Journal Slug".to_string());
                 }
@@ -415,9 +414,9 @@ pub fn settings_save(
     if section == "blog" {
         let journal_enabled = data.get("journal_enabled").map(|v| v.as_str()) == Some("true");
         let blog_slug = data.get("blog_slug").map(|v| v.trim()).unwrap_or("");
-        let portfolio_enabled = Setting::get_or(pool, "portfolio_enabled", "false") == "true";
-        let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "portfolio");
-        let admin_slug_val = Setting::get_or(pool, "admin_slug", "admin");
+        let portfolio_enabled = store.setting_get_or("portfolio_enabled", "false") == "true";
+        let portfolio_slug = store.setting_get_or("portfolio_slug", "portfolio");
+        let admin_slug_val = store.setting_get_or("admin_slug", "admin");
 
         if journal_enabled && blog_slug.is_empty() && portfolio_enabled && portfolio_slug.is_empty()
         {
@@ -441,9 +440,9 @@ pub fn settings_save(
     if section == "portfolio" {
         let portfolio_enabled = data.get("portfolio_enabled").map(|v| v.as_str()) == Some("true");
         let portfolio_slug = data.get("portfolio_slug").map(|v| v.trim()).unwrap_or("");
-        let journal_enabled = Setting::get_or(pool, "journal_enabled", "true") == "true";
-        let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
-        let admin_slug_val = Setting::get_or(pool, "admin_slug", "admin");
+        let journal_enabled = store.setting_get_or("journal_enabled", "true") == "true";
+        let blog_slug = store.setting_get_or("blog_slug", "journal");
+        let admin_slug_val = store.setting_get_or("admin_slug", "admin");
 
         if portfolio_enabled && portfolio_slug.is_empty() && journal_enabled && blog_slug.is_empty()
         {
@@ -589,7 +588,7 @@ pub fn settings_save(
         _ => &[],
     };
     for key in checkbox_keys {
-        let _ = Setting::set(pool, key, "false");
+        let _ = store.setting_set(key, "false");
     }
 
     // Sanitize SVG data URLs in branding fields (logo, favicon)
@@ -617,7 +616,7 @@ pub fn settings_save(
         }
     }
 
-    let _ = Setting::set_many(pool, &data);
+    let _ = store.setting_set_many(&data);
 
     // If email settings changed and no providers remain enabled, revert magic link to password
     if section == "email" {
@@ -636,9 +635,9 @@ pub fn settings_save(
         ];
         let any_email = email_keys
             .iter()
-            .any(|k| Setting::get_or(pool, k, "false") == "true");
-        if !any_email && Setting::get_or(pool, "login_method", "password") == "magic_link" {
-            let _ = Setting::set(pool, "login_method", "password");
+            .any(|k| store.setting_get_or(k, "false") == "true");
+        if !any_email && store.setting_get_or("login_method", "password") == "magic_link" {
+            let _ = store.setting_set("login_method", "password");
         }
     }
 
@@ -649,10 +648,10 @@ pub fn settings_save(
         .unwrap_or_default();
 
     // Refresh in-memory settings cache so dynamic routing picks up changes immediately
-    cache.refresh(pool);
+    let s: &dyn Store = &**store.inner();
+    cache.refresh_from_store(s);
 
-    AuditEntry::log(
-        pool,
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "settings_change",

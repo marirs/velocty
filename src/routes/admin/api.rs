@@ -1,85 +1,81 @@
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use serde_json::Value;
 
-use crate::db::DbPool;
-use crate::models::analytics::PageView;
-use crate::models::audit::AuditEntry;
-use crate::models::portfolio::PortfolioItem;
-use crate::models::post::Post;
-use crate::models::settings::Setting;
-use crate::models::tag::Tag;
 use crate::security::auth::{AdminUser, EditorUser};
+use crate::store::Store;
 
 #[get("/stats/overview?<from>&<to>")]
 pub fn stats_overview(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
 ) -> Json<Value> {
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
-    let stats = PageView::overview(pool, &from, &to);
+    let stats = store.analytics_overview(&from, &to);
     Json(serde_json::to_value(stats).unwrap_or_default())
 }
 
 #[get("/stats/flow?<from>&<to>")]
 pub fn stats_flow(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
 ) -> Json<Value> {
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
-    let data = PageView::flow_data(pool, &from, &to);
+    let data = store.analytics_flow_data(&from, &to);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[get("/stats/geo?<from>&<to>")]
 pub fn stats_geo(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
 ) -> Json<Value> {
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
-    let data = PageView::geo_data(pool, &from, &to);
+    let data = store.analytics_geo_data(&from, &to);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[get("/stats/stream?<from>&<to>")]
 pub fn stats_stream(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
 ) -> Json<Value> {
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
-    let data = PageView::stream_data(pool, &from, &to);
+    let data = store.analytics_stream_data(&from, &to);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[get("/stats/calendar?<from>&<to>")]
 pub fn stats_calendar(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
 ) -> Json<Value> {
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
-    let data = PageView::calendar_data(pool, &from, &to);
+    let data = store.analytics_calendar_data(&from, &to);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[get("/stats/top-portfolio?<from>&<to>&<limit>")]
 pub fn stats_top_portfolio(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
     limit: Option<i64>,
@@ -87,14 +83,14 @@ pub fn stats_top_portfolio(
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
     let limit = limit.unwrap_or(10);
-    let data = PageView::top_portfolio(pool, &from, &to, limit);
+    let data = store.analytics_top_portfolio(&from, &to, limit);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[get("/stats/top-referrers?<from>&<to>&<limit>")]
 pub fn stats_top_referrers(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     from: Option<String>,
     to: Option<String>,
     limit: Option<i64>,
@@ -102,28 +98,32 @@ pub fn stats_top_referrers(
     let from = from.unwrap_or_else(|| "2000-01-01".to_string());
     let to = to.unwrap_or_else(|| "2099-12-31".to_string());
     let limit = limit.unwrap_or(10);
-    let data = PageView::top_referrers(pool, &from, &to, limit);
+    let data = store.analytics_top_referrers(&from, &to, limit);
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[get("/stats/tags")]
-pub fn stats_tags(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
-    let data = PageView::tag_relations(pool);
+pub fn stats_tags(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let data = store.analytics_tag_relations();
     Json(serde_json::to_value(data).unwrap_or_default())
 }
 
 #[post("/theme", data = "<body>")]
-pub fn set_theme(_admin: EditorUser, pool: &State<DbPool>, body: Json<Value>) -> Json<Value> {
+pub fn set_theme(
+    _admin: EditorUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<Value>,
+) -> Json<Value> {
     let theme = body.get("theme").and_then(|v| v.as_str()).unwrap_or("dark");
     let theme = if theme == "light" { "light" } else { "dark" };
-    let _ = Setting::set(pool, "admin_theme", theme);
+    let _ = store.setting_set("admin_theme", theme);
     Json(serde_json::json!({"ok": true, "theme": theme}))
 }
 
 // ── SEO Check ─────────────────────────────────────────
 
 fn seo_check_item(
-    pool: &DbPool,
+    store: &dyn Store,
     content_type: &str,
     title: &str,
     slug: &str,
@@ -238,7 +238,7 @@ fn seo_check_item(
     }
 
     // 9. Tags
-    let tags = Tag::for_content(pool, content_id, content_type);
+    let tags = store.tag_for_content(content_id, content_type);
     if tags.is_empty() {
         checks.push(serde_json::json!({"check": "Tags", "status": "warn", "message": "No tags assigned. Tags help with internal linking and discovery."}));
     } else {
@@ -271,14 +271,14 @@ fn seo_check_item(
 }
 
 #[get("/seo-check/post/<id>")]
-pub fn seo_check_post(_admin: EditorUser, pool: &State<DbPool>, id: i64) -> Json<Value> {
-    let post = match Post::find_by_id(pool, id) {
+pub fn seo_check_post(_admin: EditorUser, store: &State<Arc<dyn Store>>, id: i64) -> Json<Value> {
+    let post = match store.post_find_by_id(id) {
         Some(p) => p,
         None => return Json(serde_json::json!({"error": "Post not found"})),
     };
 
     Json(seo_check_item(
-        pool,
+        &**store.inner(),
         "post",
         &post.title,
         &post.slug,
@@ -292,14 +292,18 @@ pub fn seo_check_post(_admin: EditorUser, pool: &State<DbPool>, id: i64) -> Json
 }
 
 #[get("/seo-check/portfolio/<id>")]
-pub fn seo_check_portfolio(_admin: EditorUser, pool: &State<DbPool>, id: i64) -> Json<Value> {
-    let item = match PortfolioItem::find_by_id(pool, id) {
+pub fn seo_check_portfolio(
+    _admin: EditorUser,
+    store: &State<Arc<dyn Store>>,
+    id: i64,
+) -> Json<Value> {
+    let item = match store.portfolio_find_by_id(id) {
         Some(i) => i,
         None => return Json(serde_json::json!({"error": "Portfolio item not found"})),
     };
 
     Json(seo_check_item(
-        pool,
+        &**store.inner(),
         "portfolio",
         &item.title,
         &item.slug,
@@ -315,17 +319,18 @@ pub fn seo_check_portfolio(_admin: EditorUser, pool: &State<DbPool>, id: i64) ->
 /// Rotate the image proxy HMAC secret key.
 /// Copies current → old (with expiry), generates a new current key.
 #[post("/rotate-image-proxy-key")]
-pub fn rotate_image_proxy_key(admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
+pub fn rotate_image_proxy_key(admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
     use rand::Rng;
 
-    let current_secret = Setting::get_or(pool, "image_proxy_secret", "");
+    let current_secret = store.setting_get_or("image_proxy_secret", "");
     if current_secret.is_empty() {
         return Json(
             serde_json::json!({ "ok": false, "error": "No image proxy secret configured" }),
         );
     }
 
-    let rotation_days: i64 = Setting::get_or(pool, "image_proxy_rotation_days", "7")
+    let rotation_days: i64 = store
+        .setting_get_or("image_proxy_rotation_days", "7")
         .parse()
         .unwrap_or(7)
         .clamp(1, 30);
@@ -334,17 +339,16 @@ pub fn rotate_image_proxy_key(admin: AdminUser, pool: &State<DbPool>) -> Json<Va
     let expires_str = expires_at.format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Copy current key → old key with expiry
-    let _ = Setting::set(pool, "image_proxy_secret_old", &current_secret);
-    let _ = Setting::set(pool, "image_proxy_secret_old_expires", &expires_str);
+    let _ = store.setting_set("image_proxy_secret_old", &current_secret);
+    let _ = store.setting_set("image_proxy_secret_old_expires", &expires_str);
 
     // Generate new key
     let mut rng = rand::thread_rng();
     let bytes: [u8; 32] = rng.gen();
     let new_secret = hex::encode(bytes);
-    let _ = Setting::set(pool, "image_proxy_secret", &new_secret);
+    let _ = store.setting_set("image_proxy_secret", &new_secret);
 
-    AuditEntry::log(
-        pool,
+    store.audit_log(
         Some(admin.user.id),
         Some(&admin.user.display_name),
         "rotate_image_proxy_key",
@@ -367,34 +371,37 @@ pub fn rotate_image_proxy_key(admin: AdminUser, pool: &State<DbPool>) -> Json<Va
 
 /// Lightweight endpoint for sidebar widget — returns average SEO score
 #[get("/seo-score")]
-pub fn seo_score_summary(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => return Json(serde_json::json!({"score": -1})),
-    };
-    let result: Result<(i64, i64), _> = conn.query_row(
-        "SELECT COALESCE(SUM(seo_score), 0), COUNT(*)
-         FROM (SELECT seo_score FROM posts WHERE seo_score >= 0
-               UNION ALL
-               SELECT seo_score FROM portfolio WHERE seo_score >= 0)",
-        [],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    );
-    match result {
-        Ok((sum, count)) if count > 0 => {
-            Json(serde_json::json!({"score": sum / count, "count": count}))
+pub fn seo_score_summary(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let posts = store.post_list(None, 10000, 0);
+    let items = store.portfolio_list(None, 10000, 0);
+    let mut sum: i64 = 0;
+    let mut count: i64 = 0;
+    for p in &posts {
+        if p.seo_score >= 0 {
+            sum += p.seo_score as i64;
+            count += 1;
         }
-        _ => Json(serde_json::json!({"score": -1, "count": 0})),
+    }
+    for i in &items {
+        if i.seo_score >= 0 {
+            sum += i.seo_score as i64;
+            count += 1;
+        }
+    }
+    if count > 0 {
+        Json(serde_json::json!({"score": sum / count, "count": count}))
+    } else {
+        Json(serde_json::json!({"score": -1, "count": 0}))
     }
 }
 
 /// Rescan SEO scores for all posts and portfolio items
 #[post("/seo-rescan")]
-pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
+pub fn seo_rescan_all(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
     let mut scanned = 0i32;
 
     // Score all posts
-    let posts = Post::list(pool, None, 10000, 0);
+    let posts = store.post_list(None, 10000, 0);
     for post in &posts {
         let input = crate::seo::audit::SeoInput {
             title: &post.title,
@@ -406,8 +413,7 @@ pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
             content_type: "post",
         };
         let audit = crate::seo::audit::compute_score(&input);
-        let _ = Post::update_seo_score(
-            pool,
+        let _ = store.post_update_seo_score(
             post.id,
             audit.score,
             &crate::seo::audit::issues_to_json(&audit.issues),
@@ -416,7 +422,7 @@ pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
     }
 
     // Score all portfolio items
-    let items = PortfolioItem::list(pool, None, 10000, 0);
+    let items = store.portfolio_list(None, 10000, 0);
     for item in &items {
         let input = crate::seo::audit::SeoInput {
             title: &item.title,
@@ -428,8 +434,7 @@ pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
             content_type: "portfolio",
         };
         let audit = crate::seo::audit::compute_score(&input);
-        let _ = PortfolioItem::update_seo_score(
-            pool,
+        let _ = store.portfolio_update_seo_score(
             item.id,
             audit.score,
             &crate::seo::audit::issues_to_json(&audit.issues),
@@ -437,8 +442,7 @@ pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
         scanned += 1;
     }
 
-    AuditEntry::log(
-        pool,
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "seo_rescan",
@@ -454,8 +458,12 @@ pub fn seo_rescan_all(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
 
 /// Fetch PageSpeed Insights for a URL (proxied to avoid CORS)
 #[get("/pagespeed?<url>")]
-pub fn pagespeed_fetch(_admin: EditorUser, pool: &State<DbPool>, url: &str) -> Json<Value> {
-    let api_key = Setting::get_or(pool, "seo_pagespeed_api_key", "");
+pub fn pagespeed_fetch(
+    _admin: EditorUser,
+    store: &State<Arc<dyn Store>>,
+    url: &str,
+) -> Json<Value> {
+    let api_key = store.setting_get_or("seo_pagespeed_api_key", "");
 
     // URL must be publicly accessible — localhost won't work
     if url.contains("localhost") || url.contains("127.0.0.1") {
@@ -518,9 +526,9 @@ pub fn pagespeed_fetch(_admin: EditorUser, pool: &State<DbPool>, url: &str) -> J
 
 /// Fetch Moz domain metrics (DA, PA, backlinks, spam score) — cached in settings
 #[get("/moz-domain")]
-pub fn moz_domain_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
-    let access_id = Setting::get_or(pool, "seo_moz_access_id", "");
-    let secret_key = Setting::get_or(pool, "seo_moz_secret_key", "");
+pub fn moz_domain_fetch(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let access_id = store.setting_get_or("seo_moz_access_id", "");
+    let secret_key = store.setting_get_or("seo_moz_secret_key", "");
 
     if access_id.is_empty() || secret_key.is_empty() {
         return Json(
@@ -528,9 +536,9 @@ pub fn moz_domain_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value>
         );
     }
 
-    let site_url = Setting::get_or(pool, "seo_canonical_base", "");
+    let site_url = store.setting_get_or("seo_canonical_base", "");
     let site_url = if site_url.is_empty() {
-        Setting::get_or(pool, "site_url", "")
+        store.setting_get_or("site_url", "")
     } else {
         site_url
     };
@@ -577,7 +585,7 @@ pub fn moz_domain_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value>
                             "data": data,
                             "fetched_at": chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
                         });
-                        let _ = Setting::set(pool, "seo_moz_cache", &cache.to_string());
+                        let _ = store.setting_set("seo_moz_cache", &cache.to_string());
                         Json(cache)
                     }
                 }
@@ -592,8 +600,8 @@ pub fn moz_domain_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value>
 
 /// Fetch cached Moz data without hitting the API
 #[get("/moz-domain/cached")]
-pub fn moz_domain_cached(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
-    let cached = Setting::get_or(pool, "seo_moz_cache", "");
+pub fn moz_domain_cached(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let cached = store.setting_get_or("seo_moz_cache", "");
     if cached.is_empty() {
         return Json(serde_json::json!({"cached": false}));
     }
@@ -605,8 +613,8 @@ pub fn moz_domain_cached(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value
 
 /// Fetch Open PageRank score — cached in settings
 #[get("/pagerank")]
-pub fn pagerank_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
-    let api_key = Setting::get_or(pool, "seo_openpagerank_api_key", "");
+pub fn pagerank_fetch(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let api_key = store.setting_get_or("seo_openpagerank_api_key", "");
 
     if api_key.is_empty() {
         return Json(
@@ -614,9 +622,9 @@ pub fn pagerank_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
         );
     }
 
-    let site_url = Setting::get_or(pool, "seo_canonical_base", "");
+    let site_url = store.setting_get_or("seo_canonical_base", "");
     let site_url = if site_url.is_empty() {
-        Setting::get_or(pool, "site_url", "")
+        store.setting_get_or("site_url", "")
     } else {
         site_url
     };
@@ -664,7 +672,7 @@ pub fn pagerank_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
                             "data": data,
                             "fetched_at": chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
                         });
-                        let _ = Setting::set(pool, "seo_pagerank_cache", &cache.to_string());
+                        let _ = store.setting_set("seo_pagerank_cache", &cache.to_string());
                         Json(cache)
                     }
                 }
@@ -679,8 +687,8 @@ pub fn pagerank_fetch(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
 
 /// Fetch cached PageRank data without hitting the API
 #[get("/pagerank/cached")]
-pub fn pagerank_cached(_admin: EditorUser, pool: &State<DbPool>) -> Json<Value> {
-    let cached = Setting::get_or(pool, "seo_pagerank_cache", "");
+pub fn pagerank_cached(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let cached = store.setting_get_or("seo_pagerank_cache", "");
     if cached.is_empty() {
         return Json(serde_json::json!({"cached": false}));
     }

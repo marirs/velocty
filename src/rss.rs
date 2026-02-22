@@ -1,22 +1,21 @@
-use crate::db::DbPool;
-use crate::models::post::Post;
-use crate::models::settings::Setting;
+use crate::store::Store;
 use chrono::{DateTime, Utc};
 
 /// Generate RSS 2.0 XML feed for published blog posts
-pub fn generate_feed(pool: &DbPool) -> String {
-    let site_name = Setting::get_or(pool, "site_name", "Velocty");
-    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
-    let site_tagline = Setting::get_or(pool, "site_caption", "");
-    let tz_name = Setting::get_or(pool, "timezone", "UTC");
+pub fn generate_feed(store: &dyn Store) -> String {
+    let site_name = store.setting_get_or("site_name", "Velocty");
+    let site_url = store.setting_get_or("site_url", "http://localhost:8000");
+    let site_tagline = store.setting_get_or("site_caption", "");
+    let tz_name = store.setting_get_or("timezone", "UTC");
 
-    let blog_slug = Setting::get_or(pool, "blog_slug", "blog");
-    let feed_count = Setting::get_or(pool, "rss_feed_count", "25")
+    let blog_slug = store.setting_get_or("blog_slug", "blog");
+    let feed_count = store
+        .setting_get_or("rss_feed_count", "25")
         .parse::<i64>()
         .unwrap_or(25)
         .clamp(1, 100);
 
-    let posts = Post::published(pool, feed_count, 0);
+    let posts = store.post_list(Some("published"), feed_count, 0);
 
     // Build date in the configured timezone (RFC 2822 format required by RSS spec)
     let format_rfc2822 = |ndt: chrono::NaiveDateTime| -> String {

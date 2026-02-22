@@ -6,8 +6,10 @@ use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::db::DbPool;
+use crate::store::Store;
 
 // ── Registry pool newtype (distinct from DbPool for Rocket managed state) ──
 
@@ -45,7 +47,7 @@ pub struct Site {
 
 pub struct SiteContext {
     pub site: Site,
-    pub pool: DbPool,
+    pub store: Arc<dyn Store>,
     pub uploads_dir: String,
 }
 
@@ -61,7 +63,64 @@ impl<'r> FromRequest<'r> for &'r SiteContext {
     }
 }
 
-// ── SitePoolManager: caches per-site DB pools ────────────────
+// ── SiteStoreManager: caches per-site Store instances ────────────────
+
+pub struct SiteStoreManager {
+    stores: DashMap<String, Arc<dyn Store>>,
+}
+
+impl SiteStoreManager {
+    pub fn new() -> Self {
+        SiteStoreManager {
+            stores: DashMap::new(),
+        }
+    }
+
+    /// Get or create a Store for the given site slug.
+    /// Uses the global backend setting to decide SQLite vs MongoDB.
+    pub fn get_store(&self, slug: &str) -> Result<Arc<dyn Store>, String> {
+        if let Some(store) = self.stores.get(slug) {
+            return Ok(store.clone());
+        }
+
+        let store = create_site_store(slug)?;
+        store.run_migrations().map_err(|e| e.to_string())?;
+        store.seed_defaults().map_err(|e| e.to_string())?;
+        self.stores.insert(slug.to_string(), store.clone());
+        Ok(store)
+    }
+}
+
+/// Create a Store instance for a specific site based on the global backend config.
+fn create_site_store(slug: &str) -> Result<Arc<dyn Store>, String> {
+    let backend = crate::health::read_db_backend();
+    match backend.as_str() {
+        "mongodb" => {
+            let toml_str = std::fs::read_to_string("velocty.toml").unwrap_or_default();
+            let toml_val: toml::Value = toml_str
+                .parse()
+                .unwrap_or(toml::Value::Table(Default::default()));
+            let uri = toml_val
+                .get("database")
+                .and_then(|d| d.get("uri"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("mongodb://localhost:27017");
+            // Each site gets its own MongoDB database: velocty_site_<slug>
+            let db_name = format!("velocty_site_{}", slug);
+            let ms = crate::store::mongo::MongoStore::new(uri, &db_name)?;
+            Ok(Arc::new(ms) as Arc<dyn Store>)
+        }
+        _ => {
+            let db_path = format!("website/sites/{}/db/velocty.db", slug);
+            let pool = crate::db::init_pool_at(&db_path)?;
+            crate::db::run_migrations(&pool).map_err(|e| e.to_string())?;
+            crate::db::seed_defaults(&pool).map_err(|e| e.to_string())?;
+            Ok(Arc::new(crate::store::sqlite::SqliteStore::new(pool)) as Arc<dyn Store>)
+        }
+    }
+}
+
+// ── Legacy SitePoolManager (kept for backward compat with super_admin health tools) ──
 
 pub struct SitePoolManager {
     pools: DashMap<String, DbPool>,
@@ -74,7 +133,7 @@ impl SitePoolManager {
         }
     }
 
-    /// Get or create a connection pool for the given site slug.
+    /// Get or create a connection pool for the given site slug (SQLite only).
     pub fn get_pool(&self, slug: &str) -> Result<DbPool, String> {
         if let Some(pool) = self.pools.get(slug) {
             return Ok(pool.clone());
@@ -257,11 +316,10 @@ pub fn create_site(
 
     let id = conn.last_insert_rowid();
 
-    // Initialize the site's own database
-    let db_path = format!("{}/db/velocty.db", base);
-    let site_pool = crate::db::init_pool_at(&db_path)?;
-    crate::db::run_migrations(&site_pool).map_err(|e| e.to_string())?;
-    crate::db::seed_defaults(&site_pool).map_err(|e| e.to_string())?;
+    // Initialize the site's own database via Store
+    let store = create_site_store(&slug)?;
+    store.run_migrations().map_err(|e| e.to_string())?;
+    store.seed_defaults().map_err(|e| e.to_string())?;
 
     Ok(Site {
         id,
@@ -425,13 +483,13 @@ impl Fairing for SiteResolver {
             return;
         }
 
-        let pool_mgr = match req.rocket().state::<SitePoolManager>() {
+        let store_mgr = match req.rocket().state::<SiteStoreManager>() {
             Some(m) => m,
             None => return,
         };
 
-        let pool = match pool_mgr.get_pool(&site.slug) {
-            Ok(p) => p,
+        let store = match store_mgr.get_store(&site.slug) {
+            Ok(s) => s,
             Err(_) => return,
         };
 
@@ -439,7 +497,7 @@ impl Fairing for SiteResolver {
 
         let ctx = SiteContext {
             site,
-            pool,
+            store,
             uploads_dir,
         };
 

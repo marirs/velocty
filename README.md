@@ -18,7 +18,7 @@
 
 ## What is Velocty?
 
-Velocty is a self-hosted CMS that ships as a **single binary** backed by **SQLite**. It's designed for photographers, artists, designers, and bloggers who want a fast, secure, and beautiful platform without the overhead of WordPress or similar systems.
+Velocty is a self-hosted CMS that ships as a **single binary** with your choice of **SQLite** or **MongoDB** as the database backend. It's designed for photographers, artists, designers, and bloggers who want a fast, secure, and beautiful platform without the overhead of WordPress or similar systems.
 
 It serves pure HTML/CSS to visitors with **microsecond response times**, while giving you a modern, polished admin panel to manage everything.
 
@@ -86,7 +86,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 |---|---|
 | **Language** | Rust |
 | **Web Framework** | Rocket |
-| **Database** | SQLite (via rusqlite + r2d2 connection pool) |
+| **Database** | SQLite (via rusqlite + r2d2) or MongoDB (via mongodb crate) — chosen at setup |
 | **Templates (admin)** | Tera |
 | **Rich Text Editor** | TinyMCE 7 (self-hosted, admin-only) |
 | **Analytics Charts** | D3.js (admin-only) |
@@ -101,7 +101,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 |---|---|---|
 | **Response time** | Microseconds | 200–500ms |
 | **Memory usage** | ~10–20 MB | ~50–100 MB |
-| **Deployment** | Single binary + SQLite file | PHP + MySQL + Apache/Nginx |
+| **Deployment** | Single binary + SQLite file (or MongoDB) | PHP + MySQL + Apache/Nginx |
 | **Attack surface** | Minimal (no plugins) | Huge (plugins, themes, XML-RPC) |
 | **Cold start** | Instant | Seconds |
 | **Dependencies at runtime** | Zero | PHP extensions, plugins |
@@ -170,7 +170,7 @@ Velocty guides you through a 4-step setup wizard on first run:
 
 ### Analytics (Built-in, Privacy-First)
 
-- **No third-party scripts** — all data stays in your SQLite database
+- **No third-party scripts** — all data stays in your database (SQLite or MongoDB)
 - **GeoLite2 offline lookup** — country/city without sending data to external services
 - **D3.js dashboard** with:
   - Visitor flow (Sankey diagram)
@@ -337,7 +337,11 @@ velocty/
 │   └── README-CMS.md
 ├── src/
 │   ├── main.rs                  # Rocket launch, DB init, route mounting
-│   ├── db.rs                    # SQLite pool, migrations, seed defaults
+│   ├── db.rs                    # SQLite pool, migrations, seed defaults, shared default_settings()
+│   ├── store/                   # Backend-agnostic database abstraction
+│   │   ├── mod.rs               # Store trait (~100 methods) + unit tests
+│   │   ├── sqlite.rs            # SqliteStore impl (wraps DbPool) + DbPool bridge
+│   │   └── mongo.rs             # MongoStore impl (fully implemented, ~3000 lines)
 │   ├── analytics.rs             # Page view logging fairing, GeoIP
 │   ├── render.rs                # Design + content merge (with captcha widget injection)
 │   ├── seo/                     # SEO module
@@ -351,7 +355,7 @@ velocty/
 │   ├── license.rs               # Purchase license.txt generation
 │   ├── rate_limit.rs            # In-memory rate limiter (login, comments)
 │   ├── tasks.rs                 # Background tasks fairing (session/token/analytics cleanup)
-│   ├── site.rs                  # Multi-site: SiteContext, SitePoolManager, SiteResolver (feature-gated)
+│   ├── site.rs                  # Multi-site: SiteContext, SiteStoreManager, SiteResolver (feature-gated)
 │   ├── ai/                      # AI provider integrations
 │   │   ├── mod.rs               # Provider dispatch, failover chain, types
 │   │   ├── prompts.rs           # Prompt builders for all AI features
@@ -453,11 +457,11 @@ velocty/
 - 7 commerce provider configurations
 - 11 email provider configurations
 - **Multi-site/multi-tenancy** (optional `--features multi-site` Cargo flag)
-  - Per-site SQLite databases in UUID-named folders (opaque to filesystem)
+  - Per-site databases: SQLite files in UUID-named folders, or per-site MongoDB databases (`velocty_site_<uuid>`)
   - Central `sites.db` registry with hostname → UUID mapping
   - Super Admin panel at `/super/` for managing all sites
   - `SiteResolver` fairing for Host-based routing
-  - `DashMap`-cached per-site connection pools
+  - `SiteStoreManager` with `DashMap`-cached per-site `Arc<dyn Store>` instances
 
 ### Phase 2 — Commerce ✅
 

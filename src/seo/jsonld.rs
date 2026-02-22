@@ -1,7 +1,6 @@
-use crate::db::DbPool;
 use crate::models::portfolio::PortfolioItem;
 use crate::models::post::Post;
-use crate::models::settings::Setting;
+use crate::store::Store;
 use chrono::{DateTime, Utc};
 
 use super::json_escape;
@@ -19,11 +18,11 @@ fn format_iso8601(ndt: chrono::NaiveDateTime, tz_name: &str) -> String {
 }
 
 /// Build JSON-LD structured data for a blog post
-pub fn build_post_jsonld(pool: &DbPool, post: &Post) -> String {
-    let site_name = Setting::get_or(pool, "site_name", "Velocty");
-    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
-    let blog_slug = Setting::get_or(pool, "blog_slug", "journal");
-    let tz_name = Setting::get_or(pool, "timezone", "UTC");
+pub fn build_post_jsonld(store: &dyn Store, post: &Post) -> String {
+    let site_name = store.setting_get_or("site_name", "Velocty");
+    let site_url = store.setting_get_or("site_url", "http://localhost:8000");
+    let blog_slug = store.setting_get_or("blog_slug", "journal");
+    let tz_name = store.setting_get_or("timezone", "UTC");
 
     let published = post
         .published_at
@@ -74,10 +73,10 @@ pub fn build_post_jsonld(pool: &DbPool, post: &Post) -> String {
 }
 
 /// Build JSON-LD structured data for a portfolio item
-pub fn build_portfolio_jsonld(pool: &DbPool, item: &PortfolioItem) -> String {
-    let site_name = Setting::get_or(pool, "site_name", "Velocty");
-    let site_url = Setting::get_or(pool, "site_url", "http://localhost:8000");
-    let portfolio_slug = Setting::get_or(pool, "portfolio_slug", "portfolio");
+pub fn build_portfolio_jsonld(store: &dyn Store, item: &PortfolioItem) -> String {
+    let site_name = store.setting_get_or("site_name", "Velocty");
+    let site_url = store.setting_get_or("site_url", "http://localhost:8000");
+    let portfolio_slug = store.setting_get_or("portfolio_slug", "portfolio");
 
     format!(
         r#"<script type="application/ld+json">

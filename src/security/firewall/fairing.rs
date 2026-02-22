@@ -6,9 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::db::DbPool;
-use crate::models::firewall::{FwBan, FwEvent};
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 use super::inspect;
 
@@ -69,13 +67,13 @@ impl Fairing for FirewallFairing {
     }
 
     async fn on_request(&self, request: &mut Request<'_>, _data: &mut Data<'_>) {
-        let pool = match request.rocket().state::<DbPool>() {
-            Some(p) => p,
+        let store = match request.rocket().state::<std::sync::Arc<dyn Store>>() {
+            Some(s) => s,
             None => return,
         };
 
         // Check if firewall is enabled
-        if Setting::get_or(pool, "firewall_enabled", "false") != "true" {
+        if store.setting_get_or("firewall_enabled", "false") != "true" {
             return;
         }
 
@@ -113,17 +111,19 @@ impl Fairing for FirewallFairing {
             .to_string();
 
         // ── 1. Ban check ──
-        if FwBan::is_banned(pool, &ip) {
+        if store.fw_is_banned(&ip) {
             request.local_cache(|| FwBlock(true));
             return;
         }
 
         // ── 2. Rate limiting ──
-        if Setting::get_or(pool, "fw_rate_limit_enabled", "true") == "true" {
-            let max_req: u64 = Setting::get_or(pool, "fw_rate_limit_requests", "100")
+        if store.setting_get_or("fw_rate_limit_enabled", "true") == "true" {
+            let max_req: u64 = store
+                .setting_get_or("fw_rate_limit_requests", "100")
                 .parse()
                 .unwrap_or(100);
-            let window: u64 = Setting::get_or(pool, "fw_rate_limit_window", "60")
+            let window: u64 = store
+                .setting_get_or("fw_rate_limit_window", "60")
                 .parse()
                 .unwrap_or(60);
 
@@ -138,9 +138,8 @@ impl Fairing for FirewallFairing {
             }
 
             if limiter.check(&ip, max_req, window) {
-                let ban_dur = Setting::get_or(pool, "fw_rate_limit_ban_duration", "1h");
-                let _ = FwBan::create_with_duration(
-                    pool,
+                let ban_dur = store.setting_get_or("fw_rate_limit_ban_duration", "1h");
+                let _ = store.fw_ban_create_with_duration(
                     &ip,
                     "rate_limit",
                     Some("Rate limit exceeded"),
@@ -148,8 +147,7 @@ impl Fairing for FirewallFairing {
                     None,
                     Some(&ua),
                 );
-                FwEvent::log(
-                    pool,
+                store.fw_event_log(
                     &ip,
                     "rate_limit",
                     Some("Rate limit exceeded"),
@@ -166,12 +164,11 @@ impl Fairing for FirewallFairing {
         let query = request.uri().query().map(|q| q.as_str()).unwrap_or("");
         let check_input = format!("{} {}", path, query);
 
-        if Setting::get_or(pool, "fw_xss_protection", "true") == "true"
+        if store.setting_get_or("fw_xss_protection", "true") == "true"
             && inspect::contains_xss(&check_input)
         {
-            let ban_dur = Setting::get_or(pool, "fw_injection_ban_duration", "7d");
-            let _ = FwBan::create_with_duration(
-                pool,
+            let ban_dur = store.setting_get_or("fw_injection_ban_duration", "7d");
+            let _ = store.fw_ban_create_with_duration(
                 &ip,
                 "xss",
                 Some("XSS attempt detected"),
@@ -179,25 +176,16 @@ impl Fairing for FirewallFairing {
                 None,
                 Some(&ua),
             );
-            FwEvent::log(
-                pool,
-                &ip,
-                "xss",
-                Some(&check_input),
-                None,
-                Some(&ua),
-                Some(&path),
-            );
+            store.fw_event_log(&ip, "xss", Some(&check_input), None, Some(&ua), Some(&path));
             request.local_cache(|| FwBlock(true));
             return;
         }
 
-        if Setting::get_or(pool, "fw_sqli_protection", "true") == "true"
+        if store.setting_get_or("fw_sqli_protection", "true") == "true"
             && inspect::contains_sqli(&check_input)
         {
-            let ban_dur = Setting::get_or(pool, "fw_injection_ban_duration", "7d");
-            let _ = FwBan::create_with_duration(
-                pool,
+            let ban_dur = store.setting_get_or("fw_injection_ban_duration", "7d");
+            let _ = store.fw_ban_create_with_duration(
                 &ip,
                 "sqli",
                 Some("SQL injection attempt detected"),
@@ -205,8 +193,7 @@ impl Fairing for FirewallFairing {
                 None,
                 Some(&ua),
             );
-            FwEvent::log(
-                pool,
+            store.fw_event_log(
                 &ip,
                 "sqli",
                 Some(&check_input),
@@ -218,12 +205,11 @@ impl Fairing for FirewallFairing {
             return;
         }
 
-        if Setting::get_or(pool, "fw_path_traversal_protection", "true") == "true"
+        if store.setting_get_or("fw_path_traversal_protection", "true") == "true"
             && inspect::contains_path_traversal(&check_input)
         {
-            let ban_dur = Setting::get_or(pool, "fw_injection_ban_duration", "7d");
-            let _ = FwBan::create_with_duration(
-                pool,
+            let ban_dur = store.setting_get_or("fw_injection_ban_duration", "7d");
+            let _ = store.fw_ban_create_with_duration(
                 &ip,
                 "path_traversal",
                 Some("Path traversal attempt detected"),
@@ -231,8 +217,7 @@ impl Fairing for FirewallFairing {
                 None,
                 Some(&ua),
             );
-            FwEvent::log(
-                pool,
+            store.fw_event_log(
                 &ip,
                 "path_traversal",
                 Some(&check_input),
@@ -245,11 +230,10 @@ impl Fairing for FirewallFairing {
         }
 
         // ── 4. Bot detection ──
-        if Setting::get_or(pool, "fw_monitor_bots", "true") == "true"
+        if store.setting_get_or("fw_monitor_bots", "true") == "true"
             && inspect::is_suspicious_bot(&ua)
         {
-            FwEvent::log(
-                pool,
+            store.fw_event_log(
                 &ip,
                 "suspicious_bot",
                 Some(&ua),
@@ -258,15 +242,15 @@ impl Fairing for FirewallFairing {
                 Some(&path),
             );
 
-            if Setting::get_or(pool, "fw_bot_auto_ban", "false") == "true" {
-                let threshold: i64 = Setting::get_or(pool, "fw_bot_ban_threshold", "10")
+            if store.setting_get_or("fw_bot_auto_ban", "false") == "true" {
+                let threshold: i64 = store
+                    .setting_get_or("fw_bot_ban_threshold", "10")
                     .parse()
                     .unwrap_or(10);
-                let count = FwEvent::count_for_ip_since(pool, &ip, "suspicious_bot", 60);
+                let count = store.fw_event_count_for_ip_since(&ip, "suspicious_bot", 60);
                 if count >= threshold {
-                    let ban_dur = Setting::get_or(pool, "fw_bot_ban_duration", "24h");
-                    let _ = FwBan::create_with_duration(
-                        pool,
+                    let ban_dur = store.setting_get_or("fw_bot_ban_duration", "24h");
+                    let _ = store.fw_ban_create_with_duration(
                         &ip,
                         "bot",
                         Some("Suspicious bot threshold exceeded"),
@@ -291,16 +275,16 @@ impl Fairing for FirewallFairing {
         }
 
         // Security headers
-        let pool = match req.rocket().state::<DbPool>() {
-            Some(p) => p,
+        let store = match req.rocket().state::<std::sync::Arc<dyn Store>>() {
+            Some(s) => s,
             None => return,
         };
 
-        if Setting::get_or(pool, "firewall_enabled", "false") != "true" {
+        if store.setting_get_or("firewall_enabled", "false") != "true" {
             return;
         }
 
-        if Setting::get_or(pool, "fw_security_headers", "true") == "true" {
+        if store.setting_get_or("fw_security_headers", "true") == "true" {
             res.set_header(Header::new("X-Frame-Options", "SAMEORIGIN"));
             res.set_header(Header::new("X-Content-Type-Options", "nosniff"));
             res.set_header(Header::new(

@@ -1,13 +1,12 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::{DownloadToken, Order};
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
-use std::collections::HashMap;
+use crate::store::Store;
 
 use super::{create_pending_order, finalize_order, site_url};
 
@@ -20,8 +19,12 @@ pub struct PayoneerCreateRequest {
 }
 
 #[post("/api/checkout/payoneer/create", format = "json", data = "<body>")]
-pub fn payoneer_create(pool: &State<DbPool>, body: Json<PayoneerCreateRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn payoneer_create(
+    store: &State<Arc<dyn Store>>,
+    body: Json<PayoneerCreateRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings
         .get("commerce_payoneer_enabled")
         .map(|v| v.as_str())
@@ -52,7 +55,7 @@ pub fn payoneer_create(pool: &State<DbPool>, body: Json<PayoneerCreateRequest>) 
     };
 
     let (order_id, price, cur) = match create_pending_order(
-        pool,
+        s,
         body.portfolio_id,
         "payoneer",
         body.buyer_email.as_deref().unwrap_or(""),
@@ -60,7 +63,7 @@ pub fn payoneer_create(pool: &State<DbPool>, body: Json<PayoneerCreateRequest>) 
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+    let item = match s.portfolio_find_by_id(body.portfolio_id) {
         Some(i) => i,
         None => return Json(json!({ "ok": false, "error": "Item not found" })),
     };
@@ -114,7 +117,7 @@ pub fn payoneer_create(pool: &State<DbPool>, body: Json<PayoneerCreateRequest>) 
                 .and_then(|u| u.as_str());
             if let Some(url) = checkout_url {
                 let pyo_id = data.get("payout_id").and_then(|i| i.as_str()).unwrap_or("");
-                let _ = Order::update_provider_order_id(pool, order_id, pyo_id);
+                let _ = s.order_update_provider_order_id(order_id, pyo_id);
                 Json(json!({ "ok": true, "order_id": order_id, "checkout_url": url }))
             } else {
                 let err = data
@@ -131,13 +134,14 @@ pub fn payoneer_create(pool: &State<DbPool>, body: Json<PayoneerCreateRequest>) 
 // ── Payoneer: Return redirect ───────────────────────────
 
 #[get("/api/payoneer/return?<order_id>")]
-pub fn payoneer_return(pool: &State<DbPool>, order_id: i64) -> rocket::response::Redirect {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn payoneer_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::response::Redirect {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
-    if let Some(order) = Order::find_by_id(pool, order_id) {
+    if let Some(order) = s.order_find_by_id(order_id) {
         if order.status == "pending" {
             if let Ok(result) = finalize_order(
-                pool,
+                s,
                 order_id,
                 &order.provider_order_id,
                 &order.buyer_email,
@@ -148,7 +152,7 @@ pub fn payoneer_return(pool: &State<DbPool>, order_id: i64) -> rocket::response:
                 }
             }
         } else if order.status == "completed" {
-            if let Some(dl) = DownloadToken::find_by_order(pool, order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order_id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }
@@ -159,7 +163,8 @@ pub fn payoneer_return(pool: &State<DbPool>, order_id: i64) -> rocket::response:
 // ── Payoneer: Webhook ───────────────────────────────────
 
 #[post("/api/payoneer/webhook", format = "json", data = "<body>")]
-pub fn payoneer_webhook(pool: &State<DbPool>, body: Json<Value>) -> &'static str {
+pub fn payoneer_webhook(store: &State<Arc<dyn Store>>, body: Json<Value>) -> &'static str {
+    let s: &dyn Store = &**store.inner();
     let status = body.get("status").and_then(|s| s.as_str()).unwrap_or("");
     let payout_id = body.get("payout_id").and_then(|p| p.as_str()).unwrap_or("");
     if status == "done" || status == "completed" {
@@ -170,7 +175,7 @@ pub fn payoneer_webhook(pool: &State<DbPool>, body: Json<Value>) -> &'static str
                     .get("payee_email")
                     .and_then(|e| e.as_str())
                     .unwrap_or("");
-                let _ = finalize_order(pool, oid, payout_id, email, "");
+                let _ = finalize_order(s, oid, payout_id, email, "");
             }
         }
     }

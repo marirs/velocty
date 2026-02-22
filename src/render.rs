@@ -1,25 +1,20 @@
 use serde_json::Value;
 
-use crate::db::DbPool;
 use crate::models::design::Design;
 use crate::seo;
+use crate::store::Store;
 use crate::typography;
 
 /// Renders a full page using the active design's shell (layout_html) from the DB.
 /// The shell contains {{placeholder}} tags that are replaced with generated content.
-pub fn render_page(pool: &DbPool, template_type: &str, context: &Value) -> String {
-    let design = Design::active(pool).expect("No active design found");
-    render_with_shell(pool, &design, template_type, context)
+pub fn render_page(store: &dyn Store, template_type: &str, context: &Value) -> String {
+    let design = store.design_active().expect("No active design found");
+    render_with_shell(&design, template_type, context)
 }
 
 /// Unified renderer: uses the design's layout_html as the page shell,
 /// replaces {{placeholder}} tags with generated content from settings and context.
-fn render_with_shell(
-    _pool: &DbPool,
-    design: &Design,
-    template_type: &str,
-    context: &Value,
-) -> String {
+fn render_with_shell(design: &Design, template_type: &str, context: &Value) -> String {
     let settings = context.get("settings").cloned().unwrap_or_default();
     let css_vars = typography::build_css_variables(&settings);
     let font_links = typography::build_font_links(&settings);
@@ -500,13 +495,13 @@ fn render_with_shell(
 
 /// Renders a legal page (Privacy Policy, Terms of Use) using the same DB-driven shell.
 pub fn render_legal_page(
-    pool: &DbPool,
+    store: &dyn Store,
     settings: &std::collections::HashMap<String, String>,
     title: &str,
     html_body: &str,
 ) -> String {
     let settings_json = serde_json::to_value(settings).unwrap_or_default();
-    let categories = crate::models::category::Category::list(pool, Some("portfolio"));
+    let categories = store.category_list(Some("portfolio"));
     let cats_json = serde_json::to_value(&categories).unwrap_or_default();
     let seo_html = format!(
         "<title>{} — {}</title>",
@@ -524,7 +519,7 @@ pub fn render_legal_page(
         "categories": cats_json,
         "seo": seo_html,
     });
-    let design = Design::active(pool).expect("No active design found");
+    let design = store.design_active().expect("No active design found");
 
     let result = {
         let settings_v = context.get("settings").cloned().unwrap_or_default();

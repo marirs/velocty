@@ -1,15 +1,13 @@
+use std::sync::Arc;
+
 use rocket::response::{Flash, Redirect};
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde_json::json;
 
 use super::admin_base;
-use crate::db::DbPool;
-use crate::models::audit::AuditEntry;
-use crate::models::category::Category;
-use crate::models::design::Design;
-use crate::models::settings::Setting;
 use crate::security::auth::AdminUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Design List ──────────────────────────────────────────
@@ -17,17 +15,17 @@ use crate::AdminSlug;
 #[get("/designer")]
 pub fn designs_list(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     flash: Option<rocket::request::FlashMessage<'_>>,
 ) -> Template {
-    let designs = Design::list(pool);
+    let designs = store.design_list();
 
     let mut context = json!({
         "page_title": "Designer",
         "designs": designs,
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
     });
 
     if let Some(ref f) = flash {
@@ -43,16 +41,16 @@ pub fn designs_list(
 #[post("/designer/<id>/activate")]
 pub fn design_activate(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Flash<Redirect> {
-    let name = Design::find_by_id(pool, id)
+    let name = store
+        .design_find_by_id(id)
         .map(|d| d.name.clone())
         .unwrap_or_default();
-    let _ = Design::activate(pool, id);
-    AuditEntry::log(
-        pool,
+    let _ = store.design_activate(id);
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "activate",
@@ -73,16 +71,18 @@ pub fn design_activate(
 #[get("/designer/<design_slug>")]
 pub fn design_overview(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     design_slug: String,
 ) -> Option<Template> {
-    let design = Design::find_by_slug(pool, &design_slug)?;
-    let portfolio_categories: Vec<serde_json::Value> = Category::list(pool, Some("portfolio"))
+    let design = store.design_find_by_slug(&design_slug)?;
+    let portfolio_categories: Vec<serde_json::Value> = store
+        .category_list(Some("portfolio"))
         .iter()
         .map(|c| json!({"id": c.id, "name": c.name, "slug": c.slug, "show_in_nav": c.show_in_nav}))
         .collect();
-    let journal_categories: Vec<serde_json::Value> = Category::list(pool, Some("post"))
+    let journal_categories: Vec<serde_json::Value> = store
+        .category_list(Some("post"))
         .iter()
         .map(|c| json!({"id": c.id, "name": c.name, "slug": c.slug, "show_in_nav": c.show_in_nav}))
         .collect();
@@ -91,7 +91,7 @@ pub fn design_overview(
         "page_title": format!("Design: {}", design.name),
         "design": design,
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "portfolio_categories": portfolio_categories,
         "journal_categories": journal_categories,
     });

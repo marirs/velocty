@@ -5,11 +5,10 @@ use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::{DownloadToken, Order};
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::store::Store;
 
 use super::stripe::RawBody;
 use super::{create_pending_order, finalize_order, site_url};
@@ -37,8 +36,12 @@ pub struct SquareCreateRequest {
 }
 
 #[post("/api/checkout/square/create", format = "json", data = "<body>")]
-pub fn square_create_payment(pool: &State<DbPool>, body: Json<SquareCreateRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn square_create_payment(
+    store: &State<Arc<dyn Store>>,
+    body: Json<SquareCreateRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings.get("commerce_square_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "Square is not enabled" }));
     }
@@ -61,7 +64,7 @@ pub fn square_create_payment(pool: &State<DbPool>, body: Json<SquareCreateReques
     };
 
     let (order_id, price, cur) = match create_pending_order(
-        pool,
+        s,
         body.portfolio_id,
         "square",
         body.buyer_email.as_deref().unwrap_or(""),
@@ -69,7 +72,7 @@ pub fn square_create_payment(pool: &State<DbPool>, body: Json<SquareCreateReques
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+    let item = match s.portfolio_find_by_id(body.portfolio_id) {
         Some(i) => i,
         None => return Json(json!({ "ok": false, "error": "Item not found" })),
     };
@@ -107,7 +110,7 @@ pub fn square_create_payment(pool: &State<DbPool>, body: Json<SquareCreateReques
                 .and_then(|i| i.as_str())
                 .unwrap_or("");
             if let Some(checkout_url) = url {
-                let _ = Order::update_provider_order_id(pool, order_id, sq_id);
+                let _ = s.order_update_provider_order_id(order_id, sq_id);
                 Json(json!({ "ok": true, "order_id": order_id, "checkout_url": checkout_url }))
             } else {
                 let errors = body
@@ -127,13 +130,14 @@ pub fn square_create_payment(pool: &State<DbPool>, body: Json<SquareCreateReques
 // ── Square: Return redirect ─────────────────────────────
 
 #[get("/api/square/return?<order_id>")]
-pub fn square_return(pool: &State<DbPool>, order_id: i64) -> rocket::response::Redirect {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn square_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::response::Redirect {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
-    if let Some(order) = Order::find_by_id(pool, order_id) {
+    if let Some(order) = s.order_find_by_id(order_id) {
         if order.status == "pending" {
             if let Ok(result) = finalize_order(
-                pool,
+                s,
                 order_id,
                 &order.provider_order_id,
                 &order.buyer_email,
@@ -144,7 +148,7 @@ pub fn square_return(pool: &State<DbPool>, order_id: i64) -> rocket::response::R
                 }
             }
         } else if order.status == "completed" {
-            if let Some(dl) = DownloadToken::find_by_order(pool, order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order_id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }
@@ -178,8 +182,13 @@ fn verify_square_signature(
 }
 
 #[post("/api/square/webhook", data = "<body>")]
-pub fn square_webhook(pool: &State<DbPool>, sig: SquareSignature, body: RawBody) -> Status {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn square_webhook(
+    store: &State<Arc<dyn Store>>,
+    sig: SquareSignature,
+    body: RawBody,
+) -> Status {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let signature_key = settings
         .get("square_webhook_signature_key")
         .cloned()
@@ -220,7 +229,7 @@ pub fn square_webhook(pool: &State<DbPool>, sig: SquareSignature, body: RawBody)
         let sq_payment_id = payment.get("id").and_then(|i| i.as_str()).unwrap_or("");
 
         if let Ok(oid) = order_id_str.parse::<i64>() {
-            let _ = finalize_order(pool, oid, sq_payment_id, buyer_email, "");
+            let _ = finalize_order(s, oid, sq_payment_id, buyer_email, "");
         }
     }
 

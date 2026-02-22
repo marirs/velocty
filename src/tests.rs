@@ -1413,7 +1413,7 @@ fn session_cleanup_expired() {
         ).unwrap();
     }
 
-    auth::cleanup_expired_sessions(&pool).unwrap();
+    auth::cleanup_expired_sessions(&pool);
 
     // Valid session should still exist
     assert!(auth::validate_session(&pool, &sid));
@@ -7013,4 +7013,315 @@ fn portfolio_render_single_missing_item_returns_404() {
     let ctx = serde_json::json!({ "settings": {} });
     let html = crate::designs::oneguy::portfolio::render_single(&ctx);
     assert!(html.contains("404"), "missing item should render 404");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Store: health_content_stats (verifies portfolio table name)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn health_content_stats_counts_portfolio() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool.clone());
+
+    // Baseline: should have zero portfolio items
+    let (_, _, _, portfolio_count, _, _, _, _, _, _) = store.health_content_stats();
+    assert_eq!(portfolio_count, 0, "should start with 0 portfolio items");
+
+    // Insert a portfolio item directly
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "INSERT INTO portfolio (title, slug, image_path, status) VALUES ('Test', 'test-item', 'img.jpg', 'published')",
+        [],
+    ).unwrap();
+
+    let (_, _, _, portfolio_count, _, _, _, _, _, _) = store.health_content_stats();
+    assert_eq!(portfolio_count, 1, "should count 1 portfolio item");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Store: task_publish_scheduled (verifies portfolio table name)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn task_publish_scheduled_publishes_portfolio() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool.clone());
+
+    // Insert a scheduled portfolio item with published_at in the past
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "INSERT INTO portfolio (title, slug, image_path, status, published_at) VALUES ('Scheduled', 'sched-item', 'img.jpg', 'scheduled', datetime('now', '-1 hour'))",
+        [],
+    ).unwrap();
+
+    // Verify it's scheduled
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM portfolio WHERE slug = 'sched-item'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(status, "scheduled");
+
+    // Run the task
+    let count = store.task_publish_scheduled().unwrap();
+    assert!(count >= 1, "should publish at least 1 item");
+
+    // Verify it's now published
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM portfolio WHERE slug = 'sched-item'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(status, "published");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Store: health_referenced_files (verifies portfolio table name)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn health_referenced_files_includes_portfolio_images() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool.clone());
+
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "INSERT INTO portfolio (title, slug, image_path, status) VALUES ('Ref Test', 'ref-test', '/uploads/photo.jpg', 'published')",
+        [],
+    ).unwrap();
+
+    let referenced = store.health_referenced_files();
+    assert!(
+        referenced.contains("photo.jpg"),
+        "should include portfolio image in referenced files, got: {:?}",
+        referenced
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Store: export_content (verifies portfolio table name)
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn export_content_includes_portfolio() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool.clone());
+
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "INSERT INTO portfolio (title, slug, image_path, status) VALUES ('Export Test', 'export-test', 'img.jpg', 'published')",
+        [],
+    ).unwrap();
+
+    let export = store
+        .health_export_content()
+        .expect("export should succeed");
+    let portfolio = export
+        .get("portfolio")
+        .expect("export should have 'portfolio' key");
+    let items = portfolio.as_array().expect("portfolio should be an array");
+    assert_eq!(items.len(), 1, "should export 1 portfolio item");
+    assert_eq!(items[0]["title"], "Export Test");
+}
+
+// ═══════════════════════════════════════════════════════════
+// Schema validation: prevent silent table/column name mismatches
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn schema_all_expected_tables_exist() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+
+    // Every table created by run_migrations() in db.rs.
+    // If a new table is added to db.rs, add it here too.
+    let expected_tables = [
+        "posts",
+        "portfolio",
+        "categories",
+        "tags",
+        "content_categories",
+        "content_tags",
+        "comments",
+        "orders",
+        "download_tokens",
+        "licenses",
+        "designs",
+        "design_templates",
+        "settings",
+        "imports",
+        "sessions",
+        "page_views",
+        "magic_links",
+        "likes",
+        "users",
+        "fw_bans",
+        "fw_events",
+        "audit_log",
+        "user_passkeys",
+    ];
+
+    for table in &expected_tables {
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name=?1",
+                rusqlite::params![table],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        assert!(exists, "Expected table '{}' does not exist in schema", table);
+    }
+}
+
+#[test]
+fn schema_posts_has_expected_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+
+    let expected = [
+        "id", "title", "slug", "content_json", "content_html", "excerpt",
+        "featured_image", "meta_title", "meta_description", "status",
+        "published_at", "created_at", "updated_at",
+    ];
+    assert_table_columns(&conn, "posts", &expected);
+}
+
+#[test]
+fn schema_portfolio_has_expected_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+
+    let expected = [
+        "id", "title", "slug", "description_json", "description_html",
+        "image_path", "thumbnail_path", "meta_title", "meta_description",
+        "sell_enabled", "price", "purchase_note", "payment_provider",
+        "download_file_path", "likes", "status", "published_at",
+        "created_at", "updated_at",
+    ];
+    assert_table_columns(&conn, "portfolio", &expected);
+}
+
+#[test]
+fn schema_content_tags_has_expected_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    assert_table_columns(&conn, "content_tags", &["content_id", "content_type", "tag_id"]);
+}
+
+#[test]
+fn schema_content_categories_has_expected_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    assert_table_columns(&conn, "content_categories", &["content_id", "content_type", "category_id"]);
+}
+
+#[test]
+fn schema_page_views_has_expected_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    assert_table_columns(
+        &conn,
+        "page_views",
+        &["id", "path", "ip_hash", "country", "city", "referrer", "user_agent", "device_type", "browser", "created_at"],
+    );
+}
+
+/// Helper: assert that a table has all expected columns.
+fn assert_table_columns(
+    conn: &r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>,
+    table: &str,
+    expected: &[&str],
+) {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({})", table))
+        .unwrap_or_else(|e| panic!("Failed to query table_info for '{}': {}", table, e));
+    let columns: Vec<String> = stmt
+        .query_map([], |r| r.get::<_, String>(1))
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+    for col in expected {
+        assert!(
+            columns.contains(&col.to_string()),
+            "Table '{}' is missing column '{}'. Actual columns: {:?}",
+            table, col, columns
+        );
+    }
+}
+
+#[test]
+fn schema_no_phantom_tables_in_health() {
+    // Verify that health.rs table list matches real tables.
+    // This test queries the same tables that health.rs uses.
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+
+    let health_tables = [
+        "posts", "portfolio", "comments", "categories", "tags",
+        "settings", "sessions", "imports", "page_views",
+        "content_tags", "content_categories",
+    ];
+    for table in &health_tables {
+        let sql = format!("SELECT COUNT(*) FROM {}", table);
+        conn.query_row(&sql, [], |r| r.get::<_, u64>(0))
+            .unwrap_or_else(|e| panic!("health.rs references table '{}' which fails: {}", table, e));
+    }
+}
+
+#[test]
+fn schema_export_queries_all_succeed() {
+    // Verify that health_export_content doesn't silently skip any section.
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+
+    let export = store.health_export_content().expect("export should succeed");
+
+    let expected_keys = [
+        "posts", "portfolio", "categories", "tags", "comments",
+        "post_tags", "post_categories", "portfolio_tags", "portfolio_categories",
+        "settings",
+    ];
+    for key in &expected_keys {
+        assert!(
+            export.get(key).is_some(),
+            "health_export_content is missing key '{}' — likely a silent SQL failure. Keys present: {:?}",
+            key,
+            export.as_object().map(|m| m.keys().collect::<Vec<_>>())
+        );
+    }
+}
+
+#[test]
+fn schema_orphan_scan_queries_succeed() {
+    // Verify health_referenced_files doesn't silently fail.
+    // Insert data in posts and portfolio, confirm both are found.
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool.clone());
+
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "INSERT INTO posts (title, slug, content_html, featured_image, status) VALUES ('P', 'p-1', '<img src=\"/uploads/post-img.jpg\">', '/uploads/feat.jpg', 'published')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO portfolio (title, slug, image_path, description_html, status) VALUES ('I', 'i-1', '/uploads/port-img.jpg', '<img src=\"/uploads/desc-img.jpg\">', 'published')",
+        [],
+    ).unwrap();
+
+    let refs = store.health_referenced_files();
+    assert!(refs.contains("feat.jpg"), "should find post featured_image, got: {:?}", refs);
+    assert!(refs.contains("post-img.jpg"), "should find image in post content_html, got: {:?}", refs);
+    assert!(refs.contains("port-img.jpg"), "should find portfolio image_path, got: {:?}", refs);
+    assert!(refs.contains("desc-img.jpg"), "should find image in portfolio description_html, got: {:?}", refs);
 }

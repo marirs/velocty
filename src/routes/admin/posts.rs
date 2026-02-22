@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::response::Redirect;
@@ -7,13 +9,9 @@ use serde_json::json;
 
 use super::admin_base;
 use super::save_upload;
-use crate::db::DbPool;
-use crate::models::audit::AuditEntry;
-use crate::models::category::Category;
-use crate::models::post::{Post, PostForm};
-use crate::models::settings::Setting;
-use crate::models::tag::Tag;
+use crate::models::post::PostForm;
 use crate::security::auth::{AuthorUser, EditorUser};
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Posts ───────────────────────────────────────────────
@@ -21,7 +19,7 @@ use crate::AdminSlug;
 #[get("/posts?<status>&<page>")]
 pub fn posts_list(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
@@ -30,8 +28,8 @@ pub fn posts_list(
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
-    let posts = Post::list(pool, status.as_deref(), per_page, offset);
-    let total = Post::count(pool, status.as_deref());
+    let posts = store.post_list(status.as_deref(), per_page, offset);
+    let total = store.post_count(status.as_deref());
     let total_pages = (total as f64 / per_page as f64).ceil() as i64;
 
     let context = json!({
@@ -41,31 +39,35 @@ pub fn posts_list(
         "total_pages": total_pages,
         "total": total,
         "status_filter": status,
-        "count_all": Post::count(pool, None),
-        "count_published": Post::count(pool, Some("published")),
-        "count_draft": Post::count(pool, Some("draft")),
-        "count_scheduled": Post::count(pool, Some("scheduled")),
-        "count_archived": Post::count(pool, Some("archived")),
+        "count_all": store.post_count(None),
+        "count_published": store.post_count(Some("published")),
+        "count_draft": store.post_count(Some("draft")),
+        "count_scheduled": store.post_count(Some("scheduled")),
+        "count_archived": store.post_count(Some("archived")),
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
     });
 
     Template::render("admin/posts/list", &context)
 }
 
 #[get("/posts/new")]
-pub fn posts_new(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
-    let categories = Category::list(pool, Some("post"));
-    let tags = Tag::list(pool);
+pub fn posts_new(
+    _admin: AuthorUser,
+    store: &State<Arc<dyn Store>>,
+    slug: &State<AdminSlug>,
+) -> Template {
+    let categories = store.category_list(Some("post"));
+    let tags = store.tag_list();
 
-    let ai_enabled = crate::ai::is_enabled(pool);
-    let ai_has_vision = crate::ai::has_vision_provider(pool);
+    let ai_enabled = store.setting_get_bool("ai_enabled");
+    let ai_has_vision = store.setting_get_bool("ai_has_vision");
     let context = json!({
         "page_title": "New Post",
         "admin_slug": slug.0,
         "categories": categories,
         "tags": tags,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "ai_enabled": ai_enabled,
         "ai_has_vision": ai_has_vision,
     });
@@ -76,18 +78,18 @@ pub fn posts_new(_admin: AuthorUser, pool: &State<DbPool>, slug: &State<AdminSlu
 #[get("/posts/<id>/edit")]
 pub fn posts_edit(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Option<Template> {
-    let post = Post::find_by_id(pool, id)?;
-    let categories = Category::list(pool, Some("post"));
-    let tags = Tag::list(pool);
-    let post_categories = Category::for_content(pool, id, "post");
-    let post_tags = Tag::for_content(pool, id, "post");
+    let post = store.post_find_by_id(id)?;
+    let categories = store.category_list(Some("post"));
+    let tags = store.tag_list();
+    let post_categories = store.category_for_content(id, "post");
+    let post_tags = store.tag_for_content(id, "post");
 
-    let ai_enabled = crate::ai::is_enabled(pool);
-    let ai_has_vision = crate::ai::has_vision_provider(pool);
+    let ai_enabled = store.setting_get_bool("ai_enabled");
+    let ai_has_vision = store.setting_get_bool("ai_has_vision");
     let context = json!({
         "page_title": "Edit Post",
         "post": post,
@@ -96,7 +98,7 @@ pub fn posts_edit(
         "post_categories": post_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "post_tags": post_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "ai_enabled": ai_enabled,
         "ai_has_vision": ai_has_vision,
     });
@@ -107,17 +109,17 @@ pub fn posts_edit(
 #[post("/posts/<id>/delete")]
 pub fn posts_delete(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
 ) -> Redirect {
-    let title = Post::find_by_id(pool, id)
+    let title = store
+        .post_find_by_id(id)
         .map(|p| p.title)
         .unwrap_or_default();
-    let _ = Post::delete(pool, id);
-    crate::models::search::remove_item(pool, "post", id);
-    AuditEntry::log(
-        pool,
+    let _ = store.post_delete(id);
+    store.search_remove_item("post", id);
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "delete",
@@ -151,7 +153,7 @@ pub struct PostFormData<'f> {
 #[post("/posts/new", data = "<form>")]
 pub async fn posts_create(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     mut form: Form<PostFormData<'_>>,
 ) -> Redirect {
@@ -164,10 +166,10 @@ pub async fn posts_create(
     } else {
         match form.featured_image.as_mut() {
             Some(f) if f.len() > 0 => {
-                if !super::is_allowed_image(f, pool) {
+                if !super::is_allowed_image(f, &**store.inner()) {
                     return Redirect::to(format!("{}/posts/new", admin_base(slug)));
                 }
-                save_upload(f, "post", pool).await
+                save_upload(f, "post", &**store.inner()).await
             }
             _ => None,
         }
@@ -200,7 +202,7 @@ pub async fn posts_create(
         ..post_form
     };
 
-    match Post::create(pool, &post_form) {
+    match store.post_create(&post_form) {
         Ok(id) => {
             // Auto-compute SEO score
             {
@@ -214,15 +216,14 @@ pub async fn posts_create(
                     content_type: "post",
                 };
                 let audit = crate::seo::audit::compute_score(&seo_input);
-                let _ = Post::update_seo_score(
-                    pool,
+                let _ = store.post_update_seo_score(
                     id,
                     audit.score,
                     &crate::seo::audit::issues_to_json(&audit.issues),
                 );
             }
             if let Some(ref cat_ids) = form.category_ids {
-                let _ = Category::set_for_content(pool, id, "post", cat_ids);
+                let _ = store.category_set_for_content(id, "post", cat_ids);
             }
             if let Some(ref names) = form.tag_names {
                 let tag_ids: Vec<i64> = names
@@ -232,14 +233,13 @@ pub async fn posts_create(
                         if n.is_empty() {
                             return None;
                         }
-                        Tag::find_or_create(pool, n).ok()
+                        store.tag_find_or_create(n).ok()
                     })
                     .collect();
-                let _ = Tag::set_for_content(pool, id, "post", &tag_ids);
+                let _ = store.tag_set_for_content(id, "post", &tag_ids);
             }
             // Update search index
-            crate::models::search::upsert_item(
-                pool,
+            store.search_upsert_item(
                 "post",
                 id,
                 &form.title,
@@ -249,8 +249,7 @@ pub async fn posts_create(
                 post_form.published_at.as_deref(),
                 final_status == "published",
             );
-            AuditEntry::log(
-                pool,
+            store.audit_log(
                 Some(_admin.user.id),
                 Some(&_admin.user.display_name),
                 "create",
@@ -279,7 +278,7 @@ pub async fn posts_create(
 #[post("/posts/<id>/edit", data = "<form>")]
 pub async fn posts_update(
     _admin: AuthorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     id: i64,
     mut form: Form<PostFormData<'_>>,
@@ -293,12 +292,12 @@ pub async fn posts_update(
     } else {
         match form.featured_image.as_mut() {
             Some(f) if f.len() > 0 => {
-                if !super::is_allowed_image(f, pool) {
+                if !super::is_allowed_image(f, &**store.inner()) {
                     return Redirect::to(format!("{}/posts/{}/edit", admin_base(slug), id));
                 }
-                save_upload(f, "post", pool).await
+                save_upload(f, "post", &**store.inner()).await
             }
-            _ => Post::find_by_id(pool, id).and_then(|p| p.featured_image),
+            _ => store.post_find_by_id(id).and_then(|p| p.featured_image),
         }
     };
 
@@ -317,7 +316,8 @@ pub async fn posts_update(
                 .clone()
                 .filter(|s| !s.is_empty())
                 .or_else(|| {
-                    Post::find_by_id(pool, id)
+                    store
+                        .post_find_by_id(id)
                         .and_then(|p| p.published_at)
                         .map(|d| d.format("%Y-%m-%dT%H:%M").to_string())
                         .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M").to_string()))
@@ -334,7 +334,7 @@ pub async fn posts_update(
         ..post_form
     };
 
-    let _ = Post::update(pool, id, &post_form);
+    let _ = store.post_update(id, &post_form);
     // Auto-compute SEO score
     {
         let seo_input = crate::seo::audit::SeoInput {
@@ -347,15 +347,14 @@ pub async fn posts_update(
             content_type: "post",
         };
         let audit = crate::seo::audit::compute_score(&seo_input);
-        let _ = Post::update_seo_score(
-            pool,
+        let _ = store.post_update_seo_score(
             id,
             audit.score,
             &crate::seo::audit::issues_to_json(&audit.issues),
         );
     }
     if let Some(ref cat_ids) = form.category_ids {
-        let _ = Category::set_for_content(pool, id, "post", cat_ids);
+        let _ = store.category_set_for_content(id, "post", cat_ids);
     }
     {
         let tag_names_str = form.tag_names.as_deref().unwrap_or("");
@@ -366,14 +365,13 @@ pub async fn posts_update(
                 if n.is_empty() {
                     return None;
                 }
-                Tag::find_or_create(pool, n).ok()
+                store.tag_find_or_create(n).ok()
             })
             .collect();
-        let _ = Tag::set_for_content(pool, id, "post", &tag_ids);
+        let _ = store.tag_set_for_content(id, "post", &tag_ids);
     }
     // Update search index
-    crate::models::search::upsert_item(
-        pool,
+    store.search_upsert_item(
         "post",
         id,
         &form.title,
@@ -383,8 +381,7 @@ pub async fn posts_update(
         post_form.published_at.as_deref(),
         final_status == "published",
     );
-    AuditEntry::log(
-        pool,
+    store.audit_log(
         Some(_admin.user.id),
         Some(&_admin.user.display_name),
         "update",

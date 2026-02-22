@@ -3,9 +3,11 @@ use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use std::sync::Arc;
+
 use crate::ai::{self, prompts, AiRequest};
-use crate::db::DbPool;
 use crate::security::auth::EditorUser;
+use crate::store::Store;
 
 use super::parse_json_from_text;
 
@@ -33,7 +35,7 @@ pub struct DescribeImageRequest {
 #[post("/ai/generate-post", format = "json", data = "<body>")]
 pub fn generate_post(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<GeneratePostRequest>,
 ) -> Json<Value> {
     let req = AiRequest {
@@ -46,7 +48,7 @@ pub fn generate_post(
         image_base64: body.image_base64.clone(),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => match parse_json_from_text(&resp.text) {
             Some(parsed) => Json(json!({
                 "ok": true,
@@ -67,7 +69,7 @@ pub fn generate_post(
 #[post("/ai/inline-assist", format = "json", data = "<body>")]
 pub fn inline_assist(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<InlineAssistRequest>,
 ) -> Json<Value> {
     let req = AiRequest {
@@ -80,7 +82,7 @@ pub fn inline_assist(
         image_base64: None,
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => {
             match parse_json_from_text(&resp.text) {
                 Some(parsed) => {
@@ -106,7 +108,7 @@ pub fn inline_assist(
 #[post("/ai/describe-image", format = "json", data = "<body>")]
 pub fn describe_image(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<DescribeImageRequest>,
 ) -> Json<Value> {
     let req = AiRequest {
@@ -117,7 +119,7 @@ pub fn describe_image(
         image_base64: Some(body.image_base64.clone()),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => match parse_json_from_text(&resp.text) {
             Some(parsed) => {
                 let description = parsed

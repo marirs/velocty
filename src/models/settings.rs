@@ -24,6 +24,18 @@ impl SettingsCache {
         }
     }
 
+    pub fn load_from_store(store: &dyn crate::store::Store) -> Self {
+        Self {
+            inner: RwLock::new(store.setting_all()),
+        }
+    }
+
+    pub fn refresh_from_store(&self, store: &dyn crate::store::Store) {
+        if let Ok(mut w) = self.inner.write() {
+            *w = store.setting_all();
+        }
+    }
+
     pub fn get(&self, key: &str) -> Option<String> {
         self.inner.read().ok()?.get(key).cloned()
     }

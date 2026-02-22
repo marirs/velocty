@@ -1,13 +1,12 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::Order;
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
-use std::collections::HashMap;
+use crate::store::Store;
 
 use super::{currency, finalize_order};
 
@@ -19,14 +18,18 @@ pub struct PaypalCreateRequest {
 }
 
 #[post("/api/checkout/paypal/create", format = "json", data = "<body>")]
-pub fn paypal_create_order(pool: &State<DbPool>, body: Json<PaypalCreateRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn paypal_create_order(
+    store: &State<Arc<dyn Store>>,
+    body: Json<PaypalCreateRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
 
     if settings.get("commerce_paypal_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "PayPal is not enabled" }));
     }
 
-    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+    let item = match s.portfolio_find_by_id(body.portfolio_id) {
         Some(i) if i.sell_enabled => i,
         _ => return Json(json!({ "ok": false, "error": "Item not available for purchase" })),
     };
@@ -39,8 +42,7 @@ pub fn paypal_create_order(pool: &State<DbPool>, body: Json<PaypalCreateRequest>
     let cur = currency(&settings);
 
     // Create a pending order in our DB
-    let order_id = match Order::create(pool, item.id, "", "", price, &cur, "paypal", "", "pending")
-    {
+    let order_id = match s.order_create(item.id, "", "", price, &cur, "paypal", "", "pending") {
         Ok(id) => id,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
@@ -66,13 +68,17 @@ pub struct PaypalCaptureRequest {
 }
 
 #[post("/api/checkout/paypal/capture", format = "json", data = "<body>")]
-pub fn paypal_capture_order(pool: &State<DbPool>, body: Json<PaypalCaptureRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn paypal_capture_order(
+    store: &State<Arc<dyn Store>>,
+    body: Json<PaypalCaptureRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings.get("commerce_paypal_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "PayPal is not enabled" }));
     }
     match finalize_order(
-        pool,
+        s,
         body.order_id,
         &body.paypal_order_id,
         &body.buyer_email,

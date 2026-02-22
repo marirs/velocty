@@ -8,8 +8,7 @@ pub mod prompts;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 // ── Types ─────────────────────────────────────────────
 
@@ -83,8 +82,8 @@ impl Provider {
 // ── Public API ────────────────────────────────────────
 
 /// Send a request through the failover chain. Returns the first successful response.
-pub fn complete(pool: &DbPool, req: &AiRequest) -> Result<AiResponse, AiError> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn complete(store: &dyn Store, req: &AiRequest) -> Result<AiResponse, AiError> {
+    let settings: HashMap<String, String> = store.setting_all();
     let chain_str = settings
         .get("ai_failover_chain")
         .cloned()
@@ -131,8 +130,8 @@ pub fn complete(pool: &DbPool, req: &AiRequest) -> Result<AiResponse, AiError> {
 }
 
 /// Check if any AI provider is enabled
-pub fn is_enabled(pool: &DbPool) -> bool {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn is_enabled(store: &dyn Store) -> bool {
+    let settings: HashMap<String, String> = store.setting_all();
     ["ollama", "openai", "gemini", "cloudflare", "groq"]
         .iter()
         .any(|p| {
@@ -144,8 +143,8 @@ pub fn is_enabled(pool: &DbPool) -> bool {
 }
 
 /// Check if any vision-capable provider is enabled (Ollama, OpenAI, Gemini, Groq)
-pub fn has_vision_provider(pool: &DbPool) -> bool {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn has_vision_provider(store: &dyn Store) -> bool {
+    let settings: HashMap<String, String> = store.setting_all();
     ["ollama", "openai", "gemini", "groq"].iter().any(|p| {
         settings
             .get(&format!("ai_{}_enabled", p))
@@ -155,8 +154,8 @@ pub fn has_vision_provider(pool: &DbPool) -> bool {
 }
 
 /// Check which suggestion features are enabled
-pub fn suggestion_flags(pool: &DbPool) -> HashMap<String, bool> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn suggestion_flags(store: &dyn Store) -> HashMap<String, bool> {
+    let settings: HashMap<String, String> = store.setting_all();
     let mut flags = HashMap::new();
     for key in &[
         "ai_suggest_meta",

@@ -3,11 +3,11 @@ use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use std::sync::Arc;
+
 use crate::ai::{self, prompts, AiRequest};
-use crate::db::DbPool;
-use crate::models::category::Category;
-use crate::models::tag::Tag;
 use crate::security::auth::EditorUser;
+use crate::store::Store;
 
 use super::parse_json_from_text;
 
@@ -60,7 +60,7 @@ pub struct SuggestTitleRequest {
 #[post("/ai/suggest-meta", format = "json", data = "<body>")]
 pub fn suggest_meta(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<SuggestMetaRequest>,
 ) -> Json<Value> {
     let excerpt = body.content_excerpt.as_deref().unwrap_or("");
@@ -74,7 +74,7 @@ pub fn suggest_meta(
         image_base64: body.image_base64.clone(),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => {
             match parse_json_from_text(&resp.text) {
                 Some(parsed) => Json(json!({
@@ -102,13 +102,13 @@ pub fn suggest_meta(
 #[post("/ai/suggest-tags", format = "json", data = "<body>")]
 pub fn suggest_tags(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<SuggestTagsRequest>,
 ) -> Json<Value> {
     let excerpt = body.content_excerpt.as_deref().unwrap_or("");
 
     // Get existing tags for context
-    let existing_tags: Vec<String> = Tag::list(pool).iter().map(|t| t.name.clone()).collect();
+    let existing_tags: Vec<String> = store.tag_list().iter().map(|t| t.name.clone()).collect();
 
     let req = AiRequest {
         system: prompts::seo_system(),
@@ -118,7 +118,7 @@ pub fn suggest_tags(
         image_base64: body.image_base64.clone(),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => {
             match parse_json_from_text(&resp.text) {
                 Some(parsed) => {
@@ -165,13 +165,14 @@ pub fn suggest_tags(
 #[post("/ai/suggest-categories", format = "json", data = "<body>")]
 pub fn suggest_categories(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<SuggestCategoriesRequest>,
 ) -> Json<Value> {
     let excerpt = body.content_excerpt.as_deref().unwrap_or("");
     let ctype = body.content_type.as_deref().unwrap_or("post");
 
-    let existing_cats: Vec<String> = Category::list(pool, Some(ctype))
+    let existing_cats: Vec<String> = store
+        .category_list(Some(ctype))
         .iter()
         .map(|c| c.name.clone())
         .collect();
@@ -184,7 +185,7 @@ pub fn suggest_categories(
         image_base64: body.image_base64.clone(),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => match parse_json_from_text(&resp.text) {
             Some(parsed) => {
                 let categories = parsed
@@ -209,7 +210,7 @@ pub fn suggest_categories(
 #[post("/ai/suggest-slug", format = "json", data = "<body>")]
 pub fn suggest_slug(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<SuggestSlugRequest>,
 ) -> Json<Value> {
     let req = AiRequest {
@@ -220,7 +221,7 @@ pub fn suggest_slug(
         image_base64: body.image_base64.clone(),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => {
             match parse_json_from_text(&resp.text) {
                 Some(parsed) => {
@@ -266,7 +267,7 @@ pub fn suggest_slug(
 #[post("/ai/suggest-alt-text", format = "json", data = "<body>")]
 pub fn suggest_alt_text(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<SuggestAltTextRequest>,
 ) -> Json<Value> {
     let context = body.context.as_deref().unwrap_or("Image in a CMS");
@@ -279,7 +280,7 @@ pub fn suggest_alt_text(
         image_base64: body.image_base64.clone(),
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => match parse_json_from_text(&resp.text) {
             Some(parsed) => {
                 let alt_text = parsed
@@ -300,7 +301,7 @@ pub fn suggest_alt_text(
 #[post("/ai/suggest-title", format = "json", data = "<body>")]
 pub fn suggest_title(
     _admin: EditorUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<SuggestTitleRequest>,
 ) -> Json<Value> {
     let desc = body.description.as_deref().unwrap_or("");
@@ -314,7 +315,7 @@ pub fn suggest_title(
             temperature: Some(0.5),
             image_base64: body.image_base64.clone(),
         };
-        match ai::complete(pool, &img_req) {
+        match ai::complete(&**store.inner(), &img_req) {
             Ok(resp) => parse_json_from_text(&resp.text)
                 .and_then(|v| {
                     v.get("description")
@@ -340,7 +341,7 @@ pub fn suggest_title(
         image_base64: None,
     };
 
-    match ai::complete(pool, &req) {
+    match ai::complete(&**store.inner(), &req) {
         Ok(resp) => {
             match parse_json_from_text(&resp.text) {
                 Some(parsed) => {

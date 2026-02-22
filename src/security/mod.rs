@@ -13,27 +13,30 @@ pub mod turnstile;
 
 use std::collections::HashMap;
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 // ── Captcha Verification ──────────────────────────────
 
 /// Verify a captcha token using the specified provider (or auto-detect).
 /// Returns Ok(true) if verified, Ok(false) if failed, Err on config/network error.
 /// If no captcha provider is enabled, returns Ok(true) (pass-through).
-pub fn verify_captcha(pool: &DbPool, token: &str, remote_ip: Option<&str>) -> Result<bool, String> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn verify_captcha(
+    store: &dyn Store,
+    token: &str,
+    remote_ip: Option<&str>,
+) -> Result<bool, String> {
+    let settings: HashMap<String, String> = store.setting_all();
     verify_captcha_with_settings(&settings, token, remote_ip)
 }
 
 /// Verify a captcha token for login specifically.
 /// Checks login_captcha_enabled and login_captcha_provider settings.
 pub fn verify_login_captcha(
-    pool: &DbPool,
+    store: &dyn Store,
     token: &str,
     remote_ip: Option<&str>,
 ) -> Result<bool, String> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let settings: HashMap<String, String> = store.setting_all();
 
     if settings.get("login_captcha_enabled").map(|v| v.as_str()) != Some("true") {
         return Ok(true);
@@ -87,8 +90,8 @@ fn verify_captcha_with_settings(
 
 /// Get login captcha info for rendering on the login page.
 /// Returns None if login captcha is disabled.
-pub fn login_captcha_info(pool: &DbPool) -> Option<CaptchaInfo> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn login_captcha_info(store: &dyn Store) -> Option<CaptchaInfo> {
+    let settings: HashMap<String, String> = store.setting_all();
     if settings.get("login_captcha_enabled").map(|v| v.as_str()) != Some("true") {
         return None;
     }
@@ -130,8 +133,8 @@ pub fn login_captcha_info(pool: &DbPool) -> Option<CaptchaInfo> {
 
 /// Get the active captcha provider name and site key for frontend rendering.
 /// Returns None if no captcha provider is enabled.
-pub fn active_captcha(pool: &DbPool) -> Option<CaptchaInfo> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn active_captcha(store: &dyn Store) -> Option<CaptchaInfo> {
+    let settings: HashMap<String, String> = store.setting_all();
 
     if settings
         .get("security_recaptcha_enabled")
@@ -195,7 +198,7 @@ pub struct CaptchaInfo {
 /// Returns Ok(true) if spam, Ok(false) if clean.
 /// Checks all enabled providers — if ANY flags it as spam, returns true.
 pub fn check_spam(
-    pool: &DbPool,
+    store: &dyn Store,
     site_url: &str,
     user_ip: &str,
     user_agent: &str,
@@ -203,7 +206,7 @@ pub fn check_spam(
     author: Option<&str>,
     author_email: Option<&str>,
 ) -> Result<bool, String> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let settings: HashMap<String, String> = store.setting_all();
 
     let mut checked = false;
 
@@ -271,8 +274,8 @@ pub fn check_spam(
 }
 
 /// Check if any spam detection provider is enabled.
-pub fn has_spam_provider(pool: &DbPool) -> bool {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn has_spam_provider(store: &dyn Store) -> bool {
+    let settings: HashMap<String, String> = store.setting_all();
     ["akismet", "cleantalk", "oopspam"].iter().any(|p| {
         settings
             .get(&format!("security_{}_enabled", p))
@@ -282,8 +285,8 @@ pub fn has_spam_provider(pool: &DbPool) -> bool {
 }
 
 /// Check if any captcha provider is enabled.
-pub fn has_captcha_provider(pool: &DbPool) -> bool {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn has_captcha_provider(store: &dyn Store) -> bool {
+    let settings: HashMap<String, String> = store.setting_all();
     ["recaptcha", "turnstile", "hcaptcha"].iter().any(|p| {
         settings
             .get(&format!("security_{}_enabled", p))

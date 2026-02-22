@@ -23,3 +23,9 @@ impl<'r> Responder<'r, 'static> for NoCacheTemplate {
 pub fn routes() -> Vec<rocket::Route> {
     auth::routes()
 }
+
+/// Minimal routes for setup-only mode (no DB configured yet).
+/// Only mounts the setup wizard page, submit handler, and mongo test.
+pub fn setup_only_routes() -> Vec<rocket::Route> {
+    auth::setup_only_routes()
+}

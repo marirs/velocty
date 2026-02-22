@@ -16,12 +16,11 @@ use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 /// Send a purchase confirmation email to the buyer with download link and license key.
 pub fn send_purchase_email(
-    pool: &DbPool,
+    store: &dyn Store,
     buyer_email: &str,
     item_title: &str,
     purchase_note: &str,
@@ -30,7 +29,7 @@ pub fn send_purchase_email(
     amount: f64,
     currency: &str,
 ) {
-    let settings = Setting::all(pool);
+    let settings = store.setting_all();
     let site_name = settings
         .get("site_name")
         .cloned()
@@ -71,6 +70,66 @@ pub fn send_purchase_email(
     let subject = format!("Your purchase: {} — {}", item_title, site_name);
 
     if let Err(e) = send_via_provider(&settings, &from, buyer_email, &subject, &body) {
+        eprintln!(
+            "[email] Failed to send purchase email to {}: {}",
+            buyer_email, e
+        );
+    } else {
+        eprintln!("[email] Purchase email sent to {}", buyer_email);
+    }
+}
+
+/// Send a purchase confirmation email using pre-fetched settings (for use in background threads).
+pub fn send_purchase_email_with_settings(
+    settings: &HashMap<String, String>,
+    buyer_email: &str,
+    item_title: &str,
+    purchase_note: &str,
+    download_url: &str,
+    license_key: Option<&str>,
+    amount: f64,
+    currency: &str,
+) {
+    let site_name = settings
+        .get("site_name")
+        .cloned()
+        .unwrap_or_else(|| "Velocty".to_string());
+    let from_email = get_from_email(settings);
+
+    if from_email.is_none() {
+        eprintln!(
+            "[email] No email provider configured, skipping purchase email to {}",
+            buyer_email
+        );
+        return;
+    }
+    let from = from_email.unwrap();
+
+    let mut body = format!(
+        "Thank you for your purchase!\n\n\
+         Item: {}\n\
+         Amount: {} {:.2}\n",
+        item_title, currency, amount,
+    );
+
+    if !purchase_note.is_empty() {
+        body.push_str(&format!("Includes: {}\n", purchase_note));
+    }
+
+    body.push_str(&format!("\nDownload your file:\n{}\n", download_url));
+
+    if let Some(key) = license_key {
+        body.push_str(&format!("\nLicense Key: {}\n", key));
+    }
+
+    body.push_str(&format!(
+        "\nPlease save this email for your records.\n\n— {}\n",
+        site_name
+    ));
+
+    let subject = format!("Your purchase: {} — {}", item_title, site_name);
+
+    if let Err(e) = send_via_provider(settings, &from, buyer_email, &subject, &body) {
         eprintln!(
             "[email] Failed to send purchase email to {}: {}",
             buyer_email, e

@@ -1,12 +1,10 @@
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
-use crate::db::DbPool;
-use crate::models::category::{Category, CategoryForm};
-use crate::models::comment::{Comment, CommentForm};
-use crate::models::import::Import;
-use crate::models::post::{Post, PostForm};
-use crate::models::tag::Tag;
+use crate::models::category::CategoryForm;
+use crate::models::comment::CommentForm;
+use crate::models::post::PostForm;
+use crate::store::Store;
 
 /// Result of a WordPress import
 pub struct WpImportResult {
@@ -18,7 +16,7 @@ pub struct WpImportResult {
 }
 
 /// Parse and import a WordPress WXR XML export file
-pub fn import_wxr(pool: &DbPool, xml_content: &str) -> Result<WpImportResult, String> {
+pub fn import_wxr(store: &dyn Store, xml_content: &str) -> Result<WpImportResult, String> {
     let mut reader = Reader::from_str(xml_content);
     reader.config_mut().trim_text(true);
 
@@ -162,7 +160,7 @@ pub fn import_wxr(pool: &DbPool, xml_content: &str) -> Result<WpImportResult, St
                     match item_post_type.as_str() {
                         "post" => {
                             match import_post(
-                                pool,
+                                store,
                                 &item_title,
                                 &item_slug,
                                 &item_content,
@@ -212,8 +210,7 @@ pub fn import_wxr(pool: &DbPool, xml_content: &str) -> Result<WpImportResult, St
 
     // Record import in history
     let log_json = serde_json::to_string(&result.log).unwrap_or_default();
-    let _ = Import::create(
-        pool,
+    let _ = store.import_create(
         "wordpress",
         None,
         result.posts_imported,
@@ -227,7 +224,7 @@ pub fn import_wxr(pool: &DbPool, xml_content: &str) -> Result<WpImportResult, St
 }
 
 fn import_post(
-    pool: &DbPool,
+    store: &dyn Store,
     title: &str,
     slug: &str,
     content: &str,
@@ -243,7 +240,7 @@ fn import_post(
     }
 
     // Check for duplicate
-    if Post::find_by_slug(pool, slug).is_some() {
+    if store.post_find_by_slug(slug).is_some() {
         return Err("Duplicate slug".to_string());
     }
 
@@ -278,29 +275,26 @@ fn import_post(
         tag_ids: None,
     };
 
-    let post_id = Post::create(pool, &form)?;
+    let post_id = store.post_create(&form)?;
 
     // Import categories
     for cat_name in categories {
         let cat_slug = slug::slugify(cat_name);
-        let cat_id = match Category::find_by_slug(pool, &cat_slug) {
+        let cat_id = match store.category_find_by_slug(&cat_slug) {
             Some(c) => c.id,
-            None => Category::create(
-                pool,
-                &CategoryForm {
-                    name: cat_name.clone(),
-                    slug: cat_slug,
-                    r#type: "post".to_string(),
-                },
-            )?,
+            None => store.category_create(&CategoryForm {
+                name: cat_name.clone(),
+                slug: cat_slug,
+                r#type: "post".to_string(),
+            })?,
         };
-        Category::set_for_content(pool, post_id, "post", &[cat_id])?;
+        store.category_set_for_content(post_id, "post", &[cat_id])?;
     }
 
     // Import tags
     for tag_name in tags {
-        let tag_id = Tag::find_or_create(pool, tag_name)?;
-        Tag::set_for_content(pool, post_id, "post", &[tag_id])?;
+        let tag_id = store.tag_find_or_create(tag_name)?;
+        store.tag_set_for_content(post_id, "post", &[tag_id])?;
     }
 
     // Import comments
@@ -318,8 +312,8 @@ fn import_post(
             honeypot: None,
             parent_id: None,
         };
-        if let Ok(cid) = Comment::create(pool, &comment_form) {
-            let _ = Comment::update_status(pool, cid, status);
+        if let Ok(cid) = store.comment_create(&comment_form) {
+            let _ = store.comment_update_status(cid, status);
         }
     }
 

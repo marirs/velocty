@@ -1,13 +1,12 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::order::{DownloadToken, Order};
-use crate::models::portfolio::PortfolioItem;
-use crate::models::settings::Setting;
-use std::collections::HashMap;
+use crate::store::Store;
 
 use super::{create_pending_order, finalize_order, site_url};
 
@@ -20,8 +19,12 @@ pub struct MollieCreateRequest {
 }
 
 #[post("/api/checkout/mollie/create", format = "json", data = "<body>")]
-pub fn mollie_create_payment(pool: &State<DbPool>, body: Json<MollieCreateRequest>) -> Json<Value> {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn mollie_create_payment(
+    store: &State<Arc<dyn Store>>,
+    body: Json<MollieCreateRequest>,
+) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     if settings.get("commerce_mollie_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "Mollie is not enabled" }));
     }
@@ -31,7 +34,7 @@ pub fn mollie_create_payment(pool: &State<DbPool>, body: Json<MollieCreateReques
     }
 
     let (order_id, price, cur) = match create_pending_order(
-        pool,
+        s,
         body.portfolio_id,
         "mollie",
         body.buyer_email.as_deref().unwrap_or(""),
@@ -39,7 +42,7 @@ pub fn mollie_create_payment(pool: &State<DbPool>, body: Json<MollieCreateReques
         Ok(v) => v,
         Err(e) => return Json(json!({ "ok": false, "error": e })),
     };
-    let item = match PortfolioItem::find_by_id(pool, body.portfolio_id) {
+    let item = match s.portfolio_find_by_id(body.portfolio_id) {
         Some(i) => i,
         None => return Json(json!({ "ok": false, "error": "Item not found" })),
     };
@@ -68,7 +71,7 @@ pub fn mollie_create_payment(pool: &State<DbPool>, body: Json<MollieCreateReques
                 .and_then(|h| h.as_str());
             let mollie_id = body.get("id").and_then(|v| v.as_str()).unwrap_or("");
             if let Some(url) = checkout_url {
-                let _ = Order::update_provider_order_id(pool, order_id, mollie_id);
+                let _ = s.order_update_provider_order_id(order_id, mollie_id);
                 Json(json!({ "ok": true, "order_id": order_id, "checkout_url": url }))
             } else {
                 let err = body
@@ -89,10 +92,11 @@ pub fn mollie_create_payment(pool: &State<DbPool>, body: Json<MollieCreateReques
     format = "application/x-www-form-urlencoded",
     data = "<body>"
 )]
-pub fn mollie_webhook(pool: &State<DbPool>, body: String) -> &'static str {
+pub fn mollie_webhook(store: &State<Arc<dyn Store>>, body: String) -> &'static str {
+    let s: &dyn Store = &**store.inner();
     // Body is: id=tr_xxxxx
     let payment_id = body.strip_prefix("id=").unwrap_or(&body);
-    let settings: HashMap<String, String> = Setting::all(pool);
+    let settings: HashMap<String, String> = s.setting_all();
     let api_key = settings.get("mollie_api_key").cloned().unwrap_or_default();
 
     // Fetch payment details from Mollie
@@ -117,7 +121,7 @@ pub fn mollie_webhook(pool: &State<DbPool>, body: String) -> &'static str {
                         .and_then(|d| d.get("consumerName"))
                         .and_then(|n| n.as_str())
                         .unwrap_or("");
-                    let _ = finalize_order(pool, oid, payment_id, email, "");
+                    let _ = finalize_order(s, oid, payment_id, email, "");
                 }
             }
         }
@@ -128,13 +132,14 @@ pub fn mollie_webhook(pool: &State<DbPool>, body: String) -> &'static str {
 // ── Mollie: Return redirect ─────────────────────────────
 
 #[get("/api/mollie/return?<order_id>")]
-pub fn mollie_return(pool: &State<DbPool>, order_id: i64) -> rocket::response::Redirect {
-    let settings: HashMap<String, String> = Setting::all(pool);
+pub fn mollie_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::response::Redirect {
+    let s: &dyn Store = &**store.inner();
+    let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
     // Check if order was completed by webhook
-    if let Some(order) = Order::find_by_id(pool, order_id) {
+    if let Some(order) = s.order_find_by_id(order_id) {
         if order.status == "completed" {
-            if let Some(dl) = DownloadToken::find_by_order(pool, order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order_id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }

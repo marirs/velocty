@@ -55,6 +55,112 @@ All responses include:
 
 ---
 
+## Database Abstraction (Store Trait)
+
+All database operations go through a backend-agnostic `Store` trait, enabling seamless switching between SQLite and MongoDB.
+
+### Architecture
+
+```
+velocty.toml → backend = "sqlite" | "mongodb"
+                    ↓
+              create_store()
+              ╱            ╲
+     SqliteStore          MongoStore
+     (wraps DbPool)       (wraps mongodb::Database)
+              ╲            ╱
+          Arc<dyn Store>  ← managed by Rocket
+                ↓
+    All routes, fairings, auth guards,
+    background tasks, setup wizard
+```
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `src/store/mod.rs` | `Store` trait definition (~100 methods) + default implementations + unit tests |
+| `src/store/sqlite.rs` | `SqliteStore` — wraps `DbPool` (r2d2), delegates to model methods. Also provides `impl Store for DbPool` bridge |
+| `src/store/mongo.rs` | `MongoStore` — fully implemented (~3000 lines), uses mongodb v2 crate with sync API |
+| `src/db.rs` | SQLite pool initialization, migrations, `seed_defaults()`, shared `default_settings()` |
+
+### Store Trait Methods
+
+The `Store` trait covers all database operations:
+
+| Category | Methods |
+|---|---|
+| **Lifecycle** | `run_migrations`, `seed_defaults`, `db_backend` |
+| **Settings** | `setting_get`, `setting_set`, `setting_set_many`, `setting_get_group`, `setting_all`, `setting_get_or`, `setting_get_i64` |
+| **Users** | `user_create`, `user_get_by_id`, `user_get_by_email`, `user_list`, `user_count`, `user_update_*`, `user_delete` |
+| **Sessions** | `session_create_full`, `session_get_user`, `session_validate`, `session_delete`, `session_cleanup_expired` |
+| **Posts** | Full CRUD + listing, filtering, counting, slug lookup |
+| **Portfolio** | Full CRUD + listing, filtering, counting, slug lookup, likes |
+| **Categories** | CRUD + type filtering, nav-visible listing, content associations |
+| **Tags** | CRUD + content associations, unused cleanup |
+| **Comments** | CRUD + moderation (approve/spam/delete), threaded replies |
+| **Designs** | CRUD + activation, slug lookup, templates |
+| **Analytics** | Record page views, query stats, cleanup |
+| **Audit** | Log actions, list entries |
+| **Firewall** | Bans CRUD, events logging, IP lookup, stats |
+| **Commerce** | Orders, download tokens, licenses — full CRUD |
+| **Passkeys** | WebAuthn credential storage, registration state |
+| **Imports** | Import history tracking |
+| **Search** | Full-text search indexing |
+| **Raw SQL** | `raw_execute`, `raw_query_i64` (SQLite-only, returns error on MongoDB) |
+| **Background Tasks** | Session cleanup, analytics pruning, orphan detection |
+
+### MongoStore Implementation Details
+
+- **Auto-increment IDs** via `_counters` collection with `next_id()` — maintains SQLite-compatible integer IDs
+- **Junction tables** as separate collections: `content_categories`, `content_tags`
+- **Aggregation pipelines** for revenue totals, top IPs, event counts
+- **Date parsing** handles RFC3339 and common datetime formats
+- **Duration parsing** for firewall ban durations (e.g. "24h", "7d", "30m")
+- **Indexes** created in `run_migrations()` for all collections
+- **Seed defaults** at full parity with SQLite (settings, designs with shell HTML/CSS, legal content backfill, design sync)
+
+### How Routes Use the Store
+
+All route handlers, fairings, and auth guards receive `&State<Arc<dyn Store>>`:
+
+```rust
+#[get("/dashboard")]
+fn dashboard(store: &State<Arc<dyn Store>>, _admin: EditorUser) -> Template {
+    let s: &dyn Store = &**store;
+    let posts = s.post_list_all();
+    // ...
+}
+```
+
+Auth guards resolve sessions via the Store:
+
+```rust
+async fn resolve_session_user(request: &Request<'_>) -> Option<User> {
+    let store = request.guard::<&State<Arc<dyn Store>>>().await.succeeded()?;
+    let session_id = cookies.get_private("velocty_session")?.value().to_string();
+    store.session_get_user(&session_id)
+}
+```
+
+### Where DbPool Still Exists
+
+`DbPool` is intentionally retained in the SQLite implementation layer:
+
+| Location | Purpose |
+|---|---|
+| `src/models/*.rs` | SQLite model methods (called by `SqliteStore`) |
+| `src/store/sqlite.rs` | `SqliteStore` wraps `DbPool` |
+| `src/db.rs` | Pool initialization + migrations |
+| `src/health.rs` | SQLite PRAGMA queries (guarded by `Option<&DbPool>`) |
+| `src/site.rs` | Legacy `SitePoolManager` for SQLite health tools |
+| `src/main.rs` | Conditional `DbPool` creation only when `backend != "mongodb"` |
+| `src/tests.rs` | Test harness (SQLite in-memory) |
+
+**Zero** `State<DbPool>` references exist in any route handler or fairing.
+
+---
+
 ## First-Run Setup Wizard
 
 On first launch (when `setup_completed` is not set), the admin panel redirects to a 4-step setup wizard at `/<admin_slug>/setup`.
@@ -185,13 +291,13 @@ In multi-site mode, the Super Admin health page (`/super/health`) includes a **M
 | `POST /super/health/tool/<site_id>/unused-tags` | Clean unused tags for the selected site |
 | `POST /super/health/tool/<site_id>/export-content` | Export content JSON for the selected site |
 
-The tool routes resolve the site ID → slug via the registry, then use `SitePoolManager` to get the site's `DbPool`. Orphan scan/delete use the per-site uploads path (`website/sites/<uuid>/uploads`).
+The tool routes resolve the site ID → slug via the registry, then use `SiteStoreManager` to get the site's `Arc<dyn Store>` (or `SitePoolManager` for SQLite-specific health tools). Orphan scan/delete use the per-site uploads path (`website/sites/<uuid>/uploads`).
 
 Per-site admin tools (`/<admin_slug>/health`) work identically in both single-site and multi-site modes — they always operate on the current site's database.
 
 ### Implementation
 
-- **Backend**: `src/health.rs` — `gather()` reads `velocty.toml` for backend, branches to `gather_db_sqlite()` or `gather_db_mongo()`
+- **Backend**: `src/health.rs` — `gather()` takes `Option<&DbPool>` + `&dyn Store`, branches to `gather_db_sqlite()` or `gather_db_mongo()`
 - **Routes**: `src/routes/admin/health.rs` — `GET /health` + `POST /health/<tool>` endpoints (single-site)
 - **Routes**: `src/routes/super_admin/health.rs` — `POST /health/tool/<site_id>/<tool>` endpoints (multi-site)
 - **Template**: `website/templates/admin/health.html.tera` — Tera conditionals on `report.database.backend`
@@ -896,8 +1002,12 @@ velocty/
 │   ├── README-CMS.md
 │   └── firewall-spec.md
 ├── src/
-│   ├── main.rs                      # Rocket launch, DB init, route mounting
-│   ├── db.rs                        # SQLite connection pool, migrations
+│   ├── main.rs                      # Rocket launch, Store init, route mounting
+│   ├── db.rs                        # SQLite connection pool, migrations, shared default_settings()
+│   ├── store/                       # Backend-agnostic database abstraction
+│   │   ├── mod.rs                   # Store trait (~100 methods) + unit tests
+│   │   ├── sqlite.rs                # SqliteStore impl (wraps DbPool) + DbPool bridge
+│   │   └── mongo.rs                 # MongoStore impl (fully implemented, ~3000 lines)
 │   ├── health.rs                    # Health dashboard data gathering + tools
 │   ├── render.rs                    # Design + content merge, placeholder replacement
 │   ├── rss.rs                       # RSS feed generation
@@ -907,7 +1017,7 @@ velocty/
 │   │   ├── auth.rs                  # Login, sessions, guards (AdminUser, EditorUser, AuthorUser)
 │   │   ├── mfa.rs                   # TOTP MFA helpers
 │   │   └── password_reset.rs        # Password reset tokens + email
-│   ├── models/
+│   ├── models/                      # SQLite model implementations (used by SqliteStore)
 │   │   ├── mod.rs
 │   │   ├── post.rs                  # Post struct, CRUD
 │   │   ├── portfolio.rs             # Portfolio struct, CRUD
@@ -915,7 +1025,7 @@ velocty/
 │   │   ├── tag.rs                   # Tag struct, CRUD
 │   │   ├── comment.rs               # Comment struct, CRUD
 │   │   ├── design.rs                # Design struct, CRUD
-│   │   ├── settings.rs              # Settings get/set helpers
+│   │   ├── settings.rs              # Settings get/set helpers + SettingsCache
 │   │   ├── import.rs                # Import history
 │   │   ├── analytics.rs             # Page views, stats queries
 │   │   ├── audit.rs                 # Audit log entries

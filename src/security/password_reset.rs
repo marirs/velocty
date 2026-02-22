@@ -1,58 +1,21 @@
-use chrono::{Duration, Utc};
-use rusqlite::params;
-
-use crate::db::DbPool;
-use crate::models::settings::Setting;
+use crate::store::Store;
 
 /// Create a password reset token for the given email. Stores in magic_links table with purpose.
-pub fn create_token(pool: &DbPool, email: &str) -> Result<String, String> {
-    let conn = pool.get().map_err(|e| e.to_string())?;
-
+pub fn create_token(store: &dyn Store, email: &str) -> Result<String, String> {
     let token = uuid::Uuid::new_v4().to_string();
-    let now = Utc::now().naive_utc();
-    let expires = now + Duration::minutes(30);
-
-    conn.execute(
-        "INSERT INTO magic_links (token, email, created_at, expires_at, used)
-         VALUES (?1, ?2, ?3, ?4, 0)",
-        params![token, email, now, expires],
-    )
-    .map_err(|e| format!("Failed to create reset token: {}", e))?;
-
+    store.magic_link_create(&token, email, 30)?;
     Ok(token)
 }
 
 /// Verify a password reset token. Returns the associated email if valid.
 /// Marks the token as used so it cannot be reused.
-pub fn verify_token(pool: &DbPool, token: &str) -> Result<String, String> {
-    let conn = pool.get().map_err(|e| e.to_string())?;
-    let now = Utc::now().naive_utc();
-
-    let result: Result<(String, bool), _> = conn.query_row(
-        "SELECT email, used FROM magic_links WHERE token = ?1 AND expires_at > ?2",
-        params![token, now],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    );
-
-    match result {
-        Ok((email, used)) => {
-            if used {
-                return Err("This reset link has already been used".into());
-            }
-            conn.execute(
-                "UPDATE magic_links SET used = 1 WHERE token = ?1",
-                params![token],
-            )
-            .map_err(|e| format!("Failed to mark token as used: {}", e))?;
-            Ok(email)
-        }
-        Err(_) => Err("Invalid or expired reset link".into()),
-    }
+pub fn verify_token(store: &dyn Store, token: &str) -> Result<String, String> {
+    store.magic_link_verify(token)
 }
 
 /// Send a password reset email.
-pub fn send_reset_email(pool: &DbPool, email: &str, token: &str) -> Result<(), String> {
-    let settings = Setting::all(pool);
+pub fn send_reset_email(store: &dyn Store, email: &str, token: &str) -> Result<(), String> {
+    let settings = store.setting_all();
     let site_url = settings
         .get("site_url")
         .cloned()
@@ -93,11 +56,11 @@ pub fn send_reset_email(pool: &DbPool, email: &str, token: &str) -> Result<(), S
 
 /// Send an admin-initiated password reset email with a temporary password.
 pub fn send_admin_reset_email(
-    pool: &DbPool,
+    store: &dyn Store,
     email: &str,
     temp_password: &str,
 ) -> Result<(), String> {
-    let settings = Setting::all(pool);
+    let settings = store.setting_all();
     let site_url = settings
         .get("site_url")
         .cloned()

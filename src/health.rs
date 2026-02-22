@@ -4,6 +4,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use crate::db::DbPool;
+use crate::store::Store;
 
 /// Boot instant — set once at startup via `init_uptime()`
 static mut BOOT_INSTANT: Option<Instant> = None;
@@ -144,8 +145,8 @@ fn read_mongo_uri() -> String {
         .unwrap_or_else(|| "mongodb://localhost:27017".to_string())
 }
 
-pub fn gather(pool: &DbPool) -> HealthReport {
-    let backend = read_db_backend();
+pub fn gather(pool: Option<&DbPool>, store: &dyn Store) -> HealthReport {
+    let backend = store.db_backend().to_string();
     let running_as_root = is_running_as_root();
     let process_user = get_process_user();
     HealthReport {
@@ -153,7 +154,7 @@ pub fn gather(pool: &DbPool) -> HealthReport {
         database: gather_db(pool, &backend),
         resources: gather_resources(),
         filesystem: gather_filesystem(&backend),
-        content: gather_content(pool),
+        content: gather_content_from_store(store),
         running_as_root,
         process_user,
     }
@@ -185,11 +186,14 @@ fn gather_disk(backend: &str) -> DiskInfo {
     }
 }
 
-fn gather_db(pool: &DbPool, backend: &str) -> DbInfo {
+fn gather_db(pool: Option<&DbPool>, backend: &str) -> DbInfo {
     if backend == "mongodb" {
         return gather_db_mongo();
     }
-    gather_db_sqlite(pool)
+    match pool {
+        Some(p) => gather_db_sqlite(p),
+        None => gather_db_mongo(), // fallback if no pool available
+    }
 }
 
 fn gather_db_sqlite(pool: &DbPool) -> DbInfo {
@@ -231,18 +235,16 @@ fn gather_db_sqlite(pool: &DbPool) -> DbInfo {
 
     let tables = [
         "posts",
-        "portfolio_items",
+        "portfolio",
         "comments",
         "categories",
         "tags",
         "settings",
         "sessions",
         "imports",
-        "analytics_events",
-        "post_tags",
-        "portfolio_tags",
-        "post_categories",
-        "portfolio_categories",
+        "page_views",
+        "content_tags",
+        "content_categories",
     ];
     let mut table_counts = HashMap::new();
     if let Some(ref c) = conn {
@@ -591,38 +593,19 @@ fn get_process_user() -> String {
     }
 }
 
-fn gather_content(pool: &DbPool) -> ContentStats {
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(_) => {
-            return ContentStats {
-                posts_total: 0,
-                posts_published: 0,
-                posts_draft: 0,
-                portfolio_total: 0,
-                comments_total: 0,
-                comments_pending: 0,
-                categories_count: 0,
-                tags_count: 0,
-                sessions_total: 0,
-                sessions_expired: 0,
-            }
-        }
-    };
-
-    let count = |sql: &str| -> u64 { conn.query_row(sql, [], |r| r.get(0)).unwrap_or(0) };
-
+fn gather_content_from_store(store: &dyn Store) -> ContentStats {
+    let (pt, pp, pd, pf, ct, cp, cc, tc, st, se) = store.health_content_stats();
     ContentStats {
-        posts_total: count("SELECT COUNT(*) FROM posts"),
-        posts_published: count("SELECT COUNT(*) FROM posts WHERE status = 'published'"),
-        posts_draft: count("SELECT COUNT(*) FROM posts WHERE status = 'draft'"),
-        portfolio_total: count("SELECT COUNT(*) FROM portfolio_items"),
-        comments_total: count("SELECT COUNT(*) FROM comments"),
-        comments_pending: count("SELECT COUNT(*) FROM comments WHERE status = 'pending'"),
-        categories_count: count("SELECT COUNT(*) FROM categories"),
-        tags_count: count("SELECT COUNT(*) FROM tags"),
-        sessions_total: count("SELECT COUNT(*) FROM sessions"),
-        sessions_expired: count("SELECT COUNT(*) FROM sessions WHERE expires_at < datetime('now')"),
+        posts_total: pt,
+        posts_published: pp,
+        posts_draft: pd,
+        portfolio_total: pf,
+        comments_total: ct,
+        comments_pending: cp,
+        categories_count: cc,
+        tags_count: tc,
+        sessions_total: st,
+        sessions_expired: se,
     }
 }
 
@@ -736,42 +719,22 @@ pub fn run_integrity_check(pool: &DbPool) -> ToolResult {
     }
 }
 
-pub fn run_session_cleanup(pool: &DbPool) -> ToolResult {
-    match pool.get() {
-        Ok(conn) => {
-            let expired: u64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM sessions WHERE expires_at < datetime('now')",
-                    [],
-                    |r| r.get(0),
-                )
-                .unwrap_or(0);
-
-            match conn.execute(
-                "DELETE FROM sessions WHERE expires_at < datetime('now')",
-                [],
-            ) {
-                Ok(_) => ToolResult {
-                    ok: true,
-                    message: format!("Cleaned up {} expired session(s).", expired),
-                    details: None,
-                },
-                Err(e) => ToolResult {
-                    ok: false,
-                    message: format!("Failed: {}", e),
-                    details: None,
-                },
-            }
-        }
+pub fn run_session_cleanup(store: &dyn Store) -> ToolResult {
+    match store.health_session_cleanup() {
+        Ok(expired) => ToolResult {
+            ok: true,
+            message: format!("Cleaned up {} expired session(s).", expired),
+            details: None,
+        },
         Err(e) => ToolResult {
             ok: false,
-            message: format!("Cannot get connection: {}", e),
+            message: format!("Failed: {}", e),
             details: None,
         },
     }
 }
 
-pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
+pub fn run_orphan_scan(store: &dyn Store, uploads_dir: &str) -> ToolResult {
     let dir = Path::new(uploads_dir);
     if !dir.exists() {
         return ToolResult {
@@ -781,73 +744,7 @@ pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
         };
     }
 
-    // Collect all referenced filenames from DB
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(e) => {
-            return ToolResult {
-                ok: false,
-                message: format!("Cannot get connection: {}", e),
-                details: None,
-            }
-        }
-    };
-
-    let mut referenced: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-    // Post featured images
-    if let Ok(mut stmt) = conn.prepare("SELECT featured_image FROM posts WHERE featured_image IS NOT NULL AND featured_image != ''") {
-        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
-            for row in rows.flatten() {
-                if let Some(name) = row.split('/').next_back() {
-                    referenced.insert(name.to_string());
-                }
-            }
-        }
-    }
-
-    // Portfolio images
-    if let Ok(mut stmt) = conn.prepare(
-        "SELECT image_path FROM portfolio_items WHERE image_path IS NOT NULL AND image_path != ''",
-    ) {
-        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
-            for row in rows.flatten() {
-                if let Some(name) = row.split('/').next_back() {
-                    referenced.insert(name.to_string());
-                }
-            }
-        }
-    }
-
-    // Images referenced in post/portfolio body content
-    if let Ok(mut stmt) = conn.prepare("SELECT body FROM posts WHERE body IS NOT NULL") {
-        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
-            for body in rows.flatten() {
-                extract_upload_refs(&body, &mut referenced);
-            }
-        }
-    }
-    if let Ok(mut stmt) =
-        conn.prepare("SELECT description FROM portfolio_items WHERE description IS NOT NULL")
-    {
-        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
-            for body in rows.flatten() {
-                extract_upload_refs(&body, &mut referenced);
-            }
-        }
-    }
-
-    // Settings (logo, favicon, etc.)
-    if let Ok(mut stmt) = conn.prepare("SELECT value FROM settings WHERE value LIKE '%/uploads/%'")
-    {
-        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
-            for val in rows.flatten() {
-                if let Some(name) = val.split('/').next_back() {
-                    referenced.insert(name.to_string());
-                }
-            }
-        }
-    }
+    let referenced = store.health_referenced_files();
 
     // Walk uploads and find orphans (skip thumbnail dirs)
     let mut orphans: Vec<String> = Vec::new();
@@ -893,9 +790,9 @@ pub fn run_orphan_scan(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     }
 }
 
-pub fn run_orphan_delete(pool: &DbPool, uploads_dir: &str) -> ToolResult {
+pub fn run_orphan_delete(store: &dyn Store, uploads_dir: &str) -> ToolResult {
     // Re-scan to get current orphans, then delete
-    let scan = run_orphan_scan(pool, uploads_dir);
+    let scan = run_orphan_scan(store, uploads_dir);
     if let Some(ref details) = scan.details {
         let uploads_dir = Path::new(uploads_dir);
         let mut deleted = 0u64;
@@ -927,50 +824,27 @@ pub fn run_orphan_delete(pool: &DbPool, uploads_dir: &str) -> ToolResult {
     }
 }
 
-pub fn run_unused_tags_cleanup(pool: &DbPool) -> ToolResult {
-    match pool.get() {
-        Ok(conn) => {
-            let count: u64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM tags WHERE id NOT IN (SELECT tag_id FROM post_tags) AND id NOT IN (SELECT tag_id FROM portfolio_tags)",
-                    [],
-                    |r| r.get(0),
-                )
-                .unwrap_or(0);
-
-            if count == 0 {
-                return ToolResult {
-                    ok: true,
-                    message: "No unused tags found.".to_string(),
-                    details: None,
-                };
-            }
-
-            match conn.execute(
-                "DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM post_tags) AND id NOT IN (SELECT tag_id FROM portfolio_tags)",
-                [],
-            ) {
-                Ok(_) => ToolResult {
-                    ok: true,
-                    message: format!("Deleted {} unused tag(s).", count),
-                    details: None,
-                },
-                Err(e) => ToolResult {
-                    ok: false,
-                    message: format!("Failed: {}", e),
-                    details: None,
-                },
-            }
-        }
+pub fn run_unused_tags_cleanup(store: &dyn Store) -> ToolResult {
+    match store.health_unused_tags_cleanup() {
+        Ok(0) => ToolResult {
+            ok: true,
+            message: "No unused tags found.".to_string(),
+            details: None,
+        },
+        Ok(count) => ToolResult {
+            ok: true,
+            message: format!("Deleted {} unused tag(s).", count),
+            details: None,
+        },
         Err(e) => ToolResult {
             ok: false,
-            message: format!("Cannot get connection: {}", e),
+            message: format!("Failed: {}", e),
             details: None,
         },
     }
 }
 
-pub fn run_analytics_prune(pool: &DbPool, days: u64) -> ToolResult {
+pub fn run_analytics_prune(store: &dyn Store, days: u64) -> ToolResult {
     if days == 0 {
         return ToolResult {
             ok: false,
@@ -979,44 +853,18 @@ pub fn run_analytics_prune(pool: &DbPool, days: u64) -> ToolResult {
         };
     }
 
-    match pool.get() {
-        Ok(conn) => {
-            let count: u64 = conn
-                .query_row(
-                    &format!(
-                        "SELECT COUNT(*) FROM analytics_events WHERE created_at < datetime('now', '-{} days')",
-                        days
-                    ),
-                    [],
-                    |r| r.get(0),
-                )
-                .unwrap_or(0);
-
-            match conn.execute(
-                &format!(
-                    "DELETE FROM analytics_events WHERE created_at < datetime('now', '-{} days')",
-                    days
-                ),
-                [],
-            ) {
-                Ok(_) => ToolResult {
-                    ok: true,
-                    message: format!(
-                        "Pruned {} analytics event(s) older than {} days.",
-                        count, days
-                    ),
-                    details: None,
-                },
-                Err(e) => ToolResult {
-                    ok: false,
-                    message: format!("Failed: {}", e),
-                    details: None,
-                },
-            }
-        }
+    match store.health_analytics_prune(days) {
+        Ok(count) => ToolResult {
+            ok: true,
+            message: format!(
+                "Pruned {} analytics event(s) older than {} days.",
+                count, days
+            ),
+            details: None,
+        },
         Err(e) => ToolResult {
             ok: false,
-            message: format!("Cannot get connection: {}", e),
+            message: format!("Failed: {}", e),
             details: None,
         },
     }
@@ -1048,196 +896,29 @@ pub fn export_database() -> ToolResult {
     }
 }
 
-pub fn export_content(pool: &DbPool) -> ToolResult {
-    let conn = match pool.get() {
-        Ok(c) => c,
-        Err(e) => {
-            return ToolResult {
-                ok: false,
-                message: format!("Cannot get connection: {}", e),
-                details: None,
+pub fn export_content(store: &dyn Store) -> ToolResult {
+    match store.health_export_content() {
+        Ok(json_data) => {
+            let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+            let export_name = format!("velocty_export_{}.json", timestamp);
+            let export_path = format!("website/site/db/{}", export_name);
+
+            match std::fs::write(
+                &export_path,
+                serde_json::to_string_pretty(&json_data).unwrap_or_default(),
+            ) {
+                Ok(_) => ToolResult {
+                    ok: true,
+                    message: format!("Content exported as {}", export_name),
+                    details: Some(export_path),
+                },
+                Err(e) => ToolResult {
+                    ok: false,
+                    message: format!("Export failed: {}", e),
+                    details: None,
+                },
             }
         }
-    };
-
-    let mut export = serde_json::Map::new();
-
-    // Export posts
-    if let Ok(mut stmt) = conn.prepare("SELECT id, title, slug, body, excerpt, featured_image, status, created_at, updated_at FROM posts ORDER BY id") {
-        let posts: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "id": r.get::<_, i64>(0)?,
-                    "title": r.get::<_, String>(1).unwrap_or_default(),
-                    "slug": r.get::<_, String>(2).unwrap_or_default(),
-                    "body": r.get::<_, String>(3).unwrap_or_default(),
-                    "excerpt": r.get::<_, String>(4).unwrap_or_default(),
-                    "featured_image": r.get::<_, String>(5).unwrap_or_default(),
-                    "status": r.get::<_, String>(6).unwrap_or_default(),
-                    "created_at": r.get::<_, String>(7).unwrap_or_default(),
-                    "updated_at": r.get::<_, String>(8).unwrap_or_default(),
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("posts".to_string(), serde_json::Value::Array(posts));
-    }
-
-    // Export portfolio items
-    if let Ok(mut stmt) = conn.prepare("SELECT id, title, slug, description, image_path, status, created_at, updated_at FROM portfolio_items ORDER BY id") {
-        let items: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "id": r.get::<_, i64>(0)?,
-                    "title": r.get::<_, String>(1).unwrap_or_default(),
-                    "slug": r.get::<_, String>(2).unwrap_or_default(),
-                    "description": r.get::<_, String>(3).unwrap_or_default(),
-                    "image_path": r.get::<_, String>(4).unwrap_or_default(),
-                    "status": r.get::<_, String>(5).unwrap_or_default(),
-                    "created_at": r.get::<_, String>(6).unwrap_or_default(),
-                    "updated_at": r.get::<_, String>(7).unwrap_or_default(),
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("portfolio_items".to_string(), serde_json::Value::Array(items));
-    }
-
-    // Export categories
-    if let Ok(mut stmt) = conn.prepare("SELECT id, name, slug FROM categories ORDER BY id") {
-        let cats: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "id": r.get::<_, i64>(0)?,
-                    "name": r.get::<_, String>(1).unwrap_or_default(),
-                    "slug": r.get::<_, String>(2).unwrap_or_default(),
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("categories".to_string(), serde_json::Value::Array(cats));
-    }
-
-    // Export tags
-    if let Ok(mut stmt) = conn.prepare("SELECT id, name, slug FROM tags ORDER BY id") {
-        let tags: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "id": r.get::<_, i64>(0)?,
-                    "name": r.get::<_, String>(1).unwrap_or_default(),
-                    "slug": r.get::<_, String>(2).unwrap_or_default(),
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("tags".to_string(), serde_json::Value::Array(tags));
-    }
-
-    // Export comments
-    if let Ok(mut stmt) = conn.prepare("SELECT id, post_id, author_name, author_email, body, status, created_at FROM comments ORDER BY id") {
-        let comments: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "id": r.get::<_, i64>(0)?,
-                    "post_id": r.get::<_, i64>(1)?,
-                    "author_name": r.get::<_, String>(2).unwrap_or_default(),
-                    "author_email": r.get::<_, String>(3).unwrap_or_default(),
-                    "body": r.get::<_, String>(4).unwrap_or_default(),
-                    "status": r.get::<_, String>(5).unwrap_or_default(),
-                    "created_at": r.get::<_, String>(6).unwrap_or_default(),
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("comments".to_string(), serde_json::Value::Array(comments));
-    }
-
-    // Export post-tag and post-category relationships
-    if let Ok(mut stmt) = conn.prepare("SELECT post_id, tag_id FROM post_tags") {
-        let rels: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "post_id": r.get::<_, i64>(0)?,
-                    "tag_id": r.get::<_, i64>(1)?,
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("post_tags".to_string(), serde_json::Value::Array(rels));
-    }
-    if let Ok(mut stmt) = conn.prepare("SELECT post_id, category_id FROM post_categories") {
-        let rels: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "post_id": r.get::<_, i64>(0)?,
-                    "category_id": r.get::<_, i64>(1)?,
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert(
-            "post_categories".to_string(),
-            serde_json::Value::Array(rels),
-        );
-    }
-    if let Ok(mut stmt) = conn.prepare("SELECT portfolio_item_id, tag_id FROM portfolio_tags") {
-        let rels: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "portfolio_item_id": r.get::<_, i64>(0)?,
-                    "tag_id": r.get::<_, i64>(1)?,
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("portfolio_tags".to_string(), serde_json::Value::Array(rels));
-    }
-    if let Ok(mut stmt) =
-        conn.prepare("SELECT portfolio_item_id, category_id FROM portfolio_categories")
-    {
-        let rels: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "portfolio_item_id": r.get::<_, i64>(0)?,
-                    "category_id": r.get::<_, i64>(1)?,
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert(
-            "portfolio_categories".to_string(),
-            serde_json::Value::Array(rels),
-        );
-    }
-
-    // Export settings
-    if let Ok(mut stmt) = conn.prepare("SELECT key, value FROM settings ORDER BY key") {
-        let settings: Vec<serde_json::Value> = stmt
-            .query_map([], |r| {
-                Ok(serde_json::json!({
-                    "key": r.get::<_, String>(0)?,
-                    "value": r.get::<_, String>(1).unwrap_or_default(),
-                }))
-            })
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-        export.insert("settings".to_string(), serde_json::Value::Array(settings));
-    }
-
-    let json_data = serde_json::Value::Object(export);
-    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-    let export_name = format!("velocty_export_{}.json", timestamp);
-    let export_path = format!("website/site/db/{}", export_name);
-
-    match std::fs::write(
-        &export_path,
-        serde_json::to_string_pretty(&json_data).unwrap_or_default(),
-    ) {
-        Ok(_) => ToolResult {
-            ok: true,
-            message: format!("Content exported as {}", export_name),
-            details: Some(export_path),
-        },
         Err(e) => ToolResult {
             ok: false,
             message: format!("Export failed: {}", e),
@@ -1388,7 +1069,7 @@ pub fn human_bytes(bytes: u64) -> String {
     }
 }
 
-fn extract_upload_refs(html: &str, refs: &mut std::collections::HashSet<String>) {
+pub fn extract_upload_refs(html: &str, refs: &mut std::collections::HashSet<String>) {
     // Simple extraction of filenames from /uploads/... references in HTML
     let mut search_from = 0;
     while let Some(pos) = html[search_from..].find("/uploads/") {

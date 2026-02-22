@@ -2,8 +2,7 @@ use rocket::fairing::{Fairing, Info, Kind};
 use rocket::{Data, Request};
 use sha2::{Digest, Sha256};
 
-use crate::db::DbPool;
-use crate::models::analytics::PageView;
+use crate::store::Store;
 use crate::AdminSlug;
 
 /// Middleware that logs page views for every public request.
@@ -37,8 +36,8 @@ impl Fairing for AnalyticsFairing {
             return;
         }
 
-        let pool = match request.rocket().state::<DbPool>() {
-            Some(p) => p,
+        let store = match request.rocket().state::<std::sync::Arc<dyn Store>>() {
+            Some(s) => s,
             None => return,
         };
 
@@ -59,8 +58,7 @@ impl Fairing for AnalyticsFairing {
         let country: Option<&str> = None;
         let city: Option<&str> = None;
 
-        let _ = PageView::record(
-            pool,
+        let _ = store.analytics_record(
             &path,
             &ip_hash,
             country,

@@ -1,67 +1,138 @@
+use std::sync::Arc;
+
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::db::DbPool;
-use crate::models::settings::Setting;
 use crate::security::auth::AdminUser;
+use crate::store::Store;
 use crate::AdminSlug;
 
 // ── Health ─────────────────────────────────────────────────
 
 #[get("/health")]
-pub fn health_page(_admin: AdminUser, pool: &State<DbPool>, slug: &State<AdminSlug>) -> Template {
-    let report = crate::health::gather(pool);
+pub fn health_page(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+    slug: &State<AdminSlug>,
+) -> Template {
+    let s: &dyn Store = &**store.inner();
+    let report = crate::health::gather(None, s);
     let context = json!({
         "page_title": "Health",
         "admin_slug": slug.0,
-        "settings": Setting::all(pool),
+        "settings": store.setting_all(),
         "report": report,
+        "db_backend": s.db_backend(),
     });
     Template::render("admin/health", &context)
 }
 
 #[post("/health/vacuum")]
-pub fn health_vacuum(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_vacuum(pool);
-    json_tool_result(r)
+pub fn health_vacuum(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    if s.db_backend() != "sqlite" {
+        return json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: "VACUUM is only available for SQLite backend".to_string(),
+            details: None,
+        });
+    }
+    match s.raw_execute("VACUUM") {
+        Ok(_) => json_tool_result(crate::health::ToolResult {
+            ok: true,
+            message: "VACUUM completed successfully".to_string(),
+            details: None,
+        }),
+        Err(e) => json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: format!("VACUUM failed: {}", e),
+            details: None,
+        }),
+    }
 }
 
 #[post("/health/wal-checkpoint")]
-pub fn health_wal_checkpoint(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_wal_checkpoint(pool);
-    json_tool_result(r)
+pub fn health_wal_checkpoint(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    if s.db_backend() != "sqlite" {
+        return json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: "WAL checkpoint is only available for SQLite backend".to_string(),
+            details: None,
+        });
+    }
+    match s.raw_execute("PRAGMA wal_checkpoint(TRUNCATE)") {
+        Ok(_) => json_tool_result(crate::health::ToolResult {
+            ok: true,
+            message: "WAL checkpoint completed successfully".to_string(),
+            details: None,
+        }),
+        Err(e) => json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: format!("WAL checkpoint failed: {}", e),
+            details: None,
+        }),
+    }
 }
 
 #[post("/health/integrity-check")]
-pub fn health_integrity_check(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_integrity_check(pool);
-    json_tool_result(r)
+pub fn health_integrity_check(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    if s.db_backend() != "sqlite" {
+        return json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: "Integrity check is only available for SQLite backend".to_string(),
+            details: None,
+        });
+    }
+    let r = s.raw_query_i64("SELECT CASE WHEN (SELECT integrity_check FROM pragma_integrity_check() LIMIT 1) = 'ok' THEN 1 ELSE 0 END");
+    match r {
+        Ok(1) => json_tool_result(crate::health::ToolResult {
+            ok: true,
+            message: "Integrity check passed".to_string(),
+            details: None,
+        }),
+        Ok(_) => json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: "Integrity check found issues".to_string(),
+            details: None,
+        }),
+        Err(e) => json_tool_result(crate::health::ToolResult {
+            ok: false,
+            message: format!("Integrity check failed: {}", e),
+            details: None,
+        }),
+    }
 }
 
 #[post("/health/session-cleanup")]
-pub fn health_session_cleanup(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_session_cleanup(pool);
+pub fn health_session_cleanup(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let r = crate::health::run_session_cleanup(s);
     json_tool_result(r)
 }
 
 #[post("/health/orphan-scan")]
-pub fn health_orphan_scan(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_orphan_scan(pool, "website/site/uploads");
+pub fn health_orphan_scan(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let r = crate::health::run_orphan_scan(s, "website/site/uploads");
     json_tool_result(r)
 }
 
 #[post("/health/orphan-delete")]
-pub fn health_orphan_delete(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_orphan_delete(pool, "website/site/uploads");
+pub fn health_orphan_delete(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let r = crate::health::run_orphan_delete(s, "website/site/uploads");
     json_tool_result(r)
 }
 
 #[post("/health/unused-tags")]
-pub fn health_unused_tags(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::run_unused_tags_cleanup(pool);
+pub fn health_unused_tags(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let r = crate::health::run_unused_tags_cleanup(s);
     json_tool_result(r)
 }
 
@@ -73,10 +144,11 @@ pub struct AnalyticsPruneForm {
 #[post("/health/analytics-prune", format = "json", data = "<body>")]
 pub fn health_analytics_prune(
     _admin: AdminUser,
-    pool: &State<DbPool>,
+    store: &State<Arc<dyn Store>>,
     body: Json<AnalyticsPruneForm>,
 ) -> Json<Value> {
-    let r = crate::health::run_analytics_prune(pool, body.days);
+    let s: &dyn Store = &**store.inner();
+    let r = crate::health::run_analytics_prune(s, body.days);
     json_tool_result(r)
 }
 
@@ -87,8 +159,9 @@ pub fn health_export_db(_admin: AdminUser) -> Json<Value> {
 }
 
 #[post("/health/export-content")]
-pub fn health_export_content(_admin: AdminUser, pool: &State<DbPool>) -> Json<Value> {
-    let r = crate::health::export_content(pool);
+pub fn health_export_content(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    let r = crate::health::export_content(s);
     json_tool_result(r)
 }
 
