@@ -16,7 +16,7 @@ use crate::AdminSlug;
 
 // ── Media Library ───────────────────────────────────────
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct MediaFile {
     pub name: String,
     pub path: String,
@@ -29,19 +29,10 @@ pub struct MediaFile {
     pub modified: String,
 }
 
-#[get("/media?<page>&<filter>")]
-pub fn media_library(
-    _admin: EditorUser,
-    slug: &State<AdminSlug>,
-    store: &State<Arc<dyn Store>>,
-    page: Option<usize>,
-    filter: Option<String>,
-) -> Template {
+/// Scan the uploads directory and return all media files sorted newest-first,
+/// along with total disk usage in bytes.
+pub(crate) fn scan_media_files(store: &dyn Store) -> (Vec<MediaFile>, u64) {
     let upload_dir = std::path::Path::new("website/site/uploads");
-    let per_page = 60usize;
-    let current_page = page.unwrap_or(1).max(1);
-
-    // Build allowed extension sets from settings
     let img_allowed =
         store.setting_get_or("images_allowed_types", "jpg,jpeg,png,gif,webp,svg,tiff");
     let img_exts: Vec<String> = img_allowed
@@ -67,7 +58,6 @@ pub fn media_library(
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
-            // Skip dotfiles (.DS_Store, .thumbs, etc.)
             if name.starts_with('.') {
                 continue;
             }
@@ -76,7 +66,6 @@ pub fn media_library(
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_lowercase();
-            // Only show files with allowed image or video extensions
             let is_image = img_exts.iter().any(|e| e == &ext);
             let is_video = vid_exts.iter().any(|e| e == &ext);
             if !is_image && !is_video {
@@ -115,14 +104,27 @@ pub fn media_library(
         }
     }
 
-    // Sort newest first
     files.sort_by(|a, b| b.modified.cmp(&a.modified));
+    (files, total_disk_bytes)
+}
+
+#[get("/media?<page>&<filter>")]
+pub fn media_library(
+    _admin: EditorUser,
+    slug: &State<AdminSlug>,
+    store: &State<Arc<dyn Store>>,
+    page: Option<usize>,
+    filter: Option<String>,
+) -> Template {
+    let per_page = 60usize;
+    let current_page = page.unwrap_or(1).max(1);
+
+    let (files, total_disk_bytes) = scan_media_files(&**store.inner());
 
     let count_all = files.len();
     let count_images = files.iter().filter(|f| f.media_type == "image").count();
     let count_videos = files.iter().filter(|f| f.media_type == "video").count();
 
-    // Disk usage human-readable
     let disk_used = if total_disk_bytes >= 1_073_741_824 {
         format!("{:.1} GB", total_disk_bytes as f64 / 1_073_741_824.0)
     } else if total_disk_bytes >= 1_048_576 {
@@ -132,7 +134,6 @@ pub fn media_library(
     } else {
         format!("{} B", total_disk_bytes)
     };
-    // Donut percentage — use 1 GB as reference capacity
     let disk_capacity_bytes: u64 = 1_073_741_824;
     let disk_pct = ((total_disk_bytes as f64 / disk_capacity_bytes as f64) * 100.0)
         .min(100.0)
@@ -165,6 +166,43 @@ pub fn media_library(
     });
 
     Template::render("admin/media/list", &context)
+}
+
+// ── Media Library JSON API (for modal picker) ───────────
+
+#[get("/api/media?<page>&<filter>")]
+pub fn api_media_list(
+    _admin: AuthorUser,
+    store: &State<Arc<dyn Store>>,
+    page: Option<usize>,
+    filter: Option<String>,
+) -> Json<Value> {
+    let per_page = 60usize;
+    let current_page = page.unwrap_or(1).max(1);
+
+    let (files, _) = scan_media_files(&**store.inner());
+
+    let filtered: Vec<&MediaFile> = match filter.as_deref() {
+        Some(f) if !f.is_empty() => files.iter().filter(|file| file.media_type == f).collect(),
+        _ => files.iter().collect(),
+    };
+
+    let total = filtered.len();
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as usize;
+    let offset = (current_page - 1) * per_page;
+    let page_files: Vec<&MediaFile> = filtered
+        .iter()
+        .skip(offset)
+        .take(per_page)
+        .copied()
+        .collect();
+
+    Json(json!({
+        "files": page_files,
+        "total": total,
+        "current_page": current_page,
+        "total_pages": total_pages,
+    }))
 }
 
 #[post("/media/<filename>/delete")]

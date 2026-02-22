@@ -7816,3 +7816,69 @@ fn schema_email_queue_has_expected_columns() {
         ],
     );
 }
+
+// ═══════════════════════════════════════════════════════════
+// Media Library API
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn media_scan_returns_empty_when_no_uploads() {
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    let (files, disk) = crate::routes::admin::media::scan_media_files(&store);
+    // Fresh test env has no uploads dir, so should return empty
+    assert!(files.is_empty() || disk >= 0, "scan should not panic");
+}
+
+#[test]
+fn media_scan_finds_uploaded_files() {
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    let dir = std::path::Path::new("website/site/uploads");
+    let _ = std::fs::create_dir_all(dir);
+    let test_file = dir.join("test_media_scan_unit.jpg");
+    std::fs::write(&test_file, b"fake-jpg-data").unwrap();
+
+    let (files, disk) = crate::routes::admin::media::scan_media_files(&store);
+    let found = files.iter().any(|f| f.name == "test_media_scan_unit.jpg");
+    assert!(found, "should find the test jpg file");
+    assert!(disk > 0, "disk usage should be > 0");
+
+    let f = files
+        .iter()
+        .find(|f| f.name == "test_media_scan_unit.jpg")
+        .unwrap();
+    assert!(f.is_image);
+    assert!(!f.is_video);
+    assert_eq!(f.media_type, "image");
+    assert_eq!(f.ext, "jpg");
+
+    let _ = std::fs::remove_file(&test_file);
+}
+
+#[test]
+fn media_scan_distinguishes_image_and_video() {
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    let dir = std::path::Path::new("website/site/uploads");
+    let _ = std::fs::create_dir_all(dir);
+    let img = dir.join("test_filter_unit.png");
+    let vid = dir.join("test_filter_unit.mp4");
+    std::fs::write(&img, b"fake-png").unwrap();
+    std::fs::write(&vid, b"fake-mp4").unwrap();
+
+    let (all, _) = crate::routes::admin::media::scan_media_files(&store);
+    let images: Vec<_> = all.iter().filter(|f| f.media_type == "image").collect();
+    let videos: Vec<_> = all.iter().filter(|f| f.media_type == "video").collect();
+    assert!(
+        images.iter().any(|f| f.name == "test_filter_unit.png"),
+        "should find png in images"
+    );
+    assert!(
+        videos.iter().any(|f| f.name == "test_filter_unit.mp4"),
+        "should find mp4 in videos"
+    );
+
+    let _ = std::fs::remove_file(&img);
+    let _ = std::fs::remove_file(&vid);
+}

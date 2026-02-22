@@ -1,0 +1,257 @@
+<!-- Media Library Modal (shared partial) -->
+<div id="media-library-modal" class="ml-modal" style="display:none">
+    <div class="ml-backdrop"></div>
+    <div class="ml-container">
+        <div class="ml-header">
+            <h3>Media Library</h3>
+            <div class="ml-filters">
+                <button type="button" class="ml-filter-btn active" data-filter="">All</button>
+                <button type="button" class="ml-filter-btn" data-filter="image">Images</button>
+                <button type="button" class="ml-filter-btn" data-filter="video">Videos</button>
+            </div>
+            <button type="button" class="ml-close" title="Close">&times;</button>
+        </div>
+        <div class="ml-body">
+            <div class="ml-grid" id="ml-grid"></div>
+            <div class="ml-empty" id="ml-empty" style="display:none">No media files found.</div>
+            <div class="ml-loading" id="ml-loading" style="display:none">
+                <span class="ml-spinner"></span> Loading…
+            </div>
+        </div>
+        <div class="ml-footer" id="ml-footer" style="display:none">
+            <button type="button" class="btn btn-secondary ml-prev" id="ml-prev" disabled>← Prev</button>
+            <span class="ml-page-info" id="ml-page-info"></span>
+            <button type="button" class="btn btn-secondary ml-next" id="ml-next" disabled>Next →</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.ml-modal { position:fixed; inset:0; z-index:10000; display:flex; align-items:center; justify-content:center; }
+.ml-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.7); }
+.ml-container {
+    position:relative; width:90vw; height:90vh; max-width:1400px;
+    background:var(--bg-card, #1e1e24); border-radius:12px; display:flex; flex-direction:column;
+    box-shadow:0 20px 60px rgba(0,0,0,.5); overflow:hidden;
+}
+.ml-header {
+    display:flex; align-items:center; gap:16px; padding:16px 20px;
+    border-bottom:1px solid var(--border-subtle, rgba(255,255,255,.08));
+}
+.ml-header h3 { margin:0; font-size:16px; font-weight:700; color:var(--text-primary, #f0f0f0); white-space:nowrap; }
+.ml-filters { display:flex; gap:6px; margin-left:auto; }
+.ml-filter-btn {
+    padding:5px 14px; border-radius:6px; border:1px solid var(--border-subtle, rgba(255,255,255,.1));
+    background:transparent; color:var(--text-secondary, #aaa); font-size:12px; font-weight:500; cursor:pointer;
+    transition:all .15s;
+}
+.ml-filter-btn:hover { border-color:var(--accent, #E8913A); color:var(--accent, #E8913A); }
+.ml-filter-btn.active { background:var(--accent, #E8913A); color:#fff; border-color:var(--accent, #E8913A); }
+.ml-close {
+    width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+    border:none; background:transparent; color:var(--text-secondary, #aaa); font-size:24px;
+    cursor:pointer; border-radius:6px; margin-left:8px; flex-shrink:0;
+}
+.ml-close:hover { background:rgba(255,255,255,.08); color:var(--text-primary, #f0f0f0); }
+.ml-body { flex:1; overflow-y:auto; padding:16px 20px; }
+.ml-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px;
+}
+.ml-item {
+    position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; cursor:pointer;
+    border:2px solid transparent; transition:border-color .15s, transform .15s;
+    background:var(--bg-input, #262830);
+}
+.ml-item:hover { border-color:var(--accent, #E8913A); transform:scale(1.02); }
+.ml-item img {
+    width:100%; height:100%; object-fit:cover; display:block;
+}
+.ml-item-video {
+    position:relative;
+}
+.ml-item-video::after {
+    content:'▶'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:36px; height:36px; background:rgba(0,0,0,.6); border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:14px; pointer-events:none;
+    line-height:36px; text-align:center; padding-left:2px;
+}
+.ml-item-name {
+    position:absolute; bottom:0; left:0; right:0; padding:4px 6px;
+    background:linear-gradient(transparent, rgba(0,0,0,.7));
+    color:#fff; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    pointer-events:none;
+}
+.ml-item-size {
+    position:absolute; top:4px; right:4px; padding:2px 6px; border-radius:4px;
+    background:rgba(0,0,0,.6); color:#fff; font-size:9px; pointer-events:none;
+}
+.ml-empty {
+    text-align:center; padding:60px 20px; color:var(--text-secondary, #aaa); font-size:14px;
+}
+.ml-loading {
+    text-align:center; padding:60px 20px; color:var(--text-secondary, #aaa); font-size:14px;
+}
+.ml-spinner {
+    display:inline-block; width:16px; height:16px; border:2px solid var(--text-secondary, #aaa);
+    border-top-color:transparent; border-radius:50%; animation:ml-spin .6s linear infinite;
+    vertical-align:-2px; margin-right:6px;
+}
+@keyframes ml-spin { to { transform:rotate(360deg); } }
+.ml-footer {
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    padding:12px 20px; border-top:1px solid var(--border-subtle, rgba(255,255,255,.08));
+}
+.ml-page-info { font-size:12px; color:var(--text-secondary, #aaa); }
+.ml-browse-link {
+    display:block; margin-top:8px; font-size:11px; font-weight:600;
+    color:var(--accent, #E8913A); text-decoration:none; cursor:pointer;
+    padding:6px 10px; border:1px solid var(--accent, #E8913A); border-radius:4px;
+    transition:background .15s, color .15s; text-align:center;
+}
+.ml-browse-link:hover { background:var(--accent, #E8913A); color:#fff; }
+</style>
+
+<script>
+(function(){
+    var modal = document.getElementById('media-library-modal');
+    var grid = document.getElementById('ml-grid');
+    var empty = document.getElementById('ml-empty');
+    var loading = document.getElementById('ml-loading');
+    var footer = document.getElementById('ml-footer');
+    var pageInfo = document.getElementById('ml-page-info');
+    var prevBtn = document.getElementById('ml-prev');
+    var nextBtn = document.getElementById('ml-next');
+    var backdrop = modal.querySelector('.ml-backdrop');
+    var closeBtn = modal.querySelector('.ml-close');
+    var filterBtns = modal.querySelectorAll('.ml-filter-btn');
+
+    var currentFilter = '';
+    var currentPage = 1;
+    var totalPages = 1;
+    var onSelectCallback = null;
+    var adminSlug = '{{ admin_slug }}';
+
+    function openMediaModal(callback) {
+        onSelectCallback = callback;
+        currentFilter = '';
+        currentPage = 1;
+        filterBtns.forEach(function(b){ b.classList.toggle('active', b.dataset.filter === ''); });
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        loadMedia();
+    }
+
+    function closeMediaModal() {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        onSelectCallback = null;
+    }
+
+    function loadMedia() {
+        grid.innerHTML = '';
+        empty.style.display = 'none';
+        loading.style.display = '';
+        footer.style.display = 'none';
+
+        var url = '/' + adminSlug + '/api/media?page=' + currentPage;
+        if (currentFilter) url += '&filter=' + currentFilter;
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                loading.style.display = 'none';
+                var files = data.files || [];
+                totalPages = data.total_pages || 1;
+
+                if (files.length === 0) {
+                    empty.style.display = '';
+                    return;
+                }
+
+                files.forEach(function(f){
+                    var item = document.createElement('div');
+                    item.className = 'ml-item' + (f.is_video ? ' ml-item-video' : '');
+                    item.title = f.name + ' (' + f.size_human + ')';
+
+                    if (f.is_image) {
+                        var img = document.createElement('img');
+                        img.src = '/uploads/' + f.path;
+                        img.alt = f.name;
+                        img.loading = 'lazy';
+                        item.appendChild(img);
+                    } else {
+                        var thumb = document.createElement('div');
+                        thumb.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input,#262830)';
+                        thumb.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary,#aaa)" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+                        item.appendChild(thumb);
+                    }
+
+                    var nameEl = document.createElement('div');
+                    nameEl.className = 'ml-item-name';
+                    nameEl.textContent = f.name;
+                    item.appendChild(nameEl);
+
+                    var sizeEl = document.createElement('div');
+                    sizeEl.className = 'ml-item-size';
+                    sizeEl.textContent = f.size_human;
+                    item.appendChild(sizeEl);
+
+                    item.addEventListener('click', function(){
+                        if (onSelectCallback) {
+                            onSelectCallback({
+                                path: f.path,
+                                url: '/uploads/' + f.path,
+                                name: f.name,
+                                is_image: f.is_image,
+                                is_video: f.is_video,
+                                ext: f.ext
+                            });
+                        }
+                        closeMediaModal();
+                    });
+
+                    grid.appendChild(item);
+                });
+
+                if (totalPages > 1) {
+                    footer.style.display = 'flex';
+                    pageInfo.textContent = 'Page ' + currentPage + ' of ' + totalPages;
+                    prevBtn.disabled = currentPage <= 1;
+                    nextBtn.disabled = currentPage >= totalPages;
+                }
+            })
+            .catch(function(){
+                loading.style.display = 'none';
+                empty.textContent = 'Failed to load media.';
+                empty.style.display = '';
+            });
+    }
+
+    filterBtns.forEach(function(btn){
+        btn.addEventListener('click', function(){
+            filterBtns.forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            currentFilter = btn.dataset.filter;
+            currentPage = 1;
+            loadMedia();
+        });
+    });
+
+    prevBtn.addEventListener('click', function(){
+        if (currentPage > 1) { currentPage--; loadMedia(); }
+    });
+    nextBtn.addEventListener('click', function(){
+        if (currentPage < totalPages) { currentPage++; loadMedia(); }
+    });
+
+    backdrop.addEventListener('click', closeMediaModal);
+    closeBtn.addEventListener('click', closeMediaModal);
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeMediaModal();
+    });
+
+    // Expose globally
+    window.openMediaLibrary = openMediaModal;
+})();
+</script>

@@ -42,7 +42,7 @@
                         <input type="file" id="portfolio-file" name="image" accept="image/*,.heic,.heif{% if settings.video_upload_enabled == 'true' %},video/mp4,video/webm,video/quicktime,video/*{% endif %}" {% if not item %}required{% endif %}>
                         <div class="drop-placeholder" id="portfolio-placeholder" {% if item and item.image_path %}style="display:none"{% endif %}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
-                            <span>Drop image{% if settings.video_upload_enabled == "true" %} or video{% endif %} here</span>
+                            <span>Drop image{% if settings.video_upload_enabled == "true" %} or video{% endif %} here or click to upload</span>
                         </div>
                         {% if item and item.image_path %}
                             {% set vext = item.image_path | split(pat=".") | last | lower %}
@@ -56,6 +56,7 @@
                         {% endif %}
                         <button type="button" class="drop-clear" id="portfolio-clear" title="Remove">&times;</button>
                     </div>
+                    <a href="javascript:void(0)" class="ml-browse-link" id="portfolio-browse-ml">Browse Media Library</a>
                     {% if ai_enabled %}
                     <button type="button" class="btn btn-sm btn-primary" id="btn-suggest-all" onclick="aiSuggestAll()" style="width:100%;margin-top:8px">✨ Suggest All</button>
                     {% endif %}
@@ -185,6 +186,7 @@
     </div>
 </form>
 
+{% include "admin/media_modal" %}
 {% endblock content %}
 
 {% block scripts %}
@@ -193,7 +195,7 @@
     tinymce.init({
         selector: '#description',
         plugins: 'lists advlist table link image media autolink code codesample searchreplace wordcount autoresize fullscreen quickbars charmap emoticons anchor visualblocks preview directionality',
-        toolbar: '{% if ai_enabled %}aiassist | {% endif %}undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat',
+        toolbar: '{% if ai_enabled %}aiassist | {% endif %}undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media medialibrary table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat',
         menubar: 'file edit view insert format tools table',
         height: 1000,
         min_height: 700,
@@ -236,6 +238,19 @@
                 form.addEventListener('submit', function() {
                     editor.save();
                 });
+            });
+            editor.ui.registry.addButton('medialibrary', {
+                icon: 'gallery',
+                tooltip: 'Browse Media Library',
+                onAction: function() {
+                    window.openMediaLibrary(function(file) {
+                        if (file.is_video) {
+                            editor.insertContent('<video src="' + file.url + '" controls style="max-width:100%"></video>');
+                        } else {
+                            editor.insertContent('<img src="' + file.url + '" alt="' + file.name + '">');
+                        }
+                    });
+                }
             });
             {% if ai_enabled %}
             editor.ui.registry.addMenuButton('aiassist', {
@@ -524,6 +539,38 @@
             {% if not item %}fileInput.setAttribute('required', '');{% endif %}
         });
     })();
+
+    // Browse Media Library for featured image
+    document.getElementById('portfolio-browse-ml').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.openMediaLibrary(function(file) {
+            var zone = document.getElementById('portfolio-zone');
+            var placeholder = document.getElementById('portfolio-placeholder');
+            var preview = document.getElementById('portfolio-preview');
+            var uploadedPath = document.getElementById('portfolio-uploaded-path');
+            var fileInput = document.getElementById('portfolio-file');
+            fileInput.value = '';
+            fileInput.removeAttribute('required');
+            uploadedPath.value = file.path;
+            // Remove any existing video preview
+            var oldVid = zone.querySelector('video#portfolio-video-preview');
+            if (oldVid) oldVid.remove();
+            if (file.is_video) {
+                preview.style.display = 'none';
+                var vid = document.createElement('video');
+                vid.id = 'portfolio-video-preview';
+                vid.src = file.url;
+                vid.muted = true; vid.autoplay = true; vid.loop = true; vid.playsInline = true;
+                vid.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+                zone.insertBefore(vid, zone.querySelector('.drop-clear'));
+            } else {
+                preview.src = file.url;
+                preview.style.display = '';
+            }
+            placeholder.style.display = 'none';
+            zone.classList.add('has-image');
+        });
+    });
 
     // Sell toggle — also disable inputs so they don't submit empty values
     function toggleSellFields(on) {

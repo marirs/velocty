@@ -407,6 +407,7 @@ pub fn routes() -> Vec<rocket::Route> {
         settings::settings_page,
         settings::settings_save,
         media::media_library,
+        media::api_media_list,
         media::media_delete,
         media::upload_image,
         media::upload_font,
