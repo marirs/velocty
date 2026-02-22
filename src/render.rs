@@ -505,7 +505,7 @@ fn render_with_shell(design: &Design, template_type: &str, context: &Value) -> S
     // Prepend site comment header
     let site_url = sg("site_url", "");
     let comment = format!(
-        "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty\n-->\n",
+        "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty (https://velocty.io)\n-->\n",
         if site_url.is_empty() {
             "http://localhost:8000"
         } else {
@@ -657,7 +657,7 @@ pub fn render_legal_page(
         // Prepend site comment header
         let site_url = sg("site_url", "");
         let comment = format!(
-            "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty\n-->\n",
+            "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty (https://velocty.io)\n-->\n",
             if site_url.is_empty() {
                 "http://localhost:8000"
             } else {
