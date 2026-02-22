@@ -64,6 +64,52 @@ pub fn generate_post(
     }
 }
 
+// ── Suggest Content ──────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct SuggestContentRequest {
+    pub title: String,
+    pub content_type: Option<String>,
+    pub image_base64: Option<String>,
+}
+
+#[post("/ai/suggest-content", format = "json", data = "<body>")]
+pub fn suggest_content(
+    _admin: EditorUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<SuggestContentRequest>,
+) -> Json<Value> {
+    let ctype = body.content_type.as_deref().unwrap_or("post");
+
+    let req = AiRequest {
+        system: "You are a professional content writer. Write engaging, well-structured content. \
+                 Always respond in valid JSON format as specified. Do not include markdown fences or explanations outside the JSON."
+            .to_string(),
+        prompt: prompts::suggest_content(&body.title, ctype),
+        max_tokens: Some(2048),
+        temperature: Some(0.8),
+        image_base64: body.image_base64.clone(),
+    };
+
+    match ai::complete(&**store.inner(), &req) {
+        Ok(resp) => match parse_json_from_text(&resp.text) {
+            Some(parsed) => {
+                let html = parsed
+                    .get("html")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                Json(json!({"ok": true, "provider": resp.provider, "html": html}))
+            }
+            None => {
+                // Fallback: treat the whole response as HTML
+                Json(json!({"ok": true, "provider": resp.provider, "html": resp.text}))
+            }
+        },
+        Err(e) => Json(json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
 // ── Inline Assist ─────────────────────────────────────
 
 #[post("/ai/inline-assist", format = "json", data = "<body>")]

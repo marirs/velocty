@@ -12,10 +12,28 @@ pub fn call(settings: &HashMap<String, String>, req: &AiRequest) -> Result<AiRes
         return Err(AiError("Gemini API key not configured".into()));
     }
 
-    let model = settings
+    let mut model = settings
         .get("ai_gemini_model")
         .cloned()
         .unwrap_or_else(|| "gemini-pro".to_string());
+
+    // Auto-upgrade to a vision-capable model when an image is present
+    if req.image_base64.is_some() {
+        let m = model.to_lowercase();
+        let is_vision = m.contains("flash")
+            || m.contains("vision")
+            || m.contains("pro-vision")
+            || m.contains("1.5")
+            || m.contains("2.0")
+            || m.contains("2.5");
+        if !is_vision {
+            log::info!(
+                "[ai] Gemini model '{}' does not support vision; upgrading to gemini-2.0-flash for this request",
+                model
+            );
+            model = "gemini-2.0-flash".to_string();
+        }
+    }
 
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",

@@ -34,7 +34,7 @@
                     <input type="text" id="title" name="title" value="{% if post %}{{ post.title }}{% endif %}" required class="input-lg">
                 </div>
                 <div class="form-group">
-                    <label for="slug">Slug {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestSlug()" title="AI Suggest Slug">✨ Suggest</button>{% endif %}</label>
+                    <label for="slug">Slug</label>
                     <input type="text" id="slug" name="slug" value="{% if post %}{{ post.slug }}{% endif %}" required>
                 </div>
                 <div class="form-group">
@@ -66,6 +66,9 @@
                         {% endif %}
                         <button type="button" class="drop-clear" id="featured-clear" title="Remove">&times;</button>
                     </div>
+                    {% if ai_enabled %}
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-suggest-all" onclick="aiSuggestAll()" style="width:100%;margin-top:8px">✨ Suggest All</button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -78,7 +81,7 @@
             </div>
 
             <div class="form-card collapsible">
-                <h4>Categories</h4>
+                <h4>Categories {% if ai_enabled %}<button type="button" class="btn-ai-suggest" onclick="aiSuggestCategory()" title="AI Suggest Category">✨ Suggest</button>{% endif %}</h4>
                 <div class="checkbox-list" id="category-list">
                     {% for cat in categories %}
                     <label class="checkbox-item">
@@ -145,7 +148,7 @@
     tinymce.init({
         selector: '#content',
         plugins: 'lists advlist table link image media autolink code codesample searchreplace wordcount autoresize fullscreen quickbars charmap emoticons anchor visualblocks preview directionality',
-        toolbar: 'undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat{% if ai_enabled %} | aiassist{% endif %}',
+        toolbar: '{% if ai_enabled %}aiassist | {% endif %}undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | codesample blockquote charmap emoticons | searchreplace visualblocks code fullscreen | ltr rtl | removeformat',
         menubar: 'file edit view insert format tools table',
         height: 1000,
         min_height: 700,
@@ -194,6 +197,8 @@
                 text: '✨ AI',
                 fetch: function(callback) {
                     var items = [
+                        {type:'menuitem', text:'✨ Suggest Content', onAction: function(){ aiSuggestContent(editor); }},
+                        {type:'separator'},
                         {type:'menuitem', text:'Expand', onAction: function(){ aiInlineAssist(editor, 'expand'); }},
                         {type:'menuitem', text:'Rewrite', onAction: function(){ aiInlineAssist(editor, 'rewrite'); }},
                         {type:'menuitem', text:'Summarise', onAction: function(){ aiInlineAssist(editor, 'summarise'); }},
@@ -455,13 +460,34 @@
             reader.readAsDataURL(file);
         });
     }
+    function imgSrcToBase64(imgEl) {
+        return new Promise(function(resolve) {
+            if (!imgEl || !imgEl.src || imgEl.style.display === 'none') { resolve(null); return; }
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                var c = document.createElement('canvas');
+                c.width = Math.min(img.width, 1024);
+                c.height = Math.round(img.height * (c.width / img.width));
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                resolve(c.toDataURL('image/jpeg', 0.8).split(',')[1]);
+            };
+            img.onerror = function() { resolve(null); };
+            img.src = imgEl.src;
+        });
+    }
     function getFeaturedImageBase64() {
         return new Promise(function(resolve) {
             var fileInput = document.getElementById('featured-file');
             if (fileInput && fileInput.files && fileInput.files[0]) {
                 fileToBase64(fileInput.files[0]).then(resolve).catch(function() { resolve(null); });
             } else {
-                resolve(null);
+                var preview = document.getElementById('featured-preview');
+                if (preview && preview.src && preview.style.display !== 'none') {
+                    imgSrcToBase64(preview).then(resolve);
+                } else {
+                    resolve(null);
+                }
             }
         });
     }
@@ -525,11 +551,108 @@
             });
         });
     }
-    function aiSuggestSlug() {
+    function aiSuggestCategory() {
         var title = document.getElementById('title').value;
-        if (!title) { aiToast('Enter a title first', 'info'); return; }
-        aiCall('/{{ admin_slug }}/api/ai/suggest-slug', {title: title}, function(data) {
-            if (data.slug) { document.getElementById('slug').value = data.slug; document.getElementById('slug').dataset.manual = 'true'; }
+        getFeaturedImageBase64().then(function(imgB64) {
+            imgB64 = checkVision(imgB64);
+            if (!title && !imgB64) {
+                aiToast('Enter a title or upload a featured image first', 'info');
+                return;
+            }
+            var excerpt = '';
+            if (tinymce.get('content')) { excerpt = tinymce.get('content').getContent({format:'text'}).substring(0, 500); }
+            var body = {title: title || '', content_excerpt: excerpt, content_type: 'post'};
+            if (imgB64) body.image_base64 = imgB64;
+            aiCall('/{{ admin_slug }}/api/ai/suggest-categories', body, function(data) {
+                if (data.categories && data.categories.length) {
+                    aiApplyCategories(data.categories);
+                }
+            });
+        });
+    }
+    function aiApplyCategories(catNames) {
+        var checkboxes = document.querySelectorAll('#category-list input[type="checkbox"]');
+        var existingNames = {};
+        checkboxes.forEach(function(cb) {
+            var label = cb.parentElement.textContent.trim();
+            existingNames[label.toLowerCase()] = cb;
+        });
+        catNames.forEach(function(name) {
+            var key = name.toLowerCase().trim();
+            if (existingNames[key]) {
+                existingNames[key].checked = true;
+            } else {
+                // Add as new category via the existing addCategory mechanism
+                var inp = document.getElementById('new-cat-name');
+                if (inp) {
+                    inp.value = name;
+                    if (typeof addCategory === 'function') addCategory();
+                }
+            }
+        });
+    }
+    function aiApplyAll(data) {
+        if (data.title) {
+            document.getElementById('title').value = data.title;
+        }
+        if (data.slug) {
+            document.getElementById('slug').value = data.slug;
+            document.getElementById('slug').dataset.manual = 'true';
+        } else if (data.title) {
+            document.getElementById('slug').value = data.title.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
+            document.getElementById('slug').dataset.manual = 'true';
+        }
+        if (data.description_html && tinymce.get('content')) {
+            tinymce.get('content').setContent(data.description_html);
+        }
+        if (data.tags && data.tags.length) {
+            data.tags.forEach(function(t) { if (window.addTagPill) window.addTagPill(t); });
+        }
+        if (data.categories && data.categories.length) {
+            aiApplyCategories(data.categories);
+        }
+        if (data.meta_title) {
+            document.getElementById('meta_title').value = data.meta_title;
+            document.getElementById('meta_title').dispatchEvent(new Event('input'));
+        }
+        if (data.meta_description) {
+            document.getElementById('meta_description').value = data.meta_description;
+            document.getElementById('meta_description').dispatchEvent(new Event('input'));
+        }
+    }
+    function aiSuggestAll() {
+        var title = document.getElementById('title').value;
+        var btn = document.getElementById('btn-suggest-all');
+        getFeaturedImageBase64().then(function(imgB64) {
+            imgB64 = checkVision(imgB64);
+            if (!title && !imgB64) {
+                aiToast('Enter a title or upload a featured image first', 'info');
+                return;
+            }
+            btn.disabled = true; btn.textContent = 'Generating…';
+            var body = {title: title || '', content_type: 'post'};
+            if (imgB64) body.image_base64 = imgB64;
+            aiCall('/{{ admin_slug }}/api/ai/suggest-all', body, function(data) {
+                aiApplyAll(data);
+                aiToast('All fields populated!', 'info');
+            }, function() { btn.disabled = false; btn.textContent = '✨ Suggest All'; });
+        });
+    }
+    function aiSuggestContent(editor) {
+        var title = document.getElementById('title').value;
+        getFeaturedImageBase64().then(function(imgB64) {
+            imgB64 = checkVision(imgB64);
+            if (!title && !imgB64) {
+                aiToast('Enter a title or upload a featured image first', 'info');
+                return;
+            }
+            editor.setProgressState(true);
+            var body = {title: title || 'Untitled', content_type: 'post'};
+            if (imgB64) body.image_base64 = imgB64;
+            aiCall('/{{ admin_slug }}/api/ai/suggest-content', body, function(data) {
+                if (data.html) { editor.setContent(data.html); }
+                editor.setProgressState(false);
+            }, function() { editor.setProgressState(false); });
         });
     }
     function aiInlineAssist(editor, action) {

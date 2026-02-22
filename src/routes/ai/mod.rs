@@ -167,6 +167,7 @@ pub fn parse_json_from_text(text: &str) -> Option<Value> {
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![
+        suggest::suggest_all,
         suggest::suggest_meta,
         suggest::suggest_tags,
         suggest::suggest_categories,
@@ -174,6 +175,7 @@ pub fn routes() -> Vec<rocket::Route> {
         suggest::suggest_alt_text,
         suggest::suggest_title,
         generate::generate_post,
+        generate::suggest_content,
         generate::inline_assist,
         generate::describe_image,
         status::ai_status,

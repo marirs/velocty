@@ -12,10 +12,28 @@ pub fn call(settings: &HashMap<String, String>, req: &AiRequest) -> Result<AiRes
         return Err(AiError("OpenAI API key not configured".into()));
     }
 
-    let model = settings
+    let mut model = settings
         .get("ai_openai_model")
         .cloned()
         .unwrap_or_else(|| "gpt-4".to_string());
+
+    // Auto-upgrade to a vision-capable model when an image is present
+    if req.image_base64.is_some() {
+        let m = model.to_lowercase();
+        let is_vision = m.contains("4o")
+            || m.contains("vision")
+            || m.contains("gpt-4-turbo")
+            || m.starts_with("o1")
+            || m.starts_with("o3")
+            || m.starts_with("o4");
+        if !is_vision {
+            log::info!(
+                "[ai] Model '{}' does not support vision; upgrading to gpt-4o for this request",
+                model
+            );
+            model = "gpt-4o".to_string();
+        }
+    }
 
     let base_url = settings
         .get("ai_openai_base_url")

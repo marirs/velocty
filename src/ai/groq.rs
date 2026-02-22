@@ -9,10 +9,23 @@ pub fn call(settings: &HashMap<String, String>, req: &AiRequest) -> Result<AiRes
         return Err(AiError("Groq API key not configured".into()));
     }
 
-    let model = settings
+    let mut model = settings
         .get("ai_groq_model")
         .cloned()
         .unwrap_or_else(|| "llama-3.3-70b-versatile".to_string());
+
+    // Auto-upgrade to a vision-capable model when an image is present
+    if req.image_base64.is_some() {
+        let m = model.to_lowercase();
+        let is_vision = m.contains("vision") || m.contains("llava");
+        if !is_vision {
+            log::info!(
+                "[ai] Groq model '{}' does not support vision; upgrading to llama-3.2-90b-vision-preview for this request",
+                model
+            );
+            model = "llama-3.2-90b-vision-preview".to_string();
+        }
+    }
 
     let url = "https://api.groq.com/openai/v1/chat/completions";
 

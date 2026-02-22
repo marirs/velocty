@@ -108,6 +108,67 @@ pub fn generate_post(description: &str) -> String {
     )
 }
 
+/// Suggest all fields at once: title, tags, description, categories, meta
+pub fn suggest_all(
+    title: &str,
+    content_type: &str,
+    existing_categories: &[String],
+    existing_tags: &[String],
+) -> String {
+    let cats = if existing_categories.is_empty() {
+        "none".to_string()
+    } else {
+        existing_categories.join(", ")
+    };
+    let tags = if existing_tags.is_empty() {
+        "none".to_string()
+    } else {
+        existing_tags.join(", ")
+    };
+    format!(
+        "Generate all metadata for a {} {}.\n\n\
+         Existing categories: {}\n\
+         Existing tags: {}\n\n\
+         Requirements:\n\
+         - title: compelling, SEO-friendly (≤70 chars){}\n\
+         - description_html: 2-4 paragraphs in HTML (p, strong, em, ul/li). If an image is provided, incorporate what you see.\n\
+         - tags: 3-6 relevant tags. Prefer reusing existing tags when appropriate.\n\
+         - categories: 1-3 relevant categories. STRONGLY prefer matching existing categories. Only suggest a new one if none fit.\n\
+         - meta_title: SEO meta title (≤60 chars)\n\
+         - meta_description: SEO meta description (120-155 chars)\n\
+         - slug: SEO-friendly URL slug (lowercase, hyphens, 3-6 words)\n\n\
+         Respond as JSON:\n\
+         {{\"title\": \"...\", \"description_html\": \"...\", \"tags\": [\"...\"], \"categories\": [\"...\"], \"meta_title\": \"...\", \"meta_description\": \"...\", \"slug\": \"...\"}}",
+        content_type,
+        if title.is_empty() || title == "Untitled" {
+            String::new()
+        } else {
+            format!("titled \"{}\"", title)
+        },
+        cats,
+        tags,
+        if title.is_empty() || title == "Untitled" {
+            ""
+        } else {
+            ". You may keep or improve the existing title"
+        },
+    )
+}
+
+/// Suggest content/description for a post or portfolio item based on title and/or image
+pub fn suggest_content(title: &str, content_type: &str) -> String {
+    format!(
+        "Write a compelling {} description/content for an item titled \"{}\".\n\n\
+         Requirements:\n\
+         - Use HTML formatting (p, strong, em, ul/li)\n\
+         - 2-4 paragraphs, engaging and informative\n\
+         - Professional but approachable tone\n\
+         - If an image is provided, describe and incorporate what you see\n\n\
+         Respond as JSON: {{\"html\": \"...\"}}",
+        content_type, title
+    )
+}
+
 /// Inline assist: transform selected text
 pub fn inline_assist(action: &str, selected_text: &str) -> String {
     let instruction = match action {

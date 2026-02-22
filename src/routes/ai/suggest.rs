@@ -55,6 +55,80 @@ pub struct SuggestTitleRequest {
     pub image_base64: Option<String>,
 }
 
+// ── Suggest All ──────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct SuggestAllRequest {
+    pub title: Option<String>,
+    pub content_type: Option<String>,
+    pub image_base64: Option<String>,
+}
+
+#[post("/ai/suggest-all", format = "json", data = "<body>")]
+pub fn suggest_all(
+    _admin: EditorUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<SuggestAllRequest>,
+) -> Json<Value> {
+    let title = body.title.as_deref().unwrap_or("");
+    let ctype = body.content_type.as_deref().unwrap_or("post");
+
+    let existing_cats: Vec<String> = store
+        .category_list(Some(ctype))
+        .iter()
+        .map(|c| c.name.clone())
+        .collect();
+    let existing_tags: Vec<String> = store.tag_list().iter().map(|t| t.name.clone()).collect();
+
+    let req = AiRequest {
+        system: "You are a professional content assistant for a CMS. Generate all requested fields in a single JSON response. \
+                 Always respond in valid JSON format as specified. Do not include markdown fences or explanations outside the JSON."
+            .to_string(),
+        prompt: prompts::suggest_all(title, ctype, &existing_cats, &existing_tags),
+        max_tokens: Some(4096),
+        temperature: Some(0.8),
+        image_base64: body.image_base64.clone(),
+    };
+
+    match ai::complete(&**store.inner(), &req) {
+        Ok(resp) => match parse_json_from_text(&resp.text) {
+            Some(parsed) => {
+                let get_str = |key: &str| {
+                    parsed
+                        .get(key)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string()
+                };
+                let get_arr = |key: &str| {
+                    parsed
+                        .get(key)
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                };
+                Json(json!({
+                    "ok": true,
+                    "provider": resp.provider,
+                    "title": get_str("title"),
+                    "description_html": get_str("description_html"),
+                    "tags": get_arr("tags"),
+                    "categories": get_arr("categories"),
+                    "meta_title": get_str("meta_title"),
+                    "meta_description": get_str("meta_description"),
+                    "slug": get_str("slug"),
+                }))
+            }
+            None => Json(json!({"ok": false, "error": "Failed to parse AI response"})),
+        },
+        Err(e) => Json(json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
 // ── Suggest Meta Title & Description ──────────────────
 
 #[post("/ai/suggest-meta", format = "json", data = "<body>")]

@@ -999,6 +999,9 @@ input[type="file"]::file-selector-button:hover {
     padding: 10px 16px;
     font-size: 13px;
     border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+    height: 68px;
+    box-sizing: border-box;
 }
 
 .data-table tr:last-child td { border-bottom: none; }
@@ -1010,8 +1013,13 @@ input[type="file"]::file-selector-button:hover {
 .table-thumb {
     width: 48px;
     height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
     object-fit: cover;
     border-radius: 4px;
+    display: block;
 }
 
 .actions {
