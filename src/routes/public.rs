@@ -1,8 +1,10 @@
+use rocket::form::Form;
 use rocket::http::{ContentType, CookieJar, Header, Status};
 use rocket::response::content::{RawHtml, RawXml};
 use rocket::response::{self, Responder, Response};
 use rocket::{Request, State};
 use serde_json::json;
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
@@ -299,6 +301,112 @@ pub fn terms_page(store: &State<Arc<dyn Store>>) -> Option<RawHtml<String>> {
     Some(RawHtml(page_html))
 }
 
+// ── Contact Page ──────────────────────────────────────
+
+#[get("/contact")]
+pub fn contact_page(store: &State<Arc<dyn Store>>) -> Option<RawHtml<String>> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
+    if settings.get("contact_page_enabled").map(|v| v.as_str()) != Some("true") {
+        return None;
+    }
+    let page_html = render::render_contact_page(s, &settings, None);
+    Some(RawHtml(page_html))
+}
+
+#[post("/contact", data = "<form>")]
+pub fn contact_submit(
+    store: &State<Arc<dyn Store>>,
+    form: Form<HashMap<String, String>>,
+) -> Option<RawHtml<String>> {
+    let s: &dyn Store = &**store.inner();
+    let settings = s.setting_all();
+    if settings.get("contact_page_enabled").map(|v| v.as_str()) != Some("true") {
+        return None;
+    }
+    if settings.get("contact_form_enabled").map(|v| v.as_str()) != Some("true") {
+        return None;
+    }
+
+    let data = form.into_inner();
+    let name = data.get("name").map(|s| s.trim()).unwrap_or("");
+    let email = data.get("email").map(|s| s.trim()).unwrap_or("");
+    let message = data.get("message").map(|s| s.trim()).unwrap_or("");
+    let honey = data.get("_honey").map(|s| s.trim()).unwrap_or("");
+
+    // Honeypot check
+    if !honey.is_empty() {
+        let html = render::render_contact_page(s, &settings, Some(("success", "Message sent! Thank you.")));
+        return Some(RawHtml(html));
+    }
+
+    // Validation
+    if name.is_empty() || email.is_empty() || message.is_empty() {
+        let html = render::render_contact_page(
+            s,
+            &settings,
+            Some(("error", "Please fill in all required fields.")),
+        );
+        return Some(RawHtml(html));
+    }
+
+    // Basic email validation
+    if !email.contains('@') || !email.contains('.') {
+        let html = render::render_contact_page(
+            s,
+            &settings,
+            Some(("error", "Please enter a valid email address.")),
+        );
+        return Some(RawHtml(html));
+    }
+
+    // Send email to admin
+    let admin_email = settings
+        .get("admin_email")
+        .cloned()
+        .unwrap_or_default();
+    if admin_email.is_empty() {
+        let html = render::render_contact_page(
+            s,
+            &settings,
+            Some(("error", "Contact form is not configured. Please try again later.")),
+        );
+        return Some(RawHtml(html));
+    }
+
+    let site_name = settings
+        .get("site_name")
+        .cloned()
+        .unwrap_or_else(|| "Velocty".to_string());
+    let subject = format!("[{}] Contact from {}", site_name, name);
+    let body = format!(
+        "New contact form submission:\n\nName: {}\nEmail: {}\n\nMessage:\n{}",
+        name, email, message
+    );
+
+    let from = crate::email::get_from_or_admin(&settings);
+    match crate::email::send_via_provider(&settings, &from, &admin_email, &subject, &body) {
+        Ok(()) => {
+            log::info!("[contact] Form submitted by {} <{}>", name, email);
+            let html = render::render_contact_page(
+                s,
+                &settings,
+                Some(("success", "Message sent! Thank you for getting in touch.")),
+            );
+            Some(RawHtml(html))
+        }
+        Err(e) => {
+            log::error!("[contact] Failed to send email: {}", e);
+            let html = render::render_contact_page(
+                s,
+                &settings,
+                Some(("error", "Failed to send message. Please try again later.")),
+            );
+            Some(RawHtml(html))
+        }
+    }
+}
+
 // ── Image proxy: /img/<token> ─────────────────────────
 // Decodes the token, verifies HMAC, serves the file with caching headers.
 
@@ -437,6 +545,8 @@ pub fn root_routes() -> Vec<rocket::Route> {
         robots,
         privacy_page,
         terms_page,
+        contact_page,
+        contact_submit,
         image_proxy_route,
         serve_uploads,
     ]

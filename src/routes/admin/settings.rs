@@ -471,7 +471,7 @@ pub fn settings_save(
             .map(|t| format!("#{}", t))
             .unwrap_or_default();
         let err_section = match section {
-            "blog" | "portfolio" => "pages",
+            "blog" | "portfolio" | "contact" => "pages",
             _ => section,
         };
         return Err(Flash::error(
@@ -529,6 +529,7 @@ pub fn settings_save(
             "portfolio_enable_likes",
             "portfolio_image_protection",
         ],
+        "contact" => &["contact_page_enabled", "contact_form_enabled"],
         "comments" => &[
             "comments_enabled",
             "comments_on_blog",
@@ -665,8 +666,7 @@ pub fn settings_save(
 
     // blog/portfolio sections now live under the unified "pages" tab
     let redirect_section = match section {
-        "blog" => "pages",
-        "portfolio" => "pages",
+        "blog" | "portfolio" | "contact" => "pages",
         _ => section,
     };
 

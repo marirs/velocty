@@ -620,6 +620,7 @@ pub fn render_legal_page(
             format!("<p class=\"site-tagline\">{}</p>", html_escape(&tagline))
         };
         html = html.replace("{{tagline_html}}", &tagline_html);
+        html = html.replace("{{categories_below_menu}}", "");
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
@@ -655,6 +656,440 @@ pub fn render_legal_page(
         }
 
         // Prepend site comment header
+        let site_url = sg("site_url", "");
+        let comment = format!(
+            "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty (https://velocty.io)\n-->\n",
+            if site_url.is_empty() {
+                "http://localhost:8000"
+            } else {
+                &site_url
+            },
+            html_escape(&design.name),
+        );
+        html.insert_str(0, &comment);
+
+        html
+    };
+    result
+}
+
+/// Renders the contact page using the same DB-driven shell.
+/// `flash` is an optional success/error message from form submission.
+pub fn render_contact_page(
+    store: &dyn Store,
+    settings: &std::collections::HashMap<String, String>,
+    flash: Option<(&str, &str)>,
+) -> String {
+    let sg = |key: &str, def: &str| -> String {
+        settings.get(key).cloned().unwrap_or_else(|| def.to_string())
+    };
+
+    let contact_label = sg("contact_label", "Contact");
+    let layout = sg("contact_layout", "modern");
+    let name = sg("contact_name", "");
+    let address = sg("contact_address", "");
+    let phone = sg("contact_phone", "");
+    let email = sg("contact_email", "");
+    let email = if email.is_empty() {
+        sg("admin_email", "")
+    } else {
+        email
+    };
+    let text = sg("contact_text", "");
+    let photo = sg("contact_photo", "");
+    let form_enabled = sg("contact_form_enabled", "true") == "true";
+
+    // Build info block
+    let mut info_html = String::new();
+    if !text.is_empty() {
+        info_html.push_str(&format!(
+            "<p class=\"contact-text\">{}</p>",
+            html_escape(&text).replace('\n', "<br>")
+        ));
+    }
+    if !address.is_empty() {
+        info_html.push_str(&format!(
+            "<p class=\"contact-address\">{}</p>",
+            html_escape(&address).replace('\n', "<br>")
+        ));
+    }
+    let mut details = String::new();
+    if !phone.is_empty() {
+        details.push_str(&format!(
+            "<div class=\"contact-detail\"><strong>Phone:</strong> {}</div>",
+            html_escape(&phone)
+        ));
+    }
+    if !email.is_empty() {
+        details.push_str(&format!(
+            "<div class=\"contact-detail\"><strong>Email:</strong> <a href=\"mailto:{}\">{}</a></div>",
+            html_escape(&email),
+            html_escape(&email)
+        ));
+    }
+    if !details.is_empty() {
+        info_html.push_str(&format!("<div class=\"contact-details\">{}</div>", details));
+    }
+
+    // Social links (inline style for contact page)
+    let settings_json = serde_json::to_value(settings).unwrap_or_default();
+    let social = build_social_links_inline(&settings_json);
+    if !social.is_empty() {
+        info_html.push_str(&format!(
+            "<div class=\"contact-social\" style=\"display:flex;gap:12px;margin-top:16px\">{}</div>",
+            social
+        ));
+    }
+
+    // Build form block
+    let form_html = if form_enabled {
+        let flash_html = match flash {
+            Some(("success", msg)) => format!(
+                "<div class=\"contact-flash contact-flash-success\" style=\"padding:12px;margin-bottom:16px;border-radius:6px;background:rgba(34,197,94,.12);color:#16a34a;font-size:14px\">{}</div>",
+                html_escape(msg)
+            ),
+            Some(("error", msg)) => format!(
+                "<div class=\"contact-flash contact-flash-error\" style=\"padding:12px;margin-bottom:16px;border-radius:6px;background:rgba(239,68,68,.12);color:#ef4444;font-size:14px\">{}</div>",
+                html_escape(msg)
+            ),
+            _ => String::new(),
+        };
+        format!(
+            r#"{flash_html}<form method="post" action="/contact" class="contact-form">
+<div class="contact-form-group"><label for="cf-name">Name <span style="color:#999">(required)</span></label><input type="text" id="cf-name" name="name" required placeholder="Your name"></div>
+<div class="contact-form-group"><label for="cf-email">Email <span style="color:#999">(required)</span></label><input type="email" id="cf-email" name="email" required placeholder="your@email.com"></div>
+<div class="contact-form-group"><label for="cf-message">Message <span style="color:#999">(required)</span></label><textarea id="cf-message" name="message" rows="6" required placeholder="Your message…"></textarea></div>
+<div style="display:none"><input type="text" name="_honey" tabindex="-1" autocomplete="off"></div>
+<button type="submit" class="contact-submit">Send Message</button>
+</form>"#,
+            flash_html = flash_html
+        )
+    } else {
+        String::new()
+    };
+
+    // Photo HTML
+    let photo_html = if !photo.is_empty() {
+        format!(
+            "<img src=\"/uploads/{}\" alt=\"{}\" class=\"contact-photo\">",
+            html_escape(&photo),
+            html_escape(&name)
+        )
+    } else {
+        String::new()
+    };
+
+    // Build body based on layout
+    let title_html = format!(
+        "<h1 class=\"contact-title\">{}</h1>",
+        html_escape(&contact_label)
+    );
+
+    let body = match layout.as_str() {
+        "compact" => {
+            // Single column, no photo
+            let separator = if form_enabled && !info_html.is_empty() {
+                "<hr class=\"contact-divider\">"
+            } else {
+                ""
+            };
+            format!(
+                "<div class=\"contact-page contact-compact\">\
+                <div class=\"contact-inner\" style=\"max-width:640px;margin:0 auto;padding:40px 20px\">\
+                {title}{info}{sep}{form}\
+                </div></div>",
+                title = title_html,
+                info = info_html,
+                sep = separator,
+                form = form_html,
+            )
+        }
+        "wide" => {
+            // Full-width hero photo, content below
+            let hero = if !photo_html.is_empty() {
+                format!(
+                    "<div class=\"contact-hero\" style=\"width:100%;max-height:500px;overflow:hidden\">\
+                    <img src=\"/uploads/{}\" alt=\"{}\" style=\"width:100%;height:auto;display:block;object-fit:cover;max-height:500px\">\
+                    </div>",
+                    html_escape(&photo),
+                    html_escape(&name)
+                )
+            } else {
+                String::new()
+            };
+            let separator = if form_enabled && !info_html.is_empty() {
+                "<hr class=\"contact-divider\">"
+            } else {
+                ""
+            };
+            format!(
+                "<div class=\"contact-page contact-wide\">\
+                {hero}\
+                <div class=\"contact-inner\" style=\"max-width:640px;margin:0 auto;padding:40px 20px\">\
+                {title}{info}{sep}{form}\
+                </div></div>",
+                hero = hero,
+                title = title_html,
+                info = info_html,
+                sep = separator,
+                form = form_html,
+            )
+        }
+        "modern" => {
+            // Two-column: left = photo + text, right = form. Title centered above.
+            let left = format!(
+                "<div class=\"contact-col-left\" style=\"flex:1;min-width:280px\">{photo}{info}</div>",
+                photo = if !photo_html.is_empty() {
+                    format!("<div class=\"contact-photo-wrap\" style=\"margin-bottom:20px\">{}</div>", photo_html)
+                } else {
+                    String::new()
+                },
+                info = info_html,
+            );
+            let right = if form_enabled {
+                format!(
+                    "<div class=\"contact-col-right\" style=\"flex:1;min-width:280px\">{}</div>",
+                    form_html
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                "<div class=\"contact-page contact-modern\">\
+                <div class=\"contact-inner\" style=\"max-width:900px;margin:0 auto;padding:40px 20px\">\
+                {title}\
+                <div class=\"contact-columns\" style=\"display:flex;gap:40px;margin-top:24px;flex-wrap:wrap\">\
+                {left}{right}\
+                </div></div></div>",
+                title = title_html,
+                left = left,
+                right = right,
+            )
+        }
+        "split" | _ => {
+            // Two equal columns: left = all info, right = form. No hero.
+            let left = format!(
+                "<div class=\"contact-col-left\" style=\"flex:1;min-width:280px\">{title}{info}</div>",
+                title = title_html,
+                info = info_html,
+            );
+            let right = if form_enabled {
+                format!(
+                    "<div class=\"contact-col-right\" style=\"flex:1;min-width:280px\">{}</div>",
+                    form_html
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                "<div class=\"contact-page contact-split\">\
+                <div class=\"contact-inner\" style=\"max-width:900px;margin:0 auto;padding:40px 20px\">\
+                <div class=\"contact-columns\" style=\"display:flex;gap:40px;flex-wrap:wrap\">\
+                {left}{right}\
+                </div></div></div>",
+                left = left,
+                right = right,
+            )
+        }
+    };
+
+    // Contact page CSS
+    let contact_css = r#"<style>
+.contact-title { font-size:2em; margin-bottom:24px; }
+.contact-text { font-size:1em; line-height:1.7; margin-bottom:16px; color:inherit; }
+.contact-address { font-size:.95em; line-height:1.6; margin-bottom:12px; }
+.contact-details { margin-bottom:16px; }
+.contact-detail { font-size:.95em; line-height:1.8; }
+.contact-detail a { color:inherit; text-decoration:underline; }
+.contact-divider { border:none; border-top:1px solid rgba(128,128,128,.2); margin:32px 0; }
+.contact-photo { width:100%; max-width:400px; height:auto; display:block; }
+.contact-form-group { margin-bottom:16px; }
+.contact-form-group label { display:block; font-size:.9em; font-weight:600; margin-bottom:6px; }
+.contact-form-group input,
+.contact-form-group textarea {
+    width:100%; padding:10px 12px; font-size:.95em; border:1px solid rgba(128,128,128,.3);
+    background:transparent; color:inherit; border-radius:4px; font-family:inherit;
+    box-sizing:border-box;
+}
+.contact-form-group textarea { resize:vertical; }
+.contact-submit {
+    display:inline-block; padding:12px 28px; font-size:.95em; font-weight:600;
+    background:#222; color:#fff; border:none; border-radius:4px; cursor:pointer;
+    font-family:inherit; transition:background .15s;
+}
+.contact-submit:hover { background:#444; }
+.contact-social a { opacity:.7; transition:opacity .15s; }
+.contact-social a:hover { opacity:1; }
+@media (max-width:640px) {
+    .contact-columns { flex-direction:column !important; }
+}
+</style>"#;
+
+    // Now render using the same shell as legal pages
+    let seo_html = format!(
+        "<title>{} — {}</title>{}",
+        html_escape(&contact_label),
+        html_escape(&sg("site_name", "Velocty")),
+        contact_css,
+    );
+    let body_with_page_type = body;
+
+    // Reuse render_legal_page's shell approach
+    let categories = store.category_list(Some("portfolio"));
+    let cats_json = serde_json::to_value(&categories).unwrap_or_default();
+    let context = serde_json::json!({
+        "settings": settings_json,
+        "categories": cats_json,
+        "page_type": "contact",
+        "seo": seo_html,
+    });
+    let design = store.design_active().expect("No active design found");
+
+    let result = {
+        let settings_v = context.get("settings").cloned().unwrap_or_default();
+        let css_vars = typography::build_css_variables(&settings_v);
+        let font_links = typography::build_font_links(&settings_v);
+        let sg = |key: &str, def: &str| -> String {
+            settings_v
+                .get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or(def)
+                .to_string()
+        };
+
+        let mut html = design.layout_html.clone();
+        html = html.replace("{{seo_meta}}", &seo_html);
+        html = html.replace("{{webmaster_meta}}", "");
+        html = html.replace("{{favicon_link}}", &build_favicon_link(&settings_v));
+        html = html.replace("{{font_links}}", &font_links);
+        html = html.replace("{{css_vars}}", &css_vars);
+        let full_base_css = format!(
+            "{}{}{}{}{}{}{}{}{}{}",
+            BASE_CSS,
+            crate::designs::oneguy::journal::list_classic::css(),
+            crate::designs::oneguy::journal::list_classic::list_css(),
+            crate::designs::oneguy::journal::list_compact::list_css(),
+            crate::designs::oneguy::journal::list_editorial::list_css(),
+            crate::designs::oneguy::journal::list_editorial::single_css(),
+            crate::designs::oneguy::journal::grid::css(),
+            crate::designs::oneguy::journal::grid::single_css(),
+            crate::designs::inkwell::journal::list_css(),
+            crate::designs::inkwell::journal::single_css(),
+        );
+        html = html.replace("{{base_css}}", &full_base_css);
+        html = html.replace("{{design_css}}", &design.style_css);
+        html = html.replace("{{body_class}}", "");
+        html = html.replace("{{data_attrs}}", "");
+        html = html.replace("{{wrapper_classes}}", "");
+        html = html.replace("{{logo_html}}", &build_logo_html(&settings_v));
+        let site_name_display_raw = sg("site_name_display", "text");
+        let site_name_raw = sg("site_name", "Velocty");
+        let has_logo = settings_v
+            .get("site_logo")
+            .and_then(|v| v.as_str())
+            .map_or(false, |s| !s.is_empty());
+        let site_name_display = if site_name_display_raw == "logo" && !has_logo {
+            "text".to_string()
+        } else {
+            site_name_display_raw
+        };
+        let site_name = if site_name_display == "none" || site_name_display == "logo" {
+            String::new()
+        } else {
+            site_name_raw
+        };
+        let site_name_html = if site_name.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<h1 class=\"site-name\"><a href=\"/\">{}</a></h1>",
+                html_escape(&site_name)
+            )
+        };
+        html = html.replace("{{site_name_html}}", &site_name_html);
+        let tagline_on = sg("site_tagline_enabled", "true") != "false";
+        let tagline = if tagline_on {
+            sg("site_caption", "")
+        } else {
+            String::new()
+        };
+        let tagline_html = if tagline.is_empty() {
+            String::new()
+        } else {
+            format!("<p class=\"site-tagline\">{}</p>", html_escape(&tagline))
+        };
+        html = html.replace("{{tagline_html}}", &tagline_html);
+
+        // Build nav links for contact page (so nav is visible)
+        let nav_order_raw = sg("nav_order", "portfolio,blog,contact");
+        let nav_order: Vec<&str> = nav_order_raw.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        let portfolio_enabled = sg("portfolio_enabled", "false") == "true";
+        let journal_enabled = sg("journal_enabled", "true") != "false";
+        let contact_enabled = sg("contact_page_enabled", "false") == "true";
+        let portfolio_slug = sg("portfolio_slug", "portfolio");
+        let portfolio_label = sg("portfolio_label", "experiences");
+        let blog_slug = sg("blog_slug", "journal");
+        let blog_label = sg("blog_label", "journal");
+        let contact_label = sg("contact_label", "contact");
+        let mut nav_html = String::new();
+        for key in &nav_order {
+            match *key {
+                "portfolio" if portfolio_enabled => {
+                    let href = if portfolio_slug.is_empty() { "/".to_string() } else { format!("/{}", portfolio_slug) };
+                    nav_html.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n", href, html_escape(&portfolio_label)));
+                }
+                "blog" if journal_enabled => {
+                    let href = if blog_slug.is_empty() { "/".to_string() } else { format!("/{}", blog_slug) };
+                    nav_html.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n", href, html_escape(&blog_label)));
+                }
+                "contact" if contact_enabled => {
+                    nav_html.push_str(&format!("<a href=\"/contact\" class=\"nav-link active\">{}</a>\n", html_escape(&contact_label)));
+                }
+                _ => {}
+            }
+        }
+        if sg("design_site_search", "true") == "true" {
+            let search_html = "<a href=\"/search\" class=\"nav-link nav-search\" aria-label=\"Search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg></a>\n";
+            if sg("search_nav_position", "after") == "before" {
+                nav_html.insert_str(0, search_html);
+            } else {
+                nav_html.push_str(search_html);
+            }
+        }
+        html = html.replace("{{categories_below_menu}}", "");
+        html = html.replace("{{nav_links}}", &nav_html);
+        html = html.replace("{{share_sidebar}}", "");
+        html = html.replace("{{custom_sidebar_html}}", "");
+        html = html.replace("{{social_sidebar}}", &build_social_links(&settings_v));
+        html = html.replace(
+            "{{footer_legal_links}}",
+            &build_footer_legal_links(&settings_v),
+        );
+        html = html.replace("{{body_content}}", &body_with_page_type);
+        html = html.replace(
+            "{{footer_inner}}",
+            &format!(
+                "<span class=\"footer-copyright\">&copy; {} {}</span>",
+                chrono::Utc::now().format("%Y"),
+                html_escape(&sg("site_name", "Velocty"))
+            ),
+        );
+        html = html.replace("{{back_to_top}}", &build_back_to_top(&settings_v));
+        html = html.replace("{{lightbox_js}}", "");
+        html = html.replace("{{image_protection_js}}", "");
+        html = html.replace(
+            "{{analytics_scripts}}",
+            &seo::build_analytics_scripts(&settings_v),
+        );
+        html = html.replace(
+            "{{cookie_consent}}",
+            &build_cookie_consent_banner(&settings_v),
+        );
+        let proxy_secret = sg("image_proxy_secret", "");
+        if !proxy_secret.is_empty() {
+            html = crate::image_proxy::rewrite_upload_urls(&html, &proxy_secret);
+        }
+
         let site_url = sg("site_url", "");
         let comment = format!(
             "<!--\n  Site: {}\n  Design: {}\n  Powered by: Velocty (https://velocty.io)\n-->\n",

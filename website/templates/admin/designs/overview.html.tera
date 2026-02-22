@@ -1084,7 +1084,7 @@ function czToggle(btn) {
     var NAV_ITEMS = {
         portfolio: { label: 'portfolio_label', defaultLabel: '{{ settings.portfolio_label | default(value="experiences") }}', enabled: {{ settings.portfolio_enabled | default(value="false") }} },
         blog:      { label: 'blog_label',      defaultLabel: '{{ settings.blog_label | default(value="journal") }}',      enabled: {{ settings.journal_enabled | default(value="true") }} },
-        contact:   { label: 'contact_label',   defaultLabel: '{{ settings.contact_label | default(value="contact") }}',   enabled: true }
+        contact:   { label: 'contact_label',   defaultLabel: '{{ settings.contact_label | default(value="contact") }}',   enabled: {{ settings.contact_page_enabled | default(value="false") }} }
     };
     var orderInput = document.querySelector('[data-setting="nav_order"]');
     var container = document.getElementById('nav-sortable');

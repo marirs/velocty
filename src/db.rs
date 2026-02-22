@@ -556,6 +556,16 @@ pub fn default_settings() -> Vec<(&'static str, &'static str)> {
         ("contact_label", "contact"),
         ("nav_order", "portfolio,blog,contact"),
         ("copyright_text", ""),
+        // Contact page
+        ("contact_page_enabled", "false"),
+        ("contact_name", ""),
+        ("contact_address", ""),
+        ("contact_phone", ""),
+        ("contact_email", ""),
+        ("contact_text", ""),
+        ("contact_photo", ""),
+        ("contact_form_enabled", "true"),
+        ("contact_layout", "modern"),
         // Journal
         ("journal_enabled", "true"),
         ("blog_slug", ""),

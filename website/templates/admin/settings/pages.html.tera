@@ -23,6 +23,7 @@
 <div class="settings-sub-nav" style="margin-bottom:16px">
     <a href="#journal" class="sub-tab active" data-subtab="journal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Journal</a>
     <a href="#portfolio" class="sub-tab" data-subtab="portfolio"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Portfolio</a>
+    <a href="#contact" class="sub-tab" data-subtab="contact"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Contact</a>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ -->
@@ -141,6 +142,90 @@
 </form>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CONTACT SUB-TAB                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="subtab-panel" id="panel-contact" style="display:none">
+<form method="post" action="/{{ admin_slug }}/settings/contact">
+    <input type="hidden" name="_tab" value="contact">
+    <div class="form-card">
+        <h3>Page</h3>
+        <label class="checkbox-item"><input type="checkbox" id="contact_page_enabled" name="contact_page_enabled" value="true" {% if settings.contact_page_enabled == "true" %}checked{% endif %}> Enable Contact Page</label>
+        <span class="form-help">Show a Contact page on your site at <code>/contact</code>. The page name can be customised in the Designer.</span>
+    </div>
+
+    <fieldset id="contact-fields" {% if settings.contact_page_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+    <div class="form-card">
+        <h3>Contact Information</h3>
+        <span class="form-help" style="margin-bottom:12px;display:block">All fields are optional. Only filled fields will be displayed on the contact page.</span>
+        <div class="form-group">
+            <label for="contact_name">Name</label>
+            <input type="text" id="contact_name" name="contact_name" value="{{ settings.contact_name | default(value='') }}" placeholder="Your name or business name">
+        </div>
+        <div class="form-group">
+            <label for="contact_email">Email</label>
+            <input type="email" id="contact_email" name="contact_email" value="{{ settings.contact_email | default(value='') }}" placeholder="hello@example.com">
+            <span class="form-help">Displayed on the page. Falls back to admin email if empty.</span>
+        </div>
+        <div class="form-group">
+            <label for="contact_phone">Phone</label>
+            <input type="text" id="contact_phone" name="contact_phone" value="{{ settings.contact_phone | default(value='') }}" placeholder="+1 234 567 890">
+        </div>
+        <div class="form-group">
+            <label for="contact_address">Address</label>
+            <textarea id="contact_address" name="contact_address" rows="3" placeholder="123 Main Street&#10;City, Country">{{ settings.contact_address | default(value='') }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="contact_text">Introduction Text</label>
+            <textarea id="contact_text" name="contact_text" rows="4" placeholder="A short paragraph about yourself or how to get in touch…">{{ settings.contact_text | default(value='') }}</textarea>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Photo</h3>
+        <span class="form-help" style="margin-bottom:12px;display:block">Optional photo displayed on the contact page. Used by the Modern and Wide layouts.</span>
+        <div class="form-group">
+            <div class="image-drop-zone {% if settings.contact_photo %}has-image{% endif %}" id="contact-photo-zone" style="width:100%;height:140px">
+                <input type="file" id="contact-photo-file" name="contact_photo_file" accept="image/*,.heic,.heif">
+                <input type="hidden" id="contact-photo-path" name="contact_photo" value="{{ settings.contact_photo | default(value='') }}">
+                <div class="drop-placeholder" id="contact-photo-placeholder" {% if settings.contact_photo %}style="display:none"{% endif %}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16v-8m-4 4l4-4 4 4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                    <span>Drop image or click to browse</span>
+                </div>
+                {% if settings.contact_photo %}
+                <img id="contact-photo-preview" src="/uploads/{{ settings.contact_photo }}" alt="Contact photo">
+                {% else %}
+                <img id="contact-photo-preview" style="display:none" alt="Contact photo">
+                {% endif %}
+                <button type="button" class="drop-clear" id="contact-photo-clear" title="Remove">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h3>Contact Form</h3>
+        <label class="checkbox-item"><input type="checkbox" id="contact_form_enabled" name="contact_form_enabled" value="true" {% if settings.contact_form_enabled != "false" %}checked{% endif %}> Enable contact form</label>
+        <span class="form-help">Show a Name / Email / Message form. Submissions are sent to your admin email address.</span>
+    </div>
+
+    <div class="form-card">
+        <h3>Layout</h3>
+        <div class="form-group">
+            <label for="contact_layout">Contact Page Layout</label>
+            <select id="contact_layout" name="contact_layout">
+                <option value="compact" {% if settings.contact_layout == "compact" %}selected{% endif %}>Compact — Single column, no photo</option>
+                <option value="wide" {% if settings.contact_layout == "wide" %}selected{% endif %}>Wide — Full-width hero photo, content below</option>
+                <option value="modern" {% if settings.contact_layout == "modern" %}selected{% endif %}>Modern — Photo + text left, form right</option>
+                <option value="split" {% if settings.contact_layout == "split" %}selected{% endif %}>Split — Info left, form right (no hero)</option>
+            </select>
+        </div>
+    </div>
+    </fieldset>
+
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Save Contact <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
+</form>
+</div>
+
 {% endblock content %}
 
 {% block scripts %}
@@ -157,6 +242,7 @@
     // Activate from URL hash or default to journal
     var hash = location.hash.replace('#', '');
     if (hash === 'portfolio') activate('portfolio');
+    else if (hash === 'contact') activate('contact');
     else activate('journal');
 
     tabs.forEach(function(t) {
@@ -181,6 +267,74 @@
             document.getElementById('portfolio-fields').disabled = !this.checked;
         });
     }
+    var contactCb = document.getElementById('contact_page_enabled');
+    if (contactCb) {
+        contactCb.addEventListener('change', function() {
+            document.getElementById('contact-fields').disabled = !this.checked;
+        });
+    }
+
+    // Contact photo drop zone (AJAX upload)
+    (function() {
+        var zone = document.getElementById('contact-photo-zone');
+        if (!zone) return;
+        var fileInput = document.getElementById('contact-photo-file');
+        var pathInput = document.getElementById('contact-photo-path');
+        var placeholder = document.getElementById('contact-photo-placeholder');
+        var preview = document.getElementById('contact-photo-preview');
+        var clearBtn = document.getElementById('contact-photo-clear');
+        var adminSlug = '{{ admin_slug }}';
+
+        function uploadAndPreview(file) {
+            // Show local preview immediately
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                preview.src = e.target.result;
+                preview.style.display = '';
+                placeholder.style.display = 'none';
+                zone.classList.add('has-image');
+            };
+            reader.readAsDataURL(file);
+            // AJAX upload
+            var fd = new FormData();
+            fd.append('file', file);
+            fetch('/' + adminSlug + '/upload/image', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.location) {
+                        // Extract filename from /uploads/editor/filename.jpg
+                        pathInput.value = data.location.replace('/uploads/', '');
+                        preview.src = data.location;
+                    }
+                });
+        }
+
+        zone.addEventListener('click', function(e) {
+            if (e.target === clearBtn || e.target.closest('.drop-clear')) return;
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) uploadAndPreview(this.files[0]);
+        });
+        zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault(); zone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                fileInput.files = e.dataTransfer.files;
+                uploadAndPreview(e.dataTransfer.files[0]);
+            }
+        });
+        clearBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            fileInput.value = '';
+            pathInput.value = '';
+            preview.style.display = 'none';
+            preview.src = '';
+            placeholder.style.display = '';
+            zone.classList.remove('has-image');
+        });
+    })();
 })();
 </script>
 {% endblock scripts %}

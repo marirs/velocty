@@ -7936,3 +7936,143 @@ fn mta_queue_stats_counts_by_status() {
     assert_eq!(failed, 1);
     assert_eq!(total, 3);
 }
+
+// ═══════════════════════════════════════════════════════════
+// Contact Page
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn contact_page_seed_defaults() {
+    let pool = test_pool();
+    assert_eq!(Setting::get_or(&pool, "contact_page_enabled", ""), "false");
+    assert_eq!(Setting::get_or(&pool, "contact_form_enabled", ""), "true");
+    assert_eq!(Setting::get_or(&pool, "contact_layout", ""), "modern");
+    assert_eq!(Setting::get_or(&pool, "contact_name", "x"), "");
+    assert_eq!(Setting::get_or(&pool, "contact_address", "x"), "");
+    assert_eq!(Setting::get_or(&pool, "contact_phone", "x"), "");
+    assert_eq!(Setting::get_or(&pool, "contact_email", "x"), "");
+    assert_eq!(Setting::get_or(&pool, "contact_text", "x"), "");
+    assert_eq!(Setting::get_or(&pool, "contact_photo", "x"), "");
+}
+
+#[test]
+fn contact_page_render_compact() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "contact_layout", "compact").unwrap();
+    Setting::set(&pool, "contact_name", "Alice").unwrap();
+    Setting::set(&pool, "contact_email", "alice@example.com").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("contact-compact"));
+    assert!(html.contains("alice@example.com"));
+    assert!(html.contains("contact-form")); // form enabled by default
+}
+
+#[test]
+fn contact_page_render_wide() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "contact_layout", "wide").unwrap();
+    Setting::set(&pool, "contact_phone", "+1 555 1234").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("contact-wide"));
+    assert!(html.contains("+1 555 1234"));
+}
+
+#[test]
+fn contact_page_render_modern() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "contact_layout", "modern").unwrap();
+    Setting::set(&pool, "contact_text", "Get in touch!").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("contact-modern"));
+    assert!(html.contains("Get in touch!"));
+    assert!(html.contains("contact-col-left"));
+    assert!(html.contains("contact-col-right"));
+}
+
+#[test]
+fn contact_page_render_split() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "contact_layout", "split").unwrap();
+    Setting::set(&pool, "contact_address", "123 Main St").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("contact-split"));
+    assert!(html.contains("123 Main St"));
+}
+
+#[test]
+fn contact_page_form_disabled() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "contact_form_enabled", "false").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(!html.contains("<form method=\"post\""));
+    assert!(!html.contains("Send Message"));
+}
+
+#[test]
+fn contact_page_flash_messages() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    let settings = store.setting_all();
+
+    let html = crate::render::render_contact_page(store, &settings, Some(("success", "Sent!")));
+    assert!(html.contains("contact-flash-success"));
+    assert!(html.contains("Sent!"));
+
+    let html = crate::render::render_contact_page(store, &settings, Some(("error", "Failed")));
+    assert!(html.contains("contact-flash-error"));
+    assert!(html.contains("Failed"));
+}
+
+#[test]
+fn contact_page_nav_links_present() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "journal_enabled", "true").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    // Contact nav link should be active
+    assert!(html.contains("nav-link active"));
+    // Journal nav link should be present
+    assert!(html.contains("nav-link"));
+}
+
+#[test]
+fn contact_page_social_links() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+    Setting::set(&pool, "social_twitter", "https://twitter.com/test").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("contact-social"));
+}
+
+#[test]
+fn contact_page_email_helper() {
+    let mut settings = std::collections::HashMap::new();
+    settings.insert("admin_email".to_string(), "admin@example.com".to_string());
+    let from = crate::email::get_from_or_admin(&settings);
+    assert_eq!(from, "admin@example.com");
+
+    // With explicit from address
+    settings.insert("email_from_address".to_string(), "noreply@example.com".to_string());
+    let from = crate::email::get_from_or_admin(&settings);
+    assert_eq!(from, "noreply@example.com");
+}
