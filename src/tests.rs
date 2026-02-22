@@ -7947,6 +7947,7 @@ fn contact_page_seed_defaults() {
     assert_eq!(Setting::get_or(&pool, "contact_page_enabled", ""), "false");
     assert_eq!(Setting::get_or(&pool, "contact_form_enabled", ""), "true");
     assert_eq!(Setting::get_or(&pool, "contact_layout", ""), "modern");
+    assert_eq!(Setting::get_or(&pool, "contact_alignment", ""), "left");
     assert_eq!(Setting::get_or(&pool, "contact_name", "x"), "");
     assert_eq!(Setting::get_or(&pool, "contact_address", "x"), "");
     assert_eq!(Setting::get_or(&pool, "contact_phone", "x"), "");
@@ -8062,6 +8063,30 @@ fn contact_page_social_links() {
     let settings = store.setting_all();
     let html = crate::render::render_contact_page(store, &settings, None);
     assert!(html.contains("contact-social"));
+}
+
+#[test]
+fn contact_page_alignment() {
+    let pool = test_pool();
+    let store: &dyn Store = &pool;
+    Setting::set(&pool, "contact_page_enabled", "true").unwrap();
+
+    // Default is left — margin-right:auto positions block to the left
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("margin-right:auto;margin-left:0;"));
+
+    // Center — margin:0 auto centers the block
+    Setting::set(&pool, "contact_alignment", "center").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("margin:0 auto;"));
+
+    // Right — margin-left:auto positions block to the right
+    Setting::set(&pool, "contact_alignment", "right").unwrap();
+    let settings = store.setting_all();
+    let html = crate::render::render_contact_page(store, &settings, None);
+    assert!(html.contains("margin-left:auto;margin-right:0;"));
 }
 
 #[test]

@@ -566,6 +566,7 @@ pub fn default_settings() -> Vec<(&'static str, &'static str)> {
         ("contact_photo", ""),
         ("contact_form_enabled", "true"),
         ("contact_layout", "modern"),
+        ("contact_alignment", "left"),
         // Journal
         ("journal_enabled", "true"),
         ("blog_slug", ""),

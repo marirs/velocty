@@ -183,7 +183,12 @@
 
     <div class="form-card">
         <h3>Photo</h3>
-        <span class="form-help" style="margin-bottom:12px;display:block">Optional photo displayed on the contact page. Used by the Modern and Wide layouts.</span>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">
+            <span class="form-help" style="margin:0">Optional photo displayed on the contact page. Used by the Modern and Wide layouts.</span>
+            <button type="button" id="contact-photo-browse" class="btn btn-sm" style="border:1px solid var(--accent);background:transparent;color:var(--accent);white-space:nowrap;flex-shrink:0" title="Pick from Media Library">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Browse Media Library
+            </button>
+        </div>
         <div class="form-group">
             <div class="image-drop-zone {% if settings.contact_photo %}has-image{% endif %}" id="contact-photo-zone" style="width:100%;height:140px">
                 <input type="file" id="contact-photo-file" name="contact_photo_file" accept="image/*,.heic,.heif">
@@ -219,6 +224,14 @@
                 <option value="split" {% if settings.contact_layout == "split" %}selected{% endif %}>Split — Info left, form right (no hero)</option>
             </select>
         </div>
+        <div class="form-group" style="margin-top:12px">
+            <label for="contact_alignment">Content Alignment</label>
+            <select id="contact_alignment" name="contact_alignment">
+                <option value="left" {% if settings.contact_alignment == "left" %}selected{% endif %}>Left</option>
+                <option value="center" {% if settings.contact_alignment == "center" %}selected{% endif %}>Centre</option>
+                <option value="right" {% if settings.contact_alignment == "right" %}selected{% endif %}>Right</option>
+            </select>
+        </div>
     </div>
     </fieldset>
 
@@ -226,6 +239,7 @@
 </form>
 </div>
 
+{% include "admin/media_modal" %}
 {% endblock content %}
 
 {% block scripts %}
@@ -334,6 +348,23 @@
             placeholder.style.display = '';
             zone.classList.remove('has-image');
         });
+
+        // Browse Media Library button
+        var browseBtn = document.getElementById('contact-photo-browse');
+        if (browseBtn) {
+            browseBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (typeof window.openMediaLibrary !== 'function') return;
+                window.openMediaLibrary(function(file) {
+                    if (!file.is_image) return;
+                    pathInput.value = file.path;
+                    preview.src = file.url;
+                    preview.style.display = '';
+                    placeholder.style.display = 'none';
+                    zone.classList.add('has-image');
+                });
+            });
+        }
     })();
 })();
 </script>

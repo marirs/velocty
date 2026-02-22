@@ -624,20 +624,13 @@ pub fn render_legal_page(
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
-        html = html.replace("{{social_sidebar}}", &build_social_links(&settings_v));
+        html = html.replace("{{social_sidebar}}", &build_social_sidebar_html(&settings_v));
         html = html.replace(
             "{{footer_legal_links}}",
             &build_footer_legal_links(&settings_v),
         );
         html = html.replace("{{body_content}}", &body);
-        html = html.replace(
-            "{{footer_inner}}",
-            &format!(
-                "<span class=\"footer-copyright\">&copy; {} {}</span>",
-                chrono::Utc::now().format("%Y"),
-                html_escape(&sg("site_name", "Velocty"))
-            ),
-        );
+        html = html.replace("{{footer_inner}}", &build_footer_inner_html(&settings_v));
         html = html.replace("{{back_to_top}}", &build_back_to_top(&settings_v));
         html = html.replace("{{lightbox_js}}", "");
         html = html.replace("{{image_protection_js}}", "");
@@ -684,257 +677,19 @@ pub fn render_contact_page(
         settings.get(key).cloned().unwrap_or_else(|| def.to_string())
     };
 
-    let contact_label = sg("contact_label", "Contact");
-    let layout = sg("contact_layout", "modern");
-    let name = sg("contact_name", "");
-    let address = sg("contact_address", "");
-    let phone = sg("contact_phone", "");
-    let email = sg("contact_email", "");
-    let email = if email.is_empty() {
-        sg("admin_email", "")
-    } else {
-        email
-    };
-    let text = sg("contact_text", "");
-    let photo = sg("contact_photo", "");
-    let form_enabled = sg("contact_form_enabled", "true") == "true";
-
-    // Build info block
-    let mut info_html = String::new();
-    if !text.is_empty() {
-        info_html.push_str(&format!(
-            "<p class=\"contact-text\">{}</p>",
-            html_escape(&text).replace('\n', "<br>")
-        ));
-    }
-    if !address.is_empty() {
-        info_html.push_str(&format!(
-            "<p class=\"contact-address\">{}</p>",
-            html_escape(&address).replace('\n', "<br>")
-        ));
-    }
-    let mut details = String::new();
-    if !phone.is_empty() {
-        details.push_str(&format!(
-            "<div class=\"contact-detail\"><strong>Phone:</strong> {}</div>",
-            html_escape(&phone)
-        ));
-    }
-    if !email.is_empty() {
-        details.push_str(&format!(
-            "<div class=\"contact-detail\"><strong>Email:</strong> <a href=\"mailto:{}\">{}</a></div>",
-            html_escape(&email),
-            html_escape(&email)
-        ));
-    }
-    if !details.is_empty() {
-        info_html.push_str(&format!("<div class=\"contact-details\">{}</div>", details));
-    }
-
-    // Social links (inline style for contact page)
     let settings_json = serde_json::to_value(settings).unwrap_or_default();
     let social = build_social_links_inline(&settings_json);
-    if !social.is_empty() {
-        info_html.push_str(&format!(
-            "<div class=\"contact-social\" style=\"display:flex;gap:12px;margin-top:16px\">{}</div>",
-            social
-        ));
-    }
+    let (body_with_page_type, contact_css) =
+        crate::designs::contact::render_body(settings, &social, flash);
 
-    // Build form block
-    let form_html = if form_enabled {
-        let flash_html = match flash {
-            Some(("success", msg)) => format!(
-                "<div class=\"contact-flash contact-flash-success\" style=\"padding:12px;margin-bottom:16px;border-radius:6px;background:rgba(34,197,94,.12);color:#16a34a;font-size:14px\">{}</div>",
-                html_escape(msg)
-            ),
-            Some(("error", msg)) => format!(
-                "<div class=\"contact-flash contact-flash-error\" style=\"padding:12px;margin-bottom:16px;border-radius:6px;background:rgba(239,68,68,.12);color:#ef4444;font-size:14px\">{}</div>",
-                html_escape(msg)
-            ),
-            _ => String::new(),
-        };
-        format!(
-            r#"{flash_html}<form method="post" action="/contact" class="contact-form">
-<div class="contact-form-group"><label for="cf-name">Name <span style="color:#999">(required)</span></label><input type="text" id="cf-name" name="name" required placeholder="Your name"></div>
-<div class="contact-form-group"><label for="cf-email">Email <span style="color:#999">(required)</span></label><input type="email" id="cf-email" name="email" required placeholder="your@email.com"></div>
-<div class="contact-form-group"><label for="cf-message">Message <span style="color:#999">(required)</span></label><textarea id="cf-message" name="message" rows="6" required placeholder="Your message…"></textarea></div>
-<div style="display:none"><input type="text" name="_honey" tabindex="-1" autocomplete="off"></div>
-<button type="submit" class="contact-submit">Send Message</button>
-</form>"#,
-            flash_html = flash_html
-        )
-    } else {
-        String::new()
-    };
-
-    // Photo HTML
-    let photo_html = if !photo.is_empty() {
-        format!(
-            "<img src=\"/uploads/{}\" alt=\"{}\" class=\"contact-photo\">",
-            html_escape(&photo),
-            html_escape(&name)
-        )
-    } else {
-        String::new()
-    };
-
-    // Build body based on layout
-    let title_html = format!(
-        "<h1 class=\"contact-title\">{}</h1>",
-        html_escape(&contact_label)
-    );
-
-    let body = match layout.as_str() {
-        "compact" => {
-            // Single column, no photo
-            let separator = if form_enabled && !info_html.is_empty() {
-                "<hr class=\"contact-divider\">"
-            } else {
-                ""
-            };
-            format!(
-                "<div class=\"contact-page contact-compact\">\
-                <div class=\"contact-inner\" style=\"max-width:640px;margin:0 auto;padding:40px 20px\">\
-                {title}{info}{sep}{form}\
-                </div></div>",
-                title = title_html,
-                info = info_html,
-                sep = separator,
-                form = form_html,
-            )
-        }
-        "wide" => {
-            // Full-width hero photo, content below
-            let hero = if !photo_html.is_empty() {
-                format!(
-                    "<div class=\"contact-hero\" style=\"width:100%;max-height:500px;overflow:hidden\">\
-                    <img src=\"/uploads/{}\" alt=\"{}\" style=\"width:100%;height:auto;display:block;object-fit:cover;max-height:500px\">\
-                    </div>",
-                    html_escape(&photo),
-                    html_escape(&name)
-                )
-            } else {
-                String::new()
-            };
-            let separator = if form_enabled && !info_html.is_empty() {
-                "<hr class=\"contact-divider\">"
-            } else {
-                ""
-            };
-            format!(
-                "<div class=\"contact-page contact-wide\">\
-                {hero}\
-                <div class=\"contact-inner\" style=\"max-width:640px;margin:0 auto;padding:40px 20px\">\
-                {title}{info}{sep}{form}\
-                </div></div>",
-                hero = hero,
-                title = title_html,
-                info = info_html,
-                sep = separator,
-                form = form_html,
-            )
-        }
-        "modern" => {
-            // Two-column: left = photo + text, right = form. Title centered above.
-            let left = format!(
-                "<div class=\"contact-col-left\" style=\"flex:1;min-width:280px\">{photo}{info}</div>",
-                photo = if !photo_html.is_empty() {
-                    format!("<div class=\"contact-photo-wrap\" style=\"margin-bottom:20px\">{}</div>", photo_html)
-                } else {
-                    String::new()
-                },
-                info = info_html,
-            );
-            let right = if form_enabled {
-                format!(
-                    "<div class=\"contact-col-right\" style=\"flex:1;min-width:280px\">{}</div>",
-                    form_html
-                )
-            } else {
-                String::new()
-            };
-            format!(
-                "<div class=\"contact-page contact-modern\">\
-                <div class=\"contact-inner\" style=\"max-width:900px;margin:0 auto;padding:40px 20px\">\
-                {title}\
-                <div class=\"contact-columns\" style=\"display:flex;gap:40px;margin-top:24px;flex-wrap:wrap\">\
-                {left}{right}\
-                </div></div></div>",
-                title = title_html,
-                left = left,
-                right = right,
-            )
-        }
-        "split" | _ => {
-            // Two equal columns: left = all info, right = form. No hero.
-            let left = format!(
-                "<div class=\"contact-col-left\" style=\"flex:1;min-width:280px\">{title}{info}</div>",
-                title = title_html,
-                info = info_html,
-            );
-            let right = if form_enabled {
-                format!(
-                    "<div class=\"contact-col-right\" style=\"flex:1;min-width:280px\">{}</div>",
-                    form_html
-                )
-            } else {
-                String::new()
-            };
-            format!(
-                "<div class=\"contact-page contact-split\">\
-                <div class=\"contact-inner\" style=\"max-width:900px;margin:0 auto;padding:40px 20px\">\
-                <div class=\"contact-columns\" style=\"display:flex;gap:40px;flex-wrap:wrap\">\
-                {left}{right}\
-                </div></div></div>",
-                left = left,
-                right = right,
-            )
-        }
-    };
-
-    // Contact page CSS
-    let contact_css = r#"<style>
-.contact-title { font-size:2em; margin-bottom:24px; }
-.contact-text { font-size:1em; line-height:1.7; margin-bottom:16px; color:inherit; }
-.contact-address { font-size:.95em; line-height:1.6; margin-bottom:12px; }
-.contact-details { margin-bottom:16px; }
-.contact-detail { font-size:.95em; line-height:1.8; }
-.contact-detail a { color:inherit; text-decoration:underline; }
-.contact-divider { border:none; border-top:1px solid rgba(128,128,128,.2); margin:32px 0; }
-.contact-photo { width:100%; max-width:400px; height:auto; display:block; }
-.contact-form-group { margin-bottom:16px; }
-.contact-form-group label { display:block; font-size:.9em; font-weight:600; margin-bottom:6px; }
-.contact-form-group input,
-.contact-form-group textarea {
-    width:100%; padding:10px 12px; font-size:.95em; border:1px solid rgba(128,128,128,.3);
-    background:transparent; color:inherit; border-radius:4px; font-family:inherit;
-    box-sizing:border-box;
-}
-.contact-form-group textarea { resize:vertical; }
-.contact-submit {
-    display:inline-block; padding:12px 28px; font-size:.95em; font-weight:600;
-    background:#222; color:#fff; border:none; border-radius:4px; cursor:pointer;
-    font-family:inherit; transition:background .15s;
-}
-.contact-submit:hover { background:#444; }
-.contact-social a { opacity:.7; transition:opacity .15s; }
-.contact-social a:hover { opacity:1; }
-@media (max-width:640px) {
-    .contact-columns { flex-direction:column !important; }
-}
-</style>"#;
-
-    // Now render using the same shell as legal pages
+    let contact_label = sg("contact_label", "Contact");
     let seo_html = format!(
         "<title>{} — {}</title>{}",
         html_escape(&contact_label),
         html_escape(&sg("site_name", "Velocty")),
         contact_css,
     );
-    let body_with_page_type = body;
 
-    // Reuse render_legal_page's shell approach
     let categories = store.category_list(Some("portfolio"));
     let cats_json = serde_json::to_value(&categories).unwrap_or_default();
     let context = serde_json::json!({
@@ -1060,20 +815,13 @@ pub fn render_contact_page(
         html = html.replace("{{nav_links}}", &nav_html);
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
-        html = html.replace("{{social_sidebar}}", &build_social_links(&settings_v));
+        html = html.replace("{{social_sidebar}}", &build_social_sidebar_html(&settings_v));
         html = html.replace(
             "{{footer_legal_links}}",
             &build_footer_legal_links(&settings_v),
         );
         html = html.replace("{{body_content}}", &body_with_page_type);
-        html = html.replace(
-            "{{footer_inner}}",
-            &format!(
-                "<span class=\"footer-copyright\">&copy; {} {}</span>",
-                chrono::Utc::now().format("%Y"),
-                html_escape(&sg("site_name", "Velocty"))
-            ),
-        );
+        html = html.replace("{{footer_inner}}", &build_footer_inner_html(&settings_v));
         html = html.replace("{{back_to_top}}", &build_back_to_top(&settings_v));
         html = html.replace("{{lightbox_js}}", "");
         html = html.replace("{{image_protection_js}}", "");
@@ -2243,6 +1991,94 @@ fn build_footer_legal_links(settings: &Value) -> String {
     }
     html.push_str("</div>");
     html
+}
+
+/// Build the social sidebar HTML respecting the social_icons_position setting.
+/// Returns the full social links HTML if position is "sidebar" or "both", else empty.
+fn build_social_sidebar_html(settings: &Value) -> String {
+    let pos = settings
+        .get("social_icons_position")
+        .and_then(|v| v.as_str())
+        .unwrap_or("sidebar");
+    if pos == "sidebar" || pos == "both" {
+        build_social_links(settings)
+    } else {
+        String::new()
+    }
+}
+
+/// Build the 3-cell footer inner HTML matching render_page's footer logic.
+/// Respects copyright_text, copyright_alignment, social_icons_position,
+/// footer_alignment, and design_powered_by settings.
+fn build_footer_inner_html(settings: &Value) -> String {
+    let sg = |key: &str, def: &str| -> String {
+        settings
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or(def)
+            .to_string()
+    };
+
+    let copyright_text = sg("copyright_text", "");
+    let copyright_align = sg("copyright_alignment", "center");
+    let social_footer_align = sg("footer_alignment", "center");
+    let powered_by = sg("design_powered_by", "false") == "true";
+
+    let social_pos = sg("social_icons_position", "sidebar");
+    let social_footer = if social_pos == "footer" || social_pos == "both" {
+        build_social_links_inline(settings)
+    } else {
+        String::new()
+    };
+
+    let has_copyright = !copyright_text.is_empty();
+    let has_social = !social_footer.is_empty();
+    if !has_copyright && !has_social && !powered_by {
+        return String::new();
+    }
+
+    let copyright_html = if has_copyright {
+        format!("<span class=\"footer-copyright\">{}</span>", copyright_text)
+    } else {
+        String::new()
+    };
+    let social_html = if has_social {
+        format!("<span class=\"footer-social\">{}</span>", social_footer)
+    } else {
+        String::new()
+    };
+    let powered_html = if powered_by {
+        "<span class=\"footer-powered\">Powered using <a href=\"https://velocty.io\" target=\"_blank\" rel=\"noopener\">Velocty</a></span>".to_string()
+    } else {
+        String::new()
+    };
+
+    let mut left = String::new();
+    let mut center = String::new();
+    let mut right = String::new();
+
+    if has_copyright {
+        match copyright_align.as_str() {
+            "center" => center.push_str(&copyright_html),
+            "right" => right.push_str(&copyright_html),
+            _ => left.push_str(&copyright_html),
+        }
+    }
+    if has_social {
+        match social_footer_align.as_str() {
+            "center" => center.push_str(&social_html),
+            "right" => right.push_str(&social_html),
+            _ => left.push_str(&social_html),
+        }
+    }
+    if powered_by {
+        right.push_str(&powered_html);
+    }
+
+    format!(
+        "<div class=\"footer-cell footer-left\">{}</div><div class=\"footer-cell footer-center\">{}</div><div class=\"footer-cell footer-right\">{}</div>",
+        left, center, right
+    )
 }
 
 fn build_back_to_top(settings: &Value) -> String {

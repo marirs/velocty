@@ -1014,6 +1014,36 @@
             </div>
             {% endif %}
 
+            <!-- ═══ CONTACT PAGE ═══ -->
+            {% if settings.contact_page_enabled == "true" %}
+            <div class="cz-section">
+                <button class="cz-section-toggle" onclick="czToggle(this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    <span>Contact Page</span>
+                    <svg class="cz-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="cz-section-body">
+                    <div class="cz-field">
+                        <label>Layout</label>
+                        <select name="contact_layout" data-setting="contact_layout">
+                            <option value="compact" {% if settings.contact_layout == "compact" %}selected{% endif %}>Compact</option>
+                            <option value="wide" {% if settings.contact_layout == "wide" %}selected{% endif %}>Wide</option>
+                            <option value="modern" {% if not settings.contact_layout is defined or settings.contact_layout == "modern" %}selected{% endif %}>Modern</option>
+                            <option value="split" {% if settings.contact_layout == "split" %}selected{% endif %}>Split</option>
+                        </select>
+                    </div>
+                    <div class="cz-field">
+                        <label>Alignment</label>
+                        <select name="contact_alignment" data-setting="contact_alignment">
+                            <option value="left" {% if not settings.contact_alignment is defined or settings.contact_alignment == "left" %}selected{% endif %}>Left</option>
+                            <option value="center" {% if settings.contact_alignment == "center" %}selected{% endif %}>Centre</option>
+                            <option value="right" {% if settings.contact_alignment == "right" %}selected{% endif %}>Right</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
         </div>
 
         <!-- Publish button -->
