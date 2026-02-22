@@ -1458,6 +1458,13 @@ const RESERVED_SLUGS: &[&str] = &[
     "magic-link",
     "forgot-password",
     "reset-password",
+    "passkey",
+    "passkeys",
+    "img",
+    "tag",
+    "category",
+    "search",
+    "contact",
 ];
 
 fn is_reserved(s: &str) -> bool {
