@@ -153,7 +153,7 @@ pub fn render_body(
             form_enabled,
             align_margin,
         ),
-        "split" | _ => render_split(
+        _ => render_split(
             &title_html,
             &info_html,
             &form_html,

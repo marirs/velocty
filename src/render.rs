@@ -51,7 +51,7 @@ fn render_with_shell(design: &Design, template_type: &str, context: &Value) -> S
     let has_logo = settings
         .get("site_logo")
         .and_then(|v| v.as_str())
-        .map_or(false, |s| !s.is_empty());
+        .is_some_and(|s| !s.is_empty());
     let site_name_display = if site_name_display_raw == "logo" && !has_logo {
         "text"
     } else {
@@ -588,7 +588,7 @@ pub fn render_legal_page(
         let has_logo = settings_v
             .get("site_logo")
             .and_then(|v| v.as_str())
-            .map_or(false, |s| !s.is_empty());
+            .is_some_and(|s| !s.is_empty());
         let site_name_display = if site_name_display_raw == "logo" && !has_logo {
             "text".to_string()
         } else {
@@ -748,7 +748,7 @@ pub fn render_contact_page(
         let has_logo = settings_v
             .get("site_logo")
             .and_then(|v| v.as_str())
-            .map_or(false, |s| !s.is_empty());
+            .is_some_and(|s| !s.is_empty());
         let site_name_display = if site_name_display_raw == "logo" && !has_logo {
             "text".to_string()
         } else {
