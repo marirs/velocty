@@ -7641,6 +7641,156 @@ fn mta_init_from_address_auto_populates() {
     assert_eq!(from, "noreply@photos.example.com");
 }
 
+// ═══════════════════════════════════════════════════════
+// AI Enabled / Vision Detection (refactor regression tests)
+// ═══════════════════════════════════════════════════════
+
+#[test]
+fn ai_is_enabled_false_by_default() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    // All AI providers default to "false", so is_enabled should be false
+    assert!(
+        !crate::ai::is_enabled(&store),
+        "ai::is_enabled should be false when no providers are enabled"
+    );
+}
+
+#[test]
+fn ai_is_enabled_true_when_provider_on() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    store.setting_set("ai_openai_enabled", "true").unwrap();
+    assert!(
+        crate::ai::is_enabled(&store),
+        "ai::is_enabled should be true when openai is enabled"
+    );
+}
+
+#[test]
+fn ai_has_vision_false_by_default() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    assert!(
+        !crate::ai::has_vision_provider(&store),
+        "ai::has_vision_provider should be false when no providers are enabled"
+    );
+}
+
+#[test]
+fn ai_has_vision_true_for_vision_provider() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    store.setting_set("ai_gemini_enabled", "true").unwrap();
+    assert!(
+        crate::ai::has_vision_provider(&store),
+        "ai::has_vision_provider should be true when gemini is enabled"
+    );
+}
+
+#[test]
+fn ai_has_vision_false_for_non_vision_provider() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    // Cloudflare does not support vision
+    store.setting_set("ai_cloudflare_enabled", "true").unwrap();
+    assert!(
+        !crate::ai::has_vision_provider(&store),
+        "ai::has_vision_provider should be false when only cloudflare is enabled"
+    );
+    // But is_enabled should still be true
+    assert!(
+        crate::ai::is_enabled(&store),
+        "ai::is_enabled should be true when cloudflare is enabled"
+    );
+}
+
+#[test]
+fn ai_is_enabled_not_a_setting_key() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    // "ai_enabled" is NOT a real setting — it must be derived via ai::is_enabled()
+    assert!(
+        !store.setting_get_bool("ai_enabled"),
+        "ai_enabled should not exist as a direct setting key"
+    );
+    assert!(
+        !store.setting_get_bool("ai_has_vision"),
+        "ai_has_vision should not exist as a direct setting key"
+    );
+}
+
+// ═══════════════════════════════════════════════════════
+// Setting keys used by setting_get_bool / setting_get_i64 must exist in defaults
+// ═══════════════════════════════════════════════════════
+
+#[test]
+fn all_bool_setting_keys_exist_in_defaults() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    let settings = store.setting_all();
+
+    // Every key that code reads via setting_get_bool must be seeded
+    let bool_keys = [
+        "seo_sitemap_enabled",
+        "seo_open_graph",
+        "seo_twitter_cards",
+        "images_webp_convert",
+        "images_reencode",
+        "images_strip_metadata",
+    ];
+    for key in &bool_keys {
+        assert!(
+            settings.contains_key(*key),
+            "setting_get_bool key '{}' is missing from seed defaults",
+            key
+        );
+    }
+}
+
+#[test]
+fn all_i64_setting_keys_exist_in_defaults() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    let settings = store.setting_all();
+
+    let i64_keys = [
+        "session_expiry_hours",
+        "login_rate_limit",
+        "images_quality",
+        "images_max_dimension",
+        "blog_posts_per_page",
+        "portfolio_items_per_page",
+        "comments_rate_limit",
+    ];
+    for key in &i64_keys {
+        assert!(
+            settings.contains_key(*key),
+            "setting_get_i64 key '{}' is missing from seed defaults",
+            key
+        );
+        let val = store.setting_get_i64(key);
+        // These should all parse to a valid number (not 0 from parse failure,
+        // except images_max_dimension which defaults to 0)
+        if *key != "images_max_dimension" {
+            assert!(
+                val > 0,
+                "setting_get_i64('{}') returned {} — expected > 0",
+                key,
+                val
+            );
+        }
+    }
+}
+
 #[test]
 fn schema_email_queue_has_expected_columns() {
     let pool = test_pool();
