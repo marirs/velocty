@@ -7,6 +7,7 @@
   <a href="https://github.com/marirs/velocty/actions/workflows/ci.yml"><img src="https://github.com/marirs/velocty/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/marirs/velocty/actions/workflows/release.yml"><img src="https://github.com/marirs/velocty/actions/workflows/release.yml/badge.svg" alt="Release"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust&logoColor=white" alt="Rust"></a>
+  <a href="https://github.com/marirs/velocty/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
 
 <p align="center">
