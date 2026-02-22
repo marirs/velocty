@@ -18,6 +18,7 @@ mod email;
 mod health;
 mod image_proxy;
 mod images;
+mod mta;
 mod rate_limit;
 mod render;
 mod rss;

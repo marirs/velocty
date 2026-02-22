@@ -697,3 +697,114 @@ pub fn pagerank_cached(_admin: EditorUser, store: &State<Arc<dyn Store>>) -> Jso
         Err(_) => Json(serde_json::json!({"cached": false})),
     }
 }
+
+// ── Built-in MTA API endpoints ──────────────────────────────────────
+
+/// Run DNS health checks for the built-in MTA.
+#[post("/mta/dns-check")]
+pub fn mta_dns_check(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let settings = store.setting_all();
+    let results = crate::mta::dns::check_all(&settings);
+    Json(serde_json::to_value(results).unwrap_or_default())
+}
+
+/// Regenerate DKIM keypair.
+#[post("/mta/regenerate-dkim")]
+pub fn mta_regenerate_dkim(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let s: &dyn Store = &**store.inner();
+    match crate::mta::regenerate_dkim(s) {
+        Ok(public_key) => {
+            let selector = store.setting_get_or("mta_dkim_selector", "velocty");
+            let site_url = store.setting_get_or("site_url", "http://localhost:8000");
+            let domain = crate::mta::deliver::domain_from_url(&site_url)
+                .unwrap_or_else(|| "localhost".to_string());
+            Json(serde_json::json!({
+                "ok": true,
+                "public_key": public_key,
+                "dns_record": format!("v=DKIM1; k=rsa; p={}", public_key),
+                "dns_name": format!("{}._domainkey.{}", selector, domain),
+                "generated_at": store.setting_get_or("mta_dkim_generated_at", ""),
+            }))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
+    }
+}
+
+/// Send a test email via the built-in MTA.
+#[post("/mta/test-email")]
+pub fn mta_test_email(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let settings = store.setting_all();
+    let from = settings
+        .get("mta_from_address")
+        .cloned()
+        .unwrap_or_default();
+    let to = settings.get("admin_email").cloned().unwrap_or_default();
+
+    if from.is_empty() {
+        return Json(serde_json::json!({"ok": false, "error": "No MTA from address configured"}));
+    }
+    if to.is_empty() {
+        return Json(
+            serde_json::json!({"ok": false, "error": "No admin email configured. Set it in Settings > Site."}),
+        );
+    }
+
+    let site_name = settings
+        .get("site_name")
+        .cloned()
+        .unwrap_or_else(|| "Velocty".to_string());
+    let subject = format!("Test email from {} (Built-in MTA)", site_name);
+    let body = format!(
+        "This is a test email sent via the built-in MTA.\n\n\
+         If you received this, your direct email delivery is working correctly.\n\n\
+         — {}\n",
+        site_name
+    );
+
+    match crate::mta::send(&settings, &from, &to, &subject, &body) {
+        Ok(()) => {
+            Json(serde_json::json!({"ok": true, "message": format!("Test email sent to {}", to)}))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
+    }
+}
+
+/// Get the required DNS records (static, no live check).
+#[get("/mta/required-records")]
+pub fn mta_required_records(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let settings = store.setting_all();
+    let records = crate::mta::dns::required_records(&settings);
+    Json(serde_json::to_value(records).unwrap_or_default())
+}
+
+/// Get DKIM public key info for display.
+#[get("/mta/dkim-info")]
+pub fn mta_dkim_info(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let private_pem = store.setting_get_or("mta_dkim_private_key", "");
+    let selector = store.setting_get_or("mta_dkim_selector", "velocty");
+    let generated_at = store.setting_get_or("mta_dkim_generated_at", "");
+    let site_url = store.setting_get_or("site_url", "http://localhost:8000");
+    let domain =
+        crate::mta::deliver::domain_from_url(&site_url).unwrap_or_else(|| "localhost".to_string());
+
+    if private_pem.is_empty() {
+        return Json(serde_json::json!({
+            "has_key": false,
+            "selector": selector,
+            "domain": domain,
+        }));
+    }
+
+    let public_key =
+        crate::mta::dkim::public_key_from_private_pem(&private_pem).unwrap_or_default();
+
+    Json(serde_json::json!({
+        "has_key": true,
+        "selector": selector,
+        "domain": domain,
+        "public_key": public_key,
+        "dns_name": format!("{}._domainkey.{}", selector, domain),
+        "dns_record": format!("v=DKIM1; k=rsa; p={}", public_key),
+        "generated_at": generated_at,
+    }))
+}

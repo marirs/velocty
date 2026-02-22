@@ -7168,6 +7168,7 @@ fn schema_all_expected_tables_exist() {
         "fw_events",
         "audit_log",
         "user_passkeys",
+        "email_queue",
     ];
 
     for table in &expected_tables {
@@ -7178,7 +7179,11 @@ fn schema_all_expected_tables_exist() {
                 |r| r.get(0),
             )
             .unwrap_or(false);
-        assert!(exists, "Expected table '{}' does not exist in schema", table);
+        assert!(
+            exists,
+            "Expected table '{}' does not exist in schema",
+            table
+        );
     }
 }
 
@@ -7188,9 +7193,19 @@ fn schema_posts_has_expected_columns() {
     let conn = pool.get().unwrap();
 
     let expected = [
-        "id", "title", "slug", "content_json", "content_html", "excerpt",
-        "featured_image", "meta_title", "meta_description", "status",
-        "published_at", "created_at", "updated_at",
+        "id",
+        "title",
+        "slug",
+        "content_json",
+        "content_html",
+        "excerpt",
+        "featured_image",
+        "meta_title",
+        "meta_description",
+        "status",
+        "published_at",
+        "created_at",
+        "updated_at",
     ];
     assert_table_columns(&conn, "posts", &expected);
 }
@@ -7201,11 +7216,25 @@ fn schema_portfolio_has_expected_columns() {
     let conn = pool.get().unwrap();
 
     let expected = [
-        "id", "title", "slug", "description_json", "description_html",
-        "image_path", "thumbnail_path", "meta_title", "meta_description",
-        "sell_enabled", "price", "purchase_note", "payment_provider",
-        "download_file_path", "likes", "status", "published_at",
-        "created_at", "updated_at",
+        "id",
+        "title",
+        "slug",
+        "description_json",
+        "description_html",
+        "image_path",
+        "thumbnail_path",
+        "meta_title",
+        "meta_description",
+        "sell_enabled",
+        "price",
+        "purchase_note",
+        "payment_provider",
+        "download_file_path",
+        "likes",
+        "status",
+        "published_at",
+        "created_at",
+        "updated_at",
     ];
     assert_table_columns(&conn, "portfolio", &expected);
 }
@@ -7214,14 +7243,22 @@ fn schema_portfolio_has_expected_columns() {
 fn schema_content_tags_has_expected_columns() {
     let pool = test_pool();
     let conn = pool.get().unwrap();
-    assert_table_columns(&conn, "content_tags", &["content_id", "content_type", "tag_id"]);
+    assert_table_columns(
+        &conn,
+        "content_tags",
+        &["content_id", "content_type", "tag_id"],
+    );
 }
 
 #[test]
 fn schema_content_categories_has_expected_columns() {
     let pool = test_pool();
     let conn = pool.get().unwrap();
-    assert_table_columns(&conn, "content_categories", &["content_id", "content_type", "category_id"]);
+    assert_table_columns(
+        &conn,
+        "content_categories",
+        &["content_id", "content_type", "category_id"],
+    );
 }
 
 #[test]
@@ -7231,7 +7268,18 @@ fn schema_page_views_has_expected_columns() {
     assert_table_columns(
         &conn,
         "page_views",
-        &["id", "path", "ip_hash", "country", "city", "referrer", "user_agent", "device_type", "browser", "created_at"],
+        &[
+            "id",
+            "path",
+            "ip_hash",
+            "country",
+            "city",
+            "referrer",
+            "user_agent",
+            "device_type",
+            "browser",
+            "created_at",
+        ],
     );
 }
 
@@ -7253,7 +7301,9 @@ fn assert_table_columns(
         assert!(
             columns.contains(&col.to_string()),
             "Table '{}' is missing column '{}'. Actual columns: {:?}",
-            table, col, columns
+            table,
+            col,
+            columns
         );
     }
 }
@@ -7266,14 +7316,24 @@ fn schema_no_phantom_tables_in_health() {
     let conn = pool.get().unwrap();
 
     let health_tables = [
-        "posts", "portfolio", "comments", "categories", "tags",
-        "settings", "sessions", "imports", "page_views",
-        "content_tags", "content_categories",
+        "posts",
+        "portfolio",
+        "comments",
+        "categories",
+        "tags",
+        "settings",
+        "sessions",
+        "imports",
+        "page_views",
+        "content_tags",
+        "content_categories",
     ];
     for table in &health_tables {
         let sql = format!("SELECT COUNT(*) FROM {}", table);
         conn.query_row(&sql, [], |r| r.get::<_, u64>(0))
-            .unwrap_or_else(|e| panic!("health.rs references table '{}' which fails: {}", table, e));
+            .unwrap_or_else(|e| {
+                panic!("health.rs references table '{}' which fails: {}", table, e)
+            });
     }
 }
 
@@ -7284,11 +7344,20 @@ fn schema_export_queries_all_succeed() {
     let pool = test_pool();
     let store = crate::store::sqlite::SqliteStore::new(pool);
 
-    let export = store.health_export_content().expect("export should succeed");
+    let export = store
+        .health_export_content()
+        .expect("export should succeed");
 
     let expected_keys = [
-        "posts", "portfolio", "categories", "tags", "comments",
-        "post_tags", "post_categories", "portfolio_tags", "portfolio_categories",
+        "posts",
+        "portfolio",
+        "categories",
+        "tags",
+        "comments",
+        "post_tags",
+        "post_categories",
+        "portfolio_tags",
+        "portfolio_categories",
         "settings",
     ];
     for key in &expected_keys {
@@ -7320,8 +7389,277 @@ fn schema_orphan_scan_queries_succeed() {
     ).unwrap();
 
     let refs = store.health_referenced_files();
-    assert!(refs.contains("feat.jpg"), "should find post featured_image, got: {:?}", refs);
-    assert!(refs.contains("post-img.jpg"), "should find image in post content_html, got: {:?}", refs);
-    assert!(refs.contains("port-img.jpg"), "should find portfolio image_path, got: {:?}", refs);
-    assert!(refs.contains("desc-img.jpg"), "should find image in portfolio description_html, got: {:?}", refs);
+    assert!(
+        refs.contains("feat.jpg"),
+        "should find post featured_image, got: {:?}",
+        refs
+    );
+    assert!(
+        refs.contains("post-img.jpg"),
+        "should find image in post content_html, got: {:?}",
+        refs
+    );
+    assert!(
+        refs.contains("port-img.jpg"),
+        "should find portfolio image_path, got: {:?}",
+        refs
+    );
+    assert!(
+        refs.contains("desc-img.jpg"),
+        "should find image in portfolio description_html, got: {:?}",
+        refs
+    );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Built-in MTA tests
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn mta_dkim_keygen_produces_valid_keypair() {
+    let (private_pem, public_b64) =
+        crate::mta::dkim::generate_keypair().expect("keygen should succeed");
+    assert!(
+        private_pem.contains("BEGIN PRIVATE KEY"),
+        "should be PEM format"
+    );
+    assert!(!public_b64.is_empty(), "public key should not be empty");
+
+    // Round-trip: extract public key from private
+    let extracted = crate::mta::dkim::public_key_from_private_pem(&private_pem)
+        .expect("extract should succeed");
+    assert_eq!(
+        extracted, public_b64,
+        "extracted public key should match generated"
+    );
+}
+
+#[test]
+fn mta_dkim_sign_message_produces_header() {
+    let (private_pem, _) = crate::mta::dkim::generate_keypair().expect("keygen should succeed");
+    let header = crate::mta::dkim::sign_message(
+        &private_pem,
+        "velocty",
+        "example.com",
+        "noreply@example.com",
+        "user@test.com",
+        "Test Subject",
+        "Hello, this is a test body.",
+    )
+    .expect("signing should succeed");
+    assert!(
+        header.starts_with("DKIM-Signature:"),
+        "should produce DKIM-Signature header"
+    );
+    assert!(header.contains("d=example.com"), "should contain domain");
+    assert!(header.contains("s=velocty"), "should contain selector");
+    assert!(header.contains("bh="), "should contain body hash");
+    assert!(header.contains("b="), "should contain signature");
+}
+
+#[test]
+fn mta_domain_from_url_extracts_correctly() {
+    assert_eq!(
+        crate::mta::deliver::domain_from_url("https://photos.example.com"),
+        Some("photos.example.com".to_string())
+    );
+    assert_eq!(
+        crate::mta::deliver::domain_from_url("http://localhost:8000"),
+        Some("localhost".to_string())
+    );
+    assert_eq!(
+        crate::mta::deliver::domain_from_url("https://example.com/blog"),
+        Some("example.com".to_string())
+    );
+}
+
+#[test]
+fn mta_default_from_address_uses_domain() {
+    assert_eq!(
+        crate::mta::deliver::default_from_address("https://photos.example.com"),
+        "noreply@photos.example.com"
+    );
+    assert_eq!(
+        crate::mta::deliver::default_from_address("http://localhost:8000"),
+        "noreply@localhost"
+    );
+}
+
+#[test]
+fn mta_spf_merge_no_existing() {
+    let result = crate::mta::dns::generate_spf(None, Some("1.2.3.4"));
+    assert_eq!(result, "v=spf1 a mx ip4:1.2.3.4 ~all");
+}
+
+#[test]
+fn mta_spf_merge_preserves_existing() {
+    let result = crate::mta::dns::merge_spf("v=spf1 include:_spf.google.com ~all", Some("1.2.3.4"));
+    assert!(
+        result.contains("include:_spf.google.com"),
+        "should preserve google include"
+    );
+    assert!(result.contains("ip4:1.2.3.4"), "should add our IP");
+    assert!(
+        result.ends_with("~all"),
+        "should preserve soft fail qualifier"
+    );
+}
+
+#[test]
+fn mta_spf_merge_already_has_a() {
+    let existing = "v=spf1 a include:_spf.google.com ~all";
+    let result = crate::mta::dns::merge_spf(existing, Some("1.2.3.4"));
+    assert_eq!(result, existing, "should not modify if 'a' already present");
+}
+
+#[test]
+fn mta_spf_merge_preserves_hard_fail() {
+    let result = crate::mta::dns::merge_spf(
+        "v=spf1 include:spf.protection.outlook.com -all",
+        Some("10.0.0.1"),
+    );
+    assert!(result.ends_with("-all"), "should preserve -all (hard fail)");
+}
+
+#[test]
+fn mta_queue_push_and_pending() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+
+    let id = store
+        .mta_queue_push("user@test.com", "noreply@example.com", "Test", "Body")
+        .expect("push should succeed");
+    assert!(id > 0, "should return positive id");
+
+    let pending = store.mta_queue_pending(10);
+    assert_eq!(pending.len(), 1, "should have 1 pending message");
+    assert_eq!(pending[0].to_addr, "user@test.com");
+    assert_eq!(pending[0].subject, "Test");
+    assert_eq!(pending[0].status, "pending");
+}
+
+#[test]
+fn mta_queue_update_status_marks_sent() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+
+    let id = store
+        .mta_queue_push("user@test.com", "noreply@example.com", "Test", "Body")
+        .unwrap();
+    store
+        .mta_queue_update_status(id, "sent", None, None)
+        .unwrap();
+
+    let pending = store.mta_queue_pending(10);
+    assert_eq!(
+        pending.len(),
+        0,
+        "sent message should not appear in pending"
+    );
+
+    let sent = store.mta_queue_sent_last_hour().unwrap();
+    assert_eq!(sent, 1, "should count 1 sent in last hour");
+}
+
+#[test]
+fn mta_queue_retry_schedule() {
+    assert_eq!(crate::mta::queue::retry_delay(0), Some(0));
+    assert_eq!(crate::mta::queue::retry_delay(1), Some(60));
+    assert_eq!(crate::mta::queue::retry_delay(4), Some(7200));
+    assert_eq!(
+        crate::mta::queue::retry_delay(5),
+        None,
+        "should give up after 5 attempts"
+    );
+}
+
+#[test]
+fn mta_queue_cleanup_removes_old() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool.clone());
+
+    store
+        .mta_queue_push("user@test.com", "noreply@example.com", "Old", "Body")
+        .unwrap();
+    // Manually backdate the entry
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "UPDATE email_queue SET created_at = datetime('now', '-60 days')",
+        [],
+    )
+    .unwrap();
+
+    let cleaned = store.mta_queue_cleanup(30).unwrap();
+    assert_eq!(cleaned, 1, "should clean up 1 old entry");
+}
+
+#[test]
+fn mta_init_dkim_generates_key() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+
+    // Should be empty initially
+    assert!(store
+        .setting_get("mta_dkim_private_key")
+        .unwrap_or_default()
+        .is_empty());
+
+    crate::mta::init_dkim_if_needed(&store);
+
+    let key = store
+        .setting_get("mta_dkim_private_key")
+        .unwrap_or_default();
+    assert!(
+        key.contains("BEGIN PRIVATE KEY"),
+        "should have generated a key"
+    );
+    assert!(!store
+        .setting_get("mta_dkim_generated_at")
+        .unwrap_or_default()
+        .is_empty());
+}
+
+#[test]
+fn mta_init_from_address_auto_populates() {
+    use crate::store::Store;
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+
+    // Set site_url, leave mta_from_address empty
+    store
+        .setting_set("site_url", "https://photos.example.com")
+        .unwrap();
+    store.setting_set("mta_from_address", "").unwrap();
+
+    crate::mta::init_from_address(&store);
+
+    let from = store.setting_get("mta_from_address").unwrap_or_default();
+    assert_eq!(from, "noreply@photos.example.com");
+}
+
+#[test]
+fn schema_email_queue_has_expected_columns() {
+    let pool = test_pool();
+    let conn = pool.get().unwrap();
+    assert_table_columns(
+        &conn,
+        "email_queue",
+        &[
+            "id",
+            "to_addr",
+            "from_addr",
+            "subject",
+            "body_text",
+            "attempts",
+            "max_attempts",
+            "next_retry_at",
+            "status",
+            "error",
+            "created_at",
+        ],
+    );
 }

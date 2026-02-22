@@ -3073,6 +3073,118 @@ impl Store for MongoStore {
         Ok(count)
     }
 
+    // ── Email queue (built-in MTA) ──────────────────────────────────
+
+    fn mta_queue_push(
+        &self,
+        to: &str,
+        from: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<i64, String> {
+        let id = self.next_id("email_queue")?;
+        let now = chrono::Utc::now().to_rfc3339();
+        let coll = self.db.collection::<Document>("email_queue");
+        coll.insert_one(
+            doc! {
+                "id": id,
+                "to_addr": to,
+                "from_addr": from,
+                "subject": subject,
+                "body_text": body,
+                "attempts": 0_i64,
+                "max_attempts": 5_i64,
+                "next_retry_at": &now,
+                "status": "pending",
+                "error": "",
+                "created_at": &now,
+            },
+            None,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(id)
+    }
+
+    fn mta_queue_pending(&self, limit: i64) -> Vec<crate::mta::queue::QueuedEmail> {
+        let coll = self.db.collection::<Document>("email_queue");
+        let now = chrono::Utc::now().to_rfc3339();
+        let filter = doc! {
+            "status": "pending",
+            "next_retry_at": { "$lte": &now },
+        };
+        let opts = mongodb::options::FindOptions::builder()
+            .sort(doc! { "next_retry_at": 1 })
+            .limit(Some(limit))
+            .build();
+        let cursor = match coll.find(filter, Some(opts)) {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        cursor
+            .flatten()
+            .filter_map(|d| {
+                Some(crate::mta::queue::QueuedEmail {
+                    id: d.get_i64("id").ok()?,
+                    to_addr: d.get_str("to_addr").ok()?.to_string(),
+                    from_addr: d.get_str("from_addr").ok()?.to_string(),
+                    subject: d.get_str("subject").ok()?.to_string(),
+                    body_text: d.get_str("body_text").ok()?.to_string(),
+                    attempts: d.get_i64("attempts").ok().unwrap_or(0),
+                    max_attempts: d.get_i64("max_attempts").ok().unwrap_or(5),
+                    next_retry_at: d.get_str("next_retry_at").ok().unwrap_or("").to_string(),
+                    status: d.get_str("status").ok().unwrap_or("pending").to_string(),
+                    error: d.get_str("error").ok().unwrap_or("").to_string(),
+                    created_at: d.get_str("created_at").ok().unwrap_or("").to_string(),
+                })
+            })
+            .collect()
+    }
+
+    fn mta_queue_update_status(
+        &self,
+        id: i64,
+        status: &str,
+        error: Option<&str>,
+        next_retry: Option<&str>,
+    ) -> Result<(), String> {
+        let coll = self.db.collection::<Document>("email_queue");
+        let mut update = doc! { "$set": { "status": status } };
+        if let Some(e) = error {
+            update.get_document_mut("$set").unwrap().insert("error", e);
+        }
+        if let Some(nr) = next_retry {
+            update
+                .get_document_mut("$set")
+                .unwrap()
+                .insert("next_retry_at", nr);
+        }
+        if status == "sending" {
+            update.insert("$inc", doc! { "attempts": 1_i64 });
+        }
+        coll.update_one(doc! { "id": id }, update, None)
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn mta_queue_sent_last_hour(&self) -> Result<u64, String> {
+        let coll = self.db.collection::<Document>("email_queue");
+        let one_hour_ago = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        let filter = doc! {
+            "status": "sent",
+            "created_at": { "$gte": &one_hour_ago },
+        };
+        coll.count_documents(filter, None)
+            .map_err(|e| e.to_string())
+    }
+
+    fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String> {
+        let coll = self.db.collection::<Document>("email_queue");
+        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days as i64)).to_rfc3339();
+        let filter = doc! { "created_at": { "$lt": &cutoff } };
+        let result = coll.delete_many(filter, None).map_err(|e| e.to_string())?;
+        Ok(result.deleted_count)
+    }
+
     fn raw_execute(&self, _sql: &str) -> Result<usize, String> {
         Err("raw_execute not supported on MongoDB".to_string())
     }

@@ -508,6 +508,34 @@ pub trait Store: Send + Sync {
     /// Delete analytics page views older than `max_age_days`.
     fn task_cleanup_analytics(&self, max_age_days: i64) -> Result<usize, String>;
 
+    // ── Email queue (built-in MTA) ─────────────────────────────────
+    /// Push an email onto the retry queue.
+    fn mta_queue_push(
+        &self,
+        to: &str,
+        from: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<i64, String>;
+
+    /// Fetch pending messages ready for delivery (status='pending', next_retry_at <= now).
+    fn mta_queue_pending(&self, limit: i64) -> Vec<crate::mta::queue::QueuedEmail>;
+
+    /// Update the status of a queued message (and optionally error + next_retry_at).
+    fn mta_queue_update_status(
+        &self,
+        id: i64,
+        status: &str,
+        error: Option<&str>,
+        next_retry: Option<&str>,
+    ) -> Result<(), String>;
+
+    /// Count emails sent (status='sent') in the last hour.
+    fn mta_queue_sent_last_hour(&self) -> Result<u64, String>;
+
+    /// Delete old queue entries older than `days`.
+    fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String>;
+
     // ── Raw execute (escape hatch for migrations/health tools) ──────
     fn raw_execute(&self, sql: &str) -> Result<usize, String>;
     fn raw_query_i64(&self, sql: &str) -> Result<i64, String>;

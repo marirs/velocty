@@ -163,6 +163,12 @@ fn get_from_email(settings: &HashMap<String, String>) -> Option<String> {
             .cloned()
             .filter(|s| !s.is_empty());
     }
+    // Built-in MTA uses its own from address
+    if settings.get("email_builtin_enabled").map(|v| v.as_str()) == Some("true") {
+        if let Some(mta_from) = settings.get("mta_from_address").filter(|s| !s.is_empty()) {
+            return Some(mta_from.clone());
+        }
+    }
     // For API-based providers, use admin_email as from
     let api_providers = [
         "email_resend_enabled",
@@ -201,7 +207,7 @@ pub fn send_via_provider(
         .get("email_failover_chain")
         .cloned()
         .unwrap_or_else(|| {
-            "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp"
+            "builtin,gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp"
                 .to_string()
         });
 
@@ -231,6 +237,7 @@ pub fn send_via_provider(
             "moosend" => moosend::send(settings, from, to, subject, body),
             "mandrill" => mandrill::send(settings, from, to, subject, body),
             "sparkpost" => sparkpost::send(settings, from, to, subject, body),
+            "builtin" => crate::mta::send(settings, from, to, subject, body),
             _ => {
                 log::warn!("Unknown email provider: {}", provider_name);
                 continue;

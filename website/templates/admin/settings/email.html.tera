@@ -33,6 +33,7 @@
     <button type="button" class="tab" data-email-tab="tab-email-mandrill">Mandrill{% if settings.email_mandrill_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-email-tab="tab-email-sparkpost">SparkPost{% if settings.email_sparkpost_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
     <button type="button" class="tab" data-email-tab="tab-email-smtp">SMTP{% if settings.email_smtp_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
+    <button type="button" class="tab" data-email-tab="tab-email-builtin">Built-in{% if settings.email_builtin_enabled == "true" %}<span class="status-dot"></span>{% endif %}</button>
 </div>
 
 <form method="post" action="/{{ admin_slug }}/settings/email">
@@ -64,11 +65,12 @@
             <h3>Email Failover Chain</h3>
             <label class="checkbox-item"><input type="checkbox" name="email_failover_enabled" value="true" {% if settings.email_failover_enabled == "true" %}checked{% endif %}> Enable Email Failover</label>
             <p class="text-muted" style="margin:12px 0 16px">When enabled, if the primary email provider fails to send, the system will automatically try the next provider in the chain.</p>
-            {% set all_providers = "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp" %}
+            {% set all_providers = "builtin,gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp" %}
             {% set echain = settings.email_failover_chain | default(value=all_providers) %}
             <div id="email-failover-chain" class="failover-list">
                 {% for provider in all_providers | split(pat=',') %}
-                {% if provider == 'gmail' and settings.email_gmail_enabled == 'true'
+                {% if provider == 'builtin' and settings.email_builtin_enabled == 'true'
+                    or provider == 'gmail' and settings.email_gmail_enabled == 'true'
                     or provider == 'resend' and settings.email_resend_enabled == 'true'
                     or provider == 'ses' and settings.email_ses_enabled == 'true'
                     or provider == 'postmark' and settings.email_postmark_enabled == 'true'
@@ -81,7 +83,7 @@
                     or provider == 'smtp' and settings.email_smtp_enabled == 'true' %}
                 <div class="failover-item" data-provider="{{ provider }}" draggable="true">
                     <span class="failover-handle">⠿</span>
-                    <span class="failover-name">{% if provider == 'gmail' %}Gmail SMTP{% elif provider == 'resend' %}Resend{% elif provider == 'ses' %}Amazon SES{% elif provider == 'postmark' %}Postmark{% elif provider == 'brevo' %}Brevo{% elif provider == 'sendpulse' %}SendPulse{% elif provider == 'mailgun' %}Mailgun{% elif provider == 'moosend' %}Moosend{% elif provider == 'mandrill' %}Mandrill{% elif provider == 'sparkpost' %}SparkPost{% elif provider == 'smtp' %}Custom SMTP{% endif %}</span>
+                    <span class="failover-name">{% if provider == 'builtin' %}Built-in (Direct Send){% elif provider == 'gmail' %}Gmail SMTP{% elif provider == 'resend' %}Resend{% elif provider == 'ses' %}Amazon SES{% elif provider == 'postmark' %}Postmark{% elif provider == 'brevo' %}Brevo{% elif provider == 'sendpulse' %}SendPulse{% elif provider == 'mailgun' %}Mailgun{% elif provider == 'moosend' %}Moosend{% elif provider == 'mandrill' %}Mandrill{% elif provider == 'sparkpost' %}SparkPost{% elif provider == 'smtp' %}Custom SMTP{% endif %}</span>
                     <span class="failover-badge"><span class="badge badge-published">Enabled</span></span>
                 </div>
                 {% endif %}
@@ -306,15 +308,145 @@
         </div>
     </div>
 
+    <!-- Built-in MTA (Direct Send) -->
+    <div id="tab-email-builtin" style="display:none">
+        <div class="form-card">
+            <h3>Built-in Email (Direct Send)</h3>
+            <p class="text-muted" style="margin-bottom:16px">Send emails directly from your server without any third-party service. Emails are delivered straight to the recipient's mail server with DKIM signing for authentication.</p>
+            <label class="checkbox-item"><input type="checkbox" name="email_builtin_enabled" value="true" data-provider-toggle {% if settings.email_builtin_enabled == "true" %}checked{% endif %}> Enable Built-in Email</label>
+            <fieldset {% if settings.email_builtin_enabled != "true" %}disabled{% endif %} style="border:none;padding:0;margin:0">
+            <div class="form-group" style="margin-top:16px">
+                <label for="mta_from_address">From Address</label>
+                <input type="email" id="mta_from_address" name="mta_from_address" value="{{ settings.mta_from_address | default(value='') }}" placeholder="noreply@yourdomain.com">
+                <span class="form-help">Auto-populated from your site URL. This is the address emails will be sent from.</span>
+            </div>
+            <div class="form-group">
+                <label for="mta_max_emails_per_hour">Rate Limit (emails/hour)</label>
+                <input type="number" id="mta_max_emails_per_hour" name="mta_max_emails_per_hour" value="{{ settings.mta_max_emails_per_hour | default(value='30') }}" min="1" max="500" style="width:120px">
+                <span class="form-help">Maximum emails sent per hour to prevent abuse</span>
+            </div>
+            </fieldset>
+        </div>
+
+        <!-- DNS Records -->
+        <div class="form-card" style="margin-top:16px">
+            <h3>DNS Records</h3>
+            <p class="text-muted" style="margin-bottom:16px">Add these DNS records to your domain for email authentication and deliverability.</p>
+
+            <!-- Status banner (hidden until check) -->
+            <div id="mta-dns-banner" style="display:none;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px"></div>
+
+            <!-- Records table container — filled by JS -->
+            <div id="mta-dns-table-wrap">
+                <p class="text-muted" style="font-size:13px">Loading records...</p>
+            </div>
+
+            <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-dns-check">Check DNS</button>
+                <button type="button" class="btn btn-sm" id="btn-test-email">Send Test Email</button>
+            </div>
+        </div>
+
+        <!-- DKIM Key Management -->
+        <div class="form-card" style="margin-top:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+                <div>
+                    <h4 style="margin:0">DKIM Key</h4>
+                    <p class="text-muted" style="margin:4px 0 0;font-size:13px" id="mta-dkim-meta">Auto-generated on first startup.</p>
+                </div>
+                <button type="button" class="btn btn-sm" id="btn-regenerate-dkim">Regenerate</button>
+            </div>
+        </div>
+    </div>
+
     <div class="form-actions"><button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button></div>
 </form>
+
+<style>
+.modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000; }
+.modal { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;z-index:1001;width:90%;color:var(--text-primary); }
+.modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-subtle); }
+.modal-header h3 { margin:0;font-size:16px;color:var(--text-primary); }
+</style>
+
+<!-- MTA Alert Modal -->
+<div id="mta-modal-overlay" class="modal-overlay" style="display:none" onclick="closeMtaModal()"></div>
+<div id="mta-modal" class="modal" style="display:none;max-width:400px">
+    <div class="modal-header">
+        <h3 id="mta-modal-title">Notice</h3>
+        <button type="button" onclick="closeMtaModal()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:18px">&times;</button>
+    </div>
+    <div style="padding:16px 20px">
+        <p id="mta-modal-body" style="margin:0;font-size:14px;color:var(--text-secondary)"></p>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border-subtle);text-align:right">
+        <button type="button" class="btn btn-sm btn-primary" onclick="closeMtaModal()">OK</button>
+    </div>
+</div>
+
+<!-- MTA Confirm Modal -->
+<div id="mta-confirm-overlay" class="modal-overlay" style="display:none" onclick="closeMtaConfirm()"></div>
+<div id="mta-confirm" class="modal" style="display:none;max-width:420px">
+    <div class="modal-header">
+        <h3 id="mta-confirm-title">Confirm</h3>
+        <button type="button" onclick="closeMtaConfirm()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:18px">&times;</button>
+    </div>
+    <div style="padding:16px 20px">
+        <p id="mta-confirm-body" style="margin:0;font-size:14px;color:var(--text-secondary)"></p>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border-subtle);display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn btn-sm" onclick="closeMtaConfirm()">Cancel</button>
+        <button type="button" class="btn btn-sm btn-danger" id="mta-confirm-ok">Confirm</button>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="mta-toast" style="display:none;position:fixed;top:20px;right:20px;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.3s"></div>
+
 {% endblock content %}
 
 {% block scripts %}
 <script>
+function showMtaModal(title, body) {
+    document.getElementById('mta-modal-title').textContent = title;
+    document.getElementById('mta-modal-body').textContent = body;
+    document.getElementById('mta-modal-overlay').style.display = '';
+    document.getElementById('mta-modal').style.display = '';
+}
+function closeMtaModal() {
+    document.getElementById('mta-modal-overlay').style.display = 'none';
+    document.getElementById('mta-modal').style.display = 'none';
+}
+function showMtaConfirm(title, body, onConfirm) {
+    document.getElementById('mta-confirm-title').textContent = title;
+    document.getElementById('mta-confirm-body').textContent = body;
+    document.getElementById('mta-confirm-overlay').style.display = '';
+    document.getElementById('mta-confirm').style.display = '';
+    var btn = document.getElementById('mta-confirm-ok');
+    var newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', function() { closeMtaConfirm(); onConfirm(); });
+}
+function closeMtaConfirm() {
+    document.getElementById('mta-confirm-overlay').style.display = 'none';
+    document.getElementById('mta-confirm').style.display = 'none';
+}
+function showMtaToast(message, type) {
+    var t = document.getElementById('mta-toast');
+    t.textContent = message;
+    t.style.background = type === 'error' ? 'var(--danger)' : 'var(--success)';
+    t.style.color = '#fff';
+    t.style.display = '';
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function() {
+        t.style.opacity = '0';
+        setTimeout(function() { t.style.display = 'none'; }, 300);
+    }, 3000);
+}
 (function() {
     var tabs = document.querySelectorAll('[data-email-tab]');
-    var panels = ['tab-email-general','tab-email-failover','tab-email-gmail','tab-email-resend','tab-email-ses','tab-email-postmark','tab-email-brevo','tab-email-sendpulse','tab-email-mailgun','tab-email-moosend','tab-email-mandrill','tab-email-sparkpost','tab-email-smtp'];
+    var panels = ['tab-email-general','tab-email-failover','tab-email-gmail','tab-email-resend','tab-email-ses','tab-email-postmark','tab-email-brevo','tab-email-sendpulse','tab-email-mailgun','tab-email-moosend','tab-email-mandrill','tab-email-sparkpost','tab-email-smtp','tab-email-builtin'];
     function activateTab(name) {
         tabs.forEach(function(t) { t.classList.remove('active'); });
         panels.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
@@ -365,6 +497,174 @@
             }
         });
     }
+
+    // ── Built-in MTA ──
+    var apiBase = '/{{ admin_slug }}/api';
+    var tableWrap = document.getElementById('mta-dns-table-wrap');
+    var banner = document.getElementById('mta-dns-banner');
+
+    function statusIcon(s) {
+        if (s === 'ok') return '<span style="color:var(--success);font-weight:700">&#10003;</span>';
+        if (s === 'warning') return '<span style="color:var(--warning);font-weight:700">&#10007;</span>';
+        if (s === 'error') return '<span style="color:var(--danger);font-weight:700">&#10007;</span>';
+        return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-tertiary);opacity:.4"></span>';
+    }
+    var copyIconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    var checkIconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+    function renderTable(records) {
+        if (!records || !records.length) { tableWrap.innerHTML = '<p class="text-muted" style="font-size:13px">No records to display.</p>'; return; }
+        var grouped = {};
+        records.forEach(function(r) {
+            if (!grouped[r.record_type]) grouped[r.record_type] = [];
+            grouped[r.record_type].push(r);
+        });
+        var order = ['DKIM', 'SPF', 'DMARC', 'PTR'];
+        var html = '';
+        order.forEach(function(type) {
+            var recs = grouped[type];
+            if (!recs) return;
+            var label = type === 'DKIM' ? 'DKIM record' : type === 'SPF' ? 'SPF record' : type === 'DMARC' ? 'DMARC record' : 'PTR record (reverse DNS)';
+            var desc = type === 'DKIM' ? 'Signs outgoing emails to prove they came from your server.' :
+                       type === 'SPF' ? 'Authorizes this server to send email on behalf of your domain.' :
+                       type === 'DMARC' ? 'Tells receiving servers how to handle authentication failures.' :
+                       'Maps your server IP back to your domain name.';
+            html += '<div style="margin-bottom:24px">';
+            html += '<h4 style="margin:0 0 4px">' + label + '</h4>';
+            html += '<p class="text-muted" style="font-size:13px;margin:0 0 12px">' + desc + '</p>';
+            // Current value banner (shown after check)
+            recs.forEach(function(r) {
+                if (r.current_value && r.status !== 'ok' && r.status !== 'unchecked') {
+                    html += '<div style="padding:10px 14px;border-radius:6px;margin-bottom:10px;font-size:13px;background:color-mix(in srgb, var(--danger) 10%, var(--bg-input));color:var(--danger)">';
+                    html += 'Your ' + type + ' record is currently set to <strong style="word-break:break-all">' + r.current_value + '</strong>';
+                    html += '</div>';
+                }
+                if (r.current_value && r.status === 'ok') {
+                    html += '<div style="padding:10px 14px;border-radius:6px;margin-bottom:10px;font-size:13px;background:color-mix(in srgb, var(--success) 10%, var(--bg-input));color:var(--success)">';
+                    html += type + ' record is correctly configured.';
+                    html += '</div>';
+                }
+            });
+            // Table
+            html += '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
+            html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+            html += '<thead><tr style="background:var(--bg-input);text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--text-tertiary)">';
+            html += '<th style="padding:10px 12px;text-align:center;width:36px"></th>';
+            html += '<th style="padding:10px 12px;text-align:left;width:50px">TYPE</th>';
+            html += '<th style="padding:10px 12px;text-align:left;width:30%">NAME</th>';
+            html += '<th style="padding:10px 12px;text-align:left">VALUE</th>';
+            html += '<th style="padding:10px 8px;text-align:center;width:36px"></th>';
+            html += '</tr></thead><tbody>';
+            recs.forEach(function(r) {
+                html += '<tr style="border-top:1px solid var(--border)">';
+                html += '<td style="padding:10px 12px;text-align:center">' + statusIcon(r.status) + '</td>';
+                html += '<td style="padding:10px 12px;font-weight:500">' + r.dns_type + '</td>';
+                html += '<td style="padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all">' + r.dns_name + '</td>';
+                html += '<td style="padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all">' + r.recommended + '</td>';
+                html += '<td style="padding:10px 8px;text-align:center"><button type="button" class="btn-copy-val" data-val="' + r.recommended.replace(/"/g, '&quot;') + '" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-tertiary);display:inline-flex;align-items:center" title="Copy value">' + copyIconSvg + '</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            html += '</div>';
+        });
+        tableWrap.innerHTML = html;
+        // Bind copy buttons
+        tableWrap.querySelectorAll('.btn-copy-val').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                navigator.clipboard.writeText(btn.dataset.val);
+                btn.innerHTML = checkIconSvg;
+                setTimeout(function(){ btn.innerHTML = copyIconSvg; }, 1500);
+            });
+        });
+    }
+
+    // Load required records on page load (static, no DNS check)
+    fetch(apiBase + '/mta/required-records').then(function(r){return r.json()}).then(function(d){
+        if (Array.isArray(d)) renderTable(d);
+    }).catch(function(){ tableWrap.innerHTML = '<p class="text-muted" style="font-size:13px">Failed to load records.</p>'; });
+
+    // Load DKIM meta
+    fetch(apiBase + '/mta/dkim-info').then(function(r){return r.json()}).then(function(d){
+        var el = document.getElementById('mta-dkim-meta');
+        if (!el) return;
+        if (d.has_key) {
+            el.textContent = 'Selector: ' + d.selector + '  \u00b7  Generated: ' + (d.generated_at || 'Unknown');
+        } else {
+            el.innerHTML = '<span style="color:var(--warning)">No key generated yet. Keys will be auto-generated on next server restart.</span>';
+        }
+    }).catch(function(){});
+
+    // ── Check DNS ──
+    var btnDns = document.getElementById('btn-dns-check');
+    if (btnDns) btnDns.addEventListener('click', function(){
+        btnDns.disabled = true;
+        btnDns.textContent = 'Checking...';
+        banner.style.display = 'none';
+        fetch(apiBase + '/mta/dns-check', {method:'POST'}).then(function(r){return r.json()}).then(function(results){
+            btnDns.disabled = false;
+            btnDns.textContent = 'Check DNS';
+            if (!Array.isArray(results)) return;
+            renderTable(results);
+            // Show summary banner
+            var allOk = results.every(function(r){ return r.status === 'ok'; });
+            var hasError = results.some(function(r){ return r.status === 'error' || r.status === 'warning'; });
+            if (allOk) {
+                banner.style.display = '';
+                banner.style.background = 'color-mix(in srgb, var(--success) 10%, var(--bg-input))';
+                banner.style.color = 'var(--success)';
+                banner.textContent = 'All DNS records are correctly configured.';
+            } else if (hasError) {
+                banner.style.display = '';
+                banner.style.background = 'color-mix(in srgb, var(--danger) 10%, var(--bg-input))';
+                banner.style.color = 'var(--danger)';
+                banner.textContent = 'Some DNS records need attention. See details below.';
+            }
+        }).catch(function(){
+            btnDns.disabled = false;
+            btnDns.textContent = 'Check DNS';
+        });
+    });
+
+    // ── Regenerate DKIM ──
+    var btnRegen = document.getElementById('btn-regenerate-dkim');
+    if (btnRegen) btnRegen.addEventListener('click', function(){
+        showMtaConfirm('Regenerate DKIM Key', 'This will generate a new DKIM keypair. You will need to update your DNS record with the new public key.', function(){
+            btnRegen.disabled = true;
+            btnRegen.textContent = 'Generating...';
+            fetch(apiBase + '/mta/regenerate-dkim', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+                btnRegen.disabled = false;
+                btnRegen.textContent = 'Regenerate';
+                if (d.ok) {
+                    fetch(apiBase + '/mta/required-records').then(function(r){return r.json()}).then(function(recs){ if (Array.isArray(recs)) renderTable(recs); });
+                    fetch(apiBase + '/mta/dkim-info').then(function(r){return r.json()}).then(function(info){
+                        var el = document.getElementById('mta-dkim-meta');
+                        if (el && info.has_key) el.textContent = 'Selector: ' + info.selector + '  \u00b7  Generated: ' + (info.generated_at || 'Unknown');
+                    });
+                    showMtaToast('DKIM key regenerated successfully. Update your DNS record.', 'success');
+                } else { showMtaToast(d.error || 'Failed to regenerate DKIM key', 'error'); }
+            }).catch(function(){ btnRegen.disabled = false; btnRegen.textContent = 'Regenerate'; showMtaToast('Network error during regeneration', 'error'); });
+        });
+    });
+
+    // ── Test Email ──
+    var btnTest = document.getElementById('btn-test-email');
+    if (btnTest) btnTest.addEventListener('click', function(){
+        btnTest.disabled = true;
+        btnTest.textContent = 'Sending...';
+        fetch(apiBase + '/mta/test-email', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+            btnTest.disabled = false;
+            btnTest.textContent = 'Send Test Email';
+            if (d.ok) {
+                showMtaToast(d.message, 'success');
+            } else {
+                showMtaToast(d.error || 'Failed to send test email', 'error');
+            }
+        }).catch(function(){
+            btnTest.disabled = false;
+            btnTest.textContent = 'Send Test Email';
+            showMtaToast('Request timed out — could not connect to the recipient mail server. Check your network and DNS settings.', 'error');
+        });
+    });
 })();
 </script>
 {% endblock scripts %}

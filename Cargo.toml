@@ -87,6 +87,11 @@ base64 = "0.22"
 # Email
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
 
+# Built-in MTA (direct send + DKIM)
+rsa = { version = "0.9", features = ["sha2"] }
+pkcs8 = { version = "0.10", features = ["pem"] }
+trust-dns-resolver = "0.23"
+
 # ZIP (design import/export)
 zip = "2"
 

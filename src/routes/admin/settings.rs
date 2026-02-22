@@ -515,6 +515,7 @@ pub fn settings_save(
             "email_mandrill_enabled",
             "email_sparkpost_enabled",
             "email_smtp_enabled",
+            "email_builtin_enabled",
         ],
         "blog" => &[
             "journal_enabled",

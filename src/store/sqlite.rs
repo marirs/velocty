@@ -1778,6 +1778,96 @@ impl Store for SqliteStore {
         .map_err(|e| e.to_string())
     }
 
+    // ── Email queue (built-in MTA) ──────────────────────────────────
+
+    fn mta_queue_push(
+        &self,
+        to: &str,
+        from: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<i64, String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO email_queue (to_addr, from_addr, subject, body_text) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![to, from, subject, body],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    fn mta_queue_pending(&self, limit: i64) -> Vec<crate::mta::queue::QueuedEmail> {
+        let conn = match self.pool.get() {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        let mut stmt = match conn.prepare(
+            "SELECT id, to_addr, from_addr, subject, body_text, attempts, max_attempts, next_retry_at, status, error, created_at \
+             FROM email_queue WHERE status = 'pending' AND next_retry_at <= datetime('now') \
+             ORDER BY next_retry_at ASC LIMIT ?1",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(rusqlite::params![limit], |r| {
+            Ok(crate::mta::queue::QueuedEmail {
+                id: r.get(0)?,
+                to_addr: r.get(1)?,
+                from_addr: r.get(2)?,
+                subject: r.get(3)?,
+                body_text: r.get(4)?,
+                attempts: r.get(5)?,
+                max_attempts: r.get(6)?,
+                next_retry_at: r.get(7)?,
+                status: r.get(8)?,
+                error: r.get::<_, String>(9).unwrap_or_default(),
+                created_at: r.get(10)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    fn mta_queue_update_status(
+        &self,
+        id: i64,
+        status: &str,
+        error: Option<&str>,
+        next_retry: Option<&str>,
+    ) -> Result<(), String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE email_queue SET status = ?1, error = COALESCE(?2, error), \
+             next_retry_at = COALESCE(?3, next_retry_at), \
+             attempts = CASE WHEN ?1 = 'sending' THEN attempts + 1 ELSE attempts END \
+             WHERE id = ?4",
+            rusqlite::params![status, error, next_retry, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn mta_queue_sent_last_hour(&self) -> Result<u64, String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        conn.query_row(
+            "SELECT COUNT(*) FROM email_queue WHERE status = 'sent' AND created_at >= datetime('now', '-1 hour')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let count = conn
+            .execute(
+                "DELETE FROM email_queue WHERE created_at < datetime('now', ?1)",
+                rusqlite::params![format!("-{} days", days)],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(count as u64)
+    }
+
     // ── Raw execute ─────────────────────────────────────────────────
 
     fn raw_execute(&self, sql: &str) -> Result<usize, String> {
@@ -2734,6 +2824,33 @@ impl Store for DbPool {
     }
     fn task_cleanup_analytics(&self, max_age_days: i64) -> Result<usize, String> {
         SqliteStore::new(self.clone()).task_cleanup_analytics(max_age_days)
+    }
+    fn mta_queue_push(
+        &self,
+        to: &str,
+        from: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<i64, String> {
+        SqliteStore::new(self.clone()).mta_queue_push(to, from, subject, body)
+    }
+    fn mta_queue_pending(&self, limit: i64) -> Vec<crate::mta::queue::QueuedEmail> {
+        SqliteStore::new(self.clone()).mta_queue_pending(limit)
+    }
+    fn mta_queue_update_status(
+        &self,
+        id: i64,
+        status: &str,
+        error: Option<&str>,
+        next_retry: Option<&str>,
+    ) -> Result<(), String> {
+        SqliteStore::new(self.clone()).mta_queue_update_status(id, status, error, next_retry)
+    }
+    fn mta_queue_sent_last_hour(&self) -> Result<u64, String> {
+        SqliteStore::new(self.clone()).mta_queue_sent_last_hour()
+    }
+    fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String> {
+        SqliteStore::new(self.clone()).mta_queue_cleanup(days)
     }
     fn raw_execute(&self, sql: &str) -> Result<usize, String> {
         SqliteStore::new(self.clone()).raw_execute(sql)

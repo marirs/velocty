@@ -468,5 +468,10 @@ pub fn api_routes() -> Vec<rocket::Route> {
         api::moz_domain_cached,
         api::pagerank_fetch,
         api::pagerank_cached,
+        api::mta_dns_check,
+        api::mta_regenerate_dkim,
+        api::mta_test_email,
+        api::mta_required_records,
+        api::mta_dkim_info,
     ]
 }

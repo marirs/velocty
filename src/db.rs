@@ -318,6 +318,23 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
         CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type);
         CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+
+        -- Email queue (built-in MTA retry queue)
+        CREATE TABLE IF NOT EXISTS email_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            to_addr TEXT NOT NULL,
+            from_addr TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body_text TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            max_attempts INTEGER NOT NULL DEFAULT 5,
+            next_retry_at DATETIME NOT NULL DEFAULT (datetime('now')),
+            status TEXT NOT NULL DEFAULT 'pending',
+            error TEXT DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_queue_status ON email_queue(status);
+        CREATE INDEX IF NOT EXISTS idx_email_queue_retry ON email_queue(next_retry_at);
         ",
     )?;
 
@@ -794,7 +811,7 @@ pub fn default_settings() -> Vec<(&'static str, &'static str)> {
         ("ai_temperature", "0.7"),
         // Email
         ("email_failover_enabled", "false"),
-        ("email_failover_chain", "gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp"),
+        ("email_failover_chain", "builtin,gmail,resend,ses,postmark,brevo,sendpulse,mailgun,moosend,mandrill,sparkpost,smtp"),
         ("email_from_name", ""),
         ("email_from_address", ""),
         ("email_reply_to", ""),
@@ -831,6 +848,13 @@ pub fn default_settings() -> Vec<(&'static str, &'static str)> {
         ("email_smtp_username", ""),
         ("email_smtp_password", ""),
         ("email_smtp_encryption", "tls"),
+        // Built-in MTA
+        ("email_builtin_enabled", "true"),
+        ("mta_from_address", ""),
+        ("mta_dkim_selector", "velocty"),
+        ("mta_dkim_private_key", ""),
+        ("mta_dkim_generated_at", ""),
+        ("mta_max_emails_per_hour", "30"),
         // Firewall
         ("firewall_enabled", "false"),
         ("fw_monitor_bots", "true"),

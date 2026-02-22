@@ -111,6 +111,22 @@ impl Fairing for BackgroundTasks {
             }
         });
 
+        // Initialize built-in MTA (DKIM keys + from address)
+        crate::mta::init_dkim_if_needed(&*store);
+        crate::mta::init_from_address(&*store);
+
+        // Email queue processing task (built-in MTA)
+        let s = Arc::clone(&store);
+        tokio::spawn(async move {
+            loop {
+                let interval = get_interval(&*s, "task_email_queue_interval", 1);
+                tokio::time::sleep(Duration::from_secs(interval * 60)).await;
+                crate::mta::process_queue(&*s);
+                // Cleanup old queue entries (keep 30 days)
+                let _ = s.mta_queue_cleanup(30);
+            }
+        });
+
         log::info!("[task] Background tasks started");
     }
 }
