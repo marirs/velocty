@@ -72,10 +72,7 @@ pub fn render_body(
         ));
     }
     if !details.is_empty() {
-        info_html.push_str(&format!(
-            "<div class=\"contact-details\">{}</div>",
-            details
-        ));
+        info_html.push_str(&format!("<div class=\"contact-details\">{}</div>", details));
     }
 
     // Social links
@@ -132,10 +129,37 @@ pub fn render_body(
 
     // Build body based on layout
     let body = match layout.as_str() {
-        "compact" => render_compact(&title_html, &info_html, &form_html, form_enabled, align_margin),
-        "wide" => render_wide(&title_html, &info_html, &form_html, &photo, &name, form_enabled, align_margin),
-        "modern" => render_modern(&title_html, &info_html, &form_html, &photo_html, form_enabled, align_margin),
-        "split" | _ => render_split(&title_html, &info_html, &form_html, form_enabled, align_margin),
+        "compact" => render_compact(
+            &title_html,
+            &info_html,
+            &form_html,
+            form_enabled,
+            align_margin,
+        ),
+        "wide" => render_wide(
+            &title_html,
+            &info_html,
+            &form_html,
+            &photo,
+            &name,
+            form_enabled,
+            align_margin,
+        ),
+        "modern" => render_modern(
+            &title_html,
+            &info_html,
+            &form_html,
+            &photo_html,
+            form_enabled,
+            align_margin,
+        ),
+        "split" | _ => render_split(
+            &title_html,
+            &info_html,
+            &form_html,
+            form_enabled,
+            align_margin,
+        ),
     };
 
     (body, css().to_string())
@@ -160,7 +184,15 @@ fn render_compact(title: &str, info: &str, form: &str, form_enabled: bool, align
     )
 }
 
-fn render_wide(title: &str, info: &str, form: &str, photo: &str, name: &str, form_enabled: bool, align: &str) -> String {
+fn render_wide(
+    title: &str,
+    info: &str,
+    form: &str,
+    photo: &str,
+    name: &str,
+    form_enabled: bool,
+    align: &str,
+) -> String {
     let hero = if !photo.is_empty() {
         format!(
             "<div class=\"contact-hero\" style=\"width:100%;max-height:500px;overflow:hidden\">\
@@ -192,7 +224,14 @@ fn render_wide(title: &str, info: &str, form: &str, photo: &str, name: &str, for
     )
 }
 
-fn render_modern(title: &str, info: &str, form: &str, photo_html: &str, form_enabled: bool, align: &str) -> String {
+fn render_modern(
+    title: &str,
+    info: &str,
+    form: &str,
+    photo_html: &str,
+    form_enabled: bool,
+    align: &str,
+) -> String {
     let left = format!(
         "<div class=\"contact-col-left\" style=\"flex:1;min-width:280px\">{photo}{info}</div>",
         photo = if !photo_html.is_empty() {

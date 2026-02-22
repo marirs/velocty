@@ -624,7 +624,10 @@ pub fn render_legal_page(
         html = html.replace("{{nav_links}}", "");
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
-        html = html.replace("{{social_sidebar}}", &build_social_sidebar_html(&settings_v));
+        html = html.replace(
+            "{{social_sidebar}}",
+            &build_social_sidebar_html(&settings_v),
+        );
         html = html.replace(
             "{{footer_legal_links}}",
             &build_footer_legal_links(&settings_v),
@@ -674,7 +677,10 @@ pub fn render_contact_page(
     flash: Option<(&str, &str)>,
 ) -> String {
     let sg = |key: &str, def: &str| -> String {
-        settings.get(key).cloned().unwrap_or_else(|| def.to_string())
+        settings
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| def.to_string())
     };
 
     let settings_json = serde_json::to_value(settings).unwrap_or_default();
@@ -777,7 +783,11 @@ pub fn render_contact_page(
 
         // Build nav links for contact page (so nav is visible)
         let nav_order_raw = sg("nav_order", "portfolio,blog,contact");
-        let nav_order: Vec<&str> = nav_order_raw.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        let nav_order: Vec<&str> = nav_order_raw
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
         let portfolio_enabled = sg("portfolio_enabled", "false") == "true";
         let journal_enabled = sg("journal_enabled", "true") != "false";
         let contact_enabled = sg("contact_page_enabled", "false") == "true";
@@ -790,15 +800,34 @@ pub fn render_contact_page(
         for key in &nav_order {
             match *key {
                 "portfolio" if portfolio_enabled => {
-                    let href = if portfolio_slug.is_empty() { "/".to_string() } else { format!("/{}", portfolio_slug) };
-                    nav_html.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n", href, html_escape(&portfolio_label)));
+                    let href = if portfolio_slug.is_empty() {
+                        "/".to_string()
+                    } else {
+                        format!("/{}", portfolio_slug)
+                    };
+                    nav_html.push_str(&format!(
+                        "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        href,
+                        html_escape(&portfolio_label)
+                    ));
                 }
                 "blog" if journal_enabled => {
-                    let href = if blog_slug.is_empty() { "/".to_string() } else { format!("/{}", blog_slug) };
-                    nav_html.push_str(&format!("<a href=\"{}\" class=\"nav-link\">{}</a>\n", href, html_escape(&blog_label)));
+                    let href = if blog_slug.is_empty() {
+                        "/".to_string()
+                    } else {
+                        format!("/{}", blog_slug)
+                    };
+                    nav_html.push_str(&format!(
+                        "<a href=\"{}\" class=\"nav-link\">{}</a>\n",
+                        href,
+                        html_escape(&blog_label)
+                    ));
                 }
                 "contact" if contact_enabled => {
-                    nav_html.push_str(&format!("<a href=\"/contact\" class=\"nav-link active\">{}</a>\n", html_escape(&contact_label)));
+                    nav_html.push_str(&format!(
+                        "<a href=\"/contact\" class=\"nav-link active\">{}</a>\n",
+                        html_escape(&contact_label)
+                    ));
                 }
                 _ => {}
             }
@@ -815,7 +844,10 @@ pub fn render_contact_page(
         html = html.replace("{{nav_links}}", &nav_html);
         html = html.replace("{{share_sidebar}}", "");
         html = html.replace("{{custom_sidebar_html}}", "");
-        html = html.replace("{{social_sidebar}}", &build_social_sidebar_html(&settings_v));
+        html = html.replace(
+            "{{social_sidebar}}",
+            &build_social_sidebar_html(&settings_v),
+        );
         html = html.replace(
             "{{footer_legal_links}}",
             &build_footer_legal_links(&settings_v),

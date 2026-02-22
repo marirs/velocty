@@ -142,7 +142,12 @@ pub fn send_purchase_email_with_settings(
 /// Public helper: get the best "from" address, falling back to admin_email.
 pub fn get_from_or_admin(settings: &HashMap<String, String>) -> String {
     get_from_email(settings)
-        .or_else(|| settings.get("admin_email").cloned().filter(|s| !s.is_empty()))
+        .or_else(|| {
+            settings
+                .get("admin_email")
+                .cloned()
+                .filter(|s| !s.is_empty())
+        })
         .unwrap_or_default()
 }
 

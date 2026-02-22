@@ -336,7 +336,11 @@ pub fn contact_submit(
 
     // Honeypot check
     if !honey.is_empty() {
-        let html = render::render_contact_page(s, &settings, Some(("success", "Message sent! Thank you.")));
+        let html = render::render_contact_page(
+            s,
+            &settings,
+            Some(("success", "Message sent! Thank you.")),
+        );
         return Some(RawHtml(html));
     }
 
@@ -361,15 +365,15 @@ pub fn contact_submit(
     }
 
     // Send email to admin
-    let admin_email = settings
-        .get("admin_email")
-        .cloned()
-        .unwrap_or_default();
+    let admin_email = settings.get("admin_email").cloned().unwrap_or_default();
     if admin_email.is_empty() {
         let html = render::render_contact_page(
             s,
             &settings,
-            Some(("error", "Contact form is not configured. Please try again later.")),
+            Some((
+                "error",
+                "Contact form is not configured. Please try again later.",
+            )),
         );
         return Some(RawHtml(html));
     }

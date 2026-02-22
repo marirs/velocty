@@ -8097,7 +8097,10 @@ fn contact_page_email_helper() {
     assert_eq!(from, "admin@example.com");
 
     // With explicit from address
-    settings.insert("email_from_address".to_string(), "noreply@example.com".to_string());
+    settings.insert(
+        "email_from_address".to_string(),
+        "noreply@example.com".to_string(),
+    );
     let from = crate::email::get_from_or_admin(&settings);
     assert_eq!(from, "noreply@example.com");
 }
