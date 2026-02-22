@@ -533,6 +533,9 @@ pub trait Store: Send + Sync {
     /// Count emails sent (status='sent') in the last hour.
     fn mta_queue_sent_last_hour(&self) -> Result<u64, String>;
 
+    /// Get email queue counts by status: (sent, pending, failed, total).
+    fn mta_queue_stats(&self) -> (u64, u64, u64, u64);
+
     /// Delete old queue entries older than `days`.
     fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String>;
 

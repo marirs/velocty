@@ -3177,6 +3177,21 @@ impl Store for MongoStore {
             .map_err(|e| e.to_string())
     }
 
+    fn mta_queue_stats(&self) -> (u64, u64, u64, u64) {
+        let coll = self.db.collection::<Document>("email_queue");
+        let sent = coll
+            .count_documents(doc! { "status": "sent" }, None)
+            .unwrap_or(0);
+        let pending = coll
+            .count_documents(doc! { "status": { "$in": ["pending", "sending"] } }, None)
+            .unwrap_or(0);
+        let failed = coll
+            .count_documents(doc! { "status": "failed" }, None)
+            .unwrap_or(0);
+        let total = coll.count_documents(doc! {}, None).unwrap_or(0);
+        (sent, pending, failed, total)
+    }
+
     fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String> {
         let coll = self.db.collection::<Document>("email_queue");
         let cutoff = (chrono::Utc::now() - chrono::Duration::days(days as i64)).to_rfc3339();

@@ -1857,6 +1857,31 @@ impl Store for SqliteStore {
         .map_err(|e| e.to_string())
     }
 
+    fn mta_queue_stats(&self) -> (u64, u64, u64, u64) {
+        let conn = match self.pool.get() {
+            Ok(c) => c,
+            Err(_) => return (0, 0, 0, 0),
+        };
+        conn.query_row(
+            "SELECT \
+                COALESCE(SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END),0), \
+                COALESCE(SUM(CASE WHEN status='pending' OR status='sending' THEN 1 ELSE 0 END),0), \
+                COALESCE(SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END),0), \
+                COUNT(*) \
+             FROM email_queue",
+            [],
+            |r| {
+                Ok((
+                    r.get::<_, u64>(0)?,
+                    r.get::<_, u64>(1)?,
+                    r.get::<_, u64>(2)?,
+                    r.get::<_, u64>(3)?,
+                ))
+            },
+        )
+        .unwrap_or((0, 0, 0, 0))
+    }
+
     fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String> {
         let conn = self.pool.get().map_err(|e| e.to_string())?;
         let count = conn
@@ -2848,6 +2873,9 @@ impl Store for DbPool {
     }
     fn mta_queue_sent_last_hour(&self) -> Result<u64, String> {
         SqliteStore::new(self.clone()).mta_queue_sent_last_hour()
+    }
+    fn mta_queue_stats(&self) -> (u64, u64, u64, u64) {
+        SqliteStore::new(self.clone()).mta_queue_stats()
     }
     fn mta_queue_cleanup(&self, days: u64) -> Result<u64, String> {
         SqliteStore::new(self.clone()).mta_queue_cleanup(days)

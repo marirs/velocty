@@ -24,6 +24,7 @@ use crate::rss;
 use crate::security::auth;
 use crate::security::mfa;
 use crate::seo;
+use crate::store::Store;
 use crate::typography;
 
 /// Atomic counter for unique shared-cache DB names so parallel tests don't collide.
@@ -7881,4 +7882,57 @@ fn media_scan_distinguishes_image_and_video() {
 
     let _ = std::fs::remove_file(&img);
     let _ = std::fs::remove_file(&vid);
+}
+
+// ═══════════════════════════════════════════════════════════
+// MTA Queue Stats
+// ═══════════════════════════════════════════════════════════
+
+#[test]
+fn mta_queue_stats_empty() {
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+    let (sent, pending, failed, total) = store.mta_queue_stats();
+    assert_eq!(sent, 0);
+    assert_eq!(pending, 0);
+    assert_eq!(failed, 0);
+    assert_eq!(total, 0);
+}
+
+#[test]
+fn mta_queue_stats_counts_by_status() {
+    let pool = test_pool();
+    let store = crate::store::sqlite::SqliteStore::new(pool);
+
+    // Push some emails
+    store
+        .mta_queue_push("a@b.com", "noreply@test.com", "Test 1", "body1")
+        .unwrap();
+    store
+        .mta_queue_push("c@d.com", "noreply@test.com", "Test 2", "body2")
+        .unwrap();
+    store
+        .mta_queue_push("e@f.com", "noreply@test.com", "Test 3", "body3")
+        .unwrap();
+
+    // All start as pending
+    let (sent, pending, failed, total) = store.mta_queue_stats();
+    assert_eq!(pending, 3);
+    assert_eq!(total, 3);
+    assert_eq!(sent, 0);
+    assert_eq!(failed, 0);
+
+    // Mark one as sent, one as failed
+    store
+        .mta_queue_update_status(1, "sent", None, None)
+        .unwrap();
+    store
+        .mta_queue_update_status(3, "failed", Some("timeout"), None)
+        .unwrap();
+
+    let (sent, pending, failed, total) = store.mta_queue_stats();
+    assert_eq!(sent, 1);
+    assert_eq!(pending, 1);
+    assert_eq!(failed, 1);
+    assert_eq!(total, 3);
 }
