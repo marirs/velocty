@@ -321,6 +321,10 @@ pub fn create_site(
     store.run_migrations().map_err(|e| e.to_string())?;
     store.seed_defaults().map_err(|e| e.to_string())?;
 
+    // Auto-set site_url from the hostname provided during site creation
+    let _ = store.setting_set("site_url", &format!("https://{}", hostname));
+    let _ = store.setting_set("site_name", display_name);
+
     Ok(Site {
         id,
         slug,

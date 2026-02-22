@@ -1,4 +1,5 @@
 use rocket::form::Form;
+use rocket::request::{FromRequest, Outcome, Request};
 use rocket::response::Redirect;
 use rocket::serde::json::Json;
 use rocket::State;
@@ -13,6 +14,30 @@ use crate::AdminSlug;
 
 use super::super::NoCacheTemplate;
 use super::login::needs_setup;
+
+/// Request guard that auto-detects the site URL from Host + X-Forwarded-Proto headers.
+pub struct DetectedSiteUrl(pub Option<String>);
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for DetectedSiteUrl {
+    type Error = ();
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let headers = req.headers();
+        let url = headers.get_one("Host").and_then(|host| {
+            let host = host.trim();
+            if host.is_empty() || host == "localhost" || host.starts_with("127.0.0.1") {
+                None
+            } else {
+                let proto = headers
+                    .get_one("X-Forwarded-Proto")
+                    .unwrap_or("http")
+                    .trim();
+                Some(format!("{}://{}", proto, host))
+            }
+        });
+        Outcome::Success(DetectedSiteUrl(url))
+    }
+}
 
 #[derive(Debug, Serialize)]
 struct SetupContext {
@@ -74,6 +99,7 @@ pub fn setup_page(
 
 #[post("/setup", data = "<form>")]
 pub fn setup_submit(
+    detected_url: DetectedSiteUrl,
     form: Form<SetupForm>,
     store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
@@ -233,6 +259,11 @@ pub fn setup_submit(
     let _ = s.setting_set("setup_completed", "true");
     let _ = s.setting_set("db_backend", &form.db_backend);
 
+    // Auto-detect site_url from request headers
+    if let Some(ref url) = detected_url.0 {
+        let _ = s.setting_set("site_url", url);
+    }
+
     Ok(Redirect::to(format!("/{}/login", admin_slug.0)))
 }
 
@@ -259,6 +290,7 @@ pub fn setup_page_no_db(admin_slug: &State<AdminSlug>) -> NoCacheTemplate {
 
 #[post("/setup", data = "<form>")]
 pub fn setup_submit_no_db(
+    detected_url: DetectedSiteUrl,
     form: Form<SetupForm>,
     admin_slug: &State<AdminSlug>,
 ) -> Result<Template, Template> {
@@ -449,6 +481,11 @@ pub fn setup_submit_no_db(
     let _ = store.setting_set("admin_password_hash", &hash);
     let _ = store.setting_set("setup_completed", "true");
     let _ = store.setting_set("db_backend", &form.db_backend);
+
+    // Auto-detect site_url from request headers
+    if let Some(ref url) = detected_url.0 {
+        let _ = store.setting_set("site_url", url);
+    }
 
     // ── Show restart message ──
     Ok(Template::render(
