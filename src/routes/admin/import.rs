@@ -20,15 +20,21 @@ pub fn import_page(
     _admin: AdminUser,
     store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
+    flash: Option<rocket::request::FlashMessage<'_>>,
 ) -> Template {
     let history = store.import_list();
 
-    let context = json!({
+    let mut context = json!({
         "page_title": "Import",
         "history": history,
         "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
+
+    if let Some(ref f) = flash {
+        context["flash_kind"] = json!(f.kind());
+        context["flash_msg"] = json!(f.message());
+    }
 
     Template::render("admin/import/index", &context)
 }

@@ -157,5 +157,27 @@ document.querySelectorAll('.import-dropzone').forEach(function(zone) {
         textLabel.innerHTML = 'File selected — <strong>change</strong>';
     }
 });
+
+document.querySelectorAll('.import-form').forEach(function(form) {
+    form.addEventListener('submit', function() {
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:4px"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>Importing…';
+        }
+        var card = form.closest('.import-card');
+        if (card) {
+            var note = document.createElement('p');
+            note.className = 'text-muted';
+            note.style.cssText = 'margin-top:8px;font-size:13px';
+            note.textContent = 'This may take a while for large files. Please do not close this page.';
+            card.appendChild(note);
+        }
+    });
+});
 </script>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+</style>
 {% endblock content %}
