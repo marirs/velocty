@@ -6,12 +6,25 @@
     <a href="/{{ admin_slug }}/posts/new" class="btn btn-primary">+ New Post <span class="kbd"><span class="kbd-mod">⌘</span>P</span></a>
 </div>
 
-<div class="status-tabs">
-    <a href="/{{ admin_slug }}/posts" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
-    <a href="/{{ admin_slug }}/posts?status=published" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
-    <a href="/{{ admin_slug }}/posts?status=draft" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
-    <a href="/{{ admin_slug }}/posts?status=scheduled" class="tab {% if status_filter == 'scheduled' %}active{% endif %}">Scheduled ({{ count_scheduled }})</a>
-    <a href="/{{ admin_slug }}/posts?status=archived" class="tab {% if status_filter == 'archived' %}active{% endif %}">Archived ({{ count_archived }})</a>
+<div class="status-tabs" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div>
+        <a href="/{{ admin_slug }}/posts{% if per_page and per_page != 50 %}?per_page={{ per_page }}{% endif %}" class="tab {% if not status_filter %}active{% endif %}">All ({{ count_all }})</a>
+        <a href="/{{ admin_slug }}/posts?status=published{% if per_page and per_page != 50 %}&per_page={{ per_page }}{% endif %}" class="tab {% if status_filter == 'published' %}active{% endif %}">Published ({{ count_published }})</a>
+        <a href="/{{ admin_slug }}/posts?status=draft{% if per_page and per_page != 50 %}&per_page={{ per_page }}{% endif %}" class="tab {% if status_filter == 'draft' %}active{% endif %}">Draft ({{ count_draft }})</a>
+        <a href="/{{ admin_slug }}/posts?status=scheduled{% if per_page and per_page != 50 %}&per_page={{ per_page }}{% endif %}" class="tab {% if status_filter == 'scheduled' %}active{% endif %}">Scheduled ({{ count_scheduled }})</a>
+        <a href="/{{ admin_slug }}/posts?status=archived{% if per_page and per_page != 50 %}&per_page={{ per_page }}{% endif %}" class="tab {% if status_filter == 'archived' %}active{% endif %}">Archived ({{ count_archived }})</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary)">
+        Show:
+        <select id="per-page-select" onchange="changePerPage(this.value)" style="padding:4px 8px;border:1px solid var(--border-input);border-radius:4px;background:var(--bg-input);color:var(--text-primary);font-size:13px">
+            {% set pp = per_page | default(value=50) %}
+            <option value="50" {% if pp == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if pp == 100 %}selected{% endif %}>100</option>
+            <option value="150" {% if pp == 150 %}selected{% endif %}>150</option>
+            <option value="200" {% if pp == 200 %}selected{% endif %}>200</option>
+            <option value="250" {% if pp == 250 %}selected{% endif %}>250</option>
+        </select>
+    </div>
 </div>
 
 <div id="bulk-bar" style="display:none;margin-bottom:12px;padding:8px 16px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;display:none;align-items:center;gap:12px">
@@ -62,15 +75,16 @@
 
 {% if total_pages > 1 %}
 <div class="pagination">
+    {% set pp_q = "" %}{% if per_page and per_page != 50 %}{% set pp_q = "&per_page=" ~ per_page %}{% endif %}
     {% if current_page > 1 %}
-    <a href="/{{ admin_slug }}/posts?page={{ current_page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">&laquo; Prev</a>
+    <a href="/{{ admin_slug }}/posts?page={{ current_page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{{ pp_q }}">&laquo; Prev</a>
     {% endif %}
     {% for p in range(end=total_pages) %}
     {% set page_num = p + 1 %}
-    <a href="/{{ admin_slug }}/posts?page={{ page_num }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
+    <a href="/{{ admin_slug }}/posts?page={{ page_num }}{% if status_filter %}&status={{ status_filter }}{% endif %}{{ pp_q }}" class="{% if page_num == current_page %}active{% endif %}">{{ page_num }}</a>
     {% endfor %}
     {% if current_page < total_pages %}
-    <a href="/{{ admin_slug }}/posts?page={{ current_page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next &raquo;</a>
+    <a href="/{{ admin_slug }}/posts?page={{ current_page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{{ pp_q }}">Next &raquo;</a>
     {% endif %}
 </div>
 {% endif %}
@@ -104,6 +118,26 @@
 {% block scripts %}
 <script>
 var ADMIN = '/{{ admin_slug }}';
+
+function changePerPage(val) {
+    localStorage.setItem('admin_journal_per_page', val);
+    var params = new URLSearchParams(window.location.search);
+    params.set('per_page', val);
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    if (!params.has('per_page')) {
+        var saved = localStorage.getItem('admin_journal_per_page');
+        if (saved && saved !== '50') {
+            params.set('per_page', saved);
+            window.location.search = params.toString();
+            return;
+        }
+    }
+})();
 
 (function() {
     var saved = new URLSearchParams(window.location.search).get('saved');

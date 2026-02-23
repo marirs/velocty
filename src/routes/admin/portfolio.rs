@@ -18,15 +18,22 @@ use crate::AdminSlug;
 
 // ── Portfolio ──────────────────────────────────────────
 
-#[get("/portfolio?<status>&<page>")]
+#[get("/portfolio?<status>&<page>&<per_page>")]
 pub fn portfolio_list(
     _admin: AuthorUser,
     store: &State<Arc<dyn Store>>,
     slug: &State<AdminSlug>,
     status: Option<String>,
     page: Option<i64>,
+    per_page: Option<i64>,
 ) -> Template {
-    let per_page = 20i64;
+    let per_page = match per_page.unwrap_or(50) {
+        n if n >= 250 => 250,
+        n if n >= 200 => 200,
+        n if n >= 150 => 150,
+        n if n >= 100 => 100,
+        _ => 50,
+    };
     let current_page = page.unwrap_or(1).max(1);
     let offset = (current_page - 1) * per_page;
 
@@ -40,6 +47,7 @@ pub fn portfolio_list(
         "current_page": current_page,
         "total_pages": total_pages,
         "total": total,
+        "per_page": per_page,
         "status_filter": status,
         "count_all": store.portfolio_count(None),
         "count_published": store.portfolio_count(Some("published")),

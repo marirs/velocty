@@ -2527,6 +2527,7 @@ fn render_blog_list(context: &Value, design_slug: &str) -> String {
                      Load More</button></div>",
                     current_page + 1, total_pages
                 ));
+                html.push_str(BLOG_LOAD_MORE_JS);
             }
             "infinite" => {
                 html.push_str(&format!(
@@ -2535,6 +2536,7 @@ fn render_blog_list(context: &Value, design_slug: &str) -> String {
                     current_page + 1,
                     total_pages
                 ));
+                html.push_str(BLOG_INFINITE_SCROLL_JS);
             }
             _ => {
                 html.push_str(&build_pagination(current_page, total_pages));
@@ -2544,6 +2546,91 @@ fn render_blog_list(context: &Value, design_slug: &str) -> String {
 
     html
 }
+
+const BLOG_LOAD_MORE_JS: &str = r#"<script>
+(function(){
+    var btn=document.getElementById('load-more-btn');
+    if(!btn)return;
+    var overlay=null;
+    function getOverlay(){
+        if(!overlay){
+            var d=document.getElementById('page-loading-overlay');
+            if(!d){var t=document.createElement('div');t.innerHTML='\x3cstyle>#page-loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}#page-loading-overlay.active{opacity:1}#page-loading-overlay .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:pgSpin .7s linear infinite}@keyframes pgSpin{to{transform:rotate(360deg)}}\x3c/style><div id="page-loading-overlay" style="display:none"><div class="spinner"></div></div>';document.body.appendChild(t);d=document.getElementById('page-loading-overlay');}
+            overlay=d;
+        }
+        return overlay;
+    }
+    function showLoading(){var o=getOverlay();o.style.display='flex';requestAnimationFrame(function(){o.classList.add('active')});}
+    function hideLoading(){var o=getOverlay();o.classList.remove('active');setTimeout(function(){o.style.display='none'},200);}
+    btn.addEventListener('click',function(){
+        var page=parseInt(btn.dataset.page);
+        var total=parseInt(btn.dataset.total);
+        if(page>total){btn.style.display='none';return;}
+        showLoading();
+        var url=window.location.pathname+'?page='+page;
+        fetch(url).then(function(r){return r.text()}).then(function(html){
+            var doc=new DOMParser().parseFromString(html,'text/html');
+            var list=doc.querySelector('.blog-list');
+            if(list){
+                var container=document.querySelector('.blog-list');
+                if(container){
+                    var items=list.querySelectorAll('.blog-item');
+                    items.forEach(function(item){container.appendChild(item)});
+                }
+            }
+            var next=page+1;
+            if(next>total){btn.style.display='none';}
+            else{btn.dataset.page=next;}
+            hideLoading();
+        }).catch(function(){hideLoading()});
+    });
+})();
+</script>"#;
+
+const BLOG_INFINITE_SCROLL_JS: &str = r#"<script>
+(function(){
+    var sentinel=document.getElementById('infinite-sentinel');
+    if(!sentinel)return;
+    var loading=false;
+    var overlay=null;
+    function getOverlay(){
+        if(!overlay){
+            var d=document.getElementById('page-loading-overlay');
+            if(!d){var t=document.createElement('div');t.innerHTML='\x3cstyle>#page-loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}#page-loading-overlay.active{opacity:1}#page-loading-overlay .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:pgSpin .7s linear infinite}@keyframes pgSpin{to{transform:rotate(360deg)}}\x3c/style><div id="page-loading-overlay" style="display:none"><div class="spinner"></div></div>';document.body.appendChild(t);d=document.getElementById('page-loading-overlay');}
+            overlay=d;
+        }
+        return overlay;
+    }
+    function showLoading(){var o=getOverlay();o.style.display='flex';requestAnimationFrame(function(){o.classList.add('active')});}
+    function hideLoading(){var o=getOverlay();o.classList.remove('active');setTimeout(function(){o.style.display='none'},200);}
+    var obs=new IntersectionObserver(function(entries){
+        if(!entries[0].isIntersecting||loading)return;
+        var page=parseInt(sentinel.dataset.page);
+        var total=parseInt(sentinel.dataset.total);
+        if(page>total){obs.disconnect();return;}
+        loading=true;
+        showLoading();
+        var url=window.location.pathname+'?page='+page;
+        fetch(url).then(function(r){return r.text()}).then(function(html){
+            var doc=new DOMParser().parseFromString(html,'text/html');
+            var list=doc.querySelector('.blog-list');
+            if(list){
+                var container=document.querySelector('.blog-list');
+                if(container){
+                    var items=list.querySelectorAll('.blog-item');
+                    items.forEach(function(item){container.appendChild(item)});
+                }
+            }
+            var next=page+1;
+            if(next>total){obs.disconnect();sentinel.remove();}
+            else{sentinel.dataset.page=next;}
+            loading=false;
+            hideLoading();
+        }).catch(function(){loading=false;hideLoading()});
+    },{rootMargin:'200px'});
+    obs.observe(sentinel);
+})();
+</script>"#;
 
 fn render_blog_single(context: &Value, design_slug: &str) -> String {
     // Delegate to design-specific renderer based on active design

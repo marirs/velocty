@@ -384,6 +384,7 @@ pub fn render_grid(context: &Value) -> String {
                      Load More</button></div>",
                     current_page + 1, total_pages
                 ));
+                html.push_str(LOAD_MORE_JS);
             }
             "infinite" => {
                 html.push_str(&format!(
@@ -392,6 +393,7 @@ pub fn render_grid(context: &Value) -> String {
                     current_page + 1,
                     total_pages
                 ));
+                html.push_str(INFINITE_SCROLL_JS);
             }
             _ => {
                 // Classic pagination
@@ -402,6 +404,99 @@ pub fn render_grid(context: &Value) -> String {
 
     html
 }
+
+const LOADING_OVERLAY_CSS: &str = r#"<style>
+#page-loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+#page-loading-overlay.active{opacity:1}
+#page-loading-overlay .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:pgSpin .7s linear infinite}
+@keyframes pgSpin{to{transform:rotate(360deg)}}
+</style>
+<div id="page-loading-overlay" style="display:none"><div class="spinner"></div></div>"#;
+
+const LOAD_MORE_JS: &str = r#"<script>
+(function(){
+    var btn=document.getElementById('load-more-btn');
+    if(!btn)return;
+    var overlay=null;
+    function getOverlay(){
+        if(!overlay){
+            var d=document.getElementById('page-loading-overlay');
+            if(!d){var t=document.createElement('div');t.innerHTML='\x3cstyle>#page-loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}#page-loading-overlay.active{opacity:1}#page-loading-overlay .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:pgSpin .7s linear infinite}@keyframes pgSpin{to{transform:rotate(360deg)}}\x3c/style><div id="page-loading-overlay" style="display:none"><div class="spinner"></div></div>';document.body.appendChild(t);d=document.getElementById('page-loading-overlay');}
+            overlay=d;
+        }
+        return overlay;
+    }
+    function showLoading(){var o=getOverlay();o.style.display='flex';requestAnimationFrame(function(){o.classList.add('active')});}
+    function hideLoading(){var o=getOverlay();o.classList.remove('active');setTimeout(function(){o.style.display='none'},200);}
+    btn.addEventListener('click',function(){
+        var page=parseInt(btn.dataset.page);
+        var total=parseInt(btn.dataset.total);
+        if(page>total){btn.style.display='none';return;}
+        showLoading();
+        var url=window.location.pathname+'?page='+page;
+        fetch(url).then(function(r){return r.text()}).then(function(html){
+            var doc=new DOMParser().parseFromString(html,'text/html');
+            var grid=doc.querySelector('.masonry-grid,.css-grid');
+            if(grid){
+                var container=document.querySelector('.masonry-grid,.css-grid');
+                if(container){
+                    var items=grid.querySelectorAll('.grid-item');
+                    items.forEach(function(item){container.appendChild(item)});
+                }
+            }
+            var next=page+1;
+            if(next>total){btn.style.display='none';}
+            else{btn.dataset.page=next;}
+            hideLoading();
+        }).catch(function(){hideLoading()});
+    });
+})();
+</script>"#;
+
+const INFINITE_SCROLL_JS: &str = r#"<script>
+(function(){
+    var sentinel=document.getElementById('infinite-sentinel');
+    if(!sentinel)return;
+    var loading=false;
+    var overlay=null;
+    function getOverlay(){
+        if(!overlay){
+            var d=document.getElementById('page-loading-overlay');
+            if(!d){var t=document.createElement('div');t.innerHTML='\x3cstyle>#page-loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}#page-loading-overlay.active{opacity:1}#page-loading-overlay .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:pgSpin .7s linear infinite}@keyframes pgSpin{to{transform:rotate(360deg)}}\x3c/style><div id="page-loading-overlay" style="display:none"><div class="spinner"></div></div>';document.body.appendChild(t);d=document.getElementById('page-loading-overlay');}
+            overlay=d;
+        }
+        return overlay;
+    }
+    function showLoading(){var o=getOverlay();o.style.display='flex';requestAnimationFrame(function(){o.classList.add('active')});}
+    function hideLoading(){var o=getOverlay();o.classList.remove('active');setTimeout(function(){o.style.display='none'},200);}
+    var obs=new IntersectionObserver(function(entries){
+        if(!entries[0].isIntersecting||loading)return;
+        var page=parseInt(sentinel.dataset.page);
+        var total=parseInt(sentinel.dataset.total);
+        if(page>total){obs.disconnect();return;}
+        loading=true;
+        showLoading();
+        var url=window.location.pathname+'?page='+page;
+        fetch(url).then(function(r){return r.text()}).then(function(html){
+            var doc=new DOMParser().parseFromString(html,'text/html');
+            var grid=doc.querySelector('.masonry-grid,.css-grid');
+            if(grid){
+                var container=document.querySelector('.masonry-grid,.css-grid');
+                if(container){
+                    var items=grid.querySelectorAll('.grid-item');
+                    items.forEach(function(item){container.appendChild(item)});
+                }
+            }
+            var next=page+1;
+            if(next>total){obs.disconnect();sentinel.remove();}
+            else{sentinel.dataset.page=next;}
+            loading=false;
+            hideLoading();
+        }).catch(function(){loading=false;hideLoading()});
+    },{rootMargin:'200px'});
+    obs.observe(sentinel);
+})();
+</script>"#;
 
 /// Render a single portfolio item page.
 pub fn render_single(context: &Value) -> String {
