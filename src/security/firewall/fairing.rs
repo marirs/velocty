@@ -79,8 +79,8 @@ impl Fairing for FirewallFairing {
 
         let path = request.uri().path().to_string();
 
-        // Skip static files
-        if path.starts_with("/static") || path.starts_with("/uploads") || path == "/favicon.ico" {
+        // Skip truly static files (no user input in path)
+        if path.starts_with("/static") || path == "/favicon.ico" {
             return;
         }
 
