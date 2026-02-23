@@ -112,12 +112,12 @@ impl PortfolioItem {
 
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match status {
             Some(s) => (
-                "SELECT * FROM portfolio WHERE status = ?1 ORDER BY created_at DESC LIMIT ?2 OFFSET ?3"
+                "SELECT * FROM portfolio WHERE status = ?1 ORDER BY published_at DESC LIMIT ?2 OFFSET ?3"
                     .to_string(),
                 vec![Box::new(s.to_string()), Box::new(limit), Box::new(offset)],
             ),
             None => (
-                "SELECT * FROM portfolio ORDER BY created_at DESC LIMIT ?1 OFFSET ?2".to_string(),
+                "SELECT * FROM portfolio ORDER BY published_at DESC LIMIT ?1 OFFSET ?2".to_string(),
                 vec![Box::new(limit), Box::new(offset)],
             ),
         };
@@ -186,15 +186,17 @@ impl PortfolioItem {
     pub fn create(pool: &DbPool, form: &PortfolioForm) -> Result<i64, String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
 
-        let published_at: Option<NaiveDateTime> = form
-            .published_at
-            .as_ref()
-            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").ok());
+        let published_at: Option<NaiveDateTime> = form.published_at.as_ref().and_then(|s| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M"))
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
+                .ok()
+        });
 
         conn.execute(
             "INSERT INTO portfolio (title, slug, description_json, description_html, image_path, thumbnail_path,
-             meta_title, meta_description, sell_enabled, price, purchase_note, payment_provider, download_file_path, status, published_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+             meta_title, meta_description, sell_enabled, price, purchase_note, payment_provider, download_file_path, status, published_at, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, COALESCE(?15, CURRENT_TIMESTAMP), COALESCE(?15, CURRENT_TIMESTAMP))",
             params![
                 form.title,
                 form.slug,
@@ -221,10 +223,12 @@ impl PortfolioItem {
     pub fn update(pool: &DbPool, id: i64, form: &PortfolioForm) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
 
-        let published_at: Option<NaiveDateTime> = form
-            .published_at
-            .as_ref()
-            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").ok());
+        let published_at: Option<NaiveDateTime> = form.published_at.as_ref().and_then(|s| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M"))
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
+                .ok()
+        });
 
         conn.execute(
             "UPDATE portfolio SET title=?1, slug=?2, description_json=?3, description_html=?4,

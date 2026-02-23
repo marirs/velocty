@@ -24,6 +24,7 @@
         <thead>
             <tr>
                 <th style="padding:10px 8px 10px 16px"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
+                <th style="width:60px">Image</th>
                 <th>Title</th>
                 <th>Status</th>
                 <th>Date</th>
@@ -34,11 +35,16 @@
             {% for post in posts %}
             <tr>
                 <td style="padding:10px 8px 10px 16px"><input type="checkbox" class="row-check" value="{{ post.id }}" onchange="updateBulkBar()"></td>
+                <td>
+                    {% if post.featured_image %}
+                    <img src="/uploads/{{ post.featured_image }}" alt="" class="table-thumb">
+                    {% endif %}
+                </td>
                 <td><a href="/{{ admin_slug }}/posts/{{ post.id }}/edit">{{ post.title }}</a></td>
                 <td>
                     <span class="badge badge-{{ post.status }}">{{ post.status }}</span>
                 </td>
-                <td class="text-muted utc-date">{{ post.created_at }}</td>
+                <td class="text-muted utc-date">{{ post.published_at | default(value=post.created_at) }}</td>
                 <td class="actions">
                     <a href="/{{ admin_slug }}/posts/{{ post.id }}/edit" class="btn btn-sm">Edit</a>
                     <form method="post" action="/{{ admin_slug }}/posts/{{ post.id }}/delete" class="inline" onsubmit="return confirmDelete(event, 'Delete this post?')">
@@ -48,7 +54,7 @@
             </tr>
             {% endfor %}
             {% if posts | length == 0 %}
-            <tr><td colspan="5" class="empty-state">No posts yet. <a href="/{{ admin_slug }}/posts/new">Create one</a>.</td></tr>
+            <tr><td colspan="6" class="empty-state">No posts yet. <a href="/{{ admin_slug }}/posts/new">Create one</a>.</td></tr>
             {% endif %}
         </tbody>
     </table>

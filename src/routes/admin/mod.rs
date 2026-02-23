@@ -41,6 +41,44 @@ pub(crate) fn resolve_status(status: &str, published_at: &Option<String>) -> Str
     status.to_string()
 }
 
+/// Compute the subdirectory for a media file based on the `media_organization` setting.
+/// `prefix` is the category/type (e.g. "post", "portfolio", "editor").
+/// Returns "" for flat, or a path like "2026/" or "2026/02/" or "portfolio/2026/" etc.
+pub(crate) fn media_subdir(store: &dyn Store, prefix: &str) -> String {
+    let org = store.setting_get_or("media_organization", "flat");
+    let now = chrono::Utc::now();
+    let year = now.format("%Y").to_string();
+    let month = now.format("%m").to_string();
+    match org.as_str() {
+        "year" => format!("{}/", year),
+        "year_month" => format!("{}/{}/", year, month),
+        "category" => format!("{}/", prefix),
+        "category_year" => format!("{}/{}/", prefix, year),
+        "category_year_month" => format!("{}/{}/{}/", prefix, year, month),
+        _ => String::new(), // "flat"
+    }
+}
+
+/// Compute the subdirectory for a media file based on the `media_organization` setting,
+/// using a specific date instead of now. Used by importers to respect original post dates.
+pub(crate) fn media_subdir_for_date(
+    store: &dyn Store,
+    prefix: &str,
+    date: &chrono::NaiveDateTime,
+) -> String {
+    let org = store.setting_get_or("media_organization", "flat");
+    let year = date.format("%Y").to_string();
+    let month = date.format("%m").to_string();
+    match org.as_str() {
+        "year" => format!("{}/", year),
+        "year_month" => format!("{}/{}/", year, month),
+        "category" => format!("{}/", prefix),
+        "category_year" => format!("{}/{}/", prefix, year),
+        "category_year_month" => format!("{}/{}/{}/", prefix, year, month),
+        _ => String::new(), // "flat"
+    }
+}
+
 pub(crate) async fn save_upload(
     file: &mut TempFile<'_>,
     prefix: &str,
@@ -65,9 +103,11 @@ pub(crate) async fn save_upload(
         .unwrap_or_else(|| "jpg".to_string());
 
     let uid = uuid::Uuid::new_v4();
-    let filename = format!("{}_{}.{}", prefix, uid, ext);
+    let subdir = media_subdir(store, prefix);
+    let filename = format!("{}{}_{}.{}", subdir, prefix, uid, ext);
     let upload_dir = std::path::Path::new("website/site/uploads");
-    let _ = std::fs::create_dir_all(upload_dir);
+    let full_dir = upload_dir.join(&subdir);
+    let _ = std::fs::create_dir_all(&full_dir);
     let dest = upload_dir.join(&filename);
 
     if file.persist_to(&dest).await.is_err() {

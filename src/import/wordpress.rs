@@ -73,16 +73,15 @@ pub fn import_wxr(store: &dyn Store, xml_content: &str) -> Result<WpImportResult
     }
 
     // Phase 3: Download media and import posts
-    let media_dir = Path::new("website/site/uploads/wp-import");
-    let _ = std::fs::create_dir_all(media_dir);
-
     for item in &items {
         match item.post_type.as_str() {
             "post" => {
+                let post_dt = parse_wp_date_to_naive(&item.date);
+
                 // Find featured image via _thumbnail_id meta
                 let featured_image = find_featured_image(item, &attachment_map);
                 let featured_local = if let Some(ref url) = featured_image {
-                    match download_media(url, media_dir) {
+                    match download_media(url, store, "post", post_dt.as_ref()) {
                         Ok(local) => {
                             result.media_downloaded += 1;
                             Some(local)
@@ -100,7 +99,13 @@ pub fn import_wxr(store: &dyn Store, xml_content: &str) -> Result<WpImportResult
                 };
 
                 // Rewrite inline wp-content/uploads URLs in content
-                let content = rewrite_inline_images(&item.content, media_dir, &mut result);
+                let content = rewrite_inline_images(
+                    &item.content,
+                    store,
+                    "post",
+                    post_dt.as_ref(),
+                    &mut result,
+                );
 
                 match import_post(
                     store,
@@ -369,14 +374,32 @@ fn find_featured_image(item: &WpItem, attachment_map: &HashMap<i64, String>) -> 
     None
 }
 
-fn download_media(url: &str, dest_dir: &Path) -> Result<String, String> {
-    let filename = url.rsplit('/').next().unwrap_or("image.jpg").to_string();
-    let dest_path = dest_dir.join(&filename);
+/// Download a media file respecting the media_organization setting.
+fn download_media(
+    url: &str,
+    store: &dyn Store,
+    prefix: &str,
+    post_date: Option<&chrono::NaiveDateTime>,
+) -> Result<String, String> {
+    let orig_filename = url.rsplit('/').next().unwrap_or("image.jpg").to_string();
+    let ext = orig_filename
+        .rsplit('.')
+        .next()
+        .unwrap_or("jpg")
+        .to_lowercase();
 
-    // Skip if already downloaded
-    if dest_path.exists() {
-        return Ok(format!("/uploads/wp-import/{}", filename));
-    }
+    let subdir = if let Some(dt) = post_date {
+        crate::routes::admin::media_subdir_for_date(store, prefix, dt)
+    } else {
+        crate::routes::admin::media_subdir(store, prefix)
+    };
+
+    let uid = uuid::Uuid::new_v4();
+    let rel_path = format!("{}{}_{}.{}", subdir, prefix, uid, ext);
+    let upload_dir = Path::new("website/site/uploads");
+    let full_dir = upload_dir.join(&subdir);
+    let _ = std::fs::create_dir_all(&full_dir);
+    let dest_path = upload_dir.join(&rel_path);
 
     let resp = reqwest::blocking::get(url).map_err(|e| format!("Download failed: {}", e))?;
     if !resp.status().is_success() {
@@ -388,10 +411,27 @@ fn download_media(url: &str, dest_dir: &Path) -> Result<String, String> {
     file.write_all(&bytes)
         .map_err(|e| format!("Write failed: {}", e))?;
 
-    Ok(format!("/uploads/wp-import/{}", filename))
+    Ok(rel_path)
 }
 
-fn rewrite_inline_images(content: &str, dest_dir: &Path, result: &mut WpImportResult) -> String {
+/// Parse WordPress date string into NaiveDateTime for media organization.
+fn parse_wp_date_to_naive(date: &str) -> Option<chrono::NaiveDateTime> {
+    if date.is_empty() {
+        return None;
+    }
+    chrono::NaiveDateTime::parse_from_str(date, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(date, "%Y-%m-%dT%H:%M:%S"))
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(date, "%Y-%m-%dT%H:%M"))
+        .ok()
+}
+
+fn rewrite_inline_images(
+    content: &str,
+    store: &dyn Store,
+    prefix: &str,
+    post_date: Option<&chrono::NaiveDateTime>,
+    result: &mut WpImportResult,
+) -> String {
     let mut output = content.to_string();
 
     // Find all wp-content/uploads URLs in the HTML
@@ -402,9 +442,10 @@ fn rewrite_inline_images(content: &str, dest_dir: &Path, result: &mut WpImportRe
             .map(|m| m.as_str().to_string())
             .collect();
         for url in urls {
-            match download_media(&url, dest_dir) {
+            match download_media(&url, store, prefix, post_date) {
                 Ok(local_path) => {
-                    output = output.replace(&url, &local_path);
+                    let html_path = format!("/uploads/{}", local_path);
+                    output = output.replace(&url, &html_path);
                     result.media_downloaded += 1;
                 }
                 Err(_) => {
@@ -461,8 +502,13 @@ fn import_post(
         meta_title: None,
         meta_description: None,
         status: velocty_status.to_string(),
-        published_at: if !date.is_empty() {
-            Some(date.to_string())
+        published_at: if date.len() >= 19 {
+            // WordPress format: "2024-01-15 10:30:00" → "2024-01-15T10:30:00"
+            Some(format!("{}T{}", &date[..10], &date[11..19]))
+        } else if date.len() >= 16 {
+            Some(format!("{}T{}:00", &date[..10], &date[11..16]))
+        } else if date.len() >= 10 {
+            Some(format!("{}T00:00:00", &date[..10]))
         } else {
             None
         },

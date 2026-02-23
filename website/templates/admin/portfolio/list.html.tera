@@ -48,7 +48,7 @@
                 <td><a href="/{{ admin_slug }}/portfolio/{{ item.id }}/edit">{{ item.title }}</a></td>
                 <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
                 <td class="text-muted">{{ item.likes }}</td>
-                <td class="text-muted utc-date">{{ item.created_at }}</td>
+                <td class="text-muted utc-date">{{ item.published_at | default(value=item.created_at) }}</td>
                 <td class="actions">
                     <a href="/{{ admin_slug }}/portfolio/{{ item.id }}/edit" class="btn btn-sm">Edit</a>
                     <form method="post" action="/{{ admin_slug }}/portfolio/{{ item.id }}/delete" class="inline" onsubmit="return confirmDelete(event, 'Delete this item?')">

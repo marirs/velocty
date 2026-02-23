@@ -482,7 +482,7 @@ impl Store for SqliteStore {
             "SELECT p.* FROM portfolio p
              JOIN content_tags ct ON ct.content_id = p.id AND ct.content_type = 'portfolio'
              WHERE ct.tag_id = ?1 AND p.status = 'published'
-             ORDER BY p.created_at DESC LIMIT ?2 OFFSET ?3",
+             ORDER BY p.published_at DESC LIMIT ?2 OFFSET ?3",
         ) {
             Ok(s) => s,
             Err(_) => return vec![],

@@ -673,7 +673,7 @@ impl Store for MongoStore {
             None => doc! {},
         };
         let opts = mongodb::options::FindOptions::builder()
-            .sort(doc! { "id": -1 })
+            .sort(doc! { "published_at": -1 })
             .skip(offset as u64)
             .limit(limit)
             .build();
@@ -697,6 +697,7 @@ impl Store for MongoStore {
     fn post_create(&self, form: &PostForm) -> Result<i64, String> {
         let id = self.next_id("posts")?;
         let now = chrono::Utc::now().to_rfc3339();
+        let ts = form.published_at.as_deref().unwrap_or(&now);
         let coll = self.db.collection::<Document>("posts");
         coll.insert_one(
             doc! {
@@ -711,8 +712,8 @@ impl Store for MongoStore {
                 "meta_description": form.meta_description.as_deref(),
                 "status": &form.status,
                 "published_at": form.published_at.as_deref(),
-                "created_at": &now,
-                "updated_at": &now,
+                "created_at": ts,
+                "updated_at": ts,
                 "seo_score": -1_i32,
                 "seo_issues": "[]",
             },
@@ -987,7 +988,7 @@ impl Store for MongoStore {
             None => doc! {},
         };
         let opts = mongodb::options::FindOptions::builder()
-            .sort(doc! { "id": -1 })
+            .sort(doc! { "published_at": -1 })
             .skip(offset as u64)
             .limit(limit)
             .build();
@@ -1055,6 +1056,7 @@ impl Store for MongoStore {
     fn portfolio_create(&self, form: &PortfolioForm) -> Result<i64, String> {
         let id = self.next_id("portfolio")?;
         let now = chrono::Utc::now().to_rfc3339();
+        let ts = form.published_at.as_deref().unwrap_or(&now);
         let coll = self.db.collection::<Document>("portfolio");
         coll.insert_one(
             doc! {
@@ -1075,8 +1077,8 @@ impl Store for MongoStore {
                 "likes": 0_i64,
                 "status": &form.status,
                 "published_at": form.published_at.as_deref(),
-                "created_at": &now,
-                "updated_at": &now,
+                "created_at": ts,
+                "updated_at": ts,
                 "seo_score": -1_i32,
                 "seo_issues": "[]",
             },
@@ -1186,7 +1188,7 @@ impl Store for MongoStore {
         }
         let coll = self.db.collection::<Document>("portfolio");
         let opts = mongodb::options::FindOptions::builder()
-            .sort(doc! { "created_at": -1 })
+            .sort(doc! { "published_at": -1 })
             .skip(offset as u64)
             .limit(limit)
             .build();

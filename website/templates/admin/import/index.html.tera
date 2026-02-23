@@ -103,7 +103,7 @@
     <div class="modal-body">
         <div class="form-group" style="margin-bottom:16px">
             <label style="display:block;margin-bottom:4px;font-size:13px;color:var(--text-secondary)">Tumblr API Key</label>
-            <input type="password" id="tumblr-api-key" class="form-control" placeholder="Your Tumblr API key" value="{{ settings.tumblr_api_key | default(value='') }}" autocomplete="off">
+            <input type="text" id="tumblr-api-key" class="form-control" placeholder="Your Tumblr API key" value="{{ settings.tumblr_api_key | default(value='') }}" autocomplete="off" data-1p-ignore data-lpignore="true">
             <small style="color:var(--text-tertiary);font-size:11px">Get your API key from <a href="https://www.tumblr.com/oauth/apps" target="_blank" style="color:var(--accent)">tumblr.com/oauth/apps</a></small>
         </div>
         <div class="form-group" style="margin-bottom:16px">
@@ -144,7 +144,7 @@
         <!-- Tabs -->
         <div style="flex-shrink:0;border-bottom:1px solid var(--border-subtle);padding:0 20px;display:flex;align-items:center;gap:0">
             <button class="tumblr-tab active" data-tab="journal" onclick="tumblrSwitchTab('journal')">Journal <span id="tumblr-count-journal" class="tumblr-tab-count">0</span></button>
-            <button class="tumblr-tab" data-tab="photo" onclick="tumblrSwitchTab('photo')">Photos <span id="tumblr-count-photo" class="tumblr-tab-count">0</span></button>
+            <button class="tumblr-tab" data-tab="photo" onclick="tumblrSwitchTab('photo')">Portfolio <span id="tumblr-count-photo" class="tumblr-tab-count">0</span></button>
             <button class="tumblr-tab" data-tab="video" onclick="tumblrSwitchTab('video')">Videos <span id="tumblr-count-video" class="tumblr-tab-count">0</span></button>
             <div style="flex:1"></div>
             <div id="tumblr-ai-bar" style="display:none;align-items:center;gap:8px">
@@ -497,7 +497,8 @@ function tumblrRenderGridTab(type, items) {
         html += '<div class="tumblr-grid-item" data-id="' + item.id + '">';
         html += '<label class="tumblr-check-overlay"><input type="checkbox" class="tumblr-item-check" data-id="' + item.id + '" data-type="' + type + '"></label>';
         if (item.image_path) {
-            html += '<div class="tumblr-grid-thumb" style="background-image:url(\'' + item.image_path + '\')"></div>';
+            var thumbUrl = item.image_path.startsWith('/') ? item.image_path : '/uploads/' + item.image_path;
+            html += '<div class="tumblr-grid-thumb" style="background-image:url(\'' + thumbUrl + '\')"></div>';
         } else {
             html += '<div class="tumblr-grid-thumb tumblr-grid-nothumb"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
         }
@@ -664,7 +665,7 @@ function tumblrShowDone(appliedCount) {
 
     var parts = [];
     if (journals > 0) parts.push(journals + ' journal post' + (journals !== 1 ? 's' : ''));
-    if (photos > 0) parts.push(photos + ' photo' + (photos !== 1 ? 's' : ''));
+    if (photos > 0) parts.push(photos + ' portfolio item' + (photos !== 1 ? 's' : ''));
     if (videos > 0) parts.push(videos + ' video' + (videos !== 1 ? 's' : ''));
     var summary = 'Imported ' + parts.join(', ') + '.';
     if (appliedCount > 0) summary += ' AI suggestions applied to ' + appliedCount + ' item' + (appliedCount !== 1 ? 's' : '') + '.';

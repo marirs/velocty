@@ -116,7 +116,7 @@ pub fn import_page(
     let blog = normalize_blog(&config.blog_url);
     let limit = 20u64;
     let url = format!(
-        "https://api.tumblr.com/v2/blog/{}/posts?api_key={}&offset={}&limit={}&reblog_info=true&npf_flat=true",
+        "https://api.tumblr.com/v2/blog/{}/posts?api_key={}&offset={}&limit={}&reblog_info=true",
         blog, config.api_key, offset, limit
     );
 
@@ -163,9 +163,6 @@ pub fn import_page(
         .map(|v| v == "true")
         .unwrap_or(false);
 
-    let media_dir = Path::new("website/site/uploads/tumblr-import");
-    let _ = std::fs::create_dir_all(media_dir);
-
     let mut items: Vec<TumblrImportedItem> = Vec::new();
     let mut skipped = 0u64;
 
@@ -198,21 +195,20 @@ pub fn import_page(
 
         match post_type.as_str() {
             "photo" => {
-                if let Some(item) = import_photo_post(store, post, &tags, date, media_dir) {
+                if let Some(item) = import_photo_post(store, post, &tags, date) {
                     items.push(item);
                 } else {
                     skipped += 1;
                 }
             }
             "video" if video_enabled => {
-                if let Some(item) = import_video_post(store, post, &tags, date, media_dir) {
+                if let Some(item) = import_video_post(store, post, &tags, date) {
                     items.push(item);
                 } else {
                     skipped += 1;
                 }
             }
             "video" => {
-                // Video uploads disabled, skip
                 skipped += 1;
             }
             "text" => {
@@ -271,8 +267,14 @@ fn import_text_post(
         return None;
     }
 
-    // Extract first image from body HTML as featured image
-    let featured_image = extract_first_img_src(body);
+    let post_dt = parse_tumblr_date_to_naive(date);
+
+    // Download all images in body HTML and rewrite URLs to local paths
+    let (body_rewritten, downloaded_images) =
+        download_and_rewrite_body_images(body, store, "post", post_dt.as_ref());
+
+    // First downloaded image becomes the featured image
+    let featured_image = downloaded_images.first().cloned();
 
     // Generate title: use Tumblr title, or first tag title-cased, or first 60 chars of body
     let title = if !tumblr_title.is_empty() {
@@ -281,20 +283,22 @@ fn import_text_post(
         fallback_title_text(tags, body, date)
     };
 
-    let slug = slug::slugify(&title);
-
-    // Skip duplicate slugs
-    if store.post_find_by_slug(&slug).is_some() {
-        return None;
-    }
+    let slug = unique_slug(&title, |s| store.post_find_by_slug(s).is_some());
 
     let published_at = parse_tumblr_date(date);
+
+    // Remove the featured image from body HTML to avoid duplication
+    let body_final = if let Some(ref fi) = featured_image {
+        remove_first_img_with_src(&body_rewritten, fi)
+    } else {
+        body_rewritten
+    };
 
     let form = PostForm {
         title: title.clone(),
         slug: slug.clone(),
         content_json: "{}".to_string(),
-        content_html: body.to_string(),
+        content_html: body_final,
         excerpt: None,
         featured_image: featured_image.clone(),
         meta_title: None,
@@ -325,7 +329,6 @@ fn import_photo_post(
     post: &Value,
     tags: &[String],
     date: &str,
-    media_dir: &Path,
 ) -> Option<TumblrImportedItem> {
     let caption = post
         .get("caption")
@@ -338,12 +341,13 @@ fn import_photo_post(
         .unwrap_or("")
         .to_string();
 
-    // Get photo URLs — try legacy "photos" array first, then NPF content blocks
-    let photo_urls: Vec<String> =
+    // Get photo URLs — try legacy "photos" array first, then NPF content blocks,
+    // then fall back to extracting <img> URLs from body HTML
+    let mut photo_urls: Vec<String> =
         if let Some(photos) = post.get("photos").and_then(|v| v.as_array()) {
             photos.iter().filter_map(best_photo_url).collect()
         } else if let Some(content) = post.get("content").and_then(|c| c.as_array()) {
-            content
+            let urls: Vec<String> = content
                 .iter()
                 .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("image"))
                 .filter_map(|b| {
@@ -354,17 +358,29 @@ fn import_photo_post(
                         .and_then(|u| u.as_str())
                         .map(String::from)
                 })
-                .collect()
+                .collect();
+            urls
         } else {
             vec![]
         };
+
+    // Fallback: extract image URLs from body HTML (NPF flattened to legacy)
+    if photo_urls.is_empty() {
+        let body = post.get("body").and_then(|v| v.as_str()).unwrap_or("");
+        photo_urls = extract_all_img_srcs(body)
+            .into_iter()
+            .filter(|u| u.starts_with("http://") || u.starts_with("https://"))
+            .collect();
+    }
 
     if photo_urls.is_empty() {
         return None;
     }
 
+    let post_dt = parse_tumblr_date_to_naive(date);
+
     // Download first photo as featured image
-    let image_path = download_media(&photo_urls[0], media_dir).ok()?;
+    let image_path = download_media(&photo_urls[0], store, "portfolio", post_dt.as_ref()).ok()?;
 
     // Build description HTML with remaining photos
     let mut desc_html = String::new();
@@ -374,9 +390,9 @@ fn import_photo_post(
     if photo_urls.len() > 1 {
         desc_html.push_str("<div class=\"tumblr-photoset\">");
         for url in &photo_urls[1..] {
-            if let Ok(local) = download_media(url, media_dir) {
+            if let Ok(local) = download_media(url, store, "portfolio", post_dt.as_ref()) {
                 desc_html.push_str(&format!(
-                    "<img src=\"{}\" alt=\"\" loading=\"lazy\">",
+                    "<img src=\"/uploads/{}\" alt=\"\" loading=\"lazy\">",
                     local
                 ));
             }
@@ -385,11 +401,7 @@ fn import_photo_post(
     }
 
     let title = fallback_title_media(tags, "Photo", date);
-    let slug = slug::slugify(&title);
-
-    if store.portfolio_find_by_slug(&slug).is_some() {
-        return None;
-    }
+    let slug = unique_slug(&title, |s| store.portfolio_find_by_slug(s).is_some());
 
     let published_at = parse_tumblr_date(date);
 
@@ -437,7 +449,6 @@ fn import_video_post(
     post: &Value,
     tags: &[String],
     date: &str,
-    media_dir: &Path,
 ) -> Option<TumblrImportedItem> {
     let caption = post.get("caption").and_then(|v| v.as_str()).unwrap_or("");
     let tumblr_url = post
@@ -446,13 +457,14 @@ fn import_video_post(
         .unwrap_or("")
         .to_string();
 
-    // Try to get video URL — legacy field first, then NPF content blocks
+    let post_dt = parse_tumblr_date_to_naive(date);
+
+    // Try to get direct video URL — legacy field first, then NPF content blocks
     let video_url = post
         .get("video_url")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| {
-            // NPF: look for video block with media URL
             post.get("content")
                 .and_then(|c| c.as_array())
                 .and_then(|blocks| {
@@ -469,49 +481,126 @@ fn import_video_post(
                 })
         });
 
-    // Download video file if available, or try thumbnail
-    let image_path = if let Some(ref url) = video_url {
-        download_media(url, media_dir).ok()
-    } else {
-        // Try thumbnail_url as fallback for the featured media
-        post.get("thumbnail_url")
+    // Step 1: Try downloading the video file directly
+    let mut image_path = None;
+    if let Some(ref url) = video_url {
+        image_path = download_media(url, store, "portfolio", post_dt.as_ref()).ok();
+    }
+
+    // Step 2: If no video file, try thumbnail_url
+    if image_path.is_none() {
+        image_path = post
+            .get("thumbnail_url")
             .and_then(|v| v.as_str())
-            .and_then(|url| download_media(url, media_dir).ok())
-            .or_else(|| {
-                // NPF: try poster image from video block
-                post.get("content")
-                    .and_then(|c| c.as_array())
-                    .and_then(|blocks| {
-                        blocks
-                            .iter()
-                            .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
-                            .and_then(|b| b.get("poster").and_then(|p| p.as_array()))
-                            .and_then(|posters| posters.first())
-                            .and_then(|p| p.get("url").and_then(|u| u.as_str()))
-                            .and_then(|url| download_media(url, media_dir).ok())
-                    })
-            })
+            .and_then(|url| download_media(url, store, "portfolio", post_dt.as_ref()).ok());
+    }
+
+    // Step 3: NPF poster image
+    if image_path.is_none() {
+        image_path = post
+            .get("content")
+            .and_then(|c| c.as_array())
+            .and_then(|blocks| {
+                blocks
+                    .iter()
+                    .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
+                    .and_then(|b| b.get("poster").and_then(|p| p.as_array()))
+                    .and_then(|posters| posters.first())
+                    .and_then(|p| p.get("url").and_then(|u| u.as_str()))
+                    .and_then(|url| download_media(url, store, "portfolio", post_dt.as_ref()).ok())
+            });
+    }
+
+    // Get embed HTML from Tumblr's player field (for YouTube/Vimeo embeds)
+    let embed_html = post
+        .get("player")
+        .and_then(|p| {
+            // player can be an array of objects with embed_code, or a string
+            if let Some(arr) = p.as_array() {
+                // Pick the largest embed (last in array)
+                arr.iter()
+                    .rev()
+                    .find_map(|item| item.get("embed_code").and_then(|e| e.as_str()))
+                    .map(String::from)
+            } else {
+                p.as_str().map(String::from)
+            }
+        })
+        .or_else(|| {
+            // NPF: look for video block embed_html or embed_url
+            post.get("content")
+                .and_then(|c| c.as_array())
+                .and_then(|blocks| {
+                    blocks
+                        .iter()
+                        .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
+                        .and_then(|b| {
+                            b.get("embed_html")
+                                .or_else(|| b.get("embed_url"))
+                                .and_then(|e| e.as_str())
+                                .map(String::from)
+                        })
+                })
+        });
+
+    // If we have no image AND no embed, this is truly unimportable
+    if image_path.is_none() && embed_html.is_none() {
+        return None;
+    }
+
+    // Build description: embed HTML + caption
+    let mut desc_parts = Vec::new();
+    if let Some(ref embed) = embed_html {
+        desc_parts.push(embed.clone());
+    }
+    if !caption.is_empty() {
+        desc_parts.push(caption.to_string());
+    }
+    let desc_html = if desc_parts.is_empty() {
+        None
+    } else {
+        Some(desc_parts.join("\n"))
     };
+
+    // For embedded videos without a downloaded file, import as a Journal post instead
+    // since portfolio requires an image_path
+    if image_path.is_none() {
+        let title = fallback_title_media(tags, "Video", date);
+        let slug = unique_slug(&title, |s| store.post_find_by_slug(s).is_some());
+        let published_at = parse_tumblr_date(date);
+
+        let form = PostForm {
+            title: title.clone(),
+            slug: slug.clone(),
+            content_json: String::new(),
+            content_html: desc_html.unwrap_or_default(),
+            excerpt: None,
+            featured_image: None,
+            meta_title: None,
+            meta_description: None,
+            status: "published".to_string(),
+            published_at,
+            category_ids: None,
+            tag_ids: None,
+        };
+
+        let item_id = store.post_create(&form).ok()?;
+
+        return Some(TumblrImportedItem {
+            id: item_id,
+            item_type: "journal".to_string(),
+            title,
+            slug,
+            image_path: String::new(),
+            tumblr_url,
+            tags: tags.to_vec(),
+        });
+    }
 
     let image_path = image_path.unwrap_or_default();
-    if image_path.is_empty() {
-        return None;
-    }
-
     let title = fallback_title_media(tags, "Video", date);
-    let slug = slug::slugify(&title);
-
-    if store.portfolio_find_by_slug(&slug).is_some() {
-        return None;
-    }
-
+    let slug = unique_slug(&title, |s| store.portfolio_find_by_slug(s).is_some());
     let published_at = parse_tumblr_date(date);
-
-    let desc_html = if !caption.is_empty() {
-        Some(caption.to_string())
-    } else {
-        None
-    };
 
     let form = PortfolioForm {
         title: title.clone(),
@@ -746,6 +835,108 @@ pub fn apply_updates(store: &dyn Store, updates: &[ApplyUpdate]) -> Result<u64, 
 
 // ── Helpers ──────────────────────────────────────────
 
+/// Generate a unique slug by appending -2, -3, etc. if the base slug already exists.
+fn unique_slug<F>(title: &str, exists: F) -> String
+where
+    F: Fn(&str) -> bool,
+{
+    let base = slug::slugify(title);
+    if !exists(&base) {
+        return base;
+    }
+    for i in 2..=999 {
+        let candidate = format!("{}-{}", base, i);
+        if !exists(&candidate) {
+            return candidate;
+        }
+    }
+    // Extremely unlikely fallback
+    format!("{}-{}", base, chrono::Utc::now().timestamp_millis())
+}
+
+/// Remove the first `<img>` tag whose `src` contains the given path from HTML.
+fn remove_first_img_with_src(html: &str, src_fragment: &str) -> String {
+    // Build the /uploads/ version of the path to match in HTML
+    let search = format!("/uploads/{}", src_fragment);
+    let lower = html.to_lowercase();
+    let search_lower = search.to_lowercase();
+
+    let mut pos = 0;
+    while let Some(img_start) = lower[pos..].find("<img ") {
+        let abs_start = pos + img_start;
+        // Find the end of this <img> tag
+        if let Some(tag_end_rel) = html[abs_start..].find('>') {
+            let tag = &html[abs_start..abs_start + tag_end_rel + 1];
+            if tag.to_lowercase().contains(&search_lower) {
+                // Remove this entire <img> tag
+                let mut result = html[..abs_start].to_string();
+                result.push_str(&html[abs_start + tag_end_rel + 1..]);
+                return result;
+            }
+            pos = abs_start + tag_end_rel + 1;
+        } else {
+            break;
+        }
+    }
+    html.to_string()
+}
+
+/// Download all images found in HTML body and rewrite their src URLs to local paths.
+/// Returns the rewritten HTML and a list of local paths for downloaded images.
+fn download_and_rewrite_body_images(
+    html: &str,
+    store: &dyn Store,
+    prefix: &str,
+    post_date: Option<&chrono::NaiveDateTime>,
+) -> (String, Vec<String>) {
+    let mut result = html.to_string();
+    let mut downloaded: Vec<String> = Vec::new();
+
+    // Find all img src URLs in the HTML
+    let img_urls = extract_all_img_srcs(html);
+    for remote_url in &img_urls {
+        // Only download remote URLs (http/https)
+        if !remote_url.starts_with("http://") && !remote_url.starts_with("https://") {
+            continue;
+        }
+        if let Ok(local_path) = download_media(remote_url, store, prefix, post_date) {
+            // HTML src needs /uploads/ prefix; DB stores without it
+            let html_path = format!("/uploads/{}", local_path);
+            result = result.replace(remote_url, &html_path);
+            downloaded.push(local_path);
+        }
+    }
+
+    (result, downloaded)
+}
+
+/// Extract all `src` attributes from `<img>` tags in HTML.
+fn extract_all_img_srcs(html: &str) -> Vec<String> {
+    let mut urls = Vec::new();
+    let lower = html.to_lowercase();
+    let mut search_from = 0;
+    while let Some(img_pos) = lower[search_from..].find("<img ") {
+        let abs_pos = search_from + img_pos;
+        let after_img = &html[abs_pos..];
+        if let Some(src_pos) = after_img.to_lowercase().find("src=") {
+            let after_src = &after_img[src_pos + 4..];
+            if let Some(quote) = after_src.chars().next() {
+                if quote == '"' || quote == '\'' {
+                    let rest = &after_src[1..];
+                    if let Some(end) = rest.find(quote) {
+                        let url = &rest[..end];
+                        if !url.is_empty() {
+                            urls.push(url.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        search_from = abs_pos + 5;
+    }
+    urls
+}
+
 /// Extract the first `src` attribute from an `<img>` tag in HTML.
 fn extract_first_img_src(html: &str) -> Option<String> {
     // Simple extraction: find <img ... src="..." ...>
@@ -814,6 +1005,17 @@ fn detect_effective_type(raw_type: &str, post: &Value) -> String {
         return "photo".to_string();
     }
 
+    // Check body HTML for embedded media (NPF posts flattened to legacy format)
+    if let Some(body) = post.get("body").and_then(|v| v.as_str()) {
+        let lower = body.to_lowercase();
+        if lower.contains("<video") || lower.contains("<iframe") {
+            return "video".to_string();
+        }
+        if lower.contains("<img ") {
+            return "photo".to_string();
+        }
+    }
+
     raw_type.to_string()
 }
 
@@ -859,16 +1061,41 @@ fn best_photo_url(photo: &Value) -> Option<String> {
         })
 }
 
-fn download_media(url: &str, dest_dir: &Path) -> Result<String, String> {
-    let filename = url.rsplit('/').next().unwrap_or("media").to_string();
-    // Clean query params from filename
-    let filename = filename.split('?').next().unwrap_or(&filename).to_string();
-    let dest_path = dest_dir.join(&filename);
+/// Download a media file from a URL into the uploads directory, respecting
+/// the `media_organization` setting. `prefix` is "post" or "portfolio".
+/// `post_date` is the original post date for date-based organization.
+/// Returns the relative path (e.g. "2026/02/post_abc.jpg") for DB storage.
+fn download_media(
+    url: &str,
+    store: &dyn Store,
+    prefix: &str,
+    post_date: Option<&chrono::NaiveDateTime>,
+) -> Result<String, String> {
+    let orig_filename = url.rsplit('/').next().unwrap_or("media").to_string();
+    let orig_filename = orig_filename
+        .split('?')
+        .next()
+        .unwrap_or(&orig_filename)
+        .to_string();
+    let ext = orig_filename
+        .rsplit('.')
+        .next()
+        .unwrap_or("jpg")
+        .to_lowercase();
 
-    // Skip if already downloaded
-    if dest_path.exists() {
-        return Ok(format!("/uploads/tumblr-import/{}", filename));
-    }
+    // Compute subdir from media organization setting
+    let subdir = if let Some(dt) = post_date {
+        crate::routes::admin::media_subdir_for_date(store, prefix, dt)
+    } else {
+        crate::routes::admin::media_subdir(store, prefix)
+    };
+
+    let uid = uuid::Uuid::new_v4();
+    let rel_path = format!("{}{}_{}.{}", subdir, prefix, uid, ext);
+    let upload_dir = Path::new("website/site/uploads");
+    let full_dir = upload_dir.join(&subdir);
+    let _ = std::fs::create_dir_all(&full_dir);
+    let dest_path = upload_dir.join(&rel_path);
 
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
@@ -890,7 +1117,7 @@ fn download_media(url: &str, dest_dir: &Path) -> Result<String, String> {
     file.write_all(&bytes)
         .map_err(|e| format!("Write failed: {}", e))?;
 
-    Ok(format!("/uploads/tumblr-import/{}", filename))
+    Ok(rel_path)
 }
 
 fn fallback_title_text(tags: &[String], body: &str, date: &str) -> String {
@@ -927,20 +1154,40 @@ fn format_date_title(prefix: &str, date: &str) -> String {
     format!("{} — Untitled", prefix)
 }
 
+/// Parse Tumblr date string into NaiveDateTime for media organization.
+fn parse_tumblr_date_to_naive(date: &str) -> Option<chrono::NaiveDateTime> {
+    if date.is_empty() {
+        return None;
+    }
+    let cleaned = date.replace(" GMT", "").replace(" UTC", "");
+    chrono::NaiveDateTime::parse_from_str(&cleaned, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(&cleaned, "%Y-%m-%dT%H:%M:%S"))
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(&cleaned, "%Y-%m-%dT%H:%M"))
+        .ok()
+}
+
 fn parse_tumblr_date(date: &str) -> Option<String> {
     if date.is_empty() {
         return None;
     }
     // Tumblr format: "2024-01-15 10:30:00 GMT"
-    // We need: "2024-01-15 10:30:00" or similar
+    // Must work with both SQLite (%Y-%m-%dT%H:%M) and MongoDB (%Y-%m-%dT%H:%M:%S)
     let cleaned = date.replace(" GMT", "").replace(" UTC", "");
-    if cleaned.len() >= 19 {
-        Some(cleaned[..19].to_string())
+    let result = if cleaned.len() >= 19 {
+        // "2024-01-15 10:30:00" → "2024-01-15T10:30:00"
+        let d = &cleaned[..10];
+        let t = &cleaned[11..19];
+        Some(format!("{}T{}", d, t))
+    } else if cleaned.len() >= 16 {
+        let d = &cleaned[..10];
+        let t = &cleaned[11..16];
+        Some(format!("{}T{}:00", d, t))
     } else if cleaned.len() >= 10 {
-        Some(format!("{} 00:00:00", &cleaned[..10]))
+        Some(format!("{}T00:00:00", &cleaned[..10]))
     } else {
         None
-    }
+    };
+    result
 }
 
 fn title_case(s: &str) -> String {

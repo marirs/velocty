@@ -88,12 +88,12 @@ impl Post {
 
         let (sql, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match status {
             Some(s) => (
-                "SELECT * FROM posts WHERE status = ?1 ORDER BY created_at DESC LIMIT ?2 OFFSET ?3"
+                "SELECT * FROM posts WHERE status = ?1 ORDER BY published_at DESC LIMIT ?2 OFFSET ?3"
                     .to_string(),
                 vec![Box::new(s.to_string()), Box::new(limit), Box::new(offset)],
             ),
             None => (
-                "SELECT * FROM posts ORDER BY created_at DESC LIMIT ?1 OFFSET ?2".to_string(),
+                "SELECT * FROM posts ORDER BY published_at DESC LIMIT ?1 OFFSET ?2".to_string(),
                 vec![Box::new(limit), Box::new(offset)],
             ),
         };
@@ -138,14 +138,16 @@ impl Post {
     pub fn create(pool: &DbPool, form: &PostForm) -> Result<i64, String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
 
-        let published_at: Option<NaiveDateTime> = form
-            .published_at
-            .as_ref()
-            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").ok());
+        let published_at: Option<NaiveDateTime> = form.published_at.as_ref().and_then(|s| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M"))
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
+                .ok()
+        });
 
         conn.execute(
-            "INSERT INTO posts (title, slug, content_json, content_html, excerpt, featured_image, meta_title, meta_description, status, published_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO posts (title, slug, content_json, content_html, excerpt, featured_image, meta_title, meta_description, status, published_at, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, COALESCE(?10, CURRENT_TIMESTAMP), COALESCE(?10, CURRENT_TIMESTAMP))",
             params![
                 form.title,
                 form.slug,
@@ -168,10 +170,12 @@ impl Post {
     pub fn update(pool: &DbPool, id: i64, form: &PostForm) -> Result<(), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
 
-        let published_at: Option<NaiveDateTime> = form
-            .published_at
-            .as_ref()
-            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").ok());
+        let published_at: Option<NaiveDateTime> = form.published_at.as_ref().and_then(|s| {
+            NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M"))
+                .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
+                .ok()
+        });
 
         conn.execute(
             "UPDATE posts SET title=?1, slug=?2, content_json=?3, content_html=?4, excerpt=?5,
