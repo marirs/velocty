@@ -110,6 +110,12 @@ impl Fairing for FirewallFairing {
             .unwrap_or("")
             .to_string();
 
+        // ── 0. Exempt loopback addresses from all firewall checks ──
+        let is_loopback = ip == "127.0.0.1" || ip == "::1" || ip == "localhost";
+        if is_loopback {
+            return;
+        }
+
         // ── 1. Ban check ──
         if store.fw_is_banned(&ip) {
             request.local_cache(|| FwBlock(true));
