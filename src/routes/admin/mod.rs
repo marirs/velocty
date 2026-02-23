@@ -522,5 +522,6 @@ pub fn api_routes() -> Vec<rocket::Route> {
         api::mta_test_email,
         api::mta_required_records,
         api::mta_dkim_info,
+        api::deploy_regenerate_key,
     ]
 }

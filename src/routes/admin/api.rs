@@ -808,3 +808,35 @@ pub fn mta_dkim_info(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<V
         "generated_at": generated_at,
     }))
 }
+
+// ── Deploy Key Regeneration ─────────────────────────────────────────
+
+/// Regenerate the deploy receive key (production only).
+#[post("/deploy/regenerate-key")]
+pub fn deploy_regenerate_key(admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<Value> {
+    let env = store.setting_get_or("site_environment", "staging");
+    if env != "production" {
+        return Json(
+            serde_json::json!({ "ok": false, "error": "Deploy keys are only available on production instances" }),
+        );
+    }
+
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let bytes: [u8; 32] = rng.gen();
+    let new_key = hex::encode(bytes);
+    let _ = store.setting_set("deploy_receive_key", &new_key);
+
+    store.audit_log(
+        Some(admin.user.id),
+        Some(&admin.user.display_name),
+        "deploy_regenerate_key",
+        None,
+        None,
+        None,
+        Some("Deploy receive key regenerated manually"),
+        None,
+    );
+
+    Json(serde_json::json!({ "ok": true, "key": new_key }))
+}

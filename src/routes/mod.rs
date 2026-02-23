@@ -2,6 +2,7 @@ pub mod admin;
 pub mod ai;
 pub mod api;
 pub mod commerce;
+pub mod deploy;
 pub mod public;
 pub mod security;
 #[cfg(feature = "multi-site")]

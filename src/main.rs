@@ -312,6 +312,8 @@ fn rocket() -> _ {
             .mount(&admin_api_mount, routes::admin::api_routes())
             .mount(&admin_api_mount, routes::ai::routes())
             .mount("/api", routes::api::routes())
+            .mount("/api", routes::deploy::public_routes())
+            .mount(&admin_api_mount, routes::deploy::admin_routes())
             .mount("/", routes::commerce::routes())
             .mount(ADMIN_INTERNAL_MOUNT, routes::security::routes())
             .register("/", catchers![not_found, server_error]);

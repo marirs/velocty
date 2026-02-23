@@ -178,6 +178,44 @@
         </div>
     </div>
 
+    <div class="form-card">
+        <h3>Environment</h3>
+        <div class="form-group">
+            <label for="site_environment">Site Environment</label>
+            {% set env = settings.site_environment | default(value='staging') %}
+            <select id="site_environment" name="site_environment" onchange="warnEnvChange(this)">
+                <option value="staging" {% if env == "staging" %}selected{% endif %}>Dev / Staging</option>
+                <option value="production" {% if env == "production" %}selected{% endif %}>Production</option>
+            </select>
+            <span class="form-help">
+                <strong>Production</strong> — live public site, receives deploys, generates a deploy key.<br>
+                <strong>Dev / Staging</strong> — local development, can deploy content to production targets.
+            </span>
+        </div>
+        {% if settings.site_environment | default(value='staging') == "production" %}
+        <div class="form-group">
+            <label>Deploy Receive Key</label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="deploy_receive_key_display" value="{{ settings.deploy_receive_key | default(value='') }}" readonly style="font-family:monospace;font-size:12px;flex:1" onclick="this.select()">
+                <button type="button" class="btn btn-secondary" onclick="copyDeployKey()" style="white-space:nowrap">Copy</button>
+                <button type="button" class="btn btn-secondary" onclick="regenerateDeployKey()" style="white-space:nowrap">Regenerate</button>
+            </div>
+            <span class="form-help">Share this key with your Dev/Staging instance to authorize deploys to this server. The key rotates automatically after each successful deploy.</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if settings.site_environment | default(value='staging') == "staging" %}
+    <div class="form-card" id="deploy-targets-card">
+        <h3>Deploy Targets</h3>
+        <p class="text-muted" style="font-size:12px;margin-bottom:14px">Configure production servers to deploy content to. Add the URL and deploy key from each production instance.</p>
+        <div id="deploy-targets-list"></div>
+        <button type="button" class="btn btn-secondary" onclick="addDeployTarget()" style="margin-top:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Target
+        </button>
+    </div>
+    {% endif %}
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save <span class="kbd"><span class="kbd-mod">⌘</span>S</span></button>
     </div>
@@ -252,5 +290,160 @@
     initDropZone('logo-zone', 'logo-file', 'site_logo', 'logo-preview', 'logo-placeholder', 'logo-clear', 512, 256);
     initDropZone('favicon-zone', 'favicon-file', 'site_favicon', 'favicon-preview', 'favicon-placeholder', 'favicon-clear', 128, 128);
 })();
+
+var ADMIN = '/{{ admin_slug }}';
+var _envOriginal = '{{ settings.site_environment | default(value="staging") }}';
+
+function warnEnvChange(sel) {
+    if (_envOriginal === 'production' && sel.value === 'staging') {
+        sel.value = 'production';
+        var envSelect = sel;
+        showInlineConfirm(
+            'Switching from Production to Dev/Staging will disable deploy receiving on this server. Continue?',
+            function() { envSelect.value = 'staging'; }
+        );
+    }
+}
+
+function copyDeployKey() {
+    var inp = document.getElementById('deploy_receive_key_display');
+    if (!inp || !inp.value) return;
+    navigator.clipboard.writeText(inp.value).then(function() {
+        var btn = event.target.closest('button');
+        var orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(function(){ btn.textContent = orig; }, 1500);
+    });
+}
+
+function regenerateDeployKey() {
+    showInlineConfirm(
+        'Regenerate the deploy key? Any Dev/Staging instances using the current key will need to be updated.',
+        function() {
+            fetch(ADMIN + '/api/deploy/regenerate-key', { method: 'POST', credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.ok) {
+                        document.getElementById('deploy_receive_key_display').value = d.key;
+                        showToast('Deploy key regenerated successfully', 'success');
+                    } else {
+                        showToast(d.error || 'Failed to regenerate key', 'error');
+                    }
+                })
+                .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+        }
+    );
+}
+
+function showInlineConfirm(msg, onYes) {
+    var existing = document.getElementById('inline-confirm-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'inline-confirm-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;padding:24px;max-width:440px;width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
+
+    var icon = document.createElement('div');
+    icon.style.cssText = 'text-align:center;margin-bottom:12px';
+    icon.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+    var txt = document.createElement('p');
+    txt.style.cssText = 'font-size:13px;color:var(--text-secondary);text-align:center;margin:0 0 20px';
+    txt.textContent = msg;
+
+    var btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;justify-content:center;gap:10px';
+
+    var btnNo = document.createElement('button');
+    btnNo.className = 'btn btn-secondary';
+    btnNo.textContent = 'Cancel';
+    btnNo.onclick = function() { overlay.remove(); };
+
+    var btnYes = document.createElement('button');
+    btnYes.className = 'btn btn-danger';
+    btnYes.textContent = 'Continue';
+    btnYes.onclick = function() { overlay.remove(); onYes(); };
+
+    btns.appendChild(btnNo);
+    btns.appendChild(btnYes);
+    box.appendChild(icon);
+    box.appendChild(txt);
+    box.appendChild(btns);
+    overlay.appendChild(box);
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+}
+
+function showToast(msg, kind) {
+    var el = document.createElement('div');
+    var cls = kind === 'error' ? 'error' : kind === 'warning' ? 'warning' : 'info';
+    el.className = 'alert alert-' + cls + ' alert-flash';
+    el.innerHTML = '<span>' + msg + '</span><button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>';
+    var header = document.querySelector('.page-header');
+    if (header) header.insertAdjacentElement('afterend', el);
+    else { var main = document.querySelector('.content-area'); if (main) main.prepend(el); }
+    setTimeout(function(){ if (el.parentElement) { el.style.transition='opacity 0.4s'; el.style.opacity='0'; setTimeout(function(){ el.remove(); },400); } }, 6000);
+}
+
+// ── Deploy Targets (staging only) ──
+var deployTargets = [];
+try { deployTargets = JSON.parse('{{ settings.deploy_targets | default(value="[]") }}'); } catch(e) { deployTargets = []; }
+
+function renderDeployTargets() {
+    var list = document.getElementById('deploy-targets-list');
+    if (!list) return;
+    if (deployTargets.length === 0) {
+        list.innerHTML = '<p class="text-muted" style="font-size:13px">No deploy targets configured yet.</p>';
+        syncDeployTargetsHidden();
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < deployTargets.length; i++) {
+        var t = deployTargets[i];
+        html += '<div class="deploy-target-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">';
+        html += '<input type="text" value="' + (t.name || '') + '" placeholder="Name (e.g. Production)" style="flex:0 0 160px;font-size:13px" onchange="updateTarget(' + i + ',\'name\',this.value)">';
+        html += '<input type="url" value="' + (t.url || '') + '" placeholder="https://mysite.com" style="flex:1;font-size:13px" onchange="updateTarget(' + i + ',\'url\',this.value)">';
+        html += '<input type="text" value="' + (t.key || '') + '" placeholder="Deploy key" style="flex:1;font-family:monospace;font-size:12px" onchange="updateTarget(' + i + ',\'key\',this.value)">';
+        html += '<button type="button" class="btn btn-danger" style="padding:5px 8px;font-size:12px" onclick="removeTarget(' + i + ')" title="Remove">&times;</button>';
+        html += '</div>';
+    }
+    list.innerHTML = html;
+    syncDeployTargetsHidden();
+}
+
+function addDeployTarget() {
+    deployTargets.push({ name: '', url: '', key: '' });
+    renderDeployTargets();
+    // Focus the name field of the new row
+    var rows = document.querySelectorAll('.deploy-target-row');
+    if (rows.length) rows[rows.length - 1].querySelector('input').focus();
+}
+
+function updateTarget(i, field, val) {
+    deployTargets[i][field] = val;
+    syncDeployTargetsHidden();
+}
+
+function removeTarget(i) {
+    deployTargets.splice(i, 1);
+    renderDeployTargets();
+}
+
+function syncDeployTargetsHidden() {
+    var h = document.getElementById('deploy_targets_hidden');
+    if (!h) {
+        h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = 'deploy_targets';
+        h.id = 'deploy_targets_hidden';
+        document.querySelector('form').appendChild(h);
+    }
+    h.value = JSON.stringify(deployTargets);
+}
+
+renderDeployTargets();
 </script>
 {% endblock scripts %}

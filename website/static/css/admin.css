@@ -425,6 +425,40 @@ a:hover { color: var(--accent-hover); }
     color: var(--text-secondary);
 }
 
+.env-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    line-height: 1;
+    user-select: none;
+}
+.env-prod {
+    background: var(--success);
+    color: #fff;
+}
+.env-staging {
+    background: var(--warning);
+    color: #1a1a1a;
+}
+.deploy-btn {
+    font-size: 12px;
+    padding: 5px 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    transition: background 0.15s;
+}
+.deploy-btn:hover {
+    background: var(--accent-hover);
+}
+
 /* ── Content Area ──────────────────────────────────── */
 .content-area {
     flex: 1;

@@ -44,6 +44,7 @@ struct SetupContext {
     error: Option<String>,
     admin_slug: String,
     site_name: String,
+    site_environment: String,
     admin_email: String,
     db_backend: String,
     mongo_uri: String,
@@ -66,6 +67,7 @@ pub struct SetupForm {
     pub mongo_password: Option<String>,
     pub mongo_auth_db: Option<String>,
     pub site_name: String,
+    pub site_environment: Option<String>,
     pub admin_email: String,
     pub password: String,
     pub confirm_password: String,
@@ -84,6 +86,7 @@ pub fn setup_page(
         error: None,
         admin_slug: admin_slug.get().clone(),
         site_name: "Velocty".to_string(),
+        site_environment: "staging".to_string(),
         admin_email: String::new(),
         db_backend: "sqlite".to_string(),
         mongo_uri: "mongodb://localhost:27017".to_string(),
@@ -114,6 +117,10 @@ pub fn setup_submit(
             error: Some(msg.to_string()),
             admin_slug: admin_slug.get().clone(),
             site_name: form.site_name.clone(),
+            site_environment: form
+                .site_environment
+                .clone()
+                .unwrap_or_else(|| "staging".to_string()),
             admin_email: form.admin_email.clone(),
             db_backend: form.db_backend.clone(),
             mongo_uri: form.mongo_uri.clone().unwrap_or_default(),
@@ -258,6 +265,14 @@ pub fn setup_submit(
     let _ = s.setting_set("admin_password_hash", &hash);
     let _ = s.setting_set("setup_completed", "true");
     let _ = s.setting_set("db_backend", &form.db_backend);
+    let env = form.site_environment.as_deref().unwrap_or("staging");
+    let _ = s.setting_set("site_environment", env);
+    if env == "production" {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let bytes: [u8; 32] = rng.gen();
+        let _ = s.setting_set("deploy_receive_key", &hex::encode(bytes));
+    }
 
     // Auto-detect site_url from request headers
     if let Some(ref url) = detected_url.0 {
@@ -275,6 +290,7 @@ pub fn setup_page_no_db(admin_slug: &State<AdminSlug>) -> NoCacheTemplate {
         error: None,
         admin_slug: admin_slug.get().clone(),
         site_name: "Velocty".to_string(),
+        site_environment: "staging".to_string(),
         admin_email: String::new(),
         db_backend: "sqlite".to_string(),
         mongo_uri: "mongodb://localhost:27017".to_string(),
@@ -299,6 +315,10 @@ pub fn setup_submit_no_db(
             error: Some(msg.to_string()),
             admin_slug: admin_slug.get().clone(),
             site_name: form.site_name.clone(),
+            site_environment: form
+                .site_environment
+                .clone()
+                .unwrap_or_else(|| "staging".to_string()),
             admin_email: form.admin_email.clone(),
             db_backend: form.db_backend.clone(),
             mongo_uri: form.mongo_uri.clone().unwrap_or_default(),
@@ -481,6 +501,14 @@ pub fn setup_submit_no_db(
     let _ = store.setting_set("admin_password_hash", &hash);
     let _ = store.setting_set("setup_completed", "true");
     let _ = store.setting_set("db_backend", &form.db_backend);
+    let env = form.site_environment.as_deref().unwrap_or("staging");
+    let _ = store.setting_set("site_environment", env);
+    if env == "production" {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let bytes: [u8; 32] = rng.gen();
+        let _ = store.setting_set("deploy_receive_key", &hex::encode(bytes));
+    }
 
     // Auto-detect site_url from request headers
     if let Some(ref url) = detected_url.0 {

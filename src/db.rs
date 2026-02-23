@@ -918,6 +918,9 @@ pub fn default_settings() -> Vec<(&'static str, &'static str)> {
         ("image_proxy_secret_old", ""),
         ("image_proxy_secret_old_expires", ""),
         ("image_proxy_rotation_days", "7"),
+        // Deploy
+        ("site_environment", "staging"),
+        ("deploy_receive_key", ""),
     ]
 }
 

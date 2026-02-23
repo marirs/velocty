@@ -147,6 +147,14 @@
                     <label for="site_name">Site Name</label>
                     <input type="text" id="site_name" name="site_name" value="{{ site_name }}" placeholder="My Awesome Site" required>
                 </div>
+                <div class="form-group">
+                    <label for="site_environment">Environment</label>
+                    <select id="site_environment" name="site_environment">
+                        <option value="staging" {% if site_environment == "staging" %}selected{% endif %}>Dev / Staging</option>
+                        <option value="production" {% if site_environment == "production" %}selected{% endif %}>Production</option>
+                    </select>
+                    <span class="form-help">Choose <strong>Production</strong> for your live public site, or <strong>Dev / Staging</strong> for local development and testing. This controls deploy functionality and can be changed later in Settings.</span>
+                </div>
                 <div class="form-actions" style="justify-content:space-between">
                     <button type="button" class="btn btn-secondary" onclick="goStep(1)">← Back</button>
                     <button type="button" class="btn btn-primary" onclick="goStep(3)">Next →</button>

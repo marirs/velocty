@@ -619,6 +619,21 @@ pub fn settings_save(
         }
     }
 
+    // If environment switched to production, auto-generate deploy receive key
+    if section == "general" {
+        if let Some(env) = data.get("site_environment") {
+            if env == "production" {
+                let existing = store.setting_get("deploy_receive_key").unwrap_or_default();
+                if existing.is_empty() {
+                    use rand::Rng;
+                    let mut rng = rand::thread_rng();
+                    let bytes: [u8; 32] = rng.gen();
+                    data.insert("deploy_receive_key".to_string(), hex::encode(bytes));
+                }
+            }
+        }
+    }
+
     let _ = store.setting_set_many(&data);
 
     // If email settings changed and no providers remain enabled, revert magic link to password
