@@ -4,8 +4,10 @@ use std::sync::Arc;
 
 use rocket::data::{Data, ToByteUnit};
 use rocket::response::{Flash, Redirect};
+use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
+use serde::Deserialize;
 use serde_json::json;
 
 use super::admin_base;
@@ -681,5 +683,184 @@ fn nonempty(s: &str) -> Option<String> {
         None
     } else {
         Some(s.to_string())
+    }
+}
+
+// ── Tumblr Import (JSON API) ─────────────────────────
+
+#[derive(Deserialize)]
+pub struct TumblrConfigInput {
+    pub api_key: String,
+    pub blog_url: String,
+}
+
+#[post("/import/tumblr/config", format = "json", data = "<body>")]
+pub fn tumblr_config(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<TumblrConfigInput>,
+) -> Json<serde_json::Value> {
+    let s: &dyn Store = &**store.inner();
+    let _ = s.setting_set("tumblr_api_key", &body.api_key);
+    let _ = s.setting_set("tumblr_blog_url", &body.blog_url);
+    Json(json!({ "ok": true }))
+}
+
+#[post("/import/tumblr/start")]
+pub fn tumblr_start(_admin: AdminUser, store: &State<Arc<dyn Store>>) -> Json<serde_json::Value> {
+    let s: &dyn Store = &**store.inner();
+    let api_key = s.setting_get("tumblr_api_key").unwrap_or_default();
+    let blog_url = s.setting_get("tumblr_blog_url").unwrap_or_default();
+
+    if api_key.is_empty() || blog_url.is_empty() {
+        return Json(json!({
+            "ok": false,
+            "error": "Tumblr API key and blog URL must be configured first."
+        }));
+    }
+
+    let config = crate::import::tumblr::TumblrConfig { api_key, blog_url };
+    match crate::import::tumblr::validate_and_count(&config) {
+        Ok(result) => Json(json!({
+            "ok": true,
+            "total_posts": result.total_posts,
+            "blog_title": result.blog_title,
+            "blog_description": result.blog_description,
+        })),
+        Err(e) => Json(json!({
+            "ok": false,
+            "error": e,
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct TumblrPageInput {
+    pub offset: u64,
+}
+
+#[post("/import/tumblr/page", format = "json", data = "<body>")]
+pub fn tumblr_page(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<TumblrPageInput>,
+) -> Json<serde_json::Value> {
+    let s: &dyn Store = &**store.inner();
+    let api_key = s.setting_get("tumblr_api_key").unwrap_or_default();
+    let blog_url = s.setting_get("tumblr_blog_url").unwrap_or_default();
+    let settings = s.setting_all();
+
+    let config = crate::import::tumblr::TumblrConfig { api_key, blog_url };
+    match crate::import::tumblr::import_page(s, &config, body.offset, &settings) {
+        Ok(result) => Json(json!({
+            "ok": true,
+            "items": result.items,
+            "offset": result.offset,
+            "has_more": result.has_more,
+            "skipped": result.skipped,
+        })),
+        Err(e) => Json(json!({
+            "ok": false,
+            "error": e,
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct TumblrSuggestInput {
+    pub items: Vec<TumblrSuggestItem>,
+}
+
+#[derive(Deserialize)]
+pub struct TumblrSuggestItem {
+    pub id: i64,
+    pub item_type: String,
+    pub title: String,
+    pub tags: Vec<String>,
+    pub image_path: String,
+}
+
+#[post("/import/tumblr/suggest", format = "json", data = "<body>")]
+pub fn tumblr_suggest(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<TumblrSuggestInput>,
+) -> Json<serde_json::Value> {
+    let s: &dyn Store = &**store.inner();
+
+    if !crate::ai::is_enabled(s) {
+        return Json(json!({
+            "ok": false,
+            "error": "AI is not enabled. Configure an AI provider in Settings."
+        }));
+    }
+
+    let mut suggestions = Vec::new();
+    let mut errors = Vec::new();
+
+    for item in &body.items {
+        match crate::import::tumblr::suggest_for_item(
+            s,
+            item.id,
+            &item.item_type,
+            &item.title,
+            &item.tags,
+            &item.image_path,
+        ) {
+            Ok(suggestion) => suggestions.push(json!({
+                "id": suggestion.id,
+                "item_type": suggestion.item_type,
+                "title": suggestion.title,
+                "description": suggestion.description,
+                "category": suggestion.category,
+            })),
+            Err(e) => errors.push(json!({
+                "id": item.id,
+                "error": e.to_string(),
+            })),
+        }
+    }
+
+    Json(json!({
+        "ok": true,
+        "suggestions": suggestions,
+        "errors": errors,
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct TumblrApplyInput {
+    pub updates: Vec<crate::import::tumblr::ApplyUpdate>,
+}
+
+#[post("/import/tumblr/apply", format = "json", data = "<body>")]
+pub fn tumblr_apply(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<TumblrApplyInput>,
+) -> Json<serde_json::Value> {
+    let s: &dyn Store = &**store.inner();
+
+    match crate::import::tumblr::apply_updates(s, &body.updates) {
+        Ok(count) => {
+            // Log the import
+            let _ = s.import_create(
+                "tumblr",
+                None,
+                0,
+                count as i64,
+                0,
+                0,
+                Some("AI suggestions applied"),
+            );
+            Json(json!({
+                "ok": true,
+                "applied": count,
+            }))
+        }
+        Err(e) => Json(json!({
+            "ok": false,
+            "error": e,
+        })),
     }
 }

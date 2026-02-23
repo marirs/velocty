@@ -53,14 +53,18 @@
     </div>
 
     <!-- Tumblr -->
-    <div class="import-card import-card-disabled">
+    <div class="import-card" id="tumblr-card">
         <div class="import-card-header">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <h4>Tumblr</h4>
         </div>
-        <p class="import-card-desc">Import posts and media from a Tumblr blog export. Coming in a future update.</p>
-        <div class="import-card-footer">
-            <span class="badge-coming">Coming Soon</span>
+        <p class="import-card-desc">Import photos, videos, and text posts from a Tumblr blog via the API. Photos &amp; videos go to Portfolio, text posts to Journal.</p>
+        <div class="import-card-footer" style="gap:8px">
+            <button type="button" class="btn btn-sm" style="font-size:12px;opacity:.7" onclick="tumblrOpenConfig()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:2px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Configure
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="tumblr-import-btn" onclick="tumblrStartImport()">Import</button>
         </div>
     </div>
 
@@ -86,6 +90,97 @@
         <div class="import-card-footer">
             <span class="badge-coming">Coming Soon</span>
         </div>
+    </div>
+</div>
+
+<!-- Tumblr Config Modal -->
+<div id="tumblr-config-overlay" class="modal-overlay" style="display:none" onclick="tumblrCloseConfig()"></div>
+<div id="tumblr-config-modal" class="modal" style="display:none;max-width:440px">
+    <div class="modal-header">
+        <h3>Tumblr Configuration</h3>
+        <button class="modal-close" onclick="tumblrCloseConfig()">&times;</button>
+    </div>
+    <div class="modal-body">
+        <div class="form-group" style="margin-bottom:16px">
+            <label style="display:block;margin-bottom:4px;font-size:13px;color:var(--text-secondary)">Tumblr API Key</label>
+            <input type="password" id="tumblr-api-key" class="form-control" placeholder="Your Tumblr API key" value="{{ settings.tumblr_api_key | default(value='') }}" autocomplete="off">
+            <small style="color:var(--text-tertiary);font-size:11px">Get your API key from <a href="https://www.tumblr.com/oauth/apps" target="_blank" style="color:var(--accent)">tumblr.com/oauth/apps</a></small>
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+            <label style="display:block;margin-bottom:4px;font-size:13px;color:var(--text-secondary)">Blog URL</label>
+            <input type="text" id="tumblr-blog-url" class="form-control" placeholder="myblog.tumblr.com" value="{{ settings.tumblr_blog_url | default(value='') }}">
+        </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-sm" onclick="tumblrCloseConfig()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="tumblrSaveConfig()">Save</button>
+    </div>
+</div>
+
+<!-- Tumblr Import Modal (90%) -->
+<div id="tumblr-import-overlay" class="modal-overlay" style="display:none"></div>
+<div id="tumblr-import-modal" class="modal tumblr-import-modal" style="display:none">
+    <div class="modal-header" style="flex-shrink:0">
+        <h3 id="tumblr-modal-title">Importing from Tumblr</h3>
+        <button class="modal-close" onclick="tumblrCloseImport()">&times;</button>
+    </div>
+
+    <!-- Phase 1: Progress -->
+    <div id="tumblr-phase-progress" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px">
+        <div style="width:100%;max-width:500px">
+            <div style="margin-bottom:16px;text-align:center">
+                <svg class="spin" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>
+            </div>
+            <div style="background:var(--bg-input);border-radius:8px;height:8px;overflow:hidden;margin-bottom:12px">
+                <div id="tumblr-progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width .3s ease;border-radius:8px"></div>
+            </div>
+            <p id="tumblr-progress-text" style="text-align:center;color:var(--text-secondary);font-size:14px">Connecting to Tumblr...</p>
+            <p id="tumblr-progress-detail" style="text-align:center;color:var(--text-tertiary);font-size:12px;margin-top:4px"></p>
+        </div>
+    </div>
+
+    <!-- Phase 2: Review -->
+    <div id="tumblr-phase-review" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+        <!-- Tabs -->
+        <div style="flex-shrink:0;border-bottom:1px solid var(--border-subtle);padding:0 20px;display:flex;align-items:center;gap:0">
+            <button class="tumblr-tab active" data-tab="journal" onclick="tumblrSwitchTab('journal')">Journal <span id="tumblr-count-journal" class="tumblr-tab-count">0</span></button>
+            <button class="tumblr-tab" data-tab="photo" onclick="tumblrSwitchTab('photo')">Photos <span id="tumblr-count-photo" class="tumblr-tab-count">0</span></button>
+            <button class="tumblr-tab" data-tab="video" onclick="tumblrSwitchTab('video')">Videos <span id="tumblr-count-video" class="tumblr-tab-count">0</span></button>
+            <div style="flex:1"></div>
+            <div id="tumblr-ai-bar" style="display:none;align-items:center;gap:8px">
+                <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="tumblr-select-all" onchange="tumblrToggleSelectAll()"> Select All
+                </label>
+                <button class="btn btn-primary btn-sm" id="tumblr-suggest-btn" onclick="tumblrRunSuggest()" style="font-size:12px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    Suggest with AI
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div style="flex:1;overflow-y:auto;padding:20px">
+            <div id="tumblr-tab-journal" class="tumblr-tab-content"></div>
+            <div id="tumblr-tab-photo" class="tumblr-tab-content" style="display:none"></div>
+            <div id="tumblr-tab-video" class="tumblr-tab-content" style="display:none"></div>
+        </div>
+
+        <!-- Footer with Save -->
+        <div id="tumblr-review-footer" style="flex-shrink:0;border-top:1px solid var(--border-subtle);padding:12px 20px;display:flex;justify-content:space-between;align-items:center">
+            <span id="tumblr-suggest-status" style="font-size:13px;color:var(--text-secondary)"></span>
+            <button class="btn btn-primary btn-sm" id="tumblr-save-btn" onclick="tumblrSaveAll()" style="display:none">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Review &amp; Save
+            </button>
+        </div>
+    </div>
+
+    <!-- Phase 3: Done -->
+    <div id="tumblr-phase-done" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;padding:40px">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <h3 style="margin-top:16px;color:var(--text-primary)">Import Complete</h3>
+        <p id="tumblr-done-summary" style="color:var(--text-secondary);margin-top:8px;text-align:center"></p>
+        <button class="btn btn-primary btn-sm" onclick="tumblrCloseImport()" style="margin-top:20px">Close</button>
     </div>
 </div>
 
@@ -175,9 +270,419 @@ document.querySelectorAll('.import-form').forEach(function(form) {
         }
     });
 });
+
+// ── Tumblr Import ────────────────────────────────────
+var ADMIN = '/{{ admin_slug }}';
+var tumblrItems = []; // all imported items
+var tumblrSuggestions = {}; // id → {title, description, category}
+var tumblrAiEnabled = {% if settings.ai_ollama_enabled == 'true' or settings.ai_openai_enabled == 'true' or settings.ai_gemini_enabled == 'true' or settings.ai_cloudflare_enabled == 'true' or settings.ai_groq_enabled == 'true' %}true{% else %}false{% endif %};
+
+function tumblrOpenConfig() {
+    document.getElementById('tumblr-config-overlay').style.display = '';
+    document.getElementById('tumblr-config-modal').style.display = '';
+}
+function tumblrCloseConfig() {
+    document.getElementById('tumblr-config-overlay').style.display = 'none';
+    document.getElementById('tumblr-config-modal').style.display = 'none';
+}
+
+function tumblrSaveConfig() {
+    var key = document.getElementById('tumblr-api-key').value.trim();
+    var url = document.getElementById('tumblr-blog-url').value.trim();
+    if (!key || !url) { alert('Both fields are required.'); return; }
+    fetch(ADMIN + '/import/tumblr/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key, blog_url: url })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) tumblrCloseConfig();
+    });
+}
+
+function tumblrCloseImport() {
+    document.getElementById('tumblr-import-overlay').style.display = 'none';
+    document.getElementById('tumblr-import-modal').style.display = 'none';
+    // Reset state
+    document.getElementById('tumblr-phase-progress').style.display = 'flex';
+    document.getElementById('tumblr-phase-review').style.display = 'none';
+    document.getElementById('tumblr-phase-done').style.display = 'none';
+    document.getElementById('tumblr-progress-bar').style.width = '0%';
+    tumblrItems = [];
+    tumblrSuggestions = {};
+}
+
+async function tumblrStartImport() {
+    var key = document.getElementById('tumblr-api-key').value.trim();
+    var url = document.getElementById('tumblr-blog-url').value.trim();
+    if (!key || !url) {
+        tumblrOpenConfig();
+        return;
+    }
+
+    // Show modal
+    document.getElementById('tumblr-import-overlay').style.display = '';
+    document.getElementById('tumblr-import-modal').style.display = '';
+    document.getElementById('tumblr-phase-progress').style.display = 'flex';
+    document.getElementById('tumblr-phase-review').style.display = 'none';
+    document.getElementById('tumblr-phase-done').style.display = 'none';
+    document.getElementById('tumblr-progress-text').textContent = 'Connecting to Tumblr...';
+    document.getElementById('tumblr-progress-detail').textContent = '';
+    document.getElementById('tumblr-progress-bar').style.width = '0%';
+    tumblrItems = [];
+
+    // Step 1: Validate & get count
+    var startResp;
+    try {
+        var r = await fetch(ADMIN + '/import/tumblr/start', { method: 'POST' });
+        startResp = await r.json();
+    } catch (e) {
+        document.getElementById('tumblr-progress-text').textContent = 'Connection failed: ' + e.message;
+        return;
+    }
+
+    if (!startResp.ok) {
+        document.getElementById('tumblr-progress-text').textContent = startResp.error || 'Failed to connect';
+        return;
+    }
+
+    var total = startResp.total_posts;
+    document.getElementById('tumblr-modal-title').textContent = 'Importing from ' + (startResp.blog_title || 'Tumblr');
+    document.getElementById('tumblr-progress-text').textContent = 'Found ' + total + ' posts. Starting import...';
+
+    // Step 2: Page through posts
+    var offset = 0;
+    var totalSkipped = 0;
+    var pageNum = 0;
+    var totalPages = Math.ceil(total / 20);
+
+    while (true) {
+        pageNum++;
+        document.getElementById('tumblr-progress-text').textContent = 'Importing page ' + pageNum + ' of ' + totalPages + '...';
+        document.getElementById('tumblr-progress-detail').textContent = tumblrItems.length + ' items imported, ' + totalSkipped + ' skipped';
+        var pct = Math.min(95, Math.round((offset / Math.max(total, 1)) * 100));
+        document.getElementById('tumblr-progress-bar').style.width = pct + '%';
+
+        var pageResp;
+        try {
+            var pr = await fetch(ADMIN + '/import/tumblr/page', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ offset: offset })
+            });
+            pageResp = await pr.json();
+        } catch (e) {
+            document.getElementById('tumblr-progress-text').textContent = 'Error on page ' + pageNum + ': ' + e.message;
+            break;
+        }
+
+        if (!pageResp.ok) {
+            document.getElementById('tumblr-progress-text').textContent = pageResp.error || 'Import error';
+            break;
+        }
+
+        tumblrItems = tumblrItems.concat(pageResp.items);
+        totalSkipped += pageResp.skipped || 0;
+        offset += 20;
+
+        if (!pageResp.has_more) break;
+    }
+
+    document.getElementById('tumblr-progress-bar').style.width = '100%';
+
+    // Transition to review phase
+    setTimeout(function() { tumblrShowReview(totalSkipped); }, 500);
+}
+
+function tumblrShowReview(totalSkipped) {
+    document.getElementById('tumblr-phase-progress').style.display = 'none';
+    document.getElementById('tumblr-phase-review').style.display = 'flex';
+    document.getElementById('tumblr-modal-title').textContent = 'Import Results';
+
+    var journals = tumblrItems.filter(function(i) { return i.item_type === 'journal'; });
+    var photos = tumblrItems.filter(function(i) { return i.item_type === 'photo'; });
+    var videos = tumblrItems.filter(function(i) { return i.item_type === 'video'; });
+
+    document.getElementById('tumblr-count-journal').textContent = journals.length;
+    document.getElementById('tumblr-count-photo').textContent = photos.length;
+    document.getElementById('tumblr-count-video').textContent = videos.length;
+
+    // Hide tabs with 0 items
+    document.querySelectorAll('.tumblr-tab').forEach(function(tab) {
+        var type = tab.getAttribute('data-tab');
+        var count = type === 'journal' ? journals.length : type === 'photo' ? photos.length : videos.length;
+        tab.style.display = count > 0 ? '' : 'none';
+    });
+
+    // Show AI bar if enabled
+    if (tumblrAiEnabled && tumblrItems.length > 0) {
+        document.getElementById('tumblr-ai-bar').style.display = 'flex';
+    }
+
+    // Render tabs
+    tumblrRenderJournalTab(journals);
+    tumblrRenderGridTab('photo', photos);
+    tumblrRenderGridTab('video', videos);
+
+    // Auto-select first visible tab
+    var firstVisible = document.querySelector('.tumblr-tab:not([style*="display: none"])');
+    if (firstVisible) tumblrSwitchTab(firstVisible.getAttribute('data-tab'));
+}
+
+function tumblrRenderJournalTab(items) {
+    var el = document.getElementById('tumblr-tab-journal');
+    if (items.length === 0) { el.innerHTML = '<p class="text-muted">No journal posts imported.</p>'; return; }
+    var html = '<div class="tumblr-journal-list">';
+    items.forEach(function(item) {
+        html += '<div class="tumblr-journal-item" data-id="' + item.id + '">';
+        html += '<label class="tumblr-check"><input type="checkbox" class="tumblr-item-check" data-id="' + item.id + '" data-type="journal"></label>';
+        html += '<div class="tumblr-journal-info">';
+        html += '<div class="tumblr-item-title" id="tumblr-title-' + item.id + '">' + escHtml(item.title) + '</div>';
+        html += '<div class="tumblr-item-meta">';
+        if (item.tags.length) html += '<span class="tumblr-tags">' + item.tags.map(function(t) { return '<span class="tumblr-tag">' + escHtml(t) + '</span>'; }).join('') + '</span>';
+        html += '</div>';
+        html += '<div class="tumblr-suggestion" id="tumblr-sug-' + item.id + '" style="display:none"></div>';
+        html += '</div></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function tumblrRenderGridTab(type, items) {
+    var el = document.getElementById('tumblr-tab-' + type);
+    if (items.length === 0) { el.innerHTML = '<p class="text-muted">No ' + type + ' items imported.</p>'; return; }
+    var html = '<div class="tumblr-grid">';
+    items.forEach(function(item) {
+        html += '<div class="tumblr-grid-item" data-id="' + item.id + '">';
+        html += '<label class="tumblr-check-overlay"><input type="checkbox" class="tumblr-item-check" data-id="' + item.id + '" data-type="' + type + '"></label>';
+        if (item.image_path) {
+            html += '<div class="tumblr-grid-thumb" style="background-image:url(\'' + item.image_path + '\')"></div>';
+        } else {
+            html += '<div class="tumblr-grid-thumb tumblr-grid-nothumb"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
+        }
+        html += '<div class="tumblr-grid-info">';
+        html += '<div class="tumblr-item-title" id="tumblr-title-' + item.id + '">' + escHtml(item.title) + '</div>';
+        if (item.tags.length) html += '<div class="tumblr-tags">' + item.tags.slice(0, 3).map(function(t) { return '<span class="tumblr-tag">' + escHtml(t) + '</span>'; }).join('') + '</div>';
+        html += '</div>';
+        html += '<div class="tumblr-suggestion" id="tumblr-sug-' + item.id + '" style="display:none"></div>';
+        html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function tumblrSwitchTab(tab) {
+    document.querySelectorAll('.tumblr-tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelector('.tumblr-tab[data-tab="' + tab + '"]').classList.add('active');
+    document.querySelectorAll('.tumblr-tab-content').forEach(function(c) { c.style.display = 'none'; });
+    document.getElementById('tumblr-tab-' + tab).style.display = '';
+}
+
+function tumblrToggleSelectAll() {
+    var checked = document.getElementById('tumblr-select-all').checked;
+    document.querySelectorAll('.tumblr-item-check').forEach(function(cb) { cb.checked = checked; });
+}
+
+async function tumblrRunSuggest() {
+    var selected = [];
+    document.querySelectorAll('.tumblr-item-check:checked').forEach(function(cb) {
+        var id = parseInt(cb.getAttribute('data-id'));
+        var item = tumblrItems.find(function(i) { return i.id === id; });
+        if (item) selected.push(item);
+    });
+
+    if (selected.length === 0) {
+        document.getElementById('tumblr-suggest-status').textContent = 'Select items first.';
+        return;
+    }
+
+    var btn = document.getElementById('tumblr-suggest-btn');
+    btn.disabled = true;
+    btn.textContent = 'Suggesting... (0/' + selected.length + ')';
+    document.getElementById('tumblr-review-footer').style.display = 'flex';
+    document.getElementById('tumblr-suggest-status').textContent = 'Running AI suggestions...';
+
+    // Show spinners on selected items
+    selected.forEach(function(item) {
+        var sugEl = document.getElementById('tumblr-sug-' + item.id);
+        if (sugEl) {
+            sugEl.style.display = 'block';
+            sugEl.innerHTML = '<span class="text-muted" style="font-size:12px"><svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px;margin-right:3px"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>Waiting for AI...</span>';
+        }
+    });
+
+    // Process in batches of 3 to avoid overloading
+    var batchSize = 3;
+    var done = 0;
+    for (var i = 0; i < selected.length; i += batchSize) {
+        var batch = selected.slice(i, i + batchSize);
+        var payload = batch.map(function(item) {
+            return { id: item.id, item_type: item.item_type, title: item.title, tags: item.tags, image_path: item.image_path };
+        });
+
+        try {
+            var r = await fetch(ADMIN + '/import/tumblr/suggest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: payload })
+            });
+            var resp = await r.json();
+            if (resp.ok && resp.suggestions) {
+                resp.suggestions.forEach(function(sug) {
+                    tumblrSuggestions[sug.id] = sug;
+                    tumblrRenderSuggestion(sug);
+                });
+            }
+            if (resp.errors) {
+                resp.errors.forEach(function(err) {
+                    var sugEl = document.getElementById('tumblr-sug-' + err.id);
+                    if (sugEl) sugEl.innerHTML = '<span style="color:var(--danger);font-size:12px">AI error: ' + escHtml(err.error) + '</span>';
+                });
+            }
+        } catch (e) {
+            batch.forEach(function(item) {
+                var sugEl = document.getElementById('tumblr-sug-' + item.id);
+                if (sugEl) sugEl.innerHTML = '<span style="color:var(--danger);font-size:12px">Request failed</span>';
+            });
+        }
+        done += batch.length;
+        btn.textContent = 'Suggesting... (' + done + '/' + selected.length + ')';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Suggest with AI';
+    var sugCount = Object.keys(tumblrSuggestions).length;
+    document.getElementById('tumblr-suggest-status').textContent = sugCount + ' suggestion' + (sugCount !== 1 ? 's' : '') + ' ready.';
+    if (sugCount > 0) {
+        document.getElementById('tumblr-save-btn').style.display = '';
+    }
+}
+
+function tumblrRenderSuggestion(sug) {
+    var sugEl = document.getElementById('tumblr-sug-' + sug.id);
+    if (!sugEl) return;
+    sugEl.style.display = 'block';
+    var html = '<div class="tumblr-sug-fields">';
+    html += '<div class="tumblr-sug-row"><label>Title</label><input type="text" class="form-control form-control-sm" id="tumblr-sug-title-' + sug.id + '" value="' + escAttr(sug.title) + '"></div>';
+    html += '<div class="tumblr-sug-row"><label>Description</label><input type="text" class="form-control form-control-sm" id="tumblr-sug-desc-' + sug.id + '" value="' + escAttr(sug.description) + '"></div>';
+    html += '<div class="tumblr-sug-row"><label>Category</label><input type="text" class="form-control form-control-sm" id="tumblr-sug-cat-' + sug.id + '" value="' + escAttr(sug.category) + '"></div>';
+    html += '</div>';
+    sugEl.innerHTML = html;
+}
+
+async function tumblrSaveAll() {
+    var updates = [];
+    Object.keys(tumblrSuggestions).forEach(function(id) {
+        var sug = tumblrSuggestions[id];
+        var titleEl = document.getElementById('tumblr-sug-title-' + id);
+        var descEl = document.getElementById('tumblr-sug-desc-' + id);
+        var catEl = document.getElementById('tumblr-sug-cat-' + id);
+        updates.push({
+            id: parseInt(id),
+            item_type: sug.item_type,
+            title: titleEl ? titleEl.value : sug.title,
+            meta_description: descEl ? descEl.value : sug.description,
+            category_name: catEl ? catEl.value : sug.category,
+        });
+    });
+
+    if (updates.length === 0) return;
+
+    var btn = document.getElementById('tumblr-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        var r = await fetch(ADMIN + '/import/tumblr/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ updates: updates })
+        });
+        var resp = await r.json();
+        if (resp.ok) {
+            tumblrShowDone(resp.applied);
+        } else {
+            document.getElementById('tumblr-suggest-status').textContent = 'Save failed: ' + (resp.error || 'Unknown error');
+            btn.disabled = false;
+            btn.textContent = 'Review & Save';
+        }
+    } catch (e) {
+        document.getElementById('tumblr-suggest-status').textContent = 'Save failed: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Review & Save';
+    }
+}
+
+function tumblrShowDone(appliedCount) {
+    document.getElementById('tumblr-phase-review').style.display = 'none';
+    document.getElementById('tumblr-phase-done').style.display = 'flex';
+
+    var journals = tumblrItems.filter(function(i) { return i.item_type === 'journal'; }).length;
+    var photos = tumblrItems.filter(function(i) { return i.item_type === 'photo'; }).length;
+    var videos = tumblrItems.filter(function(i) { return i.item_type === 'video'; }).length;
+
+    var parts = [];
+    if (journals > 0) parts.push(journals + ' journal post' + (journals !== 1 ? 's' : ''));
+    if (photos > 0) parts.push(photos + ' photo' + (photos !== 1 ? 's' : ''));
+    if (videos > 0) parts.push(videos + ' video' + (videos !== 1 ? 's' : ''));
+    var summary = 'Imported ' + parts.join(', ') + '.';
+    if (appliedCount > 0) summary += ' AI suggestions applied to ' + appliedCount + ' item' + (appliedCount !== 1 ? 's' : '') + '.';
+    document.getElementById('tumblr-done-summary').textContent = summary;
+}
+
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
+
+/* Modal styles */
+.modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000; }
+.modal { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;z-index:1001;width:90%;color:var(--text-primary); }
+.modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-subtle); }
+.modal-header h3 { margin:0;font-size:16px;color:var(--text-primary); }
+.modal-close { background:none;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;padding:0;line-height:1; }
+.modal-body { padding:20px; }
+.modal-body label { color:var(--text-secondary); }
+.modal-footer { padding:12px 20px;border-top:1px solid var(--border-subtle); }
+
+/* Tumblr import modal — override default .modal sizing for 90vh layout */
+.tumblr-import-modal { width:90vw;max-width:1400px;height:90vh;display:flex;flex-direction:column;overflow:hidden }
+
+/* Tumblr tabs */
+.tumblr-tab { background:none;border:none;padding:10px 16px;font-size:13px;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s }
+.tumblr-tab:hover { color:var(--text-primary) }
+.tumblr-tab.active { color:var(--accent);border-bottom-color:var(--accent) }
+.tumblr-tab-count { font-size:11px;background:var(--bg-input);padding:1px 6px;border-radius:10px;margin-left:4px }
+
+/* Journal list */
+.tumblr-journal-list { display:flex;flex-direction:column;gap:8px }
+.tumblr-journal-item { display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border-subtle) }
+.tumblr-journal-info { flex:1;min-width:0 }
+.tumblr-item-title { font-size:14px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.tumblr-item-meta { margin-top:4px;font-size:12px;color:var(--text-tertiary) }
+
+/* Grid */
+.tumblr-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px }
+.tumblr-grid-item { position:relative;background:var(--bg-input);border-radius:8px;border:1px solid var(--border-subtle);overflow:hidden }
+.tumblr-grid-thumb { width:100%;aspect-ratio:1;background-size:cover;background-position:center }
+.tumblr-grid-nothumb { display:flex;align-items:center;justify-content:center;background:var(--bg-card) }
+.tumblr-grid-info { padding:8px 10px }
+
+/* Checkbox */
+.tumblr-check { flex-shrink:0;margin-top:2px }
+.tumblr-check-overlay { position:absolute;top:8px;left:8px;z-index:2;background:rgba(0,0,0,.4);border-radius:4px;padding:2px 4px }
+.tumblr-check-overlay input { cursor:pointer }
+
+/* Tags */
+.tumblr-tags { display:flex;flex-wrap:wrap;gap:4px;margin-top:4px }
+.tumblr-tag { font-size:11px;padding:1px 6px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:4px;color:var(--text-tertiary) }
+
+/* Suggestion fields */
+.tumblr-suggestion { margin-top:8px;padding:8px;background:var(--bg-card);border:1px solid var(--accent);border-radius:6px }
+.tumblr-sug-fields { display:flex;flex-direction:column;gap:6px }
+.tumblr-sug-row { display:flex;align-items:center;gap:6px }
+.tumblr-sug-row label { font-size:11px;color:var(--text-tertiary);width:70px;flex-shrink:0 }
+.tumblr-sug-row input { font-size:12px;padding:4px 8px }
 </style>
 {% endblock content %}
