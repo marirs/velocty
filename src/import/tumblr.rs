@@ -294,6 +294,15 @@ fn import_text_post(
         body_rewritten
     };
 
+    let meta_desc = {
+        let plain = strip_html(&body_final);
+        if plain.len() > 5 {
+            Some(plain.chars().take(160).collect::<String>())
+        } else {
+            None
+        }
+    };
+
     let form = PostForm {
         title: title.clone(),
         slug: slug.clone(),
@@ -301,8 +310,8 @@ fn import_text_post(
         content_html: body_final,
         excerpt: None,
         featured_image: featured_image.clone(),
-        meta_title: None,
-        meta_description: None,
+        meta_title: Some(title.clone()),
+        meta_description: meta_desc,
         status: "published".to_string(),
         published_at,
         category_ids: None,
@@ -387,23 +396,31 @@ fn import_photo_post(
     if !caption.is_empty() {
         desc_html.push_str(caption);
     }
+    let title = fallback_title_media(tags, "Photo", date);
+
     if photo_urls.len() > 1 {
         desc_html.push_str("<div class=\"tumblr-photoset\">");
         for url in &photo_urls[1..] {
             if let Ok(local) = download_media(url, store, "portfolio", post_dt.as_ref()) {
                 desc_html.push_str(&format!(
-                    "<img src=\"/uploads/{}\" alt=\"\" loading=\"lazy\">",
-                    local
+                    "<img src=\"/uploads/{}\" alt=\"{}\" loading=\"lazy\">",
+                    local,
+                    html_escape(&title)
                 ));
             }
         }
         desc_html.push_str("</div>");
     }
 
-    let title = fallback_title_media(tags, "Photo", date);
     let slug = unique_slug(&title, |s| store.portfolio_find_by_slug(s).is_some());
 
     let published_at = parse_tumblr_date(date);
+
+    let meta_desc = if !caption.is_empty() {
+        Some(strip_html(&caption.chars().take(160).collect::<String>()))
+    } else {
+        None
+    };
 
     let form = PortfolioForm {
         title: title.clone(),
@@ -416,8 +433,8 @@ fn import_photo_post(
         },
         image_path: image_path.clone(),
         thumbnail_path: None,
-        meta_title: None,
-        meta_description: None,
+        meta_title: Some(title.clone()),
+        meta_description: meta_desc,
         sell_enabled: None,
         price: None,
         purchase_note: None,
@@ -569,6 +586,12 @@ fn import_video_post(
         let slug = unique_slug(&title, |s| store.post_find_by_slug(s).is_some());
         let published_at = parse_tumblr_date(date);
 
+        let meta_desc = if !caption.is_empty() {
+            Some(strip_html(&caption.chars().take(160).collect::<String>()))
+        } else {
+            None
+        };
+
         let form = PostForm {
             title: title.clone(),
             slug: slug.clone(),
@@ -576,8 +599,8 @@ fn import_video_post(
             content_html: desc_html.unwrap_or_default(),
             excerpt: None,
             featured_image: None,
-            meta_title: None,
-            meta_description: None,
+            meta_title: Some(title.clone()),
+            meta_description: meta_desc,
             status: "published".to_string(),
             published_at,
             category_ids: None,
@@ -602,6 +625,12 @@ fn import_video_post(
     let slug = unique_slug(&title, |s| store.portfolio_find_by_slug(s).is_some());
     let published_at = parse_tumblr_date(date);
 
+    let meta_desc = if !caption.is_empty() {
+        Some(strip_html(&caption.chars().take(160).collect::<String>()))
+    } else {
+        None
+    };
+
     let form = PortfolioForm {
         title: title.clone(),
         slug: slug.clone(),
@@ -609,8 +638,8 @@ fn import_video_post(
         description_html: desc_html,
         image_path: image_path.clone(),
         thumbnail_path: None,
-        meta_title: None,
-        meta_description: None,
+        meta_title: Some(title.clone()),
+        meta_description: meta_desc,
         sell_enabled: None,
         price: None,
         purchase_note: None,
@@ -763,11 +792,22 @@ pub fn apply_updates(store: &dyn Store, updates: &[ApplyUpdate]) -> Result<u64, 
         match content_type {
             "post" => {
                 if let Some(post) = store.post_find_by_id(update.id) {
+                    let new_title = update.title.clone().unwrap_or_else(|| post.title.clone());
+                    let new_slug = if update.title.is_some() {
+                        let own_slug = post.slug.clone();
+                        unique_slug(&new_title, |s| {
+                            s != own_slug && store.post_find_by_slug(s).is_some()
+                        })
+                    } else {
+                        post.slug.clone()
+                    };
+                    // Rewrite empty alt attrs in content HTML to use the new title
+                    let new_content_html = rewrite_empty_img_alts(&post.content_html, &new_title);
                     let form = PostForm {
-                        title: update.title.clone().unwrap_or(post.title),
-                        slug: post.slug,
+                        title: new_title,
+                        slug: new_slug,
                         content_json: post.content_json,
-                        content_html: post.content_html,
+                        content_html: new_content_html,
                         excerpt: post.excerpt,
                         featured_image: post.featured_image,
                         meta_title: update.title.clone(),
@@ -782,11 +822,47 @@ pub fn apply_updates(store: &dyn Store, updates: &[ApplyUpdate]) -> Result<u64, 
             }
             _ => {
                 if let Some(item) = store.portfolio_find_by_id(update.id) {
+                    let new_title = update.title.clone().unwrap_or_else(|| item.title.clone());
+                    let new_slug = if update.title.is_some() {
+                        let own_slug = item.slug.clone();
+                        unique_slug(&new_title, |s| {
+                            s != own_slug && store.portfolio_find_by_slug(s).is_some()
+                        })
+                    } else {
+                        item.slug.clone()
+                    };
+
+                    // Build description_html: prepend AI description, keep existing images
+                    let mut new_desc = String::new();
+                    if let Some(ref desc) = update.meta_description {
+                        if !desc.is_empty() {
+                            new_desc.push_str(&format!("<p>{}</p>", html_escape(desc)));
+                        }
+                    }
+                    // Append existing photoset/image HTML (strip any old text-only content)
+                    if let Some(ref existing) = item.description_html {
+                        // Keep everything from the first <div or <img onward (photoset images)
+                        let lower = existing.to_lowercase();
+                        let img_start = lower.find("<div").or_else(|| lower.find("<img"));
+                        if let Some(pos) = img_start {
+                            new_desc.push_str(&existing[pos..]);
+                        } else if new_desc.is_empty() {
+                            // No images and no AI description — keep original
+                            new_desc = existing.clone();
+                        }
+                    }
+                    // Rewrite empty alt attrs to use the new title
+                    let new_desc = rewrite_empty_img_alts(&new_desc, &new_title);
+
                     let form = PortfolioForm {
-                        title: update.title.clone().unwrap_or(item.title),
-                        slug: item.slug,
+                        title: new_title,
+                        slug: new_slug,
                         description_json: item.description_json,
-                        description_html: item.description_html,
+                        description_html: if new_desc.is_empty() {
+                            None
+                        } else {
+                            Some(new_desc)
+                        },
                         image_path: item.image_path,
                         thumbnail_path: item.thumbnail_path,
                         meta_title: update.title.clone(),
@@ -1204,6 +1280,20 @@ fn title_case(s: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Rewrite `alt=""` attributes on `<img>` tags to use the given alt text.
+fn rewrite_empty_img_alts(html: &str, alt_text: &str) -> String {
+    let escaped = html_escape(alt_text);
+    html.replace("alt=\"\"", &format!("alt=\"{}\"", escaped))
+        .replace("alt=''", &format!("alt='{}'", escaped))
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn strip_html(html: &str) -> String {
