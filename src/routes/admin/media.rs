@@ -151,7 +151,7 @@ pub fn media_library(
 
     let context = json!({
         "page_title": "Media",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "files": page_files,
         "total": total,
         "filter": filter,

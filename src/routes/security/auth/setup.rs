@@ -78,11 +78,11 @@ pub fn setup_page(
     admin_slug: &State<AdminSlug>,
 ) -> Result<NoCacheTemplate, Redirect> {
     if !needs_setup(&**store.inner()) {
-        return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
+        return Err(Redirect::to(format!("/{}/login", admin_slug.get())));
     }
     let ctx = SetupContext {
         error: None,
-        admin_slug: admin_slug.0.clone(),
+        admin_slug: admin_slug.get().clone(),
         site_name: "Velocty".to_string(),
         admin_email: String::new(),
         db_backend: "sqlite".to_string(),
@@ -106,13 +106,13 @@ pub fn setup_submit(
 ) -> Result<Redirect, Template> {
     let s: &dyn Store = &**store.inner();
     if !needs_setup(s) {
-        return Ok(Redirect::to(format!("/{}/login", admin_slug.0)));
+        return Ok(Redirect::to(format!("/{}/login", admin_slug.get())));
     }
 
     let make_err = |msg: &str, form: &SetupForm| {
         let ctx = SetupContext {
             error: Some(msg.to_string()),
-            admin_slug: admin_slug.0.clone(),
+            admin_slug: admin_slug.get().clone(),
             site_name: form.site_name.clone(),
             admin_email: form.admin_email.clone(),
             db_backend: form.db_backend.clone(),
@@ -264,7 +264,7 @@ pub fn setup_submit(
         let _ = s.setting_set("site_url", url);
     }
 
-    Ok(Redirect::to(format!("/{}/login", admin_slug.0)))
+    Ok(Redirect::to(format!("/{}/login", admin_slug.get())))
 }
 
 // ── Setup-only mode (no DB configured yet) ─────────────────────────
@@ -273,7 +273,7 @@ pub fn setup_submit(
 pub fn setup_page_no_db(admin_slug: &State<AdminSlug>) -> NoCacheTemplate {
     let ctx = SetupContext {
         error: None,
-        admin_slug: admin_slug.0.clone(),
+        admin_slug: admin_slug.get().clone(),
         site_name: "Velocty".to_string(),
         admin_email: String::new(),
         db_backend: "sqlite".to_string(),
@@ -297,7 +297,7 @@ pub fn setup_submit_no_db(
     let make_err = |msg: &str, form: &SetupForm| {
         let ctx = SetupContext {
             error: Some(msg.to_string()),
-            admin_slug: admin_slug.0.clone(),
+            admin_slug: admin_slug.get().clone(),
             site_name: form.site_name.clone(),
             admin_email: form.admin_email.clone(),
             db_backend: form.db_backend.clone(),
@@ -491,7 +491,7 @@ pub fn setup_submit_no_db(
     Ok(Template::render(
         "admin/setup_complete",
         serde_json::json!({
-            "admin_slug": admin_slug.0,
+            "admin_slug": admin_slug.get(),
             "db_backend": form.db_backend,
         }),
     ))

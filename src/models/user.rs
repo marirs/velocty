@@ -20,6 +20,7 @@ pub struct User {
     pub updated_at: String,
     pub auth_method: String,
     pub auth_method_fallback: String,
+    pub force_password_change: bool,
 }
 
 impl User {
@@ -47,11 +48,12 @@ impl User {
             auth_method_fallback: row
                 .get::<_, Option<String>>(14)?
                 .unwrap_or_else(|| "password".to_string()),
+            force_password_change: row.get::<_, Option<i32>>(15)?.unwrap_or(0) != 0,
         })
     }
 
     const SELECT_COLS: &'static str =
-        "id, email, password_hash, display_name, role, status, avatar, mfa_enabled, mfa_secret, mfa_recovery_codes, last_login_at, created_at, updated_at, auth_method, auth_method_fallback";
+        "id, email, password_hash, display_name, role, status, avatar, mfa_enabled, mfa_secret, mfa_recovery_codes, last_login_at, created_at, updated_at, auth_method, auth_method_fallback, force_password_change";
 
     // ── Lookups ──
 
@@ -342,6 +344,7 @@ impl User {
             "updated_at": self.updated_at,
             "auth_method": self.auth_method,
             "auth_method_fallback": self.auth_method_fallback,
+            "force_password_change": self.force_password_change,
         })
     }
 

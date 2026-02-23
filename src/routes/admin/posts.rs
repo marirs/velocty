@@ -44,7 +44,7 @@ pub fn posts_list(
         "count_draft": store.post_count(Some("draft")),
         "count_scheduled": store.post_count(Some("scheduled")),
         "count_archived": store.post_count(Some("archived")),
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 
@@ -64,7 +64,7 @@ pub fn posts_new(
     let ai_has_vision = crate::ai::has_vision_provider(&**store.inner());
     let context = json!({
         "page_title": "New Post",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "categories": categories,
         "tags": tags,
         "settings": store.setting_all(),
@@ -97,7 +97,7 @@ pub fn posts_edit(
         "tags": tags,
         "post_categories": post_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "post_tags": post_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
         "ai_enabled": ai_enabled,
         "ai_has_vision": ai_has_vision,

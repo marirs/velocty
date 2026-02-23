@@ -22,7 +22,7 @@ pub fn health_page(
     let report = crate::health::gather(None, s);
     let context = json!({
         "page_title": "Health",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
         "report": report,
         "db_backend": s.db_backend(),

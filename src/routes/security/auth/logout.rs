@@ -18,7 +18,7 @@ pub fn logout(
         let _ = auth::destroy_session(&**store.inner(), cookie.value());
     }
     auth::clear_session_cookie(cookies);
-    Redirect::to(format!("/{}/login", admin_slug.0))
+    Redirect::to(format!("/{}/login", admin_slug.get()))
 }
 
 /// Catch-all for any /<admin_slug>/* route that failed the AdminUser guard.
@@ -30,8 +30,8 @@ pub fn admin_redirect_to_login(
     admin_slug: &State<AdminSlug>,
 ) -> Redirect {
     if needs_setup(&**store.inner()) {
-        Redirect::to(format!("/{}/setup", admin_slug.0))
+        Redirect::to(format!("/{}/setup", admin_slug.get()))
     } else {
-        Redirect::to(format!("/{}/login", admin_slug.0))
+        Redirect::to(format!("/{}/login", admin_slug.get()))
     }
 }

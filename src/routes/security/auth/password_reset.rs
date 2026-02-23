@@ -36,7 +36,7 @@ pub fn forgot_password_page(
         "admin_theme".to_string(),
         s.setting_get_or("admin_theme", "dark"),
     );
-    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
     Template::render("admin/forgot_password", &ctx)
 }
 
@@ -53,7 +53,7 @@ pub fn forgot_password_submit(
     let theme = s.setting_get_or("admin_theme", "dark");
     let mut ctx: HashMap<String, String> = HashMap::new();
     ctx.insert("admin_theme".to_string(), theme);
-    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
 
     // Rate limit: 3 requests per 15 minutes per IP
     let rate_key = format!("pw_reset:{}", client_ip.0);
@@ -104,7 +104,7 @@ pub fn reset_password_page(
         "admin_theme".to_string(),
         s.setting_get_or("admin_theme", "dark"),
     );
-    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
     ctx.insert("token".to_string(), token.to_string());
     Template::render("admin/reset_password", &ctx)
 }
@@ -123,7 +123,7 @@ pub fn reset_password_submit(
         let mut ctx = HashMap::new();
         ctx.insert("error".to_string(), msg.to_string());
         ctx.insert("admin_theme".to_string(), theme.clone());
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
         ctx.insert("token".to_string(), token.to_string());
         Template::render("admin/reset_password", &ctx)
     };
@@ -163,6 +163,6 @@ pub fn reset_password_submit(
     // Redirect to login with a flash-like param
     Ok(Redirect::to(format!(
         "/{}/login?reset=success",
-        admin_slug.0
+        admin_slug.get()
     )))
 }

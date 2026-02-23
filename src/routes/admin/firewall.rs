@@ -65,7 +65,7 @@ pub fn firewall_dashboard(
 
     let context = json!({
         "page_title": "Firewall",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": settings,
         "active_bans": ban_total,
         "events_24h": events_24h,

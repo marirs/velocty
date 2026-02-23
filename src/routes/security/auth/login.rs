@@ -33,18 +33,18 @@ pub fn login_page(
 ) -> Result<Template, Redirect> {
     let s: &dyn Store = &**store.inner();
     if needs_setup(s) {
-        return Err(Redirect::to(format!("/{}/setup", admin_slug.0)));
+        return Err(Redirect::to(format!("/{}/setup", admin_slug.get())));
     }
     let login_method = s.setting_get_or("login_method", "password");
     if login_method == "magic_link" {
-        return Err(Redirect::to(format!("/{}/magic-link", admin_slug.0)));
+        return Err(Redirect::to(format!("/{}/magic-link", admin_slug.get())));
     }
     let mut context: HashMap<String, String> = HashMap::new();
     context.insert(
         "admin_theme".to_string(),
         s.setting_get_or("admin_theme", "dark"),
     );
-    context.insert("admin_slug".to_string(), admin_slug.0.clone());
+    context.insert("admin_slug".to_string(), admin_slug.get().clone());
     if reset == Some("success") {
         context.insert("reset_success".to_string(), "true".to_string());
     }
@@ -83,7 +83,7 @@ pub fn login_submit(
             "Too many login attempts. Please try again in 15 minutes.",
             &theme,
             s,
-            &admin_slug.0,
+            &admin_slug.get(),
         ));
     }
 
@@ -95,7 +95,7 @@ pub fn login_submit(
                 "Captcha verification failed. Please try again.",
                 &theme,
                 s,
-                &admin_slug.0,
+                &admin_slug.get(),
             ));
         }
         Err(e) => log::warn!("Login captcha error (allowing): {}", e),
@@ -130,7 +130,12 @@ pub fn login_submit(
                     );
                 }
             }
-            return Err(make_err("Invalid credentials", &theme, s, &admin_slug.0));
+            return Err(make_err(
+                "Invalid credentials",
+                &theme,
+                s,
+                &admin_slug.get(),
+            ));
         }
     };
 
@@ -140,7 +145,7 @@ pub fn login_submit(
             "This account is suspended or locked. Contact an administrator.",
             &theme,
             s,
-            &admin_slug.0,
+            &admin_slug.get(),
         ));
     }
 
@@ -150,7 +155,7 @@ pub fn login_submit(
             "Your account does not have admin panel access.",
             &theme,
             s,
-            &admin_slug.0,
+            &admin_slug.get(),
         ));
     }
 
@@ -195,7 +200,12 @@ pub fn login_submit(
             Some("Wrong password"),
             Some(ip),
         );
-        return Err(make_err("Invalid credentials", &theme, s, &admin_slug.0));
+        return Err(make_err(
+            "Invalid credentials",
+            &theme,
+            s,
+            &admin_slug.get(),
+        ));
     }
 
     // Check MFA (per-user)
@@ -203,7 +213,7 @@ pub fn login_submit(
         let pending_token = uuid::Uuid::new_v4().to_string();
         // Store user_id in a pending cookie so MFA page can complete login
         mfa::set_pending_cookie(cookies, &format!("{}:{}", user.id, pending_token));
-        return Ok(Redirect::to(format!("/{}/mfa", admin_slug.0)));
+        return Ok(Redirect::to(format!("/{}/mfa", admin_slug.get())));
     }
 
     // Create session
@@ -221,13 +231,21 @@ pub fn login_submit(
                 None,
                 Some(ip),
             );
-            Ok(Redirect::to(format!("/{}", admin_slug.0)))
+            // Force password change on first login (e.g. multi-site temp password)
+            if user.force_password_change {
+                Ok(Redirect::to(format!(
+                    "/{}/change-password",
+                    admin_slug.get()
+                )))
+            } else {
+                Ok(Redirect::to(format!("/{}", admin_slug.get())))
+            }
         }
         Err(_) => Err(make_err(
             "Session creation failed",
             &theme,
             s,
-            &admin_slug.0,
+            &admin_slug.get(),
         )),
     }
 }

@@ -22,7 +22,7 @@ pub mod users;
 
 /// Helper: get the admin base path from managed state
 pub(crate) fn admin_base(slug: &AdminSlug) -> String {
-    format!("/{}", slug.0)
+    format!("/{}", slug.get())
 }
 
 /// If status is "published" but published_at is in the future, override to "scheduled".

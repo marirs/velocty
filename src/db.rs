@@ -488,6 +488,16 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
+    // Add force_password_change to users if missing
+    let has_force_pw: bool = conn
+        .prepare("SELECT force_password_change FROM users LIMIT 0")
+        .is_ok();
+    if !has_force_pw {
+        conn.execute_batch(
+            "ALTER TABLE users ADD COLUMN force_password_change INTEGER NOT NULL DEFAULT 0;",
+        )?;
+    }
+
     // Drop the migration connection before FTS calls (avoids deadlock with max_size=1 pools)
     drop(conn);
 

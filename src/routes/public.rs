@@ -100,6 +100,7 @@ fn dispatch_root(
     let first_segment = path.split('/').next().unwrap_or("");
     let reserved = [
         admin_slug.as_str(),
+        "__adm",
         "static",
         "uploads",
         "api",
@@ -128,6 +129,7 @@ fn dispatch_root(
         "img",
         "tag",
         "category",
+        "change-password",
     ];
     if reserved.contains(&first_segment) {
         return None;

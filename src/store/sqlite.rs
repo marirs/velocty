@@ -174,6 +174,15 @@ impl Store for SqliteStore {
     fn user_update_auth_method(&self, id: i64, method: &str, fallback: &str) -> Result<(), String> {
         User::update_auth_method(&self.pool, id, method, fallback)
     }
+    fn user_set_force_password_change(&self, id: i64, force: bool) -> Result<(), String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let val: i32 = if force { 1 } else { 0 };
+        conn.execute(
+            "UPDATE users SET force_password_change = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            rusqlite::params![val, id],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
 
     // ── Posts ────────────────────────────────────────────────────────
 
@@ -2015,6 +2024,9 @@ impl Store for DbPool {
     }
     fn user_update_auth_method(&self, id: i64, method: &str, fallback: &str) -> Result<(), String> {
         SqliteStore::new(self.clone()).user_update_auth_method(id, method, fallback)
+    }
+    fn user_set_force_password_change(&self, id: i64, force: bool) -> Result<(), String> {
+        SqliteStore::new(self.clone()).user_set_force_password_change(id, force)
     }
     fn post_find_by_id(&self, id: i64) -> Option<crate::models::post::Post> {
         SqliteStore::new(self.clone()).post_find_by_id(id)

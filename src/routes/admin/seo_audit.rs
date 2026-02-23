@@ -171,7 +171,7 @@ pub fn seo_audit_dashboard(
 
     let context = json!({
         "page_title": "SEO Audit",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "user": _admin.user.safe_json(),
         "settings": settings,
         "journal_enabled": journal_enabled,

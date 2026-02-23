@@ -52,7 +52,7 @@ pub fn categories_list(
         "total_pages": total_pages,
         "total": total,
         "type_filter": type_filter,
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 
@@ -94,7 +94,7 @@ pub fn tags_list(
         "current_page": current_page,
         "total_pages": total_pages,
         "total": total,
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 

@@ -43,6 +43,9 @@
         </div>
     </div>
     <div class="container">
+        {% if success %}
+        <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#f59e0b;padding:14px 16px;border-radius:8px;font-size:13px;margin-bottom:20px;line-height:1.6;word-break:break-all">{{ success }}</div>
+        {% endif %}
         <div class="header-row">
             <h2>Sites</h2>
             <a href="/super/sites/new" class="btn">+ New Site</a>

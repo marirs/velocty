@@ -35,7 +35,7 @@ pub fn users_list(
 
     let context = json!({
         "page_title": "Users",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": settings,
         "users": users_json,
         "current_user": _admin.user.safe_json(),

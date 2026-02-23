@@ -39,7 +39,7 @@ pub fn comments_list(
         "count_pending": store.comment_count(Some("pending")),
         "count_approved": store.comment_count(Some("approved")),
         "count_spam": store.comment_count(Some("spam")),
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 

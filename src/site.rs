@@ -6,6 +6,7 @@ use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::db::DbPool;
@@ -291,11 +292,14 @@ pub fn find_site_by_id(pool: &RegistryPool, id: i64) -> Option<Site> {
     .ok()
 }
 
+/// Create a new site. Returns (Site, temp_password, email_sent).
 pub fn create_site(
     pool: &RegistryPool,
     hostname: &str,
     display_name: &str,
-) -> Result<Site, String> {
+    admin_email: &str,
+    email_settings: &HashMap<String, String>,
+) -> Result<(Site, String, bool), String> {
     // Use a random UUID as the folder name so the filesystem
     // doesn't reveal which database belongs to which site.
     let slug = uuid::Uuid::new_v4().to_string();
@@ -321,19 +325,88 @@ pub fn create_site(
     store.run_migrations().map_err(|e| e.to_string())?;
     store.seed_defaults().map_err(|e| e.to_string())?;
 
-    // Auto-set site_url from the hostname provided during site creation
+    // Auto-set site_url, site_name, admin_slug, and mark setup as completed
     let _ = store.setting_set("site_url", &format!("https://{}", hostname));
     let _ = store.setting_set("site_name", display_name);
+    let _ = store.setting_set("admin_slug", "admin");
+    let _ = store.setting_set("setup_completed", "true");
+    let _ = store.setting_set("admin_email", admin_email);
 
-    Ok(Site {
-        id,
-        slug,
-        hostname: hostname.to_string(),
-        display_name: display_name.to_string(),
-        status: "active".to_string(),
-        created_at: String::new(),
-        updated_at: String::new(),
-    })
+    // Generate a random temporary password and create the site admin user
+    let temp_password = generate_temp_password();
+    let hash = crate::security::auth::hash_password(&temp_password)
+        .map_err(|e| format!("Failed to hash temp password: {}", e))?;
+    let user_id = store
+        .user_create(admin_email, &hash, display_name, "admin")
+        .map_err(|e| format!("Failed to create site admin: {}", e))?;
+    let _ = store.user_set_force_password_change(user_id, true);
+
+    // Send welcome email with temporary password (uses super admin's email settings)
+    let email_sent = send_site_welcome_email(email_settings, hostname, admin_email, &temp_password);
+
+    Ok((
+        Site {
+            id,
+            slug,
+            hostname: hostname.to_string(),
+            display_name: display_name.to_string(),
+            status: "active".to_string(),
+            created_at: String::new(),
+            updated_at: String::new(),
+        },
+        temp_password,
+        email_sent,
+    ))
+}
+
+/// Generate a random 16-character alphanumeric temporary password.
+fn generate_temp_password() -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let mut rng = rand::thread_rng();
+    (0..16)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
+}
+
+/// Send a welcome email to the new site admin with their temporary password.
+/// Uses the super admin's email settings since the sub-site has no email configured yet.
+/// Returns true if the email was sent successfully.
+fn send_site_welcome_email(
+    settings: &HashMap<String, String>,
+    hostname: &str,
+    admin_email: &str,
+    temp_password: &str,
+) -> bool {
+    let from = crate::email::get_from_or_admin(settings);
+    let subject = format!("Your new site on {} is ready", hostname);
+    let body = format!(
+        "Hello,\n\n\
+         Your site at https://{hostname}/admin is ready.\n\n\
+         Log in with:\n\
+         Email: {email}\n\
+         Temporary password: {password}\n\n\
+         You will be asked to set a new password on first login.\n\n\
+         — Velocty",
+        hostname = hostname,
+        email = admin_email,
+        password = temp_password,
+    );
+    match crate::email::send_via_provider(settings, &from, admin_email, &subject, &body) {
+        Ok(_) => true,
+        Err(e) => {
+            log::warn!(
+                "Failed to send welcome email to {} for site {}: {}",
+                admin_email,
+                hostname,
+                e
+            );
+            false
+        }
+    }
 }
 
 pub fn update_site_status(pool: &RegistryPool, id: i64, status: &str) -> Result<(), String> {

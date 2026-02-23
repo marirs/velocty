@@ -635,6 +635,20 @@ impl Store for MongoStore {
         Ok(())
     }
 
+    fn user_set_force_password_change(&self, id: i64, force: bool) -> Result<(), String> {
+        let coll = self.db.collection::<Document>("users");
+        coll.update_one(
+            doc! { "id": id },
+            doc! { "$set": {
+                "force_password_change": force,
+                "updated_at": chrono::Utc::now().to_rfc3339(),
+            }},
+            None,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     // ── Posts ────────────────────────────────────────────────────────
     // TODO: Full MongoDB implementations for posts, portfolio, comments,
     // categories, tags, designs, audit, firewall, analytics, orders,
@@ -3240,6 +3254,7 @@ fn doc_to_user(doc: &Document) -> Option<User> {
             .ok()
             .unwrap_or("password")
             .to_string(),
+        force_password_change: doc.get_bool("force_password_change").unwrap_or(false),
     })
 }
 

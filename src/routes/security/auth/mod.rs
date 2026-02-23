@@ -1,3 +1,4 @@
+pub mod change_password;
 pub mod login;
 pub mod logout;
 pub mod magic_link;
@@ -27,6 +28,8 @@ pub fn routes() -> Vec<rocket::Route> {
         passkey::passkey_check,
         passkey::passkey_auth_start,
         passkey::passkey_auth_finish,
+        change_password::change_password_page,
+        change_password::change_password_submit,
     ]
 }
 

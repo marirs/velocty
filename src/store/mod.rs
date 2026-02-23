@@ -92,6 +92,7 @@ pub trait Store: Send + Sync {
     fn user_unlock(&self, id: i64) -> Result<(), String>;
     fn user_delete(&self, id: i64) -> Result<(), String>;
     fn user_update_auth_method(&self, id: i64, method: &str, fallback: &str) -> Result<(), String>;
+    fn user_set_force_password_change(&self, id: i64, force: bool) -> Result<(), String>;
 
     // ── Posts ────────────────────────────────────────────────────────
     fn post_find_by_id(&self, id: i64) -> Option<Post>;

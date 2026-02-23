@@ -48,7 +48,7 @@ pub fn dashboard(
 
     let context = json!({
         "page_title": "Dashboard",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "posts_count": posts_count,
         "posts_draft": posts_draft,
         "portfolio_count": portfolio_count,

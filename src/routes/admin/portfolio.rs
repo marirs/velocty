@@ -43,7 +43,7 @@ pub fn portfolio_list(
         "count_published": store.portfolio_count(Some("published")),
         "count_draft": store.portfolio_count(Some("draft")),
         "count_scheduled": store.portfolio_count(Some("scheduled")),
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 
@@ -63,7 +63,7 @@ pub fn portfolio_new(
     let ai_has_vision = crate::ai::has_vision_provider(&**store.inner());
     let context = json!({
         "page_title": "New Portfolio Item",
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "categories": categories,
         "tags": tags,
         "settings": store.setting_all(),
@@ -96,7 +96,7 @@ pub fn portfolio_edit(
         "tags": tags,
         "item_categories": item_categories.iter().map(|c| c.id).collect::<Vec<_>>(),
         "item_tags": item_tags.iter().map(|t| t.id).collect::<Vec<_>>(),
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
         "ai_enabled": ai_enabled,
         "ai_has_vision": ai_has_vision,

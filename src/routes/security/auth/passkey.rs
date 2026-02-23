@@ -177,7 +177,7 @@ pub fn passkey_auth_finish(
                         Some("Passkey authentication"),
                         Some(ip),
                     );
-                    Json(json!({ "ok": true, "redirect": format!("/{}", admin_slug.0) }))
+                    Json(json!({ "ok": true, "redirect": format!("/{}", admin_slug.get()) }))
                 }
                 Err(_) => Json(json!({ "ok": false, "error": "Session creation failed" })),
             }

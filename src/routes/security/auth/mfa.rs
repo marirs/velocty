@@ -32,7 +32,7 @@ pub fn mfa_page(
     cookies: &CookieJar<'_>,
 ) -> Result<NoCacheTemplate, Redirect> {
     if pending_user_id(cookies).is_none() {
-        return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
+        return Err(Redirect::to(format!("/{}/login", admin_slug.get())));
     }
     let s: &dyn Store = &**store.inner();
     let mut ctx: HashMap<String, String> = HashMap::new();
@@ -40,7 +40,7 @@ pub fn mfa_page(
         "admin_theme".to_string(),
         s.setting_get_or("admin_theme", "dark"),
     );
-    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
     Ok(NoCacheTemplate(Template::render("admin/mfa", &ctx)))
 }
 
@@ -57,12 +57,12 @@ pub fn mfa_submit(
     // Extract user_id from pending cookie
     let user_id = match pending_user_id(cookies) {
         Some(id) => id,
-        None => return Ok(Redirect::to(format!("/{}/login", admin_slug.0))),
+        None => return Ok(Redirect::to(format!("/{}/login", admin_slug.get()))),
     };
 
     let user = match s.user_get_by_id(user_id) {
         Some(u) => u,
-        None => return Ok(Redirect::to(format!("/{}/login", admin_slug.0))),
+        None => return Ok(Redirect::to(format!("/{}/login", admin_slug.get()))),
     };
 
     let code = form.code.trim();
@@ -90,7 +90,7 @@ pub fn mfa_submit(
             "Invalid code. Please try again.".to_string(),
         );
         ctx.insert("admin_theme".to_string(), theme);
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
         return Err(Template::render("admin/mfa", &ctx));
     }
 
@@ -102,13 +102,13 @@ pub fn mfa_submit(
     match auth::create_session(s, user.id, None, None) {
         Ok(session_id) => {
             auth::set_session_cookie(cookies, &session_id);
-            Ok(Redirect::to(format!("/{}", admin_slug.0)))
+            Ok(Redirect::to(format!("/{}", admin_slug.get())))
         }
         Err(_) => {
             let mut ctx = HashMap::new();
             ctx.insert("error".to_string(), "Session creation failed".to_string());
             ctx.insert("admin_theme".to_string(), theme);
-            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+            ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
             Err(Template::render("admin/mfa", &ctx))
         }
     }

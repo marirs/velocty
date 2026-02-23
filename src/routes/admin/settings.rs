@@ -83,7 +83,7 @@ pub fn settings_page(
     let mut context = json!({
         "page_title": format!("Settings — {}", section_label),
         "section": section,
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
         "current_user": _admin.user.safe_json(),
         "active_design_slug": active_design_slug,
@@ -382,6 +382,7 @@ pub fn settings_save(
         "category",
         "search",
         "contact",
+        "change-password",
     ];
 
     fn is_reserved(s: &str) -> bool {
@@ -652,6 +653,12 @@ pub fn settings_save(
     // Refresh in-memory settings cache so dynamic routing picks up changes immediately
     let s: &dyn Store = &**store.inner();
     cache.refresh_from_store(s);
+
+    // If admin_slug changed, update the RwLock so the rewriter fairing uses the new slug
+    if section == "security" {
+        let new_slug = s.setting_get_or("admin_slug", "admin");
+        slug.set(&new_slug);
+    }
 
     store.audit_log(
         Some(_admin.user.id),

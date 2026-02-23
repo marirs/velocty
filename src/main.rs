@@ -40,21 +40,96 @@ mod site;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::Header;
+use rocket::http::{uri::Origin, Header};
 use rocket::response::content::RawHtml;
 
 use models::settings::SettingsCache;
 use store::Store;
 
-/// Holds the admin URL slug, read from DB at startup.
-/// Shared via Rocket managed state so routes, fairings, and templates can access it.
-pub struct AdminSlug(pub String);
+/// Fixed internal mount point for admin routes.
+/// The public-facing slug is dynamic and resolved per-request by AdminSlugRewriter.
+pub const ADMIN_INTERNAL_MOUNT: &str = "/__adm";
+
+/// Holds the admin URL slug (e.g. "admin"). Protected by RwLock so it can be
+/// updated at runtime when the user changes it in Settings > Security.
+pub struct AdminSlug {
+    inner: RwLock<String>,
+}
+
+impl AdminSlug {
+    pub fn new(slug: String) -> Self {
+        Self {
+            inner: RwLock::new(slug),
+        }
+    }
+
+    /// Read the current admin slug.
+    pub fn get(&self) -> String {
+        self.inner
+            .read()
+            .map(|s| s.clone())
+            .unwrap_or_else(|_| "admin".to_string())
+    }
+
+    /// Update the admin slug at runtime (called from settings_save).
+    pub fn set(&self, new_slug: &str) {
+        if let Ok(mut w) = self.inner.write() {
+            *w = new_slug.to_string();
+        }
+    }
+}
 
 /// Marker: true when running in setup-only mode (no DB yet).
 pub struct SetupMode(pub bool);
+
+/// Fairing that rewrites incoming requests from `/{admin_slug}/...` to `/__adm/...`
+/// so that Rocket's statically-mounted routes can handle them. This makes the admin
+/// slug fully dynamic — changing it in settings takes effect immediately.
+pub struct AdminSlugRewriter;
+
+#[rocket::async_trait]
+impl Fairing for AdminSlugRewriter {
+    fn info(&self) -> Info {
+        Info {
+            name: "Admin Slug Rewriter",
+            kind: Kind::Request,
+        }
+    }
+
+    async fn on_request(&self, req: &mut rocket::Request<'_>, _data: &mut rocket::Data<'_>) {
+        let slug = req
+            .rocket()
+            .state::<AdminSlug>()
+            .map(|s| s.get())
+            .unwrap_or_else(|| "admin".to_string());
+
+        let path = req.uri().path().as_str().to_string();
+        let prefix = format!("/{}/", slug);
+        let exact = format!("/{}", slug);
+
+        let new_path = if path.starts_with(&prefix) {
+            format!("{}/{}", ADMIN_INTERNAL_MOUNT, &path[prefix.len()..])
+        } else if path == exact || path == format!("{}/", exact) {
+            ADMIN_INTERNAL_MOUNT.to_string()
+        } else {
+            return;
+        };
+
+        // Preserve query string
+        let new_uri = if let Some(q) = req.uri().query() {
+            format!("{}?{}", new_path, q)
+        } else {
+            new_path
+        };
+
+        if let Ok(origin) = Origin::parse_owned(new_uri) {
+            req.set_uri(origin);
+        }
+    }
+}
 
 pub struct NoCacheAdmin;
 
@@ -68,13 +143,8 @@ impl Fairing for NoCacheAdmin {
     }
 
     async fn on_response<'r>(&self, req: &'r rocket::Request<'_>, res: &mut rocket::Response<'r>) {
-        let slug = req
-            .rocket()
-            .state::<AdminSlug>()
-            .map(|s| s.0.as_str())
-            .unwrap_or("admin");
-        let prefix = format!("/{}", slug);
-        if req.uri().path().starts_with(&*prefix) {
+        // After rewriting, admin paths start with /__adm
+        if req.uri().path().starts_with(ADMIN_INTERNAL_MOUNT) {
             res.set_header(Header::new(
                 "Cache-Control",
                 "no-store, no-cache, must-revalidate, max-age=0",
@@ -86,14 +156,15 @@ impl Fairing for NoCacheAdmin {
 
 #[catch(404)]
 fn not_found(req: &rocket::Request<'_>) -> RawHtml<String> {
+    let slug = req
+        .rocket()
+        .state::<AdminSlug>()
+        .map(|s| s.get())
+        .unwrap_or_else(|| "admin".to_string());
+
     // If in setup mode, redirect everything to /admin/setup
     if let Some(setup) = req.rocket().state::<SetupMode>() {
         if setup.0 {
-            let slug = req
-                .rocket()
-                .state::<AdminSlug>()
-                .map(|s| s.0.as_str())
-                .unwrap_or("admin");
             let setup_url = format!("/{}/setup", slug);
             return RawHtml(format!(
                 "<html><head><meta http-equiv=\"refresh\" content=\"0;url={}\"></head><body></body></html>",
@@ -102,15 +173,10 @@ fn not_found(req: &rocket::Request<'_>) -> RawHtml<String> {
         }
     }
 
-    // If the 404 is for an admin path (auth guard forwarded), redirect to login
-    let slug = req
-        .rocket()
-        .state::<AdminSlug>()
-        .map(|s| s.0.as_str())
-        .unwrap_or("admin");
-    let admin_prefix = format!("/{}/", slug);
+    // If the 404 is for an admin path (auth guard forwarded → rewritten to /__adm), redirect to login
     let path = req.uri().path().as_str();
-    if (path == format!("/{}", slug) || path.starts_with(&admin_prefix))
+    let adm_prefix = format!("{}/", ADMIN_INTERNAL_MOUNT);
+    if (path == ADMIN_INTERNAL_MOUNT || path.starts_with(&adm_prefix))
         && !path.ends_with("/login")
         && !path.ends_with("/setup")
     {
@@ -215,36 +281,39 @@ fn rocket() -> _ {
         let backend = read_config_backend();
 
         let admin_slug = store.setting_get_or("admin_slug", "admin");
-        let admin_mount = format!("/{}", admin_slug);
-        let admin_api_mount = format!("/{}/api", admin_slug);
+        let admin_api_mount = format!("{}/api", ADMIN_INTERNAL_MOUNT);
 
         let settings_cache = SettingsCache::load_from_store(&*store);
 
         eprintln!("Database backend: {}", backend);
-        eprintln!("Admin panel mounted at: {}", admin_mount);
+        eprintln!(
+            "Admin slug: /{} (internally mounted at {})",
+            admin_slug, ADMIN_INTERNAL_MOUNT
+        );
         eprintln!("Dynamic routing enabled — blog/portfolio slugs and enabled flags read from cache at request time");
 
         #[allow(unused_mut)]
         let mut rocket = rocket::build()
             .manage(store)
-            .manage(AdminSlug(admin_slug))
+            .manage(AdminSlug::new(admin_slug))
             .manage(SetupMode(false))
             .manage(settings_cache)
             .manage(rate_limit::RateLimiter::new())
             .manage(security::firewall::FwRateLimiter::new())
             .attach(Template::fairing())
+            .attach(AdminSlugRewriter)
             .attach(security::firewall::FirewallFairing)
             .attach(analytics::AnalyticsFairing)
             .attach(NoCacheAdmin)
             .attach(tasks::BackgroundTasks)
             .mount("/static", FileServer::from("website/static"))
             .mount("/", routes::public::root_routes())
-            .mount(&admin_mount, routes::admin::routes())
+            .mount(ADMIN_INTERNAL_MOUNT, routes::admin::routes())
             .mount(&admin_api_mount, routes::admin::api_routes())
             .mount(&admin_api_mount, routes::ai::routes())
             .mount("/api", routes::api::routes())
             .mount("/", routes::commerce::routes())
-            .mount(&admin_mount, routes::security::routes())
+            .mount(ADMIN_INTERNAL_MOUNT, routes::security::routes())
             .register("/", catchers![not_found, server_error]);
 
         // SQLite backend: also manage the raw DbPool for SQLite-specific
@@ -283,12 +352,13 @@ fn rocket() -> _ {
         eprintln!("Visit http://localhost:8000/admin/setup to configure your database.");
 
         rocket::build()
-            .manage(AdminSlug("admin".to_string()))
+            .manage(AdminSlug::new("admin".to_string()))
             .manage(SetupMode(true))
             .attach(Template::fairing())
+            .attach(AdminSlugRewriter)
             .attach(NoCacheAdmin)
             .mount("/static", FileServer::from("website/static"))
-            .mount("/admin", routes::security::setup_only_routes())
+            .mount(ADMIN_INTERNAL_MOUNT, routes::security::setup_only_routes())
             .register("/", catchers![not_found, server_error])
     }
 }

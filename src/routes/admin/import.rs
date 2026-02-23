@@ -24,7 +24,7 @@ pub fn import_page(
     let context = json!({
         "page_title": "Import",
         "history": history,
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 

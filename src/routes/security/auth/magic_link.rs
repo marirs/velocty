@@ -33,14 +33,14 @@ pub fn magic_link_page(
     let s: &dyn Store = &**store.inner();
     let login_method = s.setting_get_or("login_method", "password");
     if login_method != "magic_link" {
-        return Err(Redirect::to(format!("/{}/login", admin_slug.0)));
+        return Err(Redirect::to(format!("/{}/login", admin_slug.get())));
     }
     let mut ctx: HashMap<String, String> = HashMap::new();
     ctx.insert(
         "admin_theme".to_string(),
         s.setting_get_or("admin_theme", "dark"),
     );
-    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
     inject_captcha_context(s, &mut ctx);
     Ok(NoCacheTemplate(Template::render("admin/magic_link", &ctx)))
 }
@@ -64,7 +64,7 @@ pub fn magic_link_submit(
             "Magic link login is not enabled".to_string(),
         );
         ctx.insert("admin_theme".to_string(), theme);
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
         return Err(Template::render("admin/magic_link", &ctx));
     }
 
@@ -78,7 +78,7 @@ pub fn magic_link_submit(
                 "Captcha verification failed. Please try again.".to_string(),
             );
             ctx.insert("admin_theme".to_string(), theme.clone());
-            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+            ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
             inject_captcha_context(s, &mut ctx);
             return Err(Template::render("admin/magic_link", &ctx));
         }
@@ -95,7 +95,7 @@ pub fn magic_link_submit(
             "Too many requests. Please try again in 15 minutes.".to_string(),
         );
         ctx.insert("admin_theme".to_string(), theme);
-        ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+        ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
         return Err(Template::render("admin/magic_link", &ctx));
     }
 
@@ -104,7 +104,7 @@ pub fn magic_link_submit(
     // Always show success message to prevent email enumeration
     let mut ctx = HashMap::new();
     ctx.insert("admin_theme".to_string(), theme.clone());
-    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
     ctx.insert(
         "success".to_string(),
         "If that email is registered, a magic link has been sent. Check your inbox.".to_string(),
@@ -148,7 +148,7 @@ pub fn magic_link_verify(
                     let mut ctx = HashMap::new();
                     ctx.insert("error".to_string(), "User not found".to_string());
                     ctx.insert("admin_theme".to_string(), theme);
-                    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+                    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
                     return Err(Template::render("admin/magic_link", &ctx));
                 }
             };
@@ -160,7 +160,7 @@ pub fn magic_link_verify(
                     "This account is suspended or locked.".to_string(),
                 );
                 ctx.insert("admin_theme".to_string(), theme);
-                ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+                ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
                 return Err(Template::render("admin/magic_link", &ctx));
             }
 
@@ -168,7 +168,7 @@ pub fn magic_link_verify(
             if user.mfa_enabled && !user.mfa_secret.is_empty() {
                 let pending_token = uuid::Uuid::new_v4().to_string();
                 mfa::set_pending_cookie(cookies, &format!("{}:{}", user.id, pending_token));
-                return Ok(Redirect::to(format!("/{}/mfa", admin_slug.0)));
+                return Ok(Redirect::to(format!("/{}/mfa", admin_slug.get())));
             }
 
             // Create session directly
@@ -176,13 +176,13 @@ pub fn magic_link_verify(
             match auth::create_session(s, user.id, None, None) {
                 Ok(session_id) => {
                     auth::set_session_cookie(cookies, &session_id);
-                    Ok(Redirect::to(format!("/{}", admin_slug.0)))
+                    Ok(Redirect::to(format!("/{}", admin_slug.get())))
                 }
                 Err(_) => {
                     let mut ctx = HashMap::new();
                     ctx.insert("error".to_string(), "Session creation failed".to_string());
                     ctx.insert("admin_theme".to_string(), theme);
-                    ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+                    ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
                     Err(Template::render("admin/magic_link", &ctx))
                 }
             }
@@ -191,7 +191,7 @@ pub fn magic_link_verify(
             let mut ctx = HashMap::new();
             ctx.insert("error".to_string(), e);
             ctx.insert("admin_theme".to_string(), theme);
-            ctx.insert("admin_slug".to_string(), admin_slug.0.clone());
+            ctx.insert("admin_slug".to_string(), admin_slug.get().clone());
             Err(Template::render("admin/magic_link", &ctx))
         }
     }

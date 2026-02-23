@@ -24,7 +24,7 @@ pub fn designs_list(
     let mut context = json!({
         "page_title": "Designer",
         "designs": designs,
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
     });
 
@@ -90,7 +90,7 @@ pub fn design_overview(
     let context = json!({
         "page_title": format!("Design: {}", design.name),
         "design": design,
-        "admin_slug": slug.0,
+        "admin_slug": slug.get(),
         "settings": store.setting_all(),
         "portfolio_categories": portfolio_categories,
         "journal_categories": journal_categories,

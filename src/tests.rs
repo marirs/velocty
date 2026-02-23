@@ -1465,6 +1465,7 @@ const RESERVED_SLUGS: &[&str] = &[
     "category",
     "search",
     "contact",
+    "change-password",
 ];
 
 fn is_reserved(s: &str) -> bool {

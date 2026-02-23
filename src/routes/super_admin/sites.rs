@@ -28,6 +28,7 @@ pub fn new_site_page(
 pub struct NewSiteForm {
     pub hostname: String,
     pub display_name: String,
+    pub admin_email: String,
 }
 
 #[post("/sites/new", data = "<form>")]
@@ -40,19 +41,57 @@ pub fn new_site_submit(
         return Ok(Redirect::to("/super/login"));
     }
 
-    if form.hostname.trim().is_empty() || form.display_name.trim().is_empty() {
+    if form.hostname.trim().is_empty()
+        || form.display_name.trim().is_empty()
+        || form.admin_email.trim().is_empty()
+    {
         let mut ctx = HashMap::new();
         ctx.insert("error", "All fields are required.");
         return Err(Template::render("super/site_new", &ctx));
     }
 
-    match site::create_site(registry, form.hostname.trim(), form.display_name.trim()) {
-        Ok(_site) => Ok(Redirect::to("/super/")),
+    if !form.admin_email.contains('@') {
+        let mut ctx = HashMap::new();
+        ctx.insert("error", "Please enter a valid email address.");
+        return Err(Template::render("super/site_new", &ctx));
+    }
+
+    // Use empty settings — email will fail gracefully if no provider is configured.
+    // The temp password is shown in the UI as a fallback.
+    let email_settings = HashMap::new();
+
+    match site::create_site(
+        registry,
+        form.hostname.trim(),
+        form.display_name.trim(),
+        form.admin_email.trim(),
+        &email_settings,
+    ) {
+        Ok((_site, temp_password, email_sent)) => {
+            if email_sent {
+                Ok(Redirect::to("/super/"))
+            } else {
+                // Email failed — show the temp password so the super admin can share it manually
+                let mut ctx = HashMap::new();
+                ctx.insert("success".to_string(), format!(
+                    "Site created. Email delivery failed — please share these credentials manually: Email: {} / Temporary password: {}",
+                    form.admin_email.trim(),
+                    temp_password,
+                ));
+                ctx.insert(
+                    "sites".to_string(),
+                    serde_json::to_value(site::list_sites(registry))
+                        .unwrap_or_default()
+                        .to_string(),
+                );
+                Err(Template::render("super/dashboard", &ctx))
+            }
+        }
         Err(_e) => {
             let mut ctx = HashMap::new();
             ctx.insert(
-                "error",
-                "Failed to create site. Hostname may already exist.",
+                "error".to_string(),
+                "Failed to create site. Hostname may already exist.".to_string(),
             );
             Err(Template::render("super/site_new", &ctx))
         }

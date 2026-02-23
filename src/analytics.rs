@@ -3,7 +3,7 @@ use rocket::{Data, Request};
 use sha2::{Digest, Sha256};
 
 use crate::store::Store;
-use crate::AdminSlug;
+use crate::ADMIN_INTERNAL_MOUNT;
 
 /// Middleware that logs page views for every public request.
 /// Admin routes are excluded.
@@ -21,13 +21,8 @@ impl Fairing for AnalyticsFairing {
     async fn on_request(&self, request: &mut Request<'_>, _data: &mut Data<'_>) {
         let path = request.uri().path().to_string();
 
-        // Skip admin routes, static files, and API endpoints
-        let admin_prefix = request
-            .rocket()
-            .state::<AdminSlug>()
-            .map(|s| format!("/{}", s.0))
-            .unwrap_or_else(|| "/admin".to_string());
-        if path.starts_with(&admin_prefix)
+        // Skip admin routes (already rewritten to /__adm), static files, and API endpoints
+        if path.starts_with(ADMIN_INTERNAL_MOUNT)
             || path.starts_with("/static")
             || path.starts_with("/uploads")
             || path.starts_with("/api")

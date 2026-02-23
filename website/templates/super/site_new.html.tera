@@ -46,6 +46,11 @@
                 <label for="display_name">Display Name</label>
                 <input type="text" id="display_name" name="display_name" placeholder="My Portfolio" required>
             </div>
+            <div class="form-group">
+                <label for="admin_email">Site Admin Email</label>
+                <input type="email" id="admin_email" name="admin_email" placeholder="owner@example.com" required>
+                <p class="help">A temporary password will be emailed to this address. The site owner must change it on first login.</p>
+            </div>
             <div class="btn-row">
                 <button type="submit" class="btn">Create Site</button>
                 <a href="/super/" class="btn btn-secondary">Cancel</a>

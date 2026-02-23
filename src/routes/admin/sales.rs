@@ -31,7 +31,7 @@ pub fn sales_dashboard(
 
     let context = json!({
         "page_title": "Sales Dashboard",
-        "admin_slug": &slug.0,
+        "admin_slug": &slug.get(),
         "settings": &settings,
         "total_revenue": total_revenue,
         "revenue_30d": revenue_30d,
@@ -74,7 +74,7 @@ pub fn sales_orders(
 
     let context = json!({
         "page_title": "Orders",
-        "admin_slug": &slug.0,
+        "admin_slug": &slug.get(),
         "settings": &settings,
         "orders": orders,
         "current_page": current_page,
