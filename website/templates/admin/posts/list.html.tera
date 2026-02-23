@@ -14,10 +14,16 @@
     <a href="/{{ admin_slug }}/posts?status=archived" class="tab {% if status_filter == 'archived' %}active{% endif %}">Archived ({{ count_archived }})</a>
 </div>
 
+<div id="bulk-bar" style="display:none;margin-bottom:12px;padding:8px 16px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;display:none;align-items:center;gap:12px">
+    <span id="bulk-count" style="font-size:13px;color:var(--text-secondary)">0 selected</span>
+    <button class="btn btn-sm btn-danger" onclick="bulkDelete()">Delete Selected</button>
+</div>
+
 <div class="table-wrapper">
     <table class="data-table">
         <thead>
             <tr>
+                <th style="padding:10px 8px 10px 16px"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
                 <th>Title</th>
                 <th>Status</th>
                 <th>Date</th>
@@ -27,6 +33,7 @@
         <tbody>
             {% for post in posts %}
             <tr>
+                <td style="padding:10px 8px 10px 16px"><input type="checkbox" class="row-check" value="{{ post.id }}" onchange="updateBulkBar()"></td>
                 <td><a href="/{{ admin_slug }}/posts/{{ post.id }}/edit">{{ post.title }}</a></td>
                 <td>
                     <span class="badge badge-{{ post.status }}">{{ post.status }}</span>
@@ -34,14 +41,14 @@
                 <td class="text-muted utc-date">{{ post.created_at }}</td>
                 <td class="actions">
                     <a href="/{{ admin_slug }}/posts/{{ post.id }}/edit" class="btn btn-sm">Edit</a>
-                    <form method="post" action="/{{ admin_slug }}/posts/{{ post.id }}/delete" class="inline" onsubmit="return confirm('Delete this post?')">
+                    <form method="post" action="/{{ admin_slug }}/posts/{{ post.id }}/delete" class="inline" onsubmit="return confirmDelete(event, 'Delete this post?')">
                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                     </form>
                 </td>
             </tr>
             {% endfor %}
             {% if posts | length == 0 %}
-            <tr><td colspan="4" class="empty-state">No posts yet. <a href="/{{ admin_slug }}/posts/new">Create one</a>.</td></tr>
+            <tr><td colspan="5" class="empty-state">No posts yet. <a href="/{{ admin_slug }}/posts/new">Create one</a>.</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -61,10 +68,37 @@
     {% endif %}
 </div>
 {% endif %}
+<!-- Confirm Modal -->
+<div id="confirm-overlay" class="modal-overlay" style="display:none" onclick="confirmCancel()"></div>
+<div id="confirm-modal" class="modal" style="display:none;min-width:420px;max-width:480px">
+    <div class="modal-header">
+        <h3 id="confirm-title">Confirm</h3>
+        <button type="button" class="modal-close" onclick="confirmCancel()">&times;</button>
+    </div>
+    <div class="modal-body">
+        <p id="confirm-message" style="font-size:14px;margin:0;color:var(--text-primary)"></p>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-sm" onclick="confirmCancel()">Cancel</button>
+        <button class="btn btn-sm btn-danger" id="confirm-ok" onclick="confirmOk()">Delete</button>
+    </div>
+</div>
+
+<style>
+#confirm-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000; }
+#confirm-modal { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;z-index:1001;color:var(--text-primary); }
+#confirm-modal .modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-subtle); }
+#confirm-modal .modal-header h3 { margin:0;font-size:16px;color:var(--text-primary); }
+#confirm-modal .modal-close { background:none;border:none;color:var(--text-secondary);font-size:24px;cursor:pointer;padding:0;line-height:1; }
+#confirm-modal .modal-body { padding:20px; }
+#confirm-modal .modal-footer { padding:12px 20px;border-top:1px solid var(--border-subtle); }
+</style>
 {% endblock content %}
 
 {% block scripts %}
 <script>
+var ADMIN = '/{{ admin_slug }}';
+
 (function() {
     var saved = new URLSearchParams(window.location.search).get('saved');
     if (!saved) return;
@@ -79,5 +113,62 @@
     setTimeout(function(){ t.remove(); }, 3500);
     history.replaceState(null, '', window.location.pathname);
 })();
+
+function getCheckedIds() {
+    return Array.from(document.querySelectorAll('.row-check:checked')).map(function(c) { return parseInt(c.value); });
+}
+function updateBulkBar() {
+    var ids = getCheckedIds();
+    var bar = document.getElementById('bulk-bar');
+    if (ids.length > 0) {
+        bar.style.display = 'flex';
+        document.getElementById('bulk-count').textContent = ids.length + ' selected';
+    } else {
+        bar.style.display = 'none';
+    }
+    var all = document.querySelectorAll('.row-check');
+    document.getElementById('select-all').checked = all.length > 0 && ids.length === all.length;
+}
+function toggleSelectAll(el) {
+    document.querySelectorAll('.row-check').forEach(function(c) { c.checked = el.checked; });
+    updateBulkBar();
+}
+function bulkDelete() {
+    var ids = getCheckedIds();
+    if (!ids.length) return;
+    showConfirm('Delete ' + ids.length + ' post(s)? This cannot be undone.', function() {
+        fetch(ADMIN + '/posts/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+            if (d.ok) window.location.reload();
+        });
+    });
+}
+
+var _confirmCb = null;
+function showConfirm(msg, cb) {
+    _confirmCb = cb;
+    document.getElementById('confirm-message').textContent = msg;
+    document.getElementById('confirm-overlay').style.display = '';
+    document.getElementById('confirm-modal').style.display = '';
+}
+function confirmCancel() {
+    _confirmCb = null;
+    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-modal').style.display = 'none';
+}
+function confirmOk() {
+    var cb = _confirmCb;
+    confirmCancel();
+    if (cb) cb();
+}
+function confirmDelete(e, msg) {
+    e.preventDefault();
+    var form = e.target;
+    showConfirm(msg, function() { form.submit(); });
+    return false;
+}
 </script>
 {% endblock scripts %}

@@ -338,7 +338,7 @@ fn import_photo_post(
     // Get photo URLs — try legacy "photos" array first, then NPF content blocks
     let photo_urls: Vec<String> =
         if let Some(photos) = post.get("photos").and_then(|v| v.as_array()) {
-            photos.iter().filter_map(|p| best_photo_url(p)).collect()
+            photos.iter().filter_map(best_photo_url).collect()
         } else if let Some(content) = post.get("content").and_then(|c| c.as_array()) {
             content
                 .iter()

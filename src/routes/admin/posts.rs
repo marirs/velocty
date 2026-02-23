@@ -3,8 +3,10 @@ use std::sync::Arc;
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::response::Redirect;
+use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
+use serde::Deserialize;
 use serde_json::json;
 
 use super::admin_base;
@@ -130,6 +132,38 @@ pub fn posts_delete(
         None,
     );
     Redirect::to(format!("{}/posts", admin_base(slug)))
+}
+
+#[derive(Deserialize)]
+pub struct BulkDeleteInput {
+    pub ids: Vec<i64>,
+}
+
+#[post("/posts/bulk-delete", data = "<body>")]
+pub fn posts_bulk_delete(
+    _admin: EditorUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<BulkDeleteInput>,
+) -> Json<serde_json::Value> {
+    let mut deleted = 0u64;
+    for id in &body.ids {
+        if store.post_find_by_id(*id).is_some() {
+            let _ = store.post_delete(*id);
+            store.search_remove_item("post", *id);
+            deleted += 1;
+        }
+    }
+    store.audit_log(
+        Some(_admin.user.id),
+        Some(&_admin.user.display_name),
+        "bulk_delete",
+        Some("post"),
+        None,
+        Some(&format!("{} posts", deleted)),
+        None,
+        None,
+    );
+    Json(json!({ "ok": true, "deleted": deleted }))
 }
 
 // ── POST: Create/Update Post ──────────────────────────

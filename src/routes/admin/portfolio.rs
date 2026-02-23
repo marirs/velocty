@@ -3,8 +3,10 @@ use std::sync::Arc;
 use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::response::Redirect;
+use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
+use serde::Deserialize;
 use serde_json::json;
 
 use super::admin_base;
@@ -129,6 +131,38 @@ pub fn portfolio_delete(
         None,
     );
     Redirect::to(format!("{}/portfolio", admin_base(slug)))
+}
+
+#[derive(Deserialize)]
+pub struct BulkDeleteInput {
+    pub ids: Vec<i64>,
+}
+
+#[post("/portfolio/bulk-delete", data = "<body>")]
+pub fn portfolio_bulk_delete(
+    _admin: AuthorUser,
+    store: &State<Arc<dyn Store>>,
+    body: Json<BulkDeleteInput>,
+) -> Json<serde_json::Value> {
+    let mut deleted = 0u64;
+    for id in &body.ids {
+        if store.portfolio_find_by_id(*id).is_some() {
+            let _ = store.portfolio_delete(*id);
+            store.search_remove_item("portfolio", *id);
+            deleted += 1;
+        }
+    }
+    store.audit_log(
+        Some(_admin.user.id),
+        Some(&_admin.user.display_name),
+        "bulk_delete",
+        Some("portfolio"),
+        None,
+        Some(&format!("{} items", deleted)),
+        None,
+        None,
+    );
+    Json(json!({ "ok": true, "deleted": deleted }))
 }
 
 // ── POST: Create/Update Portfolio ──────────────────────
