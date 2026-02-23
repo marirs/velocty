@@ -275,6 +275,8 @@ document.querySelectorAll('.import-form').forEach(function(form) {
 var ADMIN = '/{{ admin_slug }}';
 var tumblrItems = []; // all imported items
 var tumblrSuggestions = {}; // id → {title, description, category}
+var tumblrBusy = false; // true while import/suggest/save is running
+var tumblrAbort = null; // AbortController for in-flight requests
 var tumblrAiEnabled = {% if settings.ai_ollama_enabled == 'true' or settings.ai_openai_enabled == 'true' or settings.ai_gemini_enabled == 'true' or settings.ai_cloudflare_enabled == 'true' or settings.ai_groq_enabled == 'true' %}true{% else %}false{% endif %};
 
 // Track last-saved values so cancel restores them
@@ -341,6 +343,14 @@ function showToast(msg, type) {
 }
 
 function tumblrCloseImport() {
+    if (tumblrBusy) {
+        if (!confirm('An operation is still in progress. Items already imported will remain in the database.\n\nClose anyway?')) {
+            return;
+        }
+        // Abort in-flight requests
+        if (tumblrAbort) { tumblrAbort.abort(); tumblrAbort = null; }
+        tumblrBusy = false;
+    }
     document.getElementById('tumblr-import-overlay').style.display = 'none';
     document.getElementById('tumblr-import-modal').style.display = 'none';
     // Reset state
@@ -363,18 +373,23 @@ async function tumblrStartImport() {
     document.getElementById('tumblr-progress-detail').textContent = '';
     document.getElementById('tumblr-progress-bar').style.width = '0%';
     tumblrItems = [];
+    tumblrBusy = true;
+    tumblrAbort = new AbortController();
 
     // Step 1: Validate & get count (server checks DB for config)
     var startResp;
     try {
-        var r = await fetch(ADMIN + '/import/tumblr/start', { method: 'POST' });
+        var r = await fetch(ADMIN + '/import/tumblr/start', { method: 'POST', signal: tumblrAbort.signal });
         startResp = await r.json();
     } catch (e) {
+        if (e.name === 'AbortError') return;
+        tumblrBusy = false;
         document.getElementById('tumblr-progress-text').textContent = 'Connection failed: ' + e.message;
         return;
     }
 
     if (!startResp.ok) {
+        tumblrBusy = false;
         var err = startResp.error || 'Failed to connect';
         // If config is missing, close import modal and open config modal
         if (err.indexOf('must be configured') !== -1) {
@@ -409,10 +424,12 @@ async function tumblrStartImport() {
             var pr = await fetch(ADMIN + '/import/tumblr/page', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ offset: offset })
+                body: JSON.stringify({ offset: offset }),
+                signal: tumblrAbort.signal
             });
             pageResp = await pr.json();
         } catch (e) {
+            if (e.name === 'AbortError') return;
             document.getElementById('tumblr-progress-text').textContent = 'Error on page ' + pageNum + ': ' + e.message;
             break;
         }
@@ -431,6 +448,7 @@ async function tumblrStartImport() {
 
     document.getElementById('tumblr-progress-bar').style.width = '100%';
 
+    tumblrBusy = false;
     // Transition to review phase
     setTimeout(function() { tumblrShowReview(totalSkipped); }, 500);
 }
@@ -538,6 +556,8 @@ async function tumblrRunSuggest() {
         return;
     }
 
+    tumblrBusy = true;
+    tumblrAbort = new AbortController();
     var btn = document.getElementById('tumblr-suggest-btn');
     btn.disabled = true;
     btn.textContent = 'Suggesting... (0/' + selected.length + ')';
@@ -566,7 +586,8 @@ async function tumblrRunSuggest() {
             var r = await fetch(ADMIN + '/import/tumblr/suggest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: payload })
+                body: JSON.stringify({ items: payload }),
+                signal: tumblrAbort.signal
             });
             var resp = await r.json();
             if (resp.ok && resp.suggestions) {
@@ -582,6 +603,7 @@ async function tumblrRunSuggest() {
                 });
             }
         } catch (e) {
+            if (e.name === 'AbortError') { tumblrBusy = false; return; }
             batch.forEach(function(item) {
                 var sugEl = document.getElementById('tumblr-sug-' + item.id);
                 if (sugEl) sugEl.innerHTML = '<span style="color:var(--danger);font-size:12px">Request failed</span>';
@@ -591,6 +613,7 @@ async function tumblrRunSuggest() {
         btn.textContent = 'Suggesting... (' + done + '/' + selected.length + ')';
     }
 
+    tumblrBusy = false;
     btn.disabled = false;
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Suggest with AI';
     var sugCount = Object.keys(tumblrSuggestions).length;
@@ -630,6 +653,8 @@ async function tumblrSaveAll() {
 
     if (updates.length === 0) return;
 
+    tumblrBusy = true;
+    tumblrAbort = new AbortController();
     var btn = document.getElementById('tumblr-save-btn');
     btn.disabled = true;
     btn.textContent = 'Saving...';
@@ -638,9 +663,11 @@ async function tumblrSaveAll() {
         var r = await fetch(ADMIN + '/import/tumblr/apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ updates: updates })
+            body: JSON.stringify({ updates: updates }),
+            signal: tumblrAbort.signal
         });
         var resp = await r.json();
+        tumblrBusy = false;
         if (resp.ok) {
             tumblrShowDone(resp.applied);
         } else {
@@ -649,6 +676,8 @@ async function tumblrSaveAll() {
             btn.textContent = 'Review & Save';
         }
     } catch (e) {
+        tumblrBusy = false;
+        if (e.name === 'AbortError') return;
         document.getElementById('tumblr-suggest-status').textContent = 'Save failed: ' + e.message;
         btn.disabled = false;
         btn.textContent = 'Review & Save';
