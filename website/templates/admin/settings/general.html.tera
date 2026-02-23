@@ -36,6 +36,7 @@
         <div class="form-group">
             <label for="site_url">Site URL</label>
             <input type="url" id="site_url" name="site_url" value="{{ settings.site_url | default(value='http://localhost:8000') }}">
+            <span class="form-help">Used for SEO, meta tags, and canonical URLs only. Changing this does not alter the actual site address.</span>
         </div>
         <div class="form-group">
             <label for="timezone">Timezone</label>
