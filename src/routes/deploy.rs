@@ -2,6 +2,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::models::portfolio::PortfolioForm;
@@ -32,7 +33,7 @@ pub fn deploy_preflight(
         }));
     }
 
-    if body.key != expected_key {
+    if !constant_time_eq(body.key.as_bytes(), expected_key.as_bytes()) {
         return Json(json!({
             "ok": false,
             "error": "Invalid deploy key"
@@ -139,7 +140,7 @@ pub fn deploy_receive(
     if expected_key.is_empty() {
         return Json(json!({ "ok": false, "error": "No deploy receive key configured" }));
     }
-    if body.key != expected_key {
+    if !constant_time_eq(body.key.as_bytes(), expected_key.as_bytes()) {
         return Json(json!({ "ok": false, "error": "Invalid deploy key" }));
     }
     if env != "production" {
@@ -184,7 +185,14 @@ pub fn deploy_receive(
     for upload in &body.uploads {
         if let Ok(bytes) = base64_decode(&upload.data_base64) {
             let full_path = format!("website/site/{}", upload.path.trim_start_matches('/'));
-            if let Some(parent) = std::path::Path::new(&full_path).parent() {
+            if !is_safe_upload_path(&full_path) {
+                log::warn!(
+                    "Deploy receive: blocked path traversal attempt: {}",
+                    upload.path
+                );
+                continue;
+            }
+            if let Some(parent) = Path::new(&full_path).parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
             if std::fs::write(&full_path, &bytes).is_ok() {
@@ -304,7 +312,7 @@ pub fn deploy_receive(
     }
 
     // ── 6. Sync settings (only safe keys) ──
-    let safe_setting_prefixes = [
+    let safe_setting_keys = [
         "site_name",
         "site_caption",
         "site_logo",
@@ -315,10 +323,7 @@ pub fn deploy_receive(
         "contact_label",
     ];
     for setting in &body.settings {
-        if safe_setting_prefixes
-            .iter()
-            .any(|p| setting.key.starts_with(p))
-        {
+        if safe_setting_keys.iter().any(|k| setting.key == *k) {
             let _ = s.setting_set(&setting.key, &setting.value);
             *stats.get_mut("settings_synced").unwrap() =
                 json!(stats["settings_synced"].as_i64().unwrap_or(0) + 1);
@@ -472,6 +477,9 @@ pub fn deploy_gather(
 #[get("/deploy/upload-data?<path>")]
 pub fn deploy_upload_data(_admin: crate::security::auth::AdminUser, path: &str) -> Json<Value> {
     let full_path = format!("website/site/{}", path.trim_start_matches('/'));
+    if !is_safe_upload_path(&full_path) {
+        return Json(json!({ "ok": false, "error": "Invalid path" }));
+    }
     match std::fs::read(&full_path) {
         Ok(bytes) => {
             use base64::Engine;
@@ -503,6 +511,33 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
     base64::engine::general_purpose::STANDARD
         .decode(input)
         .map_err(|e| e.to_string())
+}
+
+/// Validate that a file path resolves within website/site/uploads/ to prevent path traversal.
+fn is_safe_upload_path(path: &str) -> bool {
+    let path = Path::new(path);
+    // Reject paths containing .. components
+    for component in path.components() {
+        if let std::path::Component::ParentDir = component {
+            return false;
+        }
+    }
+    // Must be under website/site/uploads/
+    let normalized = path.to_string_lossy();
+    normalized.starts_with("website/site/uploads/")
+        || normalized.starts_with("website/site/uploads\\")
+}
+
+/// Constant-time comparison to prevent timing attacks on deploy keys.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
 }
 
 fn collect_files(dir: &std::path::Path, prefix: &str, out: &mut Vec<String>) {

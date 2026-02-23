@@ -210,10 +210,17 @@ pub fn destroy_session(store: &dyn Store, session_id: &str) -> Result<(), String
 }
 
 pub fn set_session_cookie(cookies: &CookieJar<'_>, session_id: &str) {
+    set_session_cookie_secure(cookies, session_id, false);
+}
+
+pub fn set_session_cookie_secure(cookies: &CookieJar<'_>, session_id: &str, secure: bool) {
     let mut cookie = Cookie::new(SESSION_COOKIE, session_id.to_string());
     cookie.set_http_only(true);
     cookie.set_same_site(rocket::http::SameSite::Strict);
     cookie.set_path("/");
+    if secure {
+        cookie.set_secure(true);
+    }
     cookies.add_private(cookie);
 }
 

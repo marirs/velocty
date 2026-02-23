@@ -95,19 +95,12 @@ pub fn send_admin_reset_email(
 
 /// Generate a random temporary password (12 chars, alphanumeric + symbols).
 pub fn generate_temp_password() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let mut seed = ts as u64;
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
     let chars: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
     let mut password = String::with_capacity(12);
     for _ in 0..12 {
-        seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        let idx = ((seed >> 32) as usize) % chars.len();
+        let idx = rng.gen_range(0..chars.len());
         password.push(chars[idx] as char);
     }
     password

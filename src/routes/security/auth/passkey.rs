@@ -166,7 +166,8 @@ pub fn passkey_auth_finish(
             let _ = s.user_touch_last_login(user.id);
             match auth::create_session(s, user.id, None, None) {
                 Ok(session_id) => {
-                    auth::set_session_cookie(cookies, &session_id);
+                    let is_https = s.setting_get_or("site_url", "").starts_with("https://");
+                    auth::set_session_cookie_secure(cookies, &session_id, is_https);
                     s.audit_log(
                         Some(user.id),
                         Some(&user.display_name),

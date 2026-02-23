@@ -136,6 +136,14 @@ pub async fn import_velocty(
     let mut files_extracted = 0u64;
     for (path, data) in &zip_uploads {
         let dest = format!("website/site/{}", path);
+        // Prevent zip slip: reject paths with .. components
+        let has_traversal = std::path::Path::new(&dest)
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir));
+        if has_traversal {
+            log::warn!("Import: blocked path traversal in ZIP entry: {}", path);
+            continue;
+        }
         if let Some(parent) = std::path::Path::new(&dest).parent() {
             let _ = std::fs::create_dir_all(parent);
         }

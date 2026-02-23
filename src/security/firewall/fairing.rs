@@ -85,24 +85,37 @@ impl Fairing for FirewallFairing {
         }
 
         let headers = request.headers();
-        let ip = headers
-            .get_one("CF-Connecting-IP")
-            .or_else(|| headers.get_one("True-Client-IP"))
-            .or_else(|| headers.get_one("X-Real-IP"))
-            .map(|h| h.trim().to_string())
-            .or_else(|| {
-                headers
-                    .get_one("X-Forwarded-For")
-                    .and_then(|h| h.split(',').next())
-                    .map(|h| h.trim().to_string())
-                    .filter(|s| !s.is_empty())
-            })
-            .unwrap_or_else(|| {
-                request
-                    .client_ip()
-                    .map(|ip| ip.to_string())
-                    .unwrap_or_else(|| "unknown".to_string())
-            });
+        let socket_ip = request
+            .client_ip()
+            .map(|ip| ip.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        // Only trust forwarded headers if the direct connection is from a
+        // loopback/private address (i.e. a reverse proxy). This prevents
+        // remote clients from spoofing their IP via X-Forwarded-For etc.
+        let from_proxy = socket_ip == "127.0.0.1"
+            || socket_ip == "::1"
+            || socket_ip.starts_with("10.")
+            || socket_ip.starts_with("172.")
+            || socket_ip.starts_with("192.168.");
+
+        let ip = if from_proxy {
+            headers
+                .get_one("CF-Connecting-IP")
+                .or_else(|| headers.get_one("True-Client-IP"))
+                .or_else(|| headers.get_one("X-Real-IP"))
+                .map(|h| h.trim().to_string())
+                .or_else(|| {
+                    headers
+                        .get_one("X-Forwarded-For")
+                        .and_then(|h| h.split(',').next())
+                        .map(|h| h.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                })
+                .unwrap_or_else(|| socket_ip.clone())
+        } else {
+            socket_ip.clone()
+        };
 
         let ua = request
             .headers()
@@ -110,9 +123,9 @@ impl Fairing for FirewallFairing {
             .unwrap_or("")
             .to_string();
 
-        // ── 0. Exempt loopback addresses from all firewall checks ──
-        let is_loopback = ip == "127.0.0.1" || ip == "::1" || ip == "localhost";
-        if is_loopback {
+        // ── 0. Exempt actual loopback connections (socket-level, not header-spoofed) ──
+        let is_loopback = socket_ip == "127.0.0.1" || socket_ip == "::1";
+        if is_loopback && ip == socket_ip {
             return;
         }
 
@@ -280,15 +293,11 @@ impl Fairing for FirewallFairing {
             return;
         }
 
-        // Security headers
+        // Security headers — always set regardless of firewall state
         let store = match req.rocket().state::<std::sync::Arc<dyn Store>>() {
             Some(s) => s,
             None => return,
         };
-
-        if store.setting_get_or("firewall_enabled", "false") != "true" {
-            return;
-        }
 
         if store.setting_get_or("fw_security_headers", "true") == "true" {
             res.set_header(Header::new("X-Frame-Options", "SAMEORIGIN"));
