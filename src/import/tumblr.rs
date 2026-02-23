@@ -271,6 +271,9 @@ fn import_text_post(
         return None;
     }
 
+    // Extract first image from body HTML as featured image
+    let featured_image = extract_first_img_src(body);
+
     // Generate title: use Tumblr title, or first tag title-cased, or first 60 chars of body
     let title = if !tumblr_title.is_empty() {
         tumblr_title.to_string()
@@ -293,7 +296,7 @@ fn import_text_post(
         content_json: "{}".to_string(),
         content_html: body.to_string(),
         excerpt: None,
-        featured_image: None,
+        featured_image: featured_image.clone(),
         meta_title: None,
         meta_description: None,
         status: "published".to_string(),
@@ -309,7 +312,7 @@ fn import_text_post(
         item_type: "journal".to_string(),
         title,
         slug,
-        image_path: String::new(),
+        image_path: featured_image.unwrap_or_default(),
         tumblr_url,
         tags: tags.to_vec(),
     })
@@ -742,6 +745,27 @@ pub fn apply_updates(store: &dyn Store, updates: &[ApplyUpdate]) -> Result<u64, 
 }
 
 // ── Helpers ──────────────────────────────────────────
+
+/// Extract the first `src` attribute from an `<img>` tag in HTML.
+fn extract_first_img_src(html: &str) -> Option<String> {
+    // Simple extraction: find <img ... src="..." ...>
+    let lower = html.to_lowercase();
+    let img_pos = lower.find("<img ")?;
+    let after_img = &html[img_pos..];
+    let src_pos = after_img.to_lowercase().find("src=")?;
+    let after_src = &after_img[src_pos + 4..];
+    let quote = after_src.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let rest = &after_src[1..];
+    let end = rest.find(quote)?;
+    let url = &rest[..end];
+    if url.is_empty() {
+        return None;
+    }
+    Some(url.to_string())
+}
 
 /// Detect the effective post type. Tumblr's NPF format may return photo/video
 /// posts as type "text" with image/video content blocks. We check for legacy
