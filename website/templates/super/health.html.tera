@@ -312,12 +312,22 @@
             var resp = await fetch('/super/health/tool/' + siteId + '/' + tool, { method: 'POST' });
             var data = await resp.json();
             var cls = data.ok ? 'ok' : 'fail';
-            var html = '<span class="' + cls + '">' + (data.ok ? '✓' : '✗') + ' ' + data.message + '</span>';
-            if (data.details) html += '<div class="details">' + data.details + '</div>';
-            resultEl.innerHTML = html;
+            var span = document.createElement('span');
+            span.className = cls;
+            span.textContent = (data.ok ? '✓' : '✗') + ' ' + data.message;
+            resultEl.appendChild(span);
+            if (data.details) {
+                var det = document.createElement('div');
+                det.className = 'details';
+                det.textContent = data.details;
+                resultEl.appendChild(det);
+            }
             resultEl.className = 'tool-result show';
         } catch (e) {
-            resultEl.innerHTML = '<span class="fail">✗ Request failed: ' + e.message + '</span>';
+            var errSpan = document.createElement('span');
+            errSpan.className = 'fail';
+            errSpan.textContent = '✗ Request failed: ' + e.message;
+            resultEl.appendChild(errSpan);
             resultEl.className = 'tool-result show';
         } finally {
             btn.disabled = false;

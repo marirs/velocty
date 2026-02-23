@@ -127,7 +127,7 @@ pub fn razorpay_verify(
     };
     mac.update(msg.as_bytes());
     let expected = hex::encode(mac.finalize().into_bytes());
-    if expected != body.razorpay_signature {
+    if !super::constant_time_eq(expected.as_bytes(), body.razorpay_signature.as_bytes()) {
         return Json(json!({ "ok": false, "error": "Invalid payment signature" }));
     }
 

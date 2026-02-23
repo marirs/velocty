@@ -224,7 +224,7 @@ fn verify_stripe_signature(payload: &[u8], sig_header: &str, secret: &str) -> bo
     };
     mac.update(signed_payload.as_bytes());
     let expected = hex::encode(mac.finalize().into_bytes());
-    expected == signature
+    super::constant_time_eq(expected.as_bytes(), signature.as_bytes())
 }
 
 #[post("/api/stripe/webhook", data = "<body>")]

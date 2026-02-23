@@ -1361,12 +1361,10 @@ impl Store for SqliteStore {
             Ok(c) => c,
             Err(_) => return 0,
         };
+        let interval = format!("-{} minutes", minutes);
         conn.query_row(
-            &format!(
-                "SELECT COUNT(*) FROM sessions WHERE ip_address = ?1 AND created_at > datetime('now', '-{} minutes')",
-                minutes
-            ),
-            params![ip_hash],
+            "SELECT COUNT(*) FROM sessions WHERE ip_address = ?1 AND created_at > datetime('now', ?2)",
+            params![ip_hash, interval],
             |row| row.get(0),
         )
         .unwrap_or(0)

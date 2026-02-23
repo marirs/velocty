@@ -178,7 +178,7 @@ fn verify_square_signature(
 
     use base64::{engine::general_purpose::STANDARD, Engine};
     let expected = STANDARD.encode(mac.finalize().into_bytes());
-    expected == signature
+    super::constant_time_eq(expected.as_bytes(), signature.as_bytes())
 }
 
 #[post("/api/square/webhook", data = "<body>")]

@@ -171,11 +171,26 @@ pub fn payoneer_webhook(store: &State<Arc<dyn Store>>, body: Json<Value>) -> &'s
         // payout_id format: velocty_{order_id}
         if let Some(oid_str) = payout_id.strip_prefix("velocty_") {
             if let Ok(oid) = oid_str.parse::<i64>() {
-                let email = body
-                    .get("payee_email")
-                    .and_then(|e| e.as_str())
-                    .unwrap_or("");
-                let _ = finalize_order(s, oid, payout_id, email, "");
+                // Verify order exists and is pending before finalizing
+                match s.order_find_by_id(oid) {
+                    Some(order) if order.status == "pending" => {
+                        let email = body
+                            .get("payee_email")
+                            .and_then(|e| e.as_str())
+                            .unwrap_or("");
+                        let _ = finalize_order(s, oid, payout_id, email, "");
+                    }
+                    Some(order) => {
+                        log::warn!(
+                            "[payoneer] Webhook for order {} with status '{}', ignoring",
+                            oid,
+                            order.status
+                        );
+                    }
+                    None => {
+                        log::warn!("[payoneer] Webhook for unknown order {}", oid);
+                    }
+                }
             }
         }
     }

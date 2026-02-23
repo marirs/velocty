@@ -13,6 +13,7 @@ use crate::image_proxy;
 use crate::models::settings::SettingsCache;
 use crate::render;
 use crate::security::auth;
+use crate::security::auth::ClientIp;
 use crate::seo;
 use crate::store::Store;
 
@@ -337,6 +338,7 @@ pub fn contact_page(store: &State<Arc<dyn Store>>) -> Option<RawHtml<String>> {
 #[post("/contact", data = "<form>")]
 pub fn contact_submit(
     store: &State<Arc<dyn Store>>,
+    client_ip: ClientIp,
     form: Form<HashMap<String, String>>,
 ) -> Option<RawHtml<String>> {
     let s: &dyn Store = &**store.inner();
@@ -346,6 +348,30 @@ pub fn contact_submit(
     }
     if settings.get("contact_form_enabled").map(|v| v.as_str()) != Some("true") {
         return None;
+    }
+
+    // Rate limit: max 5 submissions per IP per 15 minutes
+    {
+        use std::sync::Mutex;
+        use std::time::Instant;
+        static CONTACT_RATE: std::sync::LazyLock<Mutex<HashMap<String, (u32, Instant)>>> =
+            std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+        let mut map = CONTACT_RATE.lock().unwrap_or_else(|e| e.into_inner());
+        let now = Instant::now();
+        let entry = map.entry(client_ip.0.clone()).or_insert((0, now));
+        if now.duration_since(entry.1).as_secs() >= 900 {
+            *entry = (1, now);
+        } else {
+            entry.0 += 1;
+            if entry.0 > 5 {
+                let html = render::render_contact_page(
+                    s,
+                    &settings,
+                    Some(("error", "Too many submissions. Please try again later.")),
+                );
+                return Some(RawHtml(html));
+            }
+        }
     }
 
     let data = form.into_inner();

@@ -280,8 +280,8 @@ var tumblrAbort = null; // AbortController for in-flight requests
 var tumblrAiEnabled = {% if settings.ai_ollama_enabled == 'true' or settings.ai_openai_enabled == 'true' or settings.ai_gemini_enabled == 'true' or settings.ai_cloudflare_enabled == 'true' or settings.ai_groq_enabled == 'true' %}true{% else %}false{% endif %};
 
 // Track last-saved values so cancel restores them
-var tumblrSavedKey = '{{ settings.tumblr_api_key | default(value="") | safe }}';
-var tumblrSavedUrl = '{{ settings.tumblr_blog_url | default(value="") | safe }}';
+var tumblrSavedKey = {{ settings.tumblr_api_key | default(value="") | json_encode() | safe }};
+var tumblrSavedUrl = {{ settings.tumblr_blog_url | default(value="") | json_encode() | safe }};
 
 function tumblrOpenConfig() {
     // Restore inputs to last-saved DB values

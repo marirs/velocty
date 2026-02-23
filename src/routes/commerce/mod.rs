@@ -16,6 +16,20 @@ use serde_json::{json, Value};
 
 use crate::store::Store;
 
+// ── Security Helpers ────────────────────────────────────
+
+/// Constant-time comparison to prevent timing attacks on webhook signatures.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 // ── Shared Helpers ──────────────────────────────────────
 
 /// Helper: get base URL for webhooks/redirects
@@ -36,31 +50,19 @@ pub fn currency(settings: &HashMap<String, String>) -> String {
 
 /// Generate a secure random token for downloads
 pub fn generate_token() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let rand_part: u64 = (ts as u64) ^ (ts.wrapping_mul(6364136223846793005) as u64);
-    format!("{:016x}{:016x}", ts as u64, rand_part)
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let bytes: [u8; 16] = rng.gen();
+    hex::encode(bytes)
 }
 
 /// Generate a license key in format: XXXX-XXXX-XXXX-XXXX
 pub fn generate_license_key() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let mut seed = ts as u64;
-    let mut parts = Vec::new();
-    for _ in 0..4 {
-        seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        let chunk = format!("{:04X}", (seed >> 32) & 0xFFFF);
-        parts.push(chunk);
-    }
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let parts: Vec<String> = (0..4)
+        .map(|_| format!("{:04X}", rng.gen::<u16>()))
+        .collect();
     parts.join("-")
 }
 

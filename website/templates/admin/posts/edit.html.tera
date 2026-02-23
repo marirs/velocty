@@ -743,6 +743,7 @@
     {% endif %}
 
     // SEO Check
+    function _escSeo(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function runSeoCheck(type, id) {
         var btn = document.getElementById('seo-check-btn');
         var results = document.getElementById('seo-results');
@@ -751,13 +752,13 @@
         fetch('/{{ admin_slug }}/api/seo-check/' + type + '/' + id)
             .then(r => r.json())
             .then(data => {
-                if (data.error) { results.innerHTML = '<p style="color:var(--danger)">' + data.error + '</p>'; results.style.display=''; return; }
+                if (data.error) { results.innerHTML = '<p style="color:var(--danger)">' + _escSeo(data.error) + '</p>'; results.style.display=''; return; }
                 var icons = { pass: '✅', warn: '⚠️', fail: '❌' };
                 var colors = { pass: 'var(--success,#22c55e)', warn: 'var(--warning,#f59e0b)', fail: 'var(--danger,#ef4444)' };
-                var html = '<div style="text-align:center;margin-bottom:8px"><strong style="font-size:28px;color:' + colors[data.grade==='A'||data.grade==='B'?'pass':data.grade==='C'?'warn':'fail'] + '">' + data.grade + '</strong><br><span style="font-size:12px;color:var(--text-secondary)">' + data.score + '/' + data.total + ' checks passed</span></div>';
+                var html = '<div style="text-align:center;margin-bottom:8px"><strong style="font-size:28px;color:' + colors[data.grade==='A'||data.grade==='B'?'pass':data.grade==='C'?'warn':'fail'] + '">' + _escSeo(data.grade) + '</strong><br><span style="font-size:12px;color:var(--text-secondary)">' + _escSeo(data.score + '/' + data.total) + ' checks passed</span></div>';
                 html += '<div style="font-size:12px;line-height:1.8">';
                 data.checks.forEach(function(c) {
-                    html += '<div style="display:flex;gap:6px;align-items:flex-start"><span>' + icons[c.status] + '</span><div><strong>' + c.check + '</strong><br><span style="color:var(--text-tertiary)">' + c.message + '</span></div></div>';
+                    html += '<div style="display:flex;gap:6px;align-items:flex-start"><span>' + (icons[c.status] || '') + '</span><div><strong>' + _escSeo(c.check) + '</strong><br><span style="color:var(--text-tertiary)">' + _escSeo(c.message) + '</span></div></div>';
                 });
                 html += '</div>';
                 results.innerHTML = html;
