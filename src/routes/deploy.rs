@@ -515,6 +515,10 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
 
 /// Validate that a file path resolves within website/site/uploads/ to prevent path traversal.
 fn is_safe_upload_path(path: &str) -> bool {
+    // Reject null bytes
+    if path.contains('\0') {
+        return false;
+    }
     let path = Path::new(path);
     // Reject paths containing .. components
     for component in path.components() {
@@ -524,8 +528,19 @@ fn is_safe_upload_path(path: &str) -> bool {
     }
     // Must be under website/site/uploads/
     let normalized = path.to_string_lossy();
-    normalized.starts_with("website/site/uploads/")
-        || normalized.starts_with("website/site/uploads\\")
+    if !normalized.starts_with("website/site/uploads/")
+        && !normalized.starts_with("website/site/uploads\\")
+    {
+        return false;
+    }
+    // Double-check: if the path exists on disk, verify canonical path is still under uploads
+    let uploads_base = Path::new("website/site/uploads");
+    if let (Ok(canon_base), Ok(canon_path)) = (uploads_base.canonicalize(), path.canonicalize()) {
+        if !canon_path.starts_with(&canon_base) {
+            return false;
+        }
+    }
+    true
 }
 
 /// Constant-time comparison to prevent timing attacks on deploy keys.

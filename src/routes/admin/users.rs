@@ -218,6 +218,9 @@ pub async fn user_avatar_upload(
         None => return Json(json!({"success": false, "error": "User not found"})),
     };
 
+    if !super::is_allowed_image(&form.file, &**store.inner()) {
+        return Json(json!({"success": false, "error": "File type not allowed. Upload a valid image."}));
+    }
     match save_upload(&mut form.file, "avatar", &**store.inner()).await {
         Some(filename) => {
             let avatar_url = format!("/uploads/{}", filename);

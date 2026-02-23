@@ -212,6 +212,11 @@ pub fn media_delete(
     slug: &State<AdminSlug>,
     filename: &str,
 ) -> Redirect {
+    // Prevent path traversal — reject filenames containing path separators or ..
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        log::warn!("Media delete: blocked path traversal attempt: {}", filename);
+        return Redirect::to(format!("{}/media", admin_base(slug)));
+    }
     let path = std::path::Path::new("website/site/uploads").join(filename);
     if path.is_file() {
         let _ = std::fs::remove_file(&path);

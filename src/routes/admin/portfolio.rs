@@ -205,7 +205,7 @@ pub async fn portfolio_create(
     let image_path = if form
         .uploaded_image_path
         .as_ref()
-        .is_some_and(|p| !p.is_empty())
+        .is_some_and(|p| !p.is_empty() && super::is_safe_uploaded_path(p))
     {
         form.uploaded_image_path.clone().unwrap()
     } else {
@@ -344,7 +344,7 @@ pub async fn portfolio_update(
     let image_path = if form
         .uploaded_image_path
         .as_ref()
-        .is_some_and(|p| !p.is_empty())
+        .is_some_and(|p| !p.is_empty() && super::is_safe_uploaded_path(p))
     {
         form.uploaded_image_path.clone().unwrap()
     } else {

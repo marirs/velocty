@@ -25,6 +25,25 @@ pub(crate) fn admin_base(slug: &AdminSlug) -> String {
     format!("/{}", slug.get())
 }
 
+/// Validate that a pre-uploaded path is safe to store as an image/media reference.
+/// Must be a relative path under /uploads/ with no traversal components.
+pub(crate) fn is_safe_uploaded_path(path: &str) -> bool {
+    let trimmed = path.trim();
+    // Must look like a relative uploads path
+    if !trimmed.starts_with("/uploads/") && !trimmed.starts_with("uploads/") {
+        return false;
+    }
+    // No path traversal
+    if trimmed.contains("..") {
+        return false;
+    }
+    // No null bytes
+    if trimmed.contains('\0') {
+        return false;
+    }
+    true
+}
+
 /// If status is "published" but published_at is in the future, override to "scheduled".
 pub(crate) fn resolve_status(status: &str, published_at: &Option<String>) -> String {
     if status == "published" {
