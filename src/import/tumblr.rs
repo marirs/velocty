@@ -64,12 +64,14 @@ pub fn validate_and_count(config: &TumblrConfig) -> Result<TumblrStartResult, St
         .map_err(|e| format!("Tumblr API request failed: {}", e))?;
 
     if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().unwrap_or_default();
-        return Err(format!(
-            "Tumblr API returned {} — check your API key and blog URL. {}",
-            status, text
-        ));
+        let code = resp.status().as_u16();
+        let msg = match code {
+            401 => "Invalid API key. Please check your Tumblr configuration.".to_string(),
+            404 => "Blog not found. Please check the blog URL in your configuration.".to_string(),
+            429 => "Rate limited by Tumblr. Please wait a moment and try again.".to_string(),
+            _ => format!("Tumblr API error ({}). Please try again later.", code),
+        };
+        return Err(msg);
     }
 
     let json: Value = resp
@@ -114,7 +116,7 @@ pub fn import_page(
     let blog = normalize_blog(&config.blog_url);
     let limit = 20u64;
     let url = format!(
-        "https://api.tumblr.com/v2/blog/{}/posts?api_key={}&offset={}&limit={}&reblog_info=true",
+        "https://api.tumblr.com/v2/blog/{}/posts?api_key={}&offset={}&limit={}&reblog_info=true&npf_flat=true",
         blog, config.api_key, offset, limit
     );
 
@@ -129,7 +131,14 @@ pub fn import_page(
         .map_err(|e| format!("Tumblr API request failed: {}", e))?;
 
     if !resp.status().is_success() {
-        return Err(format!("Tumblr API returned {}", resp.status()));
+        let code = resp.status().as_u16();
+        let msg = match code {
+            401 => "Invalid API key. Please check your Tumblr configuration.".to_string(),
+            404 => "Blog not found. Please check the blog URL.".to_string(),
+            429 => "Rate limited by Tumblr. Please wait and try again.".to_string(),
+            _ => format!("Tumblr API error ({}). Please try again later.", code),
+        };
+        return Err(msg);
     }
 
     let json: Value = resp
@@ -149,14 +158,6 @@ pub fn import_page(
         .cloned()
         .unwrap_or_default();
 
-    let journal_enabled = settings
-        .get("journal_enabled")
-        .map(|v| v == "true")
-        .unwrap_or(true);
-    let portfolio_enabled = settings
-        .get("portfolio_enabled")
-        .map(|v| v == "true")
-        .unwrap_or(false);
     let video_enabled = settings
         .get("video_upload_enabled")
         .map(|v| v == "true")
@@ -175,7 +176,10 @@ pub fn import_page(
             continue;
         }
 
-        let post_type = post.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let raw_type = post.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        // Detect effective type: NPF may return everything as "text" even for photo/video posts.
+        // Check for photo/video content in the post data to reclassify.
+        let post_type = detect_effective_type(raw_type, post);
         let _tumblr_url = post
             .get("post_url")
             .and_then(|v| v.as_str())
@@ -192,23 +196,27 @@ pub fn import_page(
             .unwrap_or_default();
         let date = post.get("date").and_then(|v| v.as_str()).unwrap_or("");
 
-        match post_type {
-            "text" if journal_enabled => {
-                if let Some(item) = import_text_post(store, post, &tags, date) {
-                    items.push(item);
-                } else {
-                    skipped += 1;
-                }
-            }
-            "photo" if portfolio_enabled => {
+        match post_type.as_str() {
+            "photo" => {
                 if let Some(item) = import_photo_post(store, post, &tags, date, media_dir) {
                     items.push(item);
                 } else {
                     skipped += 1;
                 }
             }
-            "video" if portfolio_enabled && video_enabled => {
+            "video" if video_enabled => {
                 if let Some(item) = import_video_post(store, post, &tags, date, media_dir) {
+                    items.push(item);
+                } else {
+                    skipped += 1;
+                }
+            }
+            "video" => {
+                // Video uploads disabled, skip
+                skipped += 1;
+            }
+            "text" => {
+                if let Some(item) = import_text_post(store, post, &tags, date) {
                     items.push(item);
                 } else {
                     skipped += 1;
@@ -316,38 +324,54 @@ fn import_photo_post(
     date: &str,
     media_dir: &Path,
 ) -> Option<TumblrImportedItem> {
-    let caption = post.get("caption").and_then(|v| v.as_str()).unwrap_or("");
+    let caption = post.get("caption").and_then(|v| v.as_str())
+        .or_else(|| post.get("summary").and_then(|v| v.as_str()))
+        .unwrap_or("");
     let tumblr_url = post
         .get("post_url")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
 
-    // Get photos array
-    let photos = post.get("photos").and_then(|v| v.as_array())?;
-    if photos.is_empty() {
+    // Get photo URLs — try legacy "photos" array first, then NPF content blocks
+    let photo_urls: Vec<String> = if let Some(photos) = post.get("photos").and_then(|v| v.as_array()) {
+        photos.iter().filter_map(|p| best_photo_url(p)).collect()
+    } else if let Some(content) = post.get("content").and_then(|c| c.as_array()) {
+        content.iter()
+            .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("image"))
+            .filter_map(|b| {
+                b.get("media")
+                    .and_then(|m| m.as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|m| m.get("url"))
+                    .and_then(|u| u.as_str())
+                    .map(String::from)
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+
+    if photo_urls.is_empty() {
         return None;
     }
 
     // Download first photo as featured image
-    let first_url = best_photo_url(&photos[0])?;
-    let image_path = download_media(&first_url, media_dir).ok()?;
+    let image_path = download_media(&photo_urls[0], media_dir).ok()?;
 
     // Build description HTML with remaining photos
     let mut desc_html = String::new();
     if !caption.is_empty() {
         desc_html.push_str(caption);
     }
-    if photos.len() > 1 {
+    if photo_urls.len() > 1 {
         desc_html.push_str("<div class=\"tumblr-photoset\">");
-        for photo in &photos[1..] {
-            if let Some(url) = best_photo_url(photo) {
-                if let Ok(local) = download_media(&url, media_dir) {
-                    desc_html.push_str(&format!(
-                        "<img src=\"{}\" alt=\"\" loading=\"lazy\">",
-                        local
-                    ));
-                }
+        for url in &photo_urls[1..] {
+            if let Ok(local) = download_media(url, media_dir) {
+                desc_html.push_str(&format!(
+                    "<img src=\"{}\" alt=\"\" loading=\"lazy\">",
+                    local
+                ));
             }
         }
         desc_html.push_str("</div>");
@@ -415,13 +439,29 @@ fn import_video_post(
         .unwrap_or("")
         .to_string();
 
-    // Try to get video URL from the post
+    // Try to get video URL — legacy field first, then NPF content blocks
     let video_url = post
         .get("video_url")
         .and_then(|v| v.as_str())
-        .map(String::from);
+        .map(String::from)
+        .or_else(|| {
+            // NPF: look for video block with media URL
+            post.get("content")
+                .and_then(|c| c.as_array())
+                .and_then(|blocks| {
+                    blocks.iter()
+                        .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
+                        .and_then(|b| {
+                            b.get("media")
+                                .and_then(|m| m.get("url"))
+                                .or_else(|| b.get("url"))
+                                .and_then(|u| u.as_str())
+                                .map(String::from)
+                        })
+                })
+        });
 
-    // Download video file if available
+    // Download video file if available, or try thumbnail
     let image_path = if let Some(ref url) = video_url {
         download_media(url, media_dir).ok()
     } else {
@@ -429,6 +469,19 @@ fn import_video_post(
         post.get("thumbnail_url")
             .and_then(|v| v.as_str())
             .and_then(|url| download_media(url, media_dir).ok())
+            .or_else(|| {
+                // NPF: try poster image from video block
+                post.get("content")
+                    .and_then(|c| c.as_array())
+                    .and_then(|blocks| {
+                        blocks.iter()
+                            .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
+                            .and_then(|b| b.get("poster").and_then(|p| p.as_array()))
+                            .and_then(|posters| posters.first())
+                            .and_then(|p| p.get("url").and_then(|u| u.as_str()))
+                            .and_then(|url| download_media(url, media_dir).ok())
+                    })
+            })
     };
 
     let image_path = image_path.unwrap_or_default();
@@ -683,6 +736,56 @@ pub fn apply_updates(store: &dyn Store, updates: &[ApplyUpdate]) -> Result<u64, 
 }
 
 // ── Helpers ──────────────────────────────────────────
+
+/// Detect the effective post type. Tumblr's NPF format may return photo/video
+/// posts as type "text" with image/video content blocks. We check for legacy
+/// fields (photos, video_url) and NPF content blocks to reclassify.
+fn detect_effective_type(raw_type: &str, post: &Value) -> String {
+    // If the API already says photo or video, trust it
+    if raw_type == "photo" || raw_type == "video" {
+        return raw_type.to_string();
+    }
+
+    // Check legacy photo field: "photos" array
+    if let Some(photos) = post.get("photos") {
+        if photos.is_array() && !photos.as_array().unwrap_or(&vec![]).is_empty() {
+            return "photo".to_string();
+        }
+    }
+
+    // Check legacy video field: "video_url"
+    if let Some(v) = post.get("video_url") {
+        if v.is_string() && !v.as_str().unwrap_or("").is_empty() {
+            return "video".to_string();
+        }
+    }
+
+    // Check NPF content blocks for image or video types
+    if let Some(content) = post.get("content").and_then(|c| c.as_array()) {
+        let mut has_image = false;
+        let mut has_video = false;
+        for block in content {
+            match block.get("type").and_then(|t| t.as_str()) {
+                Some("image") => has_image = true,
+                Some("video") => has_video = true,
+                _ => {}
+            }
+        }
+        if has_video {
+            return "video".to_string();
+        }
+        if has_image {
+            return "photo".to_string();
+        }
+    }
+
+    // Check for photo_url fields (some legacy formats)
+    if post.get("image_permalink").is_some() {
+        return "photo".to_string();
+    }
+
+    raw_type.to_string()
+}
 
 fn normalize_blog(url: &str) -> String {
     let s = url.trim();

@@ -694,15 +694,20 @@ pub struct TumblrConfigInput {
     pub blog_url: String,
 }
 
-#[post("/import/tumblr/config", format = "json", data = "<body>")]
+#[post("/import/tumblr/config", data = "<body>")]
 pub fn tumblr_config(
     _admin: AdminUser,
     store: &State<Arc<dyn Store>>,
     body: Json<TumblrConfigInput>,
 ) -> Json<serde_json::Value> {
     let s: &dyn Store = &**store.inner();
-    let _ = s.setting_set("tumblr_api_key", &body.api_key);
-    let _ = s.setting_set("tumblr_blog_url", &body.blog_url);
+    let key = body.api_key.trim();
+    let url = body.blog_url.trim();
+    if key.is_empty() || url.is_empty() {
+        return Json(json!({ "ok": false, "error": "Both fields are required." }));
+    }
+    let _ = s.setting_set("tumblr_api_key", key);
+    let _ = s.setting_set("tumblr_blog_url", url);
     Json(json!({ "ok": true }))
 }
 
@@ -739,7 +744,7 @@ pub struct TumblrPageInput {
     pub offset: u64,
 }
 
-#[post("/import/tumblr/page", format = "json", data = "<body>")]
+#[post("/import/tumblr/page", data = "<body>")]
 pub fn tumblr_page(
     _admin: AdminUser,
     store: &State<Arc<dyn Store>>,
@@ -780,7 +785,7 @@ pub struct TumblrSuggestItem {
     pub image_path: String,
 }
 
-#[post("/import/tumblr/suggest", format = "json", data = "<body>")]
+#[post("/import/tumblr/suggest", data = "<body>")]
 pub fn tumblr_suggest(
     _admin: AdminUser,
     store: &State<Arc<dyn Store>>,
@@ -833,7 +838,7 @@ pub struct TumblrApplyInput {
     pub updates: Vec<crate::import::tumblr::ApplyUpdate>,
 }
 
-#[post("/import/tumblr/apply", format = "json", data = "<body>")]
+#[post("/import/tumblr/apply", data = "<body>")]
 pub fn tumblr_apply(
     _admin: AdminUser,
     store: &State<Arc<dyn Store>>,

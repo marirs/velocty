@@ -277,11 +277,23 @@ var tumblrItems = []; // all imported items
 var tumblrSuggestions = {}; // id → {title, description, category}
 var tumblrAiEnabled = {% if settings.ai_ollama_enabled == 'true' or settings.ai_openai_enabled == 'true' or settings.ai_gemini_enabled == 'true' or settings.ai_cloudflare_enabled == 'true' or settings.ai_groq_enabled == 'true' %}true{% else %}false{% endif %};
 
+// Track last-saved values so cancel restores them
+var tumblrSavedKey = '{{ settings.tumblr_api_key | default(value="") | safe }}';
+var tumblrSavedUrl = '{{ settings.tumblr_blog_url | default(value="") | safe }}';
+
 function tumblrOpenConfig() {
+    // Restore inputs to last-saved DB values
+    document.getElementById('tumblr-api-key').value = tumblrSavedKey;
+    document.getElementById('tumblr-blog-url').value = tumblrSavedUrl;
+    document.getElementById('tumblr-api-key').style.borderColor = '';
+    document.getElementById('tumblr-blog-url').style.borderColor = '';
     document.getElementById('tumblr-config-overlay').style.display = '';
     document.getElementById('tumblr-config-modal').style.display = '';
 }
 function tumblrCloseConfig() {
+    // Restore inputs to last-saved values on cancel too
+    document.getElementById('tumblr-api-key').value = tumblrSavedKey;
+    document.getElementById('tumblr-blog-url').value = tumblrSavedUrl;
     document.getElementById('tumblr-config-overlay').style.display = 'none';
     document.getElementById('tumblr-config-modal').style.display = 'none';
 }
@@ -289,14 +301,43 @@ function tumblrCloseConfig() {
 function tumblrSaveConfig() {
     var key = document.getElementById('tumblr-api-key').value.trim();
     var url = document.getElementById('tumblr-blog-url').value.trim();
-    if (!key || !url) { alert('Both fields are required.'); return; }
+    // Auto-prepend https:// if no scheme provided
+    if (url && !/^https?:\/\//i.test(url)) { url = 'https://' + url; }
+    var keyEl = document.getElementById('tumblr-api-key');
+    var urlEl = document.getElementById('tumblr-blog-url');
+    keyEl.style.borderColor = key ? '' : 'var(--danger)';
+    urlEl.style.borderColor = url ? '' : 'var(--danger)';
+    if (!key || !url) { showToast('Both fields are required.', 'error'); return; }
+    document.getElementById('tumblr-blog-url').value = url;
     fetch(ADMIN + '/import/tumblr/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ api_key: key, blog_url: url })
     }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.ok) tumblrCloseConfig();
+        if (d.ok) {
+            // Update saved values to match what was just persisted
+            tumblrSavedKey = key;
+            tumblrSavedUrl = url;
+            tumblrCloseConfig();
+            showToast('Tumblr configuration saved.', 'success');
+        } else {
+            showToast('Failed to save configuration.', 'error');
+        }
+    }).catch(function() {
+        showToast('Network error. Please try again.', 'error');
     });
+}
+
+function showToast(msg, type) {
+    var t = document.createElement('div');
+    t.className = 'toast toast-' + (type || 'success');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function() { t.classList.add('toast-show'); });
+    setTimeout(function() {
+        t.classList.remove('toast-show');
+        setTimeout(function() { t.remove(); }, 300);
+    }, 3000);
 }
 
 function tumblrCloseImport() {
@@ -312,14 +353,7 @@ function tumblrCloseImport() {
 }
 
 async function tumblrStartImport() {
-    var key = document.getElementById('tumblr-api-key').value.trim();
-    var url = document.getElementById('tumblr-blog-url').value.trim();
-    if (!key || !url) {
-        tumblrOpenConfig();
-        return;
-    }
-
-    // Show modal
+    // Show modal immediately with progress
     document.getElementById('tumblr-import-overlay').style.display = '';
     document.getElementById('tumblr-import-modal').style.display = '';
     document.getElementById('tumblr-phase-progress').style.display = 'flex';
@@ -330,7 +364,7 @@ async function tumblrStartImport() {
     document.getElementById('tumblr-progress-bar').style.width = '0%';
     tumblrItems = [];
 
-    // Step 1: Validate & get count
+    // Step 1: Validate & get count (server checks DB for config)
     var startResp;
     try {
         var r = await fetch(ADMIN + '/import/tumblr/start', { method: 'POST' });
@@ -341,7 +375,15 @@ async function tumblrStartImport() {
     }
 
     if (!startResp.ok) {
-        document.getElementById('tumblr-progress-text').textContent = startResp.error || 'Failed to connect';
+        var err = startResp.error || 'Failed to connect';
+        // If config is missing, close import modal and open config modal
+        if (err.indexOf('must be configured') !== -1) {
+            tumblrCloseImport();
+            tumblrOpenConfig();
+            showToast('Please configure your Tumblr API key and blog URL first.', 'error');
+            return;
+        }
+        document.getElementById('tumblr-progress-text').textContent = err;
         return;
     }
 
@@ -684,5 +726,11 @@ function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').repl
 .tumblr-sug-row { display:flex;align-items:center;gap:6px }
 .tumblr-sug-row label { font-size:11px;color:var(--text-tertiary);width:70px;flex-shrink:0 }
 .tumblr-sug-row input { font-size:12px;padding:4px 8px }
+
+/* Toast */
+.toast { position:fixed;top:20px;right:20px;z-index:2000;padding:12px 20px;border-radius:8px;font-size:13px;color:#fff;opacity:0;transform:translateY(-10px);transition:opacity .3s,transform .3s;pointer-events:none;max-width:360px }
+.toast-show { opacity:1;transform:translateY(0) }
+.toast-success { background:var(--success) }
+.toast-error { background:var(--danger) }
 </style>
 {% endblock content %}
