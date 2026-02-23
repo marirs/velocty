@@ -564,6 +564,16 @@ impl Store for SqliteStore {
         Comment::update_status(&self.pool, id, status)
     }
 
+    fn comment_set_parent(&self, id: i64, parent_id: Option<i64>) -> Result<(), String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE comments SET parent_id = ?1 WHERE id = ?2",
+            rusqlite::params![parent_id, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     fn comment_delete(&self, id: i64) -> Result<(), String> {
         Comment::delete(&self.pool, id)
     }
@@ -711,6 +721,22 @@ impl Store for SqliteStore {
 
     fn design_create(&self, name: &str) -> Result<i64, String> {
         Design::create(&self.pool, name)
+    }
+
+    fn design_update_full(
+        &self,
+        id: i64,
+        slug: &str,
+        layout_html: &str,
+        style_css: &str,
+    ) -> Result<(), String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE designs SET slug = ?1, layout_html = ?2, style_css = ?3, updated_at = datetime('now') WHERE id = ?4",
+            rusqlite::params![slug, layout_html, style_css, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     fn design_duplicate(&self, id: i64, new_name: &str) -> Result<i64, String> {
@@ -1741,6 +1767,266 @@ impl Store for SqliteStore {
         Ok(serde_json::Value::Object(export))
     }
 
+    fn health_export_full(&self) -> Result<serde_json::Value, String> {
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let mut export = serde_json::Map::new();
+
+        // Posts — ALL columns
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, title, slug, content_json, content_html, excerpt, featured_image,
+                    meta_title, meta_description, status, published_at, created_at, updated_at, user_id
+             FROM posts ORDER BY id"
+        ) {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "title": r.get::<_, String>(1).unwrap_or_default(),
+                        "slug": r.get::<_, String>(2).unwrap_or_default(),
+                        "content_json": r.get::<_, String>(3).unwrap_or_default(),
+                        "content_html": r.get::<_, String>(4).unwrap_or_default(),
+                        "excerpt": r.get::<_, String>(5).unwrap_or_default(),
+                        "featured_image": r.get::<_, String>(6).unwrap_or_default(),
+                        "meta_title": r.get::<_, String>(7).unwrap_or_default(),
+                        "meta_description": r.get::<_, String>(8).unwrap_or_default(),
+                        "status": r.get::<_, String>(9).unwrap_or_default(),
+                        "published_at": r.get::<_, String>(10).unwrap_or_default(),
+                        "created_at": r.get::<_, String>(11).unwrap_or_default(),
+                        "updated_at": r.get::<_, String>(12).unwrap_or_default(),
+                        "user_id": r.get::<_, i64>(13).unwrap_or(0),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("posts".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Portfolio — ALL columns
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, title, slug, description_json, description_html, image_path, thumbnail_path,
+                    meta_title, meta_description, sell_enabled, price, purchase_note, payment_provider,
+                    download_file_path, likes, status, published_at, created_at, updated_at, user_id
+             FROM portfolio ORDER BY id"
+        ) {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "title": r.get::<_, String>(1).unwrap_or_default(),
+                        "slug": r.get::<_, String>(2).unwrap_or_default(),
+                        "description_json": r.get::<_, String>(3).unwrap_or_default(),
+                        "description_html": r.get::<_, String>(4).unwrap_or_default(),
+                        "image_path": r.get::<_, String>(5).unwrap_or_default(),
+                        "thumbnail_path": r.get::<_, String>(6).unwrap_or_default(),
+                        "meta_title": r.get::<_, String>(7).unwrap_or_default(),
+                        "meta_description": r.get::<_, String>(8).unwrap_or_default(),
+                        "sell_enabled": r.get::<_, i64>(9).unwrap_or(0),
+                        "price": r.get::<_, f64>(10).unwrap_or(0.0),
+                        "purchase_note": r.get::<_, String>(11).unwrap_or_default(),
+                        "payment_provider": r.get::<_, String>(12).unwrap_or_default(),
+                        "download_file_path": r.get::<_, String>(13).unwrap_or_default(),
+                        "likes": r.get::<_, i64>(14).unwrap_or(0),
+                        "status": r.get::<_, String>(15).unwrap_or_default(),
+                        "published_at": r.get::<_, String>(16).unwrap_or_default(),
+                        "created_at": r.get::<_, String>(17).unwrap_or_default(),
+                        "updated_at": r.get::<_, String>(18).unwrap_or_default(),
+                        "user_id": r.get::<_, i64>(19).unwrap_or(0),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("portfolio".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Categories — with type
+        if let Ok(mut stmt) =
+            conn.prepare("SELECT id, name, slug, type FROM categories ORDER BY id")
+        {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "name": r.get::<_, String>(1).unwrap_or_default(),
+                        "slug": r.get::<_, String>(2).unwrap_or_default(),
+                        "type": r.get::<_, String>(3).unwrap_or_default(),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("categories".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Tags
+        if let Ok(mut stmt) = conn.prepare("SELECT id, name, slug FROM tags ORDER BY id") {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "name": r.get::<_, String>(1).unwrap_or_default(),
+                        "slug": r.get::<_, String>(2).unwrap_or_default(),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("tags".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Comments — with content_type and parent_id
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, post_id, content_type, author_name, author_email, body, status, parent_id, created_at
+             FROM comments ORDER BY id"
+        ) {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "post_id": r.get::<_, i64>(1)?,
+                        "content_type": r.get::<_, String>(2).unwrap_or_else(|_| "post".to_string()),
+                        "author_name": r.get::<_, String>(3).unwrap_or_default(),
+                        "author_email": r.get::<_, String>(4).unwrap_or_default(),
+                        "body": r.get::<_, String>(5).unwrap_or_default(),
+                        "status": r.get::<_, String>(6).unwrap_or_default(),
+                        "parent_id": r.get::<_, Option<i64>>(7).unwrap_or(None),
+                        "created_at": r.get::<_, String>(8).unwrap_or_default(),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("comments".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Relationships (content_tags and content_categories)
+        for (export_key, table, content_type) in &[
+            ("post_tags", "content_tags", "post"),
+            ("post_categories", "content_categories", "post"),
+            ("portfolio_tags", "content_tags", "portfolio"),
+            ("portfolio_categories", "content_categories", "portfolio"),
+        ] {
+            let id2_col = if *table == "content_tags" {
+                "tag_id"
+            } else {
+                "category_id"
+            };
+            let sql = format!(
+                "SELECT content_id, {} FROM {} WHERE content_type = ?1",
+                id2_col, table
+            );
+            if let Ok(mut stmt) = conn.prepare(&sql) {
+                let rows: Vec<serde_json::Value> = stmt
+                    .query_map(rusqlite::params![content_type], |r| {
+                        Ok(serde_json::json!({
+                            "content_id": r.get::<_, i64>(0)?,
+                            id2_col: r.get::<_, i64>(1)?,
+                        }))
+                    })
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                    .unwrap_or_default();
+                export.insert(export_key.to_string(), serde_json::Value::Array(rows));
+            }
+        }
+
+        // Designs
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, name, slug, description, layout_html, style_css, thumbnail_path, is_active, created_at, updated_at
+             FROM designs ORDER BY id"
+        ) {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "name": r.get::<_, String>(1).unwrap_or_default(),
+                        "slug": r.get::<_, String>(2).unwrap_or_default(),
+                        "description": r.get::<_, String>(3).unwrap_or_default(),
+                        "layout_html": r.get::<_, String>(4).unwrap_or_default(),
+                        "style_css": r.get::<_, String>(5).unwrap_or_default(),
+                        "thumbnail_path": r.get::<_, String>(6).unwrap_or_default(),
+                        "is_active": r.get::<_, i64>(7).unwrap_or(0),
+                        "created_at": r.get::<_, String>(8).unwrap_or_default(),
+                        "updated_at": r.get::<_, String>(9).unwrap_or_default(),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("designs".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Design templates
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, design_id, template_type, layout_html, style_css, updated_at
+             FROM design_templates ORDER BY id",
+        ) {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "design_id": r.get::<_, i64>(1)?,
+                        "template_type": r.get::<_, String>(2).unwrap_or_default(),
+                        "layout_html": r.get::<_, String>(3).unwrap_or_default(),
+                        "style_css": r.get::<_, String>(4).unwrap_or_default(),
+                        "updated_at": r.get::<_, String>(5).unwrap_or_default(),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert(
+                "design_templates".to_string(),
+                serde_json::Value::Array(rows),
+            );
+        }
+
+        // Users — NO password_hash, NO mfa secrets
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, email, display_name, role, status, avatar, last_login_at, created_at, updated_at
+             FROM users ORDER BY id"
+        ) {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok(serde_json::json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "email": r.get::<_, String>(1).unwrap_or_default(),
+                        "display_name": r.get::<_, String>(2).unwrap_or_default(),
+                        "role": r.get::<_, String>(3).unwrap_or_default(),
+                        "status": r.get::<_, String>(4).unwrap_or_default(),
+                        "avatar": r.get::<_, String>(5).unwrap_or_default(),
+                        "last_login_at": r.get::<_, String>(6).unwrap_or_default(),
+                        "created_at": r.get::<_, String>(7).unwrap_or_default(),
+                        "updated_at": r.get::<_, String>(8).unwrap_or_default(),
+                    }))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            export.insert("users".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Settings — skip sensitive keys
+        let skip_keys = [
+            "admin_password_hash",
+            "session_secret",
+            "image_proxy_secret",
+            "image_proxy_secret_old",
+            "image_proxy_secret_old_expires",
+        ];
+        if let Ok(mut stmt) = conn.prepare("SELECT key, value FROM settings ORDER BY key") {
+            let rows: Vec<serde_json::Value> = stmt
+                .query_map([], |r| {
+                    Ok((
+                        r.get::<_, String>(0).unwrap_or_default(),
+                        r.get::<_, String>(1).unwrap_or_default(),
+                    ))
+                })
+                .map(|rows| {
+                    rows.filter_map(|r| r.ok())
+                        .filter(|(k, _)| !skip_keys.contains(&k.as_str()))
+                        .map(|(k, v)| serde_json::json!({"key": k, "value": v}))
+                        .collect()
+                })
+                .unwrap_or_default();
+            export.insert("settings".to_string(), serde_json::Value::Array(rows));
+        }
+
+        Ok(serde_json::Value::Object(export))
+    }
+
     // ── Background tasks ──────────────────────────────────────────────
 
     fn magic_link_cleanup(&self) -> Result<usize, String> {
@@ -2187,6 +2473,9 @@ impl Store for DbPool {
     fn comment_update_status(&self, id: i64, status: &str) -> Result<(), String> {
         SqliteStore::new(self.clone()).comment_update_status(id, status)
     }
+    fn comment_set_parent(&self, id: i64, parent_id: Option<i64>) -> Result<(), String> {
+        SqliteStore::new(self.clone()).comment_set_parent(id, parent_id)
+    }
     fn comment_delete(&self, id: i64) -> Result<(), String> {
         SqliteStore::new(self.clone()).comment_delete(id)
     }
@@ -2305,6 +2594,15 @@ impl Store for DbPool {
     }
     fn design_create(&self, name: &str) -> Result<i64, String> {
         SqliteStore::new(self.clone()).design_create(name)
+    }
+    fn design_update_full(
+        &self,
+        id: i64,
+        slug: &str,
+        layout_html: &str,
+        style_css: &str,
+    ) -> Result<(), String> {
+        SqliteStore::new(self.clone()).design_update_full(id, slug, layout_html, style_css)
     }
     fn design_duplicate(&self, id: i64, new_name: &str) -> Result<i64, String> {
         SqliteStore::new(self.clone()).design_duplicate(id, new_name)
@@ -2849,6 +3147,9 @@ impl Store for DbPool {
     }
     fn health_export_content(&self) -> Result<serde_json::Value, String> {
         SqliteStore::new(self.clone()).health_export_content()
+    }
+    fn health_export_full(&self) -> Result<serde_json::Value, String> {
+        SqliteStore::new(self.clone()).health_export_full()
     }
     fn magic_link_cleanup(&self) -> Result<usize, String> {
         SqliteStore::new(self.clone()).magic_link_cleanup()

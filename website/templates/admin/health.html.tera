@@ -297,6 +297,12 @@
         <button class="btn btn-primary btn-sm" onclick="runTool('export-content', this)">Export JSON</button>
         <div class="tool-result" id="result-export-content"></div>
     </div>
+
+    <div class="form-card tool-card">
+        <h4>Export Full Site</h4>
+        <p class="text-muted">Downloads a ZIP archive containing all content (posts, portfolio, categories, tags, comments, designs, users, settings) plus your uploads folder. Use this to migrate to another Velocty instance.</p>
+        <a href="/{{ admin_slug }}/health/export-site" class="btn btn-primary btn-sm" id="btn-export-site" onclick="this.textContent='Preparing…'; this.style.opacity='0.6'">Download ZIP</a>
+    </div>
 </div>
 
 </div>

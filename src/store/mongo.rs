@@ -1300,6 +1300,17 @@ impl Store for MongoStore {
         .map_err(|e| e.to_string())?;
         Ok(())
     }
+    fn comment_set_parent(&self, id: i64, parent_id: Option<i64>) -> Result<(), String> {
+        let coll = self.db.collection::<Document>("comments");
+        let val = parent_id.map(Bson::Int64).unwrap_or(Bson::Null);
+        coll.update_one(
+            doc! { "id": id },
+            doc! { "$set": { "parent_id": val } },
+            None,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
     fn comment_delete(&self, id: i64) -> Result<(), String> {
         let coll = self.db.collection::<Document>("comments");
         coll.delete_one(doc! { "id": id }, None)
@@ -1686,6 +1697,28 @@ impl Store for MongoStore {
         )
         .map_err(|e| e.to_string())?;
         Ok(id)
+    }
+    fn design_update_full(
+        &self,
+        id: i64,
+        slug: &str,
+        layout_html: &str,
+        style_css: &str,
+    ) -> Result<(), String> {
+        let coll = self.db.collection::<Document>("designs");
+        let now = chrono::Utc::now().to_rfc3339();
+        coll.update_one(
+            doc! { "id": id },
+            doc! { "$set": {
+                "slug": slug,
+                "layout_html": layout_html,
+                "style_css": style_css,
+                "updated_at": &now,
+            }},
+            None,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
     }
     fn design_duplicate(&self, id: i64, new_name: &str) -> Result<i64, String> {
         let src = self.design_find_by_id(id).ok_or("Design not found")?;
@@ -3021,6 +3054,120 @@ impl Store for MongoStore {
             "settings".to_string(),
             serde_json::Value::Array(to_json_array("settings")),
         );
+
+        Ok(serde_json::Value::Object(export))
+    }
+
+    fn health_export_full(&self) -> Result<serde_json::Value, String> {
+        let mut export = serde_json::Map::new();
+
+        let to_json_array = |coll_name: &str| -> Vec<serde_json::Value> {
+            let coll = self.db.collection::<Document>(coll_name);
+            coll.find(doc! {}, None)
+                .map(|cursor| {
+                    cursor
+                        .flatten()
+                        .filter_map(|d| {
+                            let json_str = serde_json::to_string(&d).ok()?;
+                            serde_json::from_str(&json_str).ok()
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+
+        export.insert(
+            "posts".to_string(),
+            serde_json::Value::Array(to_json_array("posts")),
+        );
+        export.insert(
+            "portfolio".to_string(),
+            serde_json::Value::Array(to_json_array("portfolio")),
+        );
+        export.insert(
+            "categories".to_string(),
+            serde_json::Value::Array(to_json_array("categories")),
+        );
+        export.insert(
+            "tags".to_string(),
+            serde_json::Value::Array(to_json_array("tags")),
+        );
+        export.insert(
+            "comments".to_string(),
+            serde_json::Value::Array(to_json_array("comments")),
+        );
+        export.insert(
+            "content_tags".to_string(),
+            serde_json::Value::Array(to_json_array("content_tags")),
+        );
+        export.insert(
+            "content_categories".to_string(),
+            serde_json::Value::Array(to_json_array("content_categories")),
+        );
+        export.insert(
+            "designs".to_string(),
+            serde_json::Value::Array(to_json_array("designs")),
+        );
+        export.insert(
+            "design_templates".to_string(),
+            serde_json::Value::Array(to_json_array("design_templates")),
+        );
+
+        // Users — strip sensitive fields
+        {
+            let coll = self.db.collection::<Document>("users");
+            let rows: Vec<serde_json::Value> = coll
+                .find(doc! {}, None)
+                .map(|cursor| {
+                    cursor
+                        .flatten()
+                        .map(|d| {
+                            serde_json::json!({
+                                "id": d.get_i64("id").unwrap_or(0),
+                                "email": d.get_str("email").unwrap_or(""),
+                                "display_name": d.get_str("display_name").unwrap_or(""),
+                                "role": d.get_str("role").unwrap_or("subscriber"),
+                                "status": d.get_str("status").unwrap_or("active"),
+                                "avatar": d.get_str("avatar").unwrap_or(""),
+                                "last_login_at": d.get_str("last_login_at").unwrap_or(""),
+                                "created_at": d.get_str("created_at").unwrap_or(""),
+                                "updated_at": d.get_str("updated_at").unwrap_or(""),
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            export.insert("users".to_string(), serde_json::Value::Array(rows));
+        }
+
+        // Settings — skip sensitive keys
+        {
+            let skip_keys = [
+                "admin_password_hash",
+                "session_secret",
+                "image_proxy_secret",
+                "image_proxy_secret_old",
+                "image_proxy_secret_old_expires",
+            ];
+            let coll = self.db.collection::<Document>("settings");
+            let rows: Vec<serde_json::Value> = coll
+                .find(doc! {}, None)
+                .map(|cursor| {
+                    cursor
+                        .flatten()
+                        .filter_map(|d| {
+                            let key = d.get_str("key").unwrap_or("");
+                            if skip_keys.contains(&key) {
+                                return None;
+                            }
+                            let value = d.get_str("value").unwrap_or("");
+                            Some(serde_json::json!({"key": key, "value": value}))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            export.insert("settings".to_string(), serde_json::Value::Array(rows));
+        }
 
         Ok(serde_json::Value::Object(export))
     }

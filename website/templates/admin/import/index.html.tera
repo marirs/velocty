@@ -18,12 +18,12 @@
             {% endif %}
             <h4>Velocty</h4>
         </div>
-        <p class="import-card-desc">Import posts, portfolio items, comments, categories, tags, and settings from a Velocty JSON export file.</p>
+        <p class="import-card-desc">Import posts, portfolio items, comments, categories, tags, designs, users, and settings from a Velocty export (ZIP or JSON).</p>
         <form method="post" action="/{{ admin_slug }}/import/velocty" enctype="multipart/form-data" class="import-form">
-            <label class="import-dropzone" data-accept=".json">
-                <input type="file" name="file" accept=".json" required>
+            <label class="import-dropzone" data-accept=".json,.zip">
+                <input type="file" name="file" accept=".json,.zip" required>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span class="dropzone-text">Drop .json file here or <strong>browse</strong></span>
+                <span class="dropzone-text">Drop .zip or .json file here or <strong>browse</strong></span>
                 <span class="dropzone-file"></span>
             </label>
             <div class="import-card-footer">

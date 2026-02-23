@@ -147,6 +147,7 @@ pub trait Store: Send + Sync {
     fn comment_count(&self, status: Option<&str>) -> i64;
     fn comment_create(&self, form: &CommentForm) -> Result<i64, String>;
     fn comment_update_status(&self, id: i64, status: &str) -> Result<(), String>;
+    fn comment_set_parent(&self, id: i64, parent_id: Option<i64>) -> Result<(), String>;
     fn comment_delete(&self, id: i64) -> Result<(), String>;
 
     // ── Categories ──────────────────────────────────────────────────
@@ -200,6 +201,13 @@ pub trait Store: Send + Sync {
     fn design_list(&self) -> Vec<Design>;
     fn design_activate(&self, id: i64) -> Result<(), String>;
     fn design_create(&self, name: &str) -> Result<i64, String>;
+    fn design_update_full(
+        &self,
+        id: i64,
+        slug: &str,
+        layout_html: &str,
+        style_css: &str,
+    ) -> Result<(), String>;
     fn design_duplicate(&self, id: i64, new_name: &str) -> Result<i64, String>;
     fn design_delete(&self, id: i64) -> Result<(), String>;
 
@@ -494,6 +502,9 @@ pub trait Store: Send + Sync {
 
     /// Export all content as JSON Value.
     fn health_export_content(&self) -> Result<serde_json::Value, String>;
+
+    /// Export full site data (all fields, designs, users) as JSON Value.
+    fn health_export_full(&self) -> Result<serde_json::Value, String>;
 
     // ── Background tasks ────────────────────────────────────────────
     /// Delete expired and used magic link tokens, return count deleted.

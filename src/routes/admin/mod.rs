@@ -422,6 +422,7 @@ pub fn routes() -> Vec<rocket::Route> {
         health::health_analytics_prune,
         health::health_export_db,
         health::health_export_content,
+        health::health_export_site,
         health::health_mongo_ping,
         users::mfa_setup,
         users::mfa_verify,

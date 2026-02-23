@@ -1,14 +1,38 @@
+use std::io::{Cursor, Write};
 use std::sync::Arc;
 
+use rocket::http::{ContentType, Header};
+use rocket::request::Request;
+use rocket::response::{self, Responder};
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_dyn_templates::Template;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use zip::write::SimpleFileOptions;
+use zip::ZipWriter;
 
 use crate::security::auth::AdminUser;
 use crate::store::Store;
 use crate::AdminSlug;
+
+pub struct ZipDownload {
+    pub filename: String,
+    pub data: Vec<u8>,
+}
+
+impl<'r> Responder<'r, 'static> for ZipDownload {
+    fn respond_to(self, _req: &'r Request<'_>) -> response::Result<'static> {
+        rocket::Response::build()
+            .header(ContentType::ZIP)
+            .header(Header::new(
+                "Content-Disposition",
+                format!("attachment; filename=\"{}\"", self.filename),
+            ))
+            .sized_body(self.data.len(), Cursor::new(self.data))
+            .ok()
+    }
+}
 
 // ── Health ─────────────────────────────────────────────────
 
@@ -163,6 +187,75 @@ pub fn health_export_content(_admin: AdminUser, store: &State<Arc<dyn Store>>) -
     let s: &dyn Store = &**store.inner();
     let r = crate::health::export_content(s);
     json_tool_result(r)
+}
+
+#[get("/health/export-site")]
+pub fn health_export_site(
+    _admin: AdminUser,
+    store: &State<Arc<dyn Store>>,
+) -> Result<ZipDownload, rocket::http::Status> {
+    let s: &dyn Store = &**store.inner();
+
+    // Build full export JSON
+    let json_data = s
+        .health_export_full()
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+    let json_bytes = serde_json::to_string_pretty(&json_data)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Build ZIP in memory
+    let mut buf = Cursor::new(Vec::new());
+    {
+        let mut zip = ZipWriter::new(&mut buf);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+        // Add export.json
+        zip.start_file("export.json", options)
+            .map_err(|_| rocket::http::Status::InternalServerError)?;
+        zip.write_all(json_bytes.as_bytes())
+            .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+        // Walk uploads/ directory and add all files
+        let uploads_dir = std::path::Path::new("website/site/uploads");
+        if uploads_dir.is_dir() {
+            add_dir_to_zip(&mut zip, uploads_dir, "uploads", options)
+                .map_err(|_| rocket::http::Status::InternalServerError)?;
+        }
+
+        zip.finish()
+            .map_err(|_| rocket::http::Status::InternalServerError)?;
+    }
+
+    let zip_bytes = buf.into_inner();
+    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("velocty_export_{}.zip", timestamp);
+
+    Ok(ZipDownload {
+        filename,
+        data: zip_bytes,
+    })
+}
+
+fn add_dir_to_zip<W: Write + std::io::Seek>(
+    zip: &mut ZipWriter<W>,
+    dir: &std::path::Path,
+    prefix: &str,
+    options: SimpleFileOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = format!("{}/{}", prefix, entry.file_name().to_string_lossy());
+        if path.is_dir() {
+            add_dir_to_zip(zip, &path, &name, options)?;
+        } else if path.is_file() {
+            zip.start_file(&name, options)?;
+            let data = std::fs::read(&path)?;
+            zip.write_all(&data)?;
+        }
+    }
+    Ok(())
 }
 
 #[post("/health/mongo-ping")]
