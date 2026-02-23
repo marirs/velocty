@@ -324,7 +324,9 @@ fn import_photo_post(
     date: &str,
     media_dir: &Path,
 ) -> Option<TumblrImportedItem> {
-    let caption = post.get("caption").and_then(|v| v.as_str())
+    let caption = post
+        .get("caption")
+        .and_then(|v| v.as_str())
         .or_else(|| post.get("summary").and_then(|v| v.as_str()))
         .unwrap_or("");
     let tumblr_url = post
@@ -334,23 +336,25 @@ fn import_photo_post(
         .to_string();
 
     // Get photo URLs — try legacy "photos" array first, then NPF content blocks
-    let photo_urls: Vec<String> = if let Some(photos) = post.get("photos").and_then(|v| v.as_array()) {
-        photos.iter().filter_map(|p| best_photo_url(p)).collect()
-    } else if let Some(content) = post.get("content").and_then(|c| c.as_array()) {
-        content.iter()
-            .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("image"))
-            .filter_map(|b| {
-                b.get("media")
-                    .and_then(|m| m.as_array())
-                    .and_then(|arr| arr.first())
-                    .and_then(|m| m.get("url"))
-                    .and_then(|u| u.as_str())
-                    .map(String::from)
-            })
-            .collect()
-    } else {
-        vec![]
-    };
+    let photo_urls: Vec<String> =
+        if let Some(photos) = post.get("photos").and_then(|v| v.as_array()) {
+            photos.iter().filter_map(|p| best_photo_url(p)).collect()
+        } else if let Some(content) = post.get("content").and_then(|c| c.as_array()) {
+            content
+                .iter()
+                .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("image"))
+                .filter_map(|b| {
+                    b.get("media")
+                        .and_then(|m| m.as_array())
+                        .and_then(|arr| arr.first())
+                        .and_then(|m| m.get("url"))
+                        .and_then(|u| u.as_str())
+                        .map(String::from)
+                })
+                .collect()
+        } else {
+            vec![]
+        };
 
     if photo_urls.is_empty() {
         return None;
@@ -449,7 +453,8 @@ fn import_video_post(
             post.get("content")
                 .and_then(|c| c.as_array())
                 .and_then(|blocks| {
-                    blocks.iter()
+                    blocks
+                        .iter()
                         .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
                         .and_then(|b| {
                             b.get("media")
@@ -474,7 +479,8 @@ fn import_video_post(
                 post.get("content")
                     .and_then(|c| c.as_array())
                     .and_then(|blocks| {
-                        blocks.iter()
+                        blocks
+                            .iter()
                             .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("video"))
                             .and_then(|b| b.get("poster").and_then(|p| p.as_array()))
                             .and_then(|posters| posters.first())
