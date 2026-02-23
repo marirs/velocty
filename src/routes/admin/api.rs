@@ -467,9 +467,7 @@ pub fn pagespeed_fetch(
 
     // Validate URL scheme and block internal/private addresses (SSRF prevention)
     if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Json(
-            serde_json::json!({"error": "URL must start with http:// or https://"}),
-        );
+        return Json(serde_json::json!({"error": "URL must start with http:// or https://"}));
     }
     let host_part = url
         .trim_start_matches("https://")
