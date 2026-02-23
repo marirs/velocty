@@ -1123,6 +1123,8 @@ function czToggle(btn) {
     // Map nav keys to their category template IDs
     var CAT_TEMPLATES = { portfolio: 'tpl-cat-portfolio', blog: 'tpl-cat-blog' };
 
+    function _escNav(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function _escNavAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
     function buildItems() {
         container.innerHTML = '';
         var order = orderInput.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
@@ -1139,8 +1141,8 @@ function czToggle(btn) {
             var displayName = labelInput ? labelInput.value : cfg.defaultLabel;
             row.innerHTML = '<div class="nav-sort-header">' +
                 '<span class="nav-sort-handle">&#9776;</span>' +
-                '<span class="nav-sort-label">' + displayName + '</span>' +
-                '<input type="text" class="nav-sort-input" data-setting="' + cfg.label + '" name="' + cfg.label + '" value="' + displayName.replace(/"/g,'&quot;') + '" required>' +
+                '<span class="nav-sort-label">' + _escNav(displayName) + '</span>' +
+                '<input type="text" class="nav-sort-input" data-setting="' + cfg.label + '" name="' + cfg.label + '" value="' + _escNavAttr(displayName) + '" required>' +
                 (!cfg.enabled ? '<span class="nav-sort-disabled">(disabled)</span>' : '') +
                 '</div>';
             // Inject category sub-section from template if available

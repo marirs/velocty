@@ -313,7 +313,8 @@
                 var list = document.getElementById('category-list');
                 var label = document.createElement('label');
                 label.className = 'checkbox-item';
-                label.innerHTML = '<input type="checkbox" name="category_ids" value="' + data.id + '" checked> ' + data.name;
+                var _esc = function(s){ var d=document.createElement('div');d.textContent=s;return d.innerHTML; };
+                label.innerHTML = '<input type="checkbox" name="category_ids" value="' + parseInt(data.id) + '" checked> ' + _esc(data.name);
                 list.appendChild(label);
                 input.value = '';
             } else {
@@ -366,7 +367,8 @@
             var pill = document.createElement('span');
             pill.className = 'tag-pill';
             pill.dataset.tagName = name;
-            pill.innerHTML = name + ' <button type="button" class="tag-remove">&times;</button>';
+            var _escT = function(s){ var d=document.createElement('div');d.textContent=s;return d.innerHTML; };
+            pill.innerHTML = _escT(name) + ' <button type="button" class="tag-remove">&times;</button>';
             list.appendChild(pill);
         }
 
@@ -422,7 +424,8 @@
         var placeholderOriginal = placeholder.innerHTML;
 
         function ajaxUploadHeic(file) {
-            placeholder.innerHTML = '<span style="font-size:13px;color:var(--text-secondary)">Converting ' + file.name + '…</span>';
+            var _escF = function(s){ var d=document.createElement('div');d.textContent=s;return d.innerHTML; };
+            placeholder.innerHTML = '<span style="font-size:13px;color:var(--text-secondary)">Converting ' + _escF(file.name) + '…</span>';
             placeholder.style.display = '';
             preview.style.display = 'none';
             zone.classList.add('has-image');

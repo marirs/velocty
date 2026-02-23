@@ -465,10 +465,42 @@ pub fn pagespeed_fetch(
 ) -> Json<Value> {
     let api_key = store.setting_get_or("seo_pagespeed_api_key", "");
 
-    // URL must be publicly accessible — localhost won't work
-    if url.contains("localhost") || url.contains("127.0.0.1") {
+    // Validate URL scheme and block internal/private addresses (SSRF prevention)
+    if !url.starts_with("https://") && !url.starts_with("http://") {
         return Json(
-            serde_json::json!({"error": "PageSpeed Insights requires a publicly accessible URL. localhost cannot be tested."}),
+            serde_json::json!({"error": "URL must start with http:// or https://"}),
+        );
+    }
+    let host_part = url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .split(':')
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
+    if host_part.is_empty()
+        || host_part == "localhost"
+        || host_part.starts_with("127.")
+        || host_part.starts_with("10.")
+        || host_part.starts_with("192.168.")
+        || host_part.starts_with("172.16.")
+        || host_part.starts_with("172.17.")
+        || host_part.starts_with("172.18.")
+        || host_part.starts_with("172.19.")
+        || host_part.starts_with("172.2")
+        || host_part.starts_with("172.30.")
+        || host_part.starts_with("172.31.")
+        || host_part == "0.0.0.0"
+        || host_part == "[::1]"
+        || host_part.starts_with("169.254.")
+        || host_part.ends_with(".internal")
+        || host_part.ends_with(".local")
+    {
+        return Json(
+            serde_json::json!({"error": "PageSpeed Insights requires a publicly accessible URL. Internal/private addresses cannot be tested."}),
         );
     }
 

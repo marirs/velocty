@@ -946,16 +946,17 @@ function passkeyLoadList() {
                 el.innerHTML = '<p class="text-muted" style="font-size:13px">No passkeys registered yet.</p>';
                 return;
             }
+            function _escPk(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
             var html = '<div style="display:flex;flex-direction:column;gap:6px">';
             d.passkeys.forEach(function(pk) {
                 var date = pk.created_at ? pk.created_at.split('T')[0] : '';
                 html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:8px">';
                 html += '<div style="display:flex;align-items:center;gap:8px">';
                 html += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
-                html += '<span style="font-size:13px;font-weight:500">' + (pk.name || 'Passkey') + '</span>';
-                html += '<span class="text-muted" style="font-size:11px">' + date + '</span>';
+                html += '<span style="font-size:13px;font-weight:500">' + _escPk(pk.name || 'Passkey') + '</span>';
+                html += '<span class="text-muted" style="font-size:11px">' + _escPk(date) + '</span>';
                 html += '</div>';
-                html += '<button type="button" class="btn btn-sm btn-danger" style="padding:3px 10px;font-size:11px" onclick="passkeyDelete(' + pk.id + ')">Remove</button>';
+                html += '<button type="button" class="btn btn-sm btn-danger" style="padding:3px 10px;font-size:11px" onclick="passkeyDelete(' + parseInt(pk.id) + ')">Remove</button>';
                 html += '</div>';
             });
             html += '</div>';

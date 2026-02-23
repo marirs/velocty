@@ -381,7 +381,15 @@ function showToast(msg, kind) {
     var el = document.createElement('div');
     var cls = kind === 'error' ? 'error' : kind === 'warning' ? 'warning' : 'info';
     el.className = 'alert alert-' + cls + ' alert-flash';
-    el.innerHTML = '<span>' + msg + '</span><button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>';
+    var span = document.createElement('span');
+    span.textContent = msg;
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'alert-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = function(){ el.remove(); };
+    el.appendChild(span);
+    el.appendChild(closeBtn);
     var header = document.querySelector('.page-header');
     if (header) header.insertAdjacentElement('afterend', el);
     else { var main = document.querySelector('.content-area'); if (main) main.prepend(el); }
@@ -390,8 +398,9 @@ function showToast(msg, kind) {
 
 // ── Deploy Targets (staging only) ──
 var deployTargets = [];
-try { deployTargets = JSON.parse('{{ settings.deploy_targets | default(value="[]") }}'); } catch(e) { deployTargets = []; }
+try { deployTargets = JSON.parse({{ settings.deploy_targets | default(value="[]") | json_encode() | safe }}); } catch(e) { deployTargets = []; }
 
+function _escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function renderDeployTargets() {
     var list = document.getElementById('deploy-targets-list');
     if (!list) return;
@@ -404,9 +413,9 @@ function renderDeployTargets() {
     for (var i = 0; i < deployTargets.length; i++) {
         var t = deployTargets[i];
         html += '<div class="deploy-target-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">';
-        html += '<input type="text" value="' + (t.name || '') + '" placeholder="Name (e.g. Production)" style="flex:0 0 160px;font-size:13px" onchange="updateTarget(' + i + ',\'name\',this.value)">';
-        html += '<input type="url" value="' + (t.url || '') + '" placeholder="https://mysite.com" style="flex:1;font-size:13px" onchange="updateTarget(' + i + ',\'url\',this.value)">';
-        html += '<input type="text" value="' + (t.key || '') + '" placeholder="Deploy key" style="flex:1;font-family:monospace;font-size:12px" onchange="updateTarget(' + i + ',\'key\',this.value)">';
+        html += '<input type="text" value="' + _escAttr(t.name || '') + '" placeholder="Name (e.g. Production)" style="flex:0 0 160px;font-size:13px" onchange="updateTarget(' + i + ',\'name\',this.value)">';
+        html += '<input type="url" value="' + _escAttr(t.url || '') + '" placeholder="https://mysite.com" style="flex:1;font-size:13px" onchange="updateTarget(' + i + ',\'url\',this.value)">';
+        html += '<input type="text" value="' + _escAttr(t.key || '') + '" placeholder="Deploy key" style="flex:1;font-family:monospace;font-size:12px" onchange="updateTarget(' + i + ',\'key\',this.value)">';
         html += '<button type="button" class="btn btn-danger" style="padding:5px 8px;font-size:12px" onclick="removeTarget(' + i + ')" title="Remove">&times;</button>';
         html += '</div>';
     }

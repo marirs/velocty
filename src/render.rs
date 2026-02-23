@@ -5344,7 +5344,7 @@ pub(crate) fn build_commerce_html(
     s.push_str("var result=document.getElementById('lookup-result');\n");
     s.push_str("if(!email)return;\nresult.style.display='';result.textContent='Looking up...';\n");
     s.push_str(&format!("fetch('/api/checkout/check',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{portfolio_id:{},email:email}})}}).then(function(r){{return r.json()}}).then(function(d){{\n", item_id));
-    s.push_str("if(d.purchased&&d.token_valid){result.innerHTML='<a href=\"/download/'+d.download_token+'\" style=\"color:#E8913A;font-weight:600\">Go to Download Page &rarr;</a>';}\n");
+    s.push_str("if(d.purchased&&d.token_valid){var _a=document.createElement('a');_a.href='/download/'+encodeURIComponent(d.download_token);_a.style.cssText='color:#E8913A;font-weight:600';_a.textContent='Go to Download Page \\u2192';result.innerHTML='';result.appendChild(_a);}\n");
     s.push_str("else if(d.purchased){result.textContent='Purchase found but download link has expired.';result.style.color='#f59e0b';}\n");
     s.push_str("else{result.textContent='No purchase found for this email.';result.style.color='#ef4444';}\n");
     s.push_str("}).catch(function(){result.textContent='Error looking up purchase.';});\n}\n");
