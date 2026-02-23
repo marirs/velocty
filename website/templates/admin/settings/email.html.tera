@@ -499,6 +499,7 @@ function showMtaToast(message, type) {
     }
 
     // ── Built-in MTA ──
+    function _escDns(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     var apiBase = '/{{ admin_slug }}/api';
     var tableWrap = document.getElementById('mta-dns-table-wrap');
     var banner = document.getElementById('mta-dns-banner');
@@ -536,7 +537,7 @@ function showMtaToast(message, type) {
             recs.forEach(function(r) {
                 if (r.current_value && r.status !== 'ok' && r.status !== 'unchecked') {
                     html += '<div style="padding:10px 14px;border-radius:6px;margin-bottom:10px;font-size:13px;background:color-mix(in srgb, var(--danger) 10%, var(--bg-input));color:var(--danger)">';
-                    html += 'Your ' + type + ' record is currently set to <strong style="word-break:break-all">' + r.current_value + '</strong>';
+                    html += 'Your ' + _escDns(type) + ' record is currently set to <strong style="word-break:break-all">' + _escDns(r.current_value) + '</strong>';
                     html += '</div>';
                 }
                 if (r.current_value && r.status === 'ok') {
@@ -558,10 +559,10 @@ function showMtaToast(message, type) {
             recs.forEach(function(r) {
                 html += '<tr style="border-top:1px solid var(--border)">';
                 html += '<td style="padding:10px 12px;text-align:center">' + statusIcon(r.status) + '</td>';
-                html += '<td style="padding:10px 12px;font-weight:500">' + r.dns_type + '</td>';
-                html += '<td style="padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all">' + r.dns_name + '</td>';
-                html += '<td style="padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all">' + r.recommended + '</td>';
-                html += '<td style="padding:10px 8px;text-align:center"><button type="button" class="btn-copy-val" data-val="' + r.recommended.replace(/"/g, '&quot;') + '" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-tertiary);display:inline-flex;align-items:center" title="Copy value">' + copyIconSvg + '</button></td>';
+                html += '<td style="padding:10px 12px;font-weight:500">' + _escDns(r.dns_type) + '</td>';
+                html += '<td style="padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all">' + _escDns(r.dns_name) + '</td>';
+                html += '<td style="padding:10px 12px;font-family:monospace;font-size:12px;word-break:break-all">' + _escDns(r.recommended) + '</td>';
+                html += '<td style="padding:10px 8px;text-align:center"><button type="button" class="btn-copy-val" data-val="' + _escDns(r.recommended) + '" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-tertiary);display:inline-flex;align-items:center" title="Copy value">' + copyIconSvg + '</button></td>';
                 html += '</tr>';
             });
             html += '</tbody></table></div>';

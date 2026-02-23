@@ -311,7 +311,15 @@
     (function(){
         var el = document.createElement('div');
         el.className = 'alert alert-{{ flash_kind | default(value="info") }} alert-flash';
-        el.innerHTML = '<span>{{ flash_msg }}</span><button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>';
+        var span = document.createElement('span');
+        span.textContent = {{ flash_msg | json_encode() | safe }};
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'alert-close';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = function(){ el.remove(); };
+        el.appendChild(span);
+        el.appendChild(closeBtn);
         var header = document.querySelector('.page-header');
         if (header) header.insertAdjacentElement('afterend', el);
         else { var main = document.querySelector('.content-area'); if (main) main.prepend(el); }
@@ -370,6 +378,7 @@
         });
     }
 
+    function _escDeploy(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function renderDeployTargetPicker() {
         var list = document.getElementById('deploy-target-list');
         var html = '';
@@ -378,8 +387,8 @@
             var sel = i === _deploySelected;
             html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid ' + (sel ? 'var(--accent)' : 'var(--border-subtle)') + ';border-radius:8px;cursor:pointer;margin-bottom:6px;background:' + (sel ? 'var(--bg-input)' : 'transparent') + '" onclick="selectDeployTarget(' + i + ')">';
             html += '<input type="radio" name="deploy_target" ' + (sel ? 'checked' : '') + ' style="margin:0">';
-            html += '<div><strong style="color:var(--text-primary)">' + (t.name || 'Unnamed') + '</strong>';
-            html += '<div style="font-size:12px;color:var(--text-tertiary)">' + (t.url || 'No URL') + '</div></div></label>';
+            html += '<div><strong style="color:var(--text-primary)">' + _escDeploy(t.name || 'Unnamed') + '</strong>';
+            html += '<div style="font-size:12px;color:var(--text-tertiary)">' + _escDeploy(t.url || 'No URL') + '</div></div></label>';
         }
         list.innerHTML = html;
         document.getElementById('deploy-start-btn').disabled = _deploySelected < 0;

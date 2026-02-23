@@ -963,17 +963,17 @@ pub(crate) fn build_comments_section(
                 if version == "v3" {
                     captcha_script = format!(
                         r#"<script src="https://www.google.com/recaptcha/api.js?render={}"></script>"#,
-                        captcha_site_key
+                        html_escape(&captcha_site_key)
                     );
                     captcha_get_token_js = format!(
                         "function(){{return grecaptcha.execute('{}',{{action:'comment'}})}}",
-                        captcha_site_key
+                        html_escape(&captcha_site_key)
                     );
                 } else {
                     captcha_script = "https://www.google.com/recaptcha/api.js".to_string();
                     captcha_html = format!(
                         r#"<div class="g-recaptcha" data-sitekey="{}"></div>"#,
-                        captcha_site_key
+                        html_escape(&captcha_site_key)
                     );
                     captcha_get_token_js =
                         "function(){return Promise.resolve(grecaptcha.getResponse())}".to_string();
@@ -984,7 +984,7 @@ pub(crate) fn build_comments_section(
                     "https://challenges.cloudflare.com/turnstile/v0/api.js".to_string();
                 captcha_html = format!(
                     r#"<div class="cf-turnstile" data-sitekey="{}"></div>"#,
-                    captcha_site_key
+                    html_escape(&captcha_site_key)
                 );
                 captcha_get_token_js = "function(){return Promise.resolve(document.querySelector('[name=cf-turnstile-response]').value)}".to_string();
             }
@@ -992,7 +992,7 @@ pub(crate) fn build_comments_section(
                 captcha_script = "https://js.hcaptcha.com/1/api.js".to_string();
                 captcha_html = format!(
                     r#"<div class="h-captcha" data-sitekey="{}"></div>"#,
-                    captcha_site_key
+                    html_escape(&captcha_site_key)
                 );
                 captcha_get_token_js =
                     "function(){return Promise.resolve(hcaptcha.getResponse())}".to_string();
@@ -3100,6 +3100,17 @@ pub(crate) fn html_escape(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+/// Escape a string for safe embedding inside a JS single-quoted string literal.
+pub(crate) fn js_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('\'', "\\'")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('<', "\\x3c")
+        .replace('>', "\\x3e")
 }
 
 /// Remove any remaining {{placeholder}} tags from rendered HTML.
@@ -5312,7 +5323,9 @@ pub(crate) fn build_commerce_html(
         s.push_str("paypal.Buttons({\n");
         s.push_str(&format!(
             "style:{{layout:'vertical',color:'{}',shape:'{}',label:'{}'}},\n",
-            pp_color, pp_shape, pp_label
+            js_escape(pp_color),
+            js_escape(pp_shape),
+            js_escape(pp_label)
         ));
         s.push_str("createOrder:function(){\n");
         s.push_str("var email=_vEmail();if(!email)return;\n");

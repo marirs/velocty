@@ -414,7 +414,15 @@
 function showToast(msg, type) {
     var el = document.createElement('div');
     el.className = 'alert alert-' + (type || 'info') + ' alert-flash';
-    el.innerHTML = '<span>' + msg + '</span><button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>';
+    var span = document.createElement('span');
+    span.textContent = msg;
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'alert-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = function(){ el.remove(); };
+    el.appendChild(span);
+    el.appendChild(closeBtn);
     var header = document.querySelector('.page-header');
     if (header) header.insertAdjacentElement('afterend', el);
     else { var main = document.querySelector('.content-area'); if (main) main.prepend(el); }
@@ -608,7 +616,8 @@ function renderPageSpeed(data) {
                 var val = audits[v.key].displayValue || '—';
                 var scoreVal = audits[v.key].score;
                 var c = scoreVal >= 0.9 ? 'var(--success)' : scoreVal >= 0.5 ? 'var(--warning)' : 'var(--danger)';
-                vitalsHtml += '<tr><td style="color:var(--text-primary)">' + v.label + '</td><td style="text-align:right;font-weight:600;color:' + c + '">' + val + '</td></tr>';
+                var _e = function(s){ var d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+                vitalsHtml += '<tr><td style="color:var(--text-primary)">' + v.label + '</td><td style="text-align:right;font-weight:600;color:' + c + '">' + _e(val) + '</td></tr>';
             }
         });
         vitalsHtml += '</tbody></table>';
