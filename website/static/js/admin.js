@@ -78,15 +78,17 @@
         if (!container) return;
         container.innerHTML = '';
 
-        // Group: referrer->content_type (first half) and content_type->page (second half)
         var refToType = data.filter(function(d) { return ['Blog','Portfolio','Pages'].indexOf(d.target) >= 0; });
         var typeToPage = data.filter(function(d) { return ['Blog','Portfolio','Pages'].indexOf(d.source) >= 0 && ['Blog','Portfolio','Pages'].indexOf(d.target) < 0; });
 
         var width = container.clientWidth || 600;
-        var margin = {top: 10, right: 10, bottom: 10, left: 10};
-        var colWidth = (width - margin.left - margin.right) / 3;
+        var margin = {top: 14, right: 14, bottom: 14, left: 14};
+        var innerW = width - margin.left - margin.right;
+        var srcColW = innerW * 0.18;
+        var midColStart = innerW * 0.22;
+        var midColW = innerW * 0.30;
+        var tgtColStart = innerW * 0.58;
 
-        // Collect unique nodes per column
         var sources = [];
         refToType.forEach(function(d) { if (sources.indexOf(d.source) < 0) sources.push(d.source); });
         var middles = ['Blog', 'Portfolio', 'Pages'];
@@ -94,69 +96,93 @@
         typeToPage.forEach(function(d) { if (targets.indexOf(d.target) < 0) targets.push(d.target); });
         targets = targets.slice(0, 8);
 
-        var nodeH = 22, nodeGap = 4;
-        var height = Math.max(sources.length, middles.length, targets.length) * (nodeH + nodeGap) + 40;
+        var nodeH = 22, nodeGap = 8;
+        var maxRows = Math.max(sources.length, middles.length, targets.length);
+        var height = maxRows * (nodeH + nodeGap) + margin.top + margin.bottom;
 
         var svg = d3.select(selector).append('svg')
             .attr('width', width).attr('height', height);
 
         var typeColor = {Blog: chartColors.accent, Portfolio: chartColors.blue, Pages: chartColors.purple};
 
-        // Draw source nodes (referrers)
-        var srcY = function(i) { return margin.top + i * (nodeH + nodeGap); };
+        // Vertically center each column within the total height
+        var contentH = height - margin.top - margin.bottom;
+        function colY(count, i) {
+            var totalH = count * nodeH + (count - 1) * nodeGap;
+            var offset = (contentH - totalH) / 2;
+            return margin.top + offset + i * (nodeH + nodeGap);
+        }
+
+        // Source nodes (referrers)
+        var srcY = function(i) { return colY(sources.length, i); };
         sources.forEach(function(s, i) {
             var label = s.replace('https://', '').replace('http://', '').replace(/\/$/, '') || 'Direct';
             svg.append('text').attr('x', margin.left).attr('y', srcY(i) + nodeH/2 + 4)
                 .attr('fill', chartColors.textMuted).attr('font-size', '11px').text(label);
         });
 
-        // Draw middle nodes (content types)
-        var midX = margin.left + colWidth;
-        var midY = function(i) { return margin.top + i * (nodeH + nodeGap + 8); };
+        // Middle nodes (content types) with bars
+        var midX = margin.left + midColStart;
         var midTotals = {};
         refToType.forEach(function(d) { midTotals[d.target] = (midTotals[d.target] || 0) + d.value; });
-        middles.forEach(function(m, i) {
+        var activeMids = middles.filter(function(m) { return (midTotals[m] || 0) > 0; });
+        var midY = function(i) { return colY(activeMids.length, i); };
+        var maxMidTotal = Math.max.apply(null, activeMids.map(function(m) { return midTotals[m] || 0; }));
+        var midBarWidths = {};
+        activeMids.forEach(function(m, i) {
             var total = midTotals[m] || 0;
-            if (total === 0) return;
-            var barW = Math.min(total * 2, colWidth - 40);
+            var barW = Math.max(20, (total / Math.max(maxMidTotal, 1)) * (midColW - 10));
+            midBarWidths[m] = barW;
             svg.append('rect').attr('x', midX).attr('y', midY(i)).attr('width', 0).attr('height', nodeH)
                 .attr('fill', typeColor[m] || chartColors.accent).attr('rx', 3).attr('opacity', 0.8)
                 .transition().duration(600).attr('width', barW);
-            svg.append('text').attr('x', midX + barW + 6).attr('y', midY(i) + nodeH/2 + 4)
-                .attr('fill', chartColors.textMuted).attr('font-size', '11px').text(m + ' (' + total + ')');
+            var labelText = m + ' (' + total + ')';
+            var labelFitsInBar = barW > labelText.length * 7;
+            if (labelFitsInBar) {
+                svg.append('text').attr('x', midX + 6).attr('y', midY(i) + nodeH/2 + 4)
+                    .attr('fill', '#fff').attr('font-size', '11px').attr('font-weight', '600').text(labelText);
+            } else {
+                svg.append('text').attr('x', midX + barW + 6).attr('y', midY(i) + nodeH/2 + 4)
+                    .attr('fill', chartColors.textMuted).attr('font-size', '11px').attr('font-weight', '600').text(labelText);
+            }
         });
 
-        // Draw links from sources to middles
+        // Links: sources → middles
         refToType.forEach(function(d) {
             var si = sources.indexOf(d.source);
-            var mi = middles.indexOf(d.target);
-            if (si < 0 || mi < 0 || !midTotals[d.target]) return;
-            svg.append('line')
-                .attr('x1', margin.left + 80).attr('y1', srcY(si) + nodeH/2)
-                .attr('x2', midX).attr('y2', midY(mi) + nodeH/2)
-                .attr('stroke', typeColor[d.target] || chartColors.accent).attr('stroke-opacity', 0.25)
-                .attr('stroke-width', Math.max(1, Math.min(d.value / 2, 6)));
+            var mi = activeMids.indexOf(d.target);
+            if (si < 0 || mi < 0) return;
+            svg.append('path')
+                .attr('d', linkPath(margin.left + srcColW, srcY(si) + nodeH/2, midX, midY(mi) + nodeH/2))
+                .attr('fill', 'none')
+                .attr('stroke', typeColor[d.target] || chartColors.accent).attr('stroke-opacity', 0.2)
+                .attr('stroke-width', Math.max(1, Math.min(d.value / 3, 5)));
         });
 
-        // Draw target nodes (top pages)
-        var tgtX = margin.left + colWidth * 2;
-        var tgtY = function(i) { return margin.top + i * (nodeH + nodeGap); };
+        // Target nodes (top pages)
+        var tgtX = margin.left + tgtColStart;
+        var tgtY = function(i) { return colY(targets.length, i); };
         typeToPage.slice(0, 8).forEach(function(d, i) {
             var label = d.target.replace(/^\/portfolio\//, '').replace(/^\/journal\//, '').replace(/^\/blog\//, '');
-            if (label.length > 20) label = label.substring(0, 20) + '…';
+            if (label.length > 22) label = label.substring(0, 22) + '\u2026';
             svg.append('text').attr('x', tgtX + 6).attr('y', tgtY(i) + nodeH/2 + 4)
                 .attr('fill', chartColors.textMuted).attr('font-size', '11px').text(label + ' (' + d.value + ')');
 
-            // Link from middle to target
-            var mi = middles.indexOf(d.source);
+            var mi = activeMids.indexOf(d.source);
             if (mi >= 0) {
-                svg.append('line')
-                    .attr('x1', midX + 60).attr('y1', midY(mi) + nodeH/2)
-                    .attr('x2', tgtX).attr('y2', tgtY(i) + nodeH/2)
-                    .attr('stroke', typeColor[d.source] || chartColors.accent).attr('stroke-opacity', 0.2)
-                    .attr('stroke-width', Math.max(1, Math.min(d.value / 2, 4)));
+                var barEnd = midX + (midBarWidths[d.source] || 40);
+                svg.append('path')
+                    .attr('d', linkPath(barEnd, midY(mi) + nodeH/2, tgtX, tgtY(i) + nodeH/2))
+                    .attr('fill', 'none')
+                    .attr('stroke', typeColor[d.source] || chartColors.accent).attr('stroke-opacity', 0.15)
+                    .attr('stroke-width', Math.max(1, Math.min(d.value / 3, 4)));
             }
         });
+
+        function linkPath(x1, y1, x2, y2) {
+            var mx = (x1 + x2) / 2;
+            return 'M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2;
+        }
     }
 
     function renderSunburst(selector, overview, geo) {
@@ -215,10 +241,19 @@
         var maxCount = Math.max.apply(null, top.map(function(d) { return d.count; }));
         var total = data.reduce(function(s, d) { return s + d.count; }, 0);
 
+        // Measure longest label to set dynamic label column width
+        var canvas = document.createElement('canvas');
+        var ctx = canvas.getContext('2d');
+        ctx.font = '500 11px sans-serif';
+        var labelW = 40;
+        top.forEach(function(d) {
+            var w = ctx.measureText(d.label || '').width;
+            if (w + 12 > labelW) labelW = w + 12;
+        });
+        var barW = width - labelW - 80;
+
         var svg = d3.select(selector).append('svg')
             .attr('width', width).attr('height', height);
-
-        var labelW = 40, barW = width - labelW - 60;
 
         svg.selectAll('g').data(top).join('g')
             .attr('transform', function(d, i) { return 'translate(0,' + (i * barHeight) + ')'; })

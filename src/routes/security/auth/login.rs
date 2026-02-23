@@ -29,11 +29,18 @@ pub fn needs_setup(store: &dyn Store) -> bool {
 pub fn login_page(
     store: &State<Arc<dyn Store>>,
     admin_slug: &State<AdminSlug>,
+    cookies: &CookieJar<'_>,
     reset: Option<&str>,
 ) -> Result<Template, Redirect> {
     let s: &dyn Store = &**store.inner();
     if needs_setup(s) {
         return Err(Redirect::to(format!("/{}/setup", admin_slug.get())));
+    }
+    // If already authenticated, redirect to dashboard
+    if let Some(sid) = cookies.get_private("velocty_session") {
+        if s.session_get_user(sid.value()).is_some() {
+            return Err(Redirect::to(format!("/{}", admin_slug.get())));
+        }
     }
     let login_method = s.setting_get_or("login_method", "password");
     if login_method == "magic_link" {
