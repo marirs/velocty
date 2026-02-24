@@ -327,6 +327,7 @@ pub trait Store: Send + Sync {
 
     // ── Orders ──────────────────────────────────────────────────────
     fn order_find_by_id(&self, id: i64) -> Option<Order>;
+    fn order_find_by_uuid(&self, uuid: &str) -> Option<Order>;
     fn order_find_by_provider_order_id(&self, provider_order_id: &str) -> Option<Order>;
     fn order_list(&self, limit: i64, offset: i64) -> Vec<Order>;
     fn order_list_by_status(&self, status: &str, limit: i64, offset: i64) -> Vec<Order>;
@@ -346,7 +347,7 @@ pub trait Store: Send + Sync {
         provider: &str,
         provider_order_id: &str,
         status: &str,
-    ) -> Result<i64, String>;
+    ) -> Result<(i64, String), String>;
     fn order_update_status(&self, id: i64, status: &str) -> Result<(), String>;
     fn order_update_provider_order_id(
         &self,
@@ -987,6 +988,220 @@ mod tests {
         let s = test_store();
         let count = s.raw_query_i64("SELECT COUNT(*) FROM settings").unwrap();
         assert!(count > 0);
+    }
+
+    // ── Orders (UUID) ────────────────────────────────────────────────
+
+    /// Helper: create a portfolio item with sell_enabled for order tests
+    fn create_sellable_item(s: &SqliteStore) -> i64 {
+        let form = PortfolioForm {
+            title: "Digital Art".to_string(),
+            slug: "digital-art".to_string(),
+            description_json: None,
+            description_html: Some("<p>Art</p>".to_string()),
+            image_path: "art.jpg".to_string(),
+            thumbnail_path: None,
+            meta_title: None,
+            meta_description: None,
+            sell_enabled: Some(true),
+            price: Some(9.99),
+            purchase_note: None,
+            payment_provider: Some("stripe".to_string()),
+            download_file_path: Some("/uploads/art.zip".to_string()),
+            status: "published".to_string(),
+            published_at: None,
+            category_ids: None,
+            tag_ids: None,
+        };
+        s.portfolio_create(&form).unwrap()
+    }
+
+    #[test]
+    fn test_order_create_returns_uuid() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+        let (id, uuid) = s
+            .order_create(
+                pid,
+                "buyer@test.com",
+                "Buyer",
+                9.99,
+                "USD",
+                "stripe",
+                "",
+                "pending",
+            )
+            .unwrap();
+        assert!(id > 0);
+        assert!(!uuid.is_empty());
+        // UUID v4 format: 8-4-4-4-12 hex chars
+        assert_eq!(uuid.len(), 36);
+        assert_eq!(uuid.chars().filter(|c| *c == '-').count(), 4);
+    }
+
+    #[test]
+    fn test_order_find_by_uuid() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+        let (id, uuid) = s
+            .order_create(
+                pid,
+                "buyer@test.com",
+                "Buyer",
+                9.99,
+                "USD",
+                "stripe",
+                "",
+                "pending",
+            )
+            .unwrap();
+
+        let order = s.order_find_by_uuid(&uuid).expect("should find by uuid");
+        assert_eq!(order.id, id);
+        assert_eq!(order.uuid, uuid);
+        assert_eq!(order.portfolio_id, pid);
+        assert_eq!(order.buyer_email, "buyer@test.com");
+        assert_eq!(order.status, "pending");
+    }
+
+    #[test]
+    fn test_order_find_by_uuid_not_found() {
+        let s = test_store();
+        assert!(s.order_find_by_uuid("nonexistent-uuid").is_none());
+    }
+
+    #[test]
+    fn test_order_uuid_uniqueness() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+        let (_, uuid1) = s
+            .order_create(pid, "a@t.com", "", 5.0, "USD", "stripe", "", "pending")
+            .unwrap();
+        let (_, uuid2) = s
+            .order_create(pid, "b@t.com", "", 5.0, "USD", "stripe", "", "pending")
+            .unwrap();
+        assert_ne!(uuid1, uuid2);
+    }
+
+    #[test]
+    fn test_order_update_status_via_uuid_lookup() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+        let (_id, uuid) = s
+            .order_create(
+                pid,
+                "buyer@test.com",
+                "",
+                9.99,
+                "USD",
+                "stripe",
+                "",
+                "pending",
+            )
+            .unwrap();
+
+        // Look up by UUID, then update using internal id
+        let order = s.order_find_by_uuid(&uuid).unwrap();
+        assert_eq!(order.status, "pending");
+        s.order_update_status(order.id, "completed").unwrap();
+
+        let updated = s.order_find_by_uuid(&uuid).unwrap();
+        assert_eq!(updated.status, "completed");
+    }
+
+    #[test]
+    fn test_order_find_by_id_has_uuid() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+        let (id, uuid) = s
+            .order_create(
+                pid,
+                "buyer@test.com",
+                "",
+                9.99,
+                "USD",
+                "stripe",
+                "",
+                "pending",
+            )
+            .unwrap();
+
+        let order = s.order_find_by_id(id).unwrap();
+        assert_eq!(order.uuid, uuid);
+    }
+
+    #[test]
+    fn test_order_list_has_uuid() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+        let (_, uuid) = s
+            .order_create(
+                pid,
+                "buyer@test.com",
+                "",
+                9.99,
+                "USD",
+                "stripe",
+                "",
+                "pending",
+            )
+            .unwrap();
+
+        let orders = s.order_list(10, 0);
+        assert_eq!(orders.len(), 1);
+        assert_eq!(orders[0].uuid, uuid);
+    }
+
+    #[test]
+    fn test_order_full_flow_with_uuid() {
+        let s = test_store();
+        let pid = create_sellable_item(&s);
+
+        // 1. Create pending order
+        let (id, uuid) = s
+            .order_create(pid, "", "", 9.99, "USD", "stripe", "", "pending")
+            .unwrap();
+        assert!(id > 0);
+
+        // 2. Update provider order id
+        s.order_update_provider_order_id(id, "stripe_session_123")
+            .unwrap();
+
+        // 3. Update buyer info
+        s.order_update_buyer_info(id, "buyer@example.com", "John Doe")
+            .unwrap();
+
+        // 4. Complete the order
+        s.order_update_status(id, "completed").unwrap();
+
+        // 5. Verify via UUID lookup
+        let order = s.order_find_by_uuid(&uuid).unwrap();
+        assert_eq!(order.status, "completed");
+        assert_eq!(order.buyer_email, "buyer@example.com");
+        assert_eq!(order.buyer_name, "John Doe");
+        assert_eq!(order.provider_order_id, "stripe_session_123");
+
+        // 6. Create download token + license
+        let expires = chrono::Utc::now().naive_utc() + chrono::Duration::hours(48);
+        let dt_id = s
+            .download_token_create(order.id, "tok_abc123", 3, expires)
+            .unwrap();
+        assert!(dt_id > 0);
+
+        let lic_id = s.license_create(order.id, "AAAA-BBBB-CCCC-DDDD").unwrap();
+        assert!(lic_id > 0);
+
+        // 7. Verify download token and license via order
+        let dt = s.download_token_find_by_order(order.id).unwrap();
+        assert_eq!(dt.token, "tok_abc123");
+        let lic = s.license_find_by_order(order.id).unwrap();
+        assert_eq!(lic.license_key, "AAAA-BBBB-CCCC-DDDD");
+
+        // 8. Verify completed order lookup by email + portfolio
+        let found = s
+            .order_find_completed_by_email_and_portfolio("buyer@example.com", pid)
+            .expect("should find completed order by email + portfolio");
+        assert_eq!(found.uuid, uuid);
     }
 
     // ── DbPool bridge ───────────────────────────────────────────────

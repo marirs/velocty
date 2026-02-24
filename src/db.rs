@@ -498,6 +498,15 @@ pub fn run_migrations(pool: &DbPool) -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
 
+    // Add uuid column to orders if missing
+    let has_order_uuid: bool = conn.prepare("SELECT uuid FROM orders LIMIT 0").is_ok();
+    if !has_order_uuid {
+        conn.execute_batch("ALTER TABLE orders ADD COLUMN uuid TEXT NOT NULL DEFAULT '';")?;
+        // Backfill existing orders with legacy UUIDs
+        conn.execute_batch("UPDATE orders SET uuid = 'legacy_' || id WHERE uuid = '';")?;
+        conn.execute_batch("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_uuid ON orders(uuid);")?;
+    }
+
     // Drop the migration connection before FTS calls (avoids deadlock with max_size=1 pools)
     drop(conn);
 

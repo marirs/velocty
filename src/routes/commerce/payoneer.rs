@@ -54,7 +54,7 @@ pub fn payoneer_create(
         "https://api.payoneer.com"
     };
 
-    let (order_id, price, cur) = match create_pending_order(
+    let (order_id, order_uuid, price, cur) = match create_pending_order(
         s,
         body.portfolio_id,
         "payoneer",
@@ -102,8 +102,8 @@ pub fn payoneer_create(
             "amount": price,
             "currency": cur,
             "description": item.title,
-            "payout_id": format!("velocty_{}", order_id),
-            "redirect_url": format!("{}/api/payoneer/return?order_id={}", base, order_id),
+            "payout_id": format!("velocty_{}", order_uuid),
+            "redirect_url": format!("{}/api/payoneer/return?order_id={}", base, order_uuid),
             "notification_url": format!("{}/api/payoneer/webhook", base)
         }))
         .send();
@@ -118,7 +118,7 @@ pub fn payoneer_create(
             if let Some(url) = checkout_url {
                 let pyo_id = data.get("payout_id").and_then(|i| i.as_str()).unwrap_or("");
                 let _ = s.order_update_provider_order_id(order_id, pyo_id);
-                Json(json!({ "ok": true, "order_id": order_id, "checkout_url": url }))
+                Json(json!({ "ok": true, "order_id": order_uuid, "checkout_url": url }))
             } else {
                 let err = data
                     .get("description")
@@ -134,16 +134,19 @@ pub fn payoneer_create(
 // ── Payoneer: Return redirect ───────────────────────────
 
 #[get("/api/payoneer/return?<order_id>")]
-pub fn payoneer_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::response::Redirect {
+pub fn payoneer_return(
+    store: &State<Arc<dyn Store>>,
+    order_id: &str,
+) -> rocket::response::Redirect {
     let s: &dyn Store = &**store.inner();
     let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
     // Only redirect to download if the webhook already completed the order.
     // Never finalize from a return redirect — that must come from the webhook.
-    if let Some(order) = s.order_find_by_id(order_id) {
+    if let Some(order) = s.order_find_by_uuid(order_id) {
         if order.status == "completed" {
-            if let Some(dl) = s.download_token_find_by_order(order_id) {
-                return rocket::response::Redirect::to(format!("/download/{}", dl.token));
+            if let Some(dl) = s.download_token_find_by_order(order.id) {
+                return rocket::response::Redirect::to(format!("/download/{}/file", dl.token));
             }
         }
     }
@@ -159,27 +162,27 @@ pub fn payoneer_webhook(store: &State<Arc<dyn Store>>, body: Json<Value>) -> &'s
     let status = body.get("status").and_then(|s| s.as_str()).unwrap_or("");
     let payout_id = body.get("payout_id").and_then(|p| p.as_str()).unwrap_or("");
     if status == "done" || status == "completed" {
-        // payout_id format: velocty_{order_id}
-        if let Some(oid_str) = payout_id.strip_prefix("velocty_") {
-            if let Ok(oid) = oid_str.parse::<i64>() {
+        // payout_id format: velocty_{uuid}
+        if let Some(order_uuid) = payout_id.strip_prefix("velocty_") {
+            if !order_uuid.is_empty() {
                 // Verify order exists and is pending before finalizing
-                match s.order_find_by_id(oid) {
+                match s.order_find_by_uuid(order_uuid) {
                     Some(order) if order.status == "pending" => {
                         let email = body
                             .get("payee_email")
                             .and_then(|e| e.as_str())
                             .unwrap_or("");
-                        let _ = finalize_order(s, oid, payout_id, email, "");
+                        let _ = finalize_order(s, order_uuid, payout_id, email, "");
                     }
                     Some(order) => {
                         log::warn!(
                             "[payoneer] Webhook for order {} with status '{}', ignoring",
-                            oid,
+                            order_uuid,
                             order.status
                         );
                     }
                     None => {
-                        log::warn!("[payoneer] Webhook for unknown order {}", oid);
+                        log::warn!("[payoneer] Webhook for unknown order {}", order_uuid);
                     }
                 }
             }

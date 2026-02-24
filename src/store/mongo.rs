@@ -2262,6 +2262,11 @@ impl Store for MongoStore {
         let d = coll.find_one(doc! { "id": id }, None).ok()??;
         doc_to_order(&d)
     }
+    fn order_find_by_uuid(&self, uuid: &str) -> Option<Order> {
+        let coll = self.db.collection::<Document>("orders");
+        let d = coll.find_one(doc! { "uuid": uuid }, None).ok()??;
+        doc_to_order(&d)
+    }
     fn order_find_by_provider_order_id(&self, provider_order_id: &str) -> Option<Order> {
         let coll = self.db.collection::<Document>("orders");
         let d = coll
@@ -2383,13 +2388,15 @@ impl Store for MongoStore {
         provider: &str,
         provider_order_id: &str,
         status: &str,
-    ) -> Result<i64, String> {
+    ) -> Result<(i64, String), String> {
         let id = self.next_id("orders")?;
+        let order_uuid = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         let coll = self.db.collection::<Document>("orders");
         coll.insert_one(
             doc! {
                 "id": id,
+                "uuid": &order_uuid,
                 "portfolio_id": portfolio_id,
                 "buyer_email": buyer_email,
                 "buyer_name": buyer_name,
@@ -2403,7 +2410,7 @@ impl Store for MongoStore {
             None,
         )
         .map_err(|e| e.to_string())?;
-        Ok(id)
+        Ok((id, order_uuid))
     }
     fn order_update_status(&self, id: i64, status: &str) -> Result<(), String> {
         let coll = self.db.collection::<Document>("orders");
@@ -3638,6 +3645,7 @@ fn doc_to_fw_event(doc: &Document) -> Option<FwEvent> {
 fn doc_to_order(doc: &Document) -> Option<Order> {
     Some(Order {
         id: doc.get_i64("id").ok()?,
+        uuid: doc.get_str("uuid").ok().unwrap_or("").to_string(),
         portfolio_id: doc.get_i64("portfolio_id").ok()?,
         buyer_email: doc.get_str("buyer_email").ok()?.to_string(),
         buyer_name: doc.get_str("buyer_name").ok().unwrap_or("").to_string(),

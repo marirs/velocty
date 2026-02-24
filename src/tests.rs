@@ -951,7 +951,7 @@ fn order_crud() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
 
-    let oid = Order::create(
+    let (oid, uuid) = Order::create(
         &pool,
         pid,
         "buyer@test.com",
@@ -964,11 +964,17 @@ fn order_crud() {
     )
     .unwrap();
     assert!(oid > 0);
+    assert!(!uuid.is_empty());
 
     let order = Order::find_by_id(&pool, oid).unwrap();
     assert_eq!(order.buyer_email, "buyer@test.com");
     assert_eq!(order.amount, 29.99);
     assert_eq!(order.status, "pending");
+    assert_eq!(order.uuid, uuid);
+
+    // Find by UUID
+    let o_uuid = Order::find_by_uuid(&pool, &uuid).unwrap();
+    assert_eq!(o_uuid.id, oid);
 
     // Find by provider order ID
     let o2 = Order::find_by_provider_order_id(&pool, "PP-123").unwrap();
@@ -1031,7 +1037,7 @@ fn order_list_filters() {
 fn download_token_lifecycle() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(
+    let (oid, _uuid) = Order::create(
         &pool,
         pid,
         "b@t.com",
@@ -1068,7 +1074,7 @@ fn download_token_lifecycle() {
 fn download_token_expired() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(
+    let (oid, _uuid) = Order::create(
         &pool,
         pid,
         "b@t.com",
@@ -1092,7 +1098,7 @@ fn download_token_expired() {
 fn license_crud() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(
+    let (oid, _uuid) = Order::create(
         &pool,
         pid,
         "b@t.com",
@@ -2131,7 +2137,7 @@ fn order_revenue_by_period() {
 fn download_token_max_downloads_exhausted() {
     let pool = test_pool();
     let pid = setup_portfolio(&pool);
-    let oid = Order::create(
+    let (oid, _uuid) = Order::create(
         &pool,
         pid,
         "b@t.com",

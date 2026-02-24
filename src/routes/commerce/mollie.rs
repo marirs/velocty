@@ -33,7 +33,7 @@ pub fn mollie_create_payment(
         return Json(json!({ "ok": false, "error": "Mollie API key not configured" }));
     }
 
-    let (order_id, price, cur) = match create_pending_order(
+    let (order_id, order_uuid, price, cur) = match create_pending_order(
         s,
         body.portfolio_id,
         "mollie",
@@ -55,9 +55,9 @@ pub fn mollie_create_payment(
         .json(&json!({
             "amount": { "currency": cur, "value": format!("{:.2}", price) },
             "description": item.title,
-            "redirectUrl": format!("{}/api/mollie/return?order_id={}", base, order_id),
+            "redirectUrl": format!("{}/api/mollie/return?order_id={}", base, order_uuid),
             "webhookUrl": format!("{}/api/mollie/webhook", base),
-            "metadata": { "order_id": order_id.to_string() }
+            "metadata": { "order_id": &order_uuid }
         }))
         .send();
 
@@ -72,7 +72,7 @@ pub fn mollie_create_payment(
             let mollie_id = body.get("id").and_then(|v| v.as_str()).unwrap_or("");
             if let Some(url) = checkout_url {
                 let _ = s.order_update_provider_order_id(order_id, mollie_id);
-                Json(json!({ "ok": true, "order_id": order_id, "checkout_url": url }))
+                Json(json!({ "ok": true, "order_id": order_uuid, "checkout_url": url }))
             } else {
                 let err = body
                     .get("detail")
@@ -114,15 +114,13 @@ pub fn mollie_webhook(store: &State<Arc<dyn Store>>, body: String) -> &'static s
                 .and_then(|m| m.get("order_id"))
                 .and_then(|o| o.as_str())
                 .unwrap_or("");
-            if status == "paid" {
-                if let Ok(oid) = order_id_str.parse::<i64>() {
-                    let email = data
-                        .get("details")
-                        .and_then(|d| d.get("consumerName"))
-                        .and_then(|n| n.as_str())
-                        .unwrap_or("");
-                    let _ = finalize_order(s, oid, payment_id, email, "");
-                }
+            if status == "paid" && !order_id_str.is_empty() {
+                let email = data
+                    .get("details")
+                    .and_then(|d| d.get("consumerName"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("");
+                let _ = finalize_order(s, order_id_str, payment_id, email, "");
             }
         }
     }
@@ -132,14 +130,14 @@ pub fn mollie_webhook(store: &State<Arc<dyn Store>>, body: String) -> &'static s
 // ── Mollie: Return redirect ─────────────────────────────
 
 #[get("/api/mollie/return?<order_id>")]
-pub fn mollie_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::response::Redirect {
+pub fn mollie_return(store: &State<Arc<dyn Store>>, order_id: &str) -> rocket::response::Redirect {
     let s: &dyn Store = &**store.inner();
     let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
     // Check if order was completed by webhook
-    if let Some(order) = s.order_find_by_id(order_id) {
+    if let Some(order) = s.order_find_by_uuid(order_id) {
         if order.status == "completed" {
-            if let Some(dl) = s.download_token_find_by_order(order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order.id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }

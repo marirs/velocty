@@ -77,7 +77,7 @@ pub fn stripe_create_session(
         return Json(json!({ "ok": false, "error": "Stripe secret key not configured" }));
     }
 
-    let (order_id, price, cur) = match create_pending_order(
+    let (order_id, order_uuid, price, cur) = match create_pending_order(
         s,
         body.portfolio_id,
         "stripe",
@@ -103,7 +103,7 @@ pub fn stripe_create_session(
                 "success_url",
                 &format!(
                     "{}/api/stripe/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={}",
-                    base, order_id
+                    base, order_uuid
                 ),
             ),
             ("cancel_url", &format!("{}/portfolio/{}", base, item.slug)),
@@ -114,7 +114,7 @@ pub fn stripe_create_session(
             ),
             ("line_items[0][price_data][product_data][name]", &item.title),
             ("line_items[0][quantity]", "1"),
-            ("metadata[order_id]", &order_id.to_string()),
+            ("metadata[order_id]", &order_uuid),
         ])
         .send();
 
@@ -125,7 +125,7 @@ pub fn stripe_create_session(
                 let session_id = body.get("id").and_then(|v| v.as_str()).unwrap_or("");
                 let _ = s.order_update_provider_order_id(order_id, session_id);
                 Json(
-                    json!({ "ok": true, "order_id": order_id, "checkout_url": url, "session_id": session_id }),
+                    json!({ "ok": true, "order_id": order_uuid, "checkout_url": url, "session_id": session_id }),
                 )
             } else {
                 let err = body
@@ -146,7 +146,7 @@ pub fn stripe_create_session(
 pub fn stripe_success(
     store: &State<Arc<dyn Store>>,
     session_id: &str,
-    order_id: i64,
+    order_id: &str,
 ) -> rocket::response::Redirect {
     let s: &dyn Store = &**store.inner();
     let settings: HashMap<String, String> = s.setting_all();
@@ -284,8 +284,8 @@ pub fn stripe_webhook(
             .and_then(|e| e.as_str())
             .unwrap_or("");
 
-        if let Ok(order_id) = order_id_str.parse::<i64>() {
-            let _ = finalize_order(s, order_id, session_id, buyer_email, "");
+        if !order_id_str.is_empty() {
+            let _ = finalize_order(s, order_id_str, session_id, buyer_email, "");
         }
     }
 

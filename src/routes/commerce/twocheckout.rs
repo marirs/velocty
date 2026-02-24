@@ -42,7 +42,7 @@ pub fn twocheckout_create(
     }
     let is_sandbox = settings.get("twocheckout_mode").map(|v| v.as_str()) != Some("live");
 
-    let (order_id, price, cur) = match create_pending_order(
+    let (_order_id, order_uuid, price, cur) = match create_pending_order(
         s,
         body.portfolio_id,
         "2checkout",
@@ -65,10 +65,10 @@ pub fn twocheckout_create(
     };
     let checkout_url = format!(
         "{}?seller_id={}&product_id=velocty_{}&price={:.2}&currency={}&return-url={}/api/2checkout/return?order_id={}&return-type=redirect&prod={}&qty=1",
-        checkout_base, merchant_code, order_id, price, cur, base, order_id, urlencoding(&item.title)
+        checkout_base, merchant_code, order_uuid, price, cur, base, order_uuid, urlencoding(&item.title)
     );
 
-    Json(json!({ "ok": true, "order_id": order_id, "checkout_url": checkout_url }))
+    Json(json!({ "ok": true, "order_id": order_uuid, "checkout_url": checkout_url }))
 }
 
 // ── 2Checkout: Return redirect ──────────────────────────
@@ -76,16 +76,16 @@ pub fn twocheckout_create(
 #[get("/api/2checkout/return?<order_id>")]
 pub fn twocheckout_return(
     store: &State<Arc<dyn Store>>,
-    order_id: i64,
+    order_id: &str,
 ) -> rocket::response::Redirect {
     let s: &dyn Store = &**store.inner();
     let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
     // Only redirect to download if the webhook already completed the order.
     // Never finalize from a return redirect — that must come from the verified webhook.
-    if let Some(order) = s.order_find_by_id(order_id) {
+    if let Some(order) = s.order_find_by_uuid(order_id) {
         if order.status == "completed" {
-            if let Some(dl) = s.download_token_find_by_order(order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order.id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }
@@ -153,13 +153,13 @@ pub fn twocheckout_webhook(
     if message_type == "ORDER_CREATED" || message_type == "INVOICE_STATUS_CHANGED" {
         // vendor_order_id format from our create: velocty_{order_id} or just the order_id
         let vendor_order_id = body.vendor_order_id.as_deref().unwrap_or("");
-        let order_id_str = vendor_order_id
+        let order_uuid = vendor_order_id
             .strip_prefix("velocty_")
             .unwrap_or(vendor_order_id);
-        if let Ok(oid) = order_id_str.parse::<i64>() {
+        if !order_uuid.is_empty() {
             let email = body.customer_email.as_deref().unwrap_or("");
             let name = body.customer_name.as_deref().unwrap_or("");
-            let _ = finalize_order(s, oid, sale_id, email, name);
+            let _ = finalize_order(s, order_uuid, sale_id, email, name);
         }
     }
 

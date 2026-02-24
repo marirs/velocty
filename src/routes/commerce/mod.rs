@@ -70,12 +70,14 @@ pub fn generate_license_key() -> String {
 /// Returns JSON with download_token, license_key, etc.
 pub fn finalize_order(
     store: &dyn Store,
-    order_id: i64,
+    order_uuid: &str,
     provider_order_id: &str,
     buyer_email: &str,
     buyer_name: &str,
 ) -> Result<Value, String> {
-    let order = store.order_find_by_id(order_id).ok_or("Order not found")?;
+    let order = store
+        .order_find_by_uuid(order_uuid)
+        .ok_or("Order not found")?;
     if order.status != "pending" {
         return Err("Order already completed".to_string());
     }
@@ -140,13 +142,13 @@ pub fn finalize_order(
     }))
 }
 
-/// Create a pending order for a given provider + item, returns (order_id, price, currency).
+/// Create a pending order for a given provider + item, returns (internal_id, uuid, price, currency).
 pub fn create_pending_order(
     store: &dyn Store,
     portfolio_id: i64,
     provider: &str,
     buyer_email: &str,
-) -> Result<(i64, f64, String), String> {
+) -> Result<(i64, String, f64, String), String> {
     let item = store
         .portfolio_find_by_id(portfolio_id)
         .filter(|i| i.sell_enabled)
@@ -157,7 +159,7 @@ pub fn create_pending_order(
         .ok_or("Item has no price set")?;
     let settings: HashMap<String, String> = store.setting_all();
     let cur = currency(&settings);
-    let order_id = store.order_create(
+    let (order_id, order_uuid) = store.order_create(
         item.id,
         buyer_email,
         "",
@@ -167,7 +169,7 @@ pub fn create_pending_order(
         "",
         "pending",
     )?;
-    Ok((order_id, price, cur))
+    Ok((order_id, order_uuid, price, cur))
 }
 
 /// Simple URL encoding for query parameters

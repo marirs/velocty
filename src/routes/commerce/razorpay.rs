@@ -41,7 +41,7 @@ pub fn razorpay_create_order(
         return Json(json!({ "ok": false, "error": "Razorpay credentials not configured" }));
     }
 
-    let (order_id, price, cur) = match create_pending_order(
+    let (order_id, order_uuid, price, cur) = match create_pending_order(
         s,
         body.portfolio_id,
         "razorpay",
@@ -73,7 +73,7 @@ pub fn razorpay_create_order(
                 let _ = s.order_update_provider_order_id(order_id, rp_order_id);
                 Json(json!({
                     "ok": true,
-                    "order_id": order_id,
+                    "order_id": order_uuid,
                     "razorpay_order_id": rp_order_id,
                     "razorpay_key_id": key_id,
                     "amount": amount_minor,
@@ -96,7 +96,7 @@ pub fn razorpay_create_order(
 
 #[derive(Deserialize)]
 pub struct RazorpayVerifyRequest {
-    pub order_id: i64,
+    pub order_id: String,
     pub razorpay_order_id: String,
     pub razorpay_payment_id: String,
     pub razorpay_signature: String,
@@ -133,7 +133,7 @@ pub fn razorpay_verify(
 
     match finalize_order(
         s,
-        body.order_id,
+        &body.order_id,
         &body.razorpay_payment_id,
         &body.buyer_email,
         body.buyer_name.as_deref().unwrap_or(""),

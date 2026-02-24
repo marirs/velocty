@@ -42,15 +42,16 @@ pub fn paypal_create_order(
     let cur = currency(&settings);
 
     // Create a pending order in our DB
-    let order_id = match s.order_create(item.id, "", "", price, &cur, "paypal", "", "pending") {
-        Ok(id) => id,
-        Err(e) => return Json(json!({ "ok": false, "error": e })),
-    };
+    let (_order_id, order_uuid) =
+        match s.order_create(item.id, "", "", price, &cur, "paypal", "", "pending") {
+            Ok(v) => v,
+            Err(e) => return Json(json!({ "ok": false, "error": e })),
+        };
 
     // Return the order info for the PayPal JS SDK to create the PayPal order client-side
     Json(json!({
         "ok": true,
-        "order_id": order_id,
+        "order_id": order_uuid,
         "amount": format!("{:.2}", price),
         "currency": cur,
         "item_title": item.title,
@@ -61,7 +62,7 @@ pub fn paypal_create_order(
 
 #[derive(Deserialize)]
 pub struct PaypalCaptureRequest {
-    pub order_id: i64,
+    pub order_id: String,
     pub paypal_order_id: String,
     pub buyer_email: String,
     pub buyer_name: Option<String>,
@@ -139,7 +140,7 @@ pub fn paypal_capture_order(
 
     match finalize_order(
         s,
-        body.order_id,
+        &body.order_id,
         &body.paypal_order_id,
         &body.buyer_email,
         body.buyer_name.as_deref().unwrap_or(""),

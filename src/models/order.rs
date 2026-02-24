@@ -7,6 +7,7 @@ use crate::db::DbPool;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Order {
     pub id: i64,
+    pub uuid: String,
     pub portfolio_id: i64,
     pub buyer_email: String,
     pub buyer_name: String,
@@ -38,9 +39,10 @@ pub struct License {
 }
 
 impl Order {
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+    pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(Order {
             id: row.get("id")?,
+            uuid: row.get::<_, Option<String>>("uuid")?.unwrap_or_default(),
             portfolio_id: row.get("portfolio_id")?,
             buyer_email: row.get("buyer_email")?,
             buyer_name: row
@@ -62,6 +64,16 @@ impl Order {
         conn.query_row(
             "SELECT * FROM orders WHERE id = ?1",
             params![id],
+            Self::from_row,
+        )
+        .ok()
+    }
+
+    pub fn find_by_uuid(pool: &DbPool, uuid: &str) -> Option<Self> {
+        let conn = pool.get().ok()?;
+        conn.query_row(
+            "SELECT * FROM orders WHERE uuid = ?1",
+            params![uuid],
             Self::from_row,
         )
         .ok()
@@ -199,15 +211,16 @@ impl Order {
         provider: &str,
         provider_order_id: &str,
         status: &str,
-    ) -> Result<i64, String> {
+    ) -> Result<(i64, String), String> {
         let conn = pool.get().map_err(|e| e.to_string())?;
+        let order_uuid = uuid::Uuid::new_v4().to_string();
         conn.execute(
-            "INSERT INTO orders (portfolio_id, buyer_email, buyer_name, amount, currency, provider, provider_order_id, status)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![portfolio_id, buyer_email, buyer_name, amount, currency, provider, provider_order_id, status],
+            "INSERT INTO orders (portfolio_id, buyer_email, buyer_name, amount, currency, provider, provider_order_id, status, uuid)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![portfolio_id, buyer_email, buyer_name, amount, currency, provider, provider_order_id, status, order_uuid],
         )
         .map_err(|e| e.to_string())?;
-        Ok(conn.last_insert_rowid())
+        Ok((conn.last_insert_rowid(), order_uuid))
     }
 
     pub fn update_status(pool: &DbPool, id: i64, status: &str) -> Result<(), String> {

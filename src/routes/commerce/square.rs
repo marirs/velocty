@@ -63,7 +63,7 @@ pub fn square_create_payment(
         "https://connect.squareup.com"
     };
 
-    let (order_id, price, cur) = match create_pending_order(
+    let (order_id, order_uuid, price, cur) = match create_pending_order(
         s,
         body.portfolio_id,
         "square",
@@ -91,9 +91,9 @@ pub fn square_create_payment(
                 "location_id": location_id
             },
             "checkout_options": {
-                "redirect_url": format!("{}/api/square/return?order_id={}", base, order_id)
+                "redirect_url": format!("{}/api/square/return?order_id={}", base, order_uuid)
             },
-            "payment_note": format!("Order #{}", order_id)
+            "payment_note": format!("Order #{}", order_uuid)
         }))
         .send();
 
@@ -111,7 +111,7 @@ pub fn square_create_payment(
                 .unwrap_or("");
             if let Some(checkout_url) = url {
                 let _ = s.order_update_provider_order_id(order_id, sq_id);
-                Json(json!({ "ok": true, "order_id": order_id, "checkout_url": checkout_url }))
+                Json(json!({ "ok": true, "order_id": order_uuid, "checkout_url": checkout_url }))
             } else {
                 let errors = body
                     .get("errors")
@@ -130,15 +130,15 @@ pub fn square_create_payment(
 // ── Square: Return redirect ─────────────────────────────
 
 #[get("/api/square/return?<order_id>")]
-pub fn square_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::response::Redirect {
+pub fn square_return(store: &State<Arc<dyn Store>>, order_id: &str) -> rocket::response::Redirect {
     let s: &dyn Store = &**store.inner();
     let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
     // Only redirect to download if the webhook already completed the order.
     // Never finalize from a return redirect — that must come from the verified webhook.
-    if let Some(order) = s.order_find_by_id(order_id) {
+    if let Some(order) = s.order_find_by_uuid(order_id) {
         if order.status == "completed" {
-            if let Some(dl) = s.download_token_find_by_order(order_id) {
+            if let Some(dl) = s.download_token_find_by_order(order.id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }
@@ -213,16 +213,16 @@ pub fn square_webhook(
         };
 
         let note = payment.get("note").and_then(|n| n.as_str()).unwrap_or("");
-        // note format: "Order #123"
-        let order_id_str = note.strip_prefix("Order #").unwrap_or("");
+        // note format: "Order #<uuid>"
+        let order_uuid = note.strip_prefix("Order #").unwrap_or("");
         let buyer_email = payment
             .get("buyer_email_address")
             .and_then(|e| e.as_str())
             .unwrap_or("");
         let sq_payment_id = payment.get("id").and_then(|i| i.as_str()).unwrap_or("");
 
-        if let Ok(oid) = order_id_str.parse::<i64>() {
-            let _ = finalize_order(s, oid, sq_payment_id, buyer_email, "");
+        if !order_uuid.is_empty() {
+            let _ = finalize_order(s, order_uuid, sq_payment_id, buyer_email, "");
         }
     }
 

@@ -1018,6 +1018,10 @@ impl Store for SqliteStore {
         Order::find_by_id(&self.pool, id)
     }
 
+    fn order_find_by_uuid(&self, uuid: &str) -> Option<Order> {
+        Order::find_by_uuid(&self.pool, uuid)
+    }
+
     fn order_find_by_provider_order_id(&self, provider_order_id: &str) -> Option<Order> {
         Order::find_by_provider_order_id(&self.pool, provider_order_id)
     }
@@ -1064,7 +1068,7 @@ impl Store for SqliteStore {
         provider: &str,
         provider_order_id: &str,
         status: &str,
-    ) -> Result<i64, String> {
+    ) -> Result<(i64, String), String> {
         Order::create(
             &self.pool,
             portfolio_id,
@@ -1111,13 +1115,12 @@ impl Store for SqliteStore {
         portfolio_id: i64,
     ) -> Option<Order> {
         let conn = self.pool.get().ok()?;
-        let mut stmt = conn
-            .prepare("SELECT id FROM orders WHERE portfolio_id = ?1 AND buyer_email = ?2 AND status = 'completed' ORDER BY created_at DESC LIMIT 1")
-            .ok()?;
-        let id: i64 = stmt
-            .query_row(rusqlite::params![portfolio_id, email], |row| row.get(0))
-            .ok()?;
-        Order::find_by_id(&self.pool, id)
+        conn.query_row(
+            "SELECT * FROM orders WHERE portfolio_id = ?1 AND buyer_email = ?2 AND status = 'completed' ORDER BY created_at DESC LIMIT 1",
+            rusqlite::params![portfolio_id, email],
+            Order::from_row,
+        )
+        .ok()
     }
 
     // ── Download Tokens ─────────────────────────────────────────────
@@ -2851,6 +2854,9 @@ impl Store for DbPool {
     fn order_find_by_id(&self, id: i64) -> Option<Order> {
         SqliteStore::new(self.clone()).order_find_by_id(id)
     }
+    fn order_find_by_uuid(&self, uuid: &str) -> Option<Order> {
+        SqliteStore::new(self.clone()).order_find_by_uuid(uuid)
+    }
     fn order_find_by_provider_order_id(&self, provider_order_id: &str) -> Option<Order> {
         SqliteStore::new(self.clone()).order_find_by_provider_order_id(provider_order_id)
     }
@@ -2888,7 +2894,7 @@ impl Store for DbPool {
         provider: &str,
         provider_order_id: &str,
         status: &str,
-    ) -> Result<i64, String> {
+    ) -> Result<(i64, String), String> {
         SqliteStore::new(self.clone()).order_create(
             portfolio_id,
             buyer_email,
