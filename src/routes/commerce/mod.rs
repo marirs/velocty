@@ -395,34 +395,6 @@ pub fn check_purchase(
     }
 }
 
-// ── Generic: Capture (fallback for any provider) ────────
-
-#[derive(Deserialize)]
-pub struct GenericCaptureRequest {
-    pub order_id: i64,
-    pub provider_order_id: String,
-    pub buyer_email: String,
-    pub buyer_name: Option<String>,
-}
-
-#[post("/api/checkout/capture", format = "json", data = "<body>")]
-pub fn generic_capture_order(
-    store: &State<Arc<dyn Store>>,
-    body: Json<GenericCaptureRequest>,
-) -> Json<Value> {
-    let s: &dyn Store = &**store.inner();
-    match finalize_order(
-        s,
-        body.order_id,
-        &body.provider_order_id,
-        &body.buyer_email,
-        body.buyer_name.as_deref().unwrap_or(""),
-    ) {
-        Ok(v) => Json(v),
-        Err(e) => Json(json!({ "ok": false, "error": e })),
-    }
-}
-
 // ── Route Registration ──────────────────────────────────
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -446,7 +418,6 @@ pub fn routes() -> Vec<rocket::Route> {
         payoneer::payoneer_create,
         payoneer::payoneer_return,
         payoneer::payoneer_webhook,
-        generic_capture_order,
         download_page,
         download_file,
         download_license,

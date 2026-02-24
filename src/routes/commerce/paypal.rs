@@ -77,6 +77,52 @@ pub fn paypal_capture_order(
     if settings.get("commerce_paypal_enabled").map(|v| v.as_str()) != Some("true") {
         return Json(json!({ "ok": false, "error": "PayPal is not enabled" }));
     }
+
+    // Server-side verification: fetch order details from PayPal API
+    let client_id = settings.get("paypal_client_id").cloned().unwrap_or_default();
+    let secret = settings.get("paypal_secret").cloned().unwrap_or_default();
+    if client_id.is_empty() || secret.is_empty() {
+        return Json(json!({ "ok": false, "error": "PayPal credentials not configured" }));
+    }
+    let is_sandbox = settings.get("paypal_mode").map(|v| v.as_str()) != Some("live");
+    let api_base = if is_sandbox {
+        "https://api-m.sandbox.paypal.com"
+    } else {
+        "https://api-m.paypal.com"
+    };
+
+    // Get OAuth token
+    let client = reqwest::blocking::Client::new();
+    let token_resp = client
+        .post(format!("{}/v1/oauth2/token", api_base))
+        .basic_auth(&client_id, Some(&secret))
+        .form(&[("grant_type", "client_credentials")])
+        .send();
+    let access_token = match token_resp {
+        Ok(r) => match r.json::<Value>().ok().and_then(|v| v.get("access_token").and_then(|t| t.as_str()).map(|s| s.to_string())) {
+            Some(t) => t,
+            None => return Json(json!({ "ok": false, "error": "Failed to get PayPal access token" })),
+        },
+        Err(e) => return Json(json!({ "ok": false, "error": format!("PayPal auth failed: {}", e) })),
+    };
+
+    // Verify the PayPal order is COMPLETED/APPROVED
+    let order_resp = client
+        .get(format!("{}/v2/checkout/orders/{}", api_base, body.paypal_order_id))
+        .bearer_auth(&access_token)
+        .send();
+    let verified = match order_resp {
+        Ok(r) => {
+            let data: Value = r.json().unwrap_or_default();
+            let status = data.get("status").and_then(|s| s.as_str()).unwrap_or("");
+            status == "COMPLETED" || status == "APPROVED"
+        }
+        Err(_) => false,
+    };
+    if !verified {
+        return Json(json!({ "ok": false, "error": "PayPal payment not verified" }));
+    }
+
     match finalize_order(
         s,
         body.order_id,

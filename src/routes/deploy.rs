@@ -192,13 +192,32 @@ pub fn deploy_receive(
                 );
                 continue;
             }
+            // Validate file extension against allowed media types
+            if !is_allowed_deploy_extension(&full_path) {
+                log::warn!(
+                    "Deploy receive: blocked disallowed file type: {}",
+                    upload.path
+                );
+                continue;
+            }
             if let Some(parent) = Path::new(&full_path).parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            if std::fs::write(&full_path, &bytes).is_ok() {
-                *stats.get_mut("uploads_written").unwrap() =
-                    json!(stats["uploads_written"].as_i64().unwrap_or(0) + 1);
+            // Sanitize SVG files before writing
+            if full_path.to_lowercase().ends_with(".svg") {
+                if let Some(clean) = crate::svg_sanitizer::sanitize_svg(&bytes) {
+                    let _ = std::fs::write(&full_path, &clean);
+                } else {
+                    log::warn!("Deploy receive: SVG sanitization failed: {}", upload.path);
+                    continue;
+                }
+            } else if std::fs::write(&full_path, &bytes).is_ok() {
+                // written successfully
+            } else {
+                continue;
             }
+            *stats.get_mut("uploads_written").unwrap() =
+                json!(stats["uploads_written"].as_i64().unwrap_or(0) + 1);
         }
     }
 
@@ -541,6 +560,22 @@ fn is_safe_upload_path(path: &str) -> bool {
         }
     }
     true
+}
+
+/// Allowlist of file extensions permitted in deploy uploads.
+fn is_allowed_deploy_extension(path: &str) -> bool {
+    const ALLOWED: &[&str] = &[
+        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "ico", "avif",
+        "mp4", "webm", "mov", "avi",
+        "woff2", "woff", "ttf", "otf",
+        "pdf",
+    ];
+    let ext = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    ALLOWED.contains(&ext.as_str())
 }
 
 /// Constant-time comparison to prevent timing attacks on deploy keys.

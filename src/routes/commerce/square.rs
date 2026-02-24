@@ -134,25 +134,16 @@ pub fn square_return(store: &State<Arc<dyn Store>>, order_id: i64) -> rocket::re
     let s: &dyn Store = &**store.inner();
     let settings: HashMap<String, String> = s.setting_all();
     let base = site_url(&settings);
+    // Only redirect to download if the webhook already completed the order.
+    // Never finalize from a return redirect — that must come from the verified webhook.
     if let Some(order) = s.order_find_by_id(order_id) {
-        if order.status == "pending" {
-            if let Ok(result) = finalize_order(
-                s,
-                order_id,
-                &order.provider_order_id,
-                &order.buyer_email,
-                "",
-            ) {
-                if let Some(token) = result.get("download_token").and_then(|t| t.as_str()) {
-                    return rocket::response::Redirect::to(format!("/download/{}", token));
-                }
-            }
-        } else if order.status == "completed" {
+        if order.status == "completed" {
             if let Some(dl) = s.download_token_find_by_order(order_id) {
                 return rocket::response::Redirect::to(format!("/download/{}", dl.token));
             }
         }
     }
+    // Webhook hasn't fired yet — redirect to home
     rocket::response::Redirect::to(base)
 }
 
@@ -196,9 +187,11 @@ pub fn square_webhook(
     let base = site_url(&settings);
     let webhook_url = format!("{}/api/square/webhook", base);
 
-    if !signature_key.is_empty()
-        && !verify_square_signature(&webhook_url, &body.0, &sig.0, &signature_key)
-    {
+    if signature_key.is_empty() {
+        eprintln!("[square] Webhook signature key not configured, rejecting");
+        return Status::BadRequest;
+    }
+    if !verify_square_signature(&webhook_url, &body.0, &sig.0, &signature_key) {
         eprintln!("[square] Invalid webhook signature");
         return Status::BadRequest;
     }
