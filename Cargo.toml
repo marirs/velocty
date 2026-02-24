@@ -34,7 +34,10 @@ webauthn-rs-proto = "0.5"
 # OpenSSL (vendored) — webauthn-rs unconditionally depends on openssl for X.509
 # attestation. Vendoring compiles OpenSSL from source so cross-compilation works
 # without system libssl-dev packages.
+# Pin openssl-src to 3.4.x — OpenSSL 3.5 uses SIO_UDP_NETRESET (QUIC) which is
+# missing from the MinGW headers in the cross Docker container.
 openssl = { version = "0.10", features = ["vendored"] }
+openssl-src = "=300.4.1"
 
 # Session / tokens
 rand = "0.8"
