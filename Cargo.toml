@@ -31,6 +31,11 @@ totp-rs = { version = "5", features = ["qr", "gen_secret"] }
 webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }
 webauthn-rs-proto = "0.5"
 
+# OpenSSL (vendored) — webauthn-rs unconditionally depends on openssl for X.509
+# attestation. Vendoring compiles OpenSSL from source so cross-compilation works
+# without system libssl-dev packages.
+openssl = { version = "0.10", features = ["vendored"] }
+
 # Session / tokens
 rand = "0.8"
 hex = "0.4"
