@@ -134,9 +134,18 @@ pub async fn import_velocty(
 
     // Extract uploads from ZIP to disk
     let mut files_extracted = 0u64;
+    const ALLOWED_EXTS: &[&str] = &[
+        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "ico", "avif",
+        "mp4", "webm", "mov", "avi",
+        "woff2", "woff", "ttf", "otf",
+        "pdf",
+    ];
     for (path, data) in &zip_uploads {
         let dest = format!("website/site/{}", path);
-        // Prevent zip slip: reject paths with .. components
+        // Prevent zip slip: reject paths with .. or null bytes
+        if dest.contains('\0') {
+            continue;
+        }
         let has_traversal = std::path::Path::new(&dest)
             .components()
             .any(|c| matches!(c, std::path::Component::ParentDir));
@@ -144,10 +153,28 @@ pub async fn import_velocty(
             log::warn!("Import: blocked path traversal in ZIP entry: {}", path);
             continue;
         }
+        // Validate file extension
+        let ext = std::path::Path::new(&dest)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if !ALLOWED_EXTS.contains(&ext.as_str()) {
+            log::warn!("Import: blocked disallowed file type in ZIP: {}", path);
+            continue;
+        }
         if let Some(parent) = std::path::Path::new(&dest).parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        if std::fs::write(&dest, data).is_ok() {
+        // Sanitize SVG files before writing
+        if ext == "svg" {
+            if let Some(clean) = crate::svg_sanitizer::sanitize_svg(data) {
+                let _ = std::fs::write(&dest, &clean);
+                files_extracted += 1;
+            } else {
+                log::warn!("Import: SVG sanitization failed for: {}", path);
+            }
+        } else if std::fs::write(&dest, data).is_ok() {
             files_extracted += 1;
         }
     }
