@@ -554,7 +554,10 @@ fn serve_file_from_path(path: &str, cache_control: &str) -> Result<FileResponse,
     // served with a restrictive CSP (default-src 'none').
     let disposition = match mime {
         "text/html" | "application/xhtml+xml" => {
-            let fname = canonical.file_name().and_then(|f| f.to_str()).unwrap_or("download");
+            let fname = canonical
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("download");
             Some(format!("attachment; filename=\"{}\"", fname))
         }
         _ => None,

@@ -213,7 +213,11 @@ pub fn media_delete(
     filename: &str,
 ) -> Redirect {
     // Prevent path traversal — reject filenames containing path separators or ..
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') || filename.contains('\0') {
+    if filename.contains("..")
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename.contains('\0')
+    {
         log::warn!("Media delete: blocked path traversal attempt: {}", filename);
         return Redirect::to(format!("{}/media", admin_base(slug)));
     }

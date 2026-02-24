@@ -15,7 +15,10 @@ pub fn init_uptime() {
 }
 
 fn uptime_secs() -> u64 {
-    BOOT_INSTANT.get().map(|b| b.elapsed().as_secs()).unwrap_or(0)
+    BOOT_INSTANT
+        .get()
+        .map(|b| b.elapsed().as_secs())
+        .unwrap_or(0)
 }
 
 // ── Data Structures ─────────────────────────────────────────

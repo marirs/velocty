@@ -300,11 +300,15 @@ pub fn download_file(
 
     // Validate: must be a relative path, not an absolute URL or protocol-relative
     if !file_url.starts_with('/') || file_url.starts_with("//") {
-        return Err(Json(json!({ "ok": false, "error": "Invalid download path" })));
+        return Err(Json(
+            json!({ "ok": false, "error": "Invalid download path" }),
+        ));
     }
     // Block path traversal
     if file_url.contains("..") {
-        return Err(Json(json!({ "ok": false, "error": "Invalid download path" })));
+        return Err(Json(
+            json!({ "ok": false, "error": "Invalid download path" }),
+        ));
     }
 
     Ok(rocket::response::Redirect::to(file_url))
