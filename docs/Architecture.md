@@ -25,11 +25,12 @@ This document expands on `README-CMS.md` with detailed architecture decisions, s
 
 ### Admin Login
 
-- Single admin user (configured on first run / setup wizard)
-- Session-based auth with secure cookies (`SameSite=Strict`, `HttpOnly`, `Secure`)
+- Multi-user system with roles (admin/editor/author/subscriber)
+- Session-based auth with secure cookies (`SameSite=Strict`, `HttpOnly`, `Secure` derived from `site_url` + `site_environment` settings)
 - Bcrypt password hashing
 - Login rate limiting (max 5 attempts per 15 minutes per IP)
 - Session expiry (configurable, default 24h)
+- Auth guards: `AdminUser`, `EditorUser`, `AuthorUser`, `AuthenticatedUser`
 
 ### Multi-Factor Authentication (MFA)
 
@@ -52,6 +53,18 @@ All responses include:
 - `X-XSS-Protection: 1; mode=block`
 - `Content-Security-Policy` (strict, admin pages allow GrapesJS/Editor.js)
 - `Referrer-Policy: strict-origin-when-cross-origin`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (when `site_url` starts with `https://`)
+
+### Security Hardening
+
+- **Constant-time comparison** — all secret comparisons (deploy keys, webhook HMAC signatures, image proxy tokens) use a consolidated SHA-256 hash-then-compare function in `src/security/mod.rs`, preventing both timing and length-leak side-channels
+- **OnceLock** — `static mut` in health.rs replaced with `std::sync::OnceLock` to eliminate undefined behavior from data races
+- **Download path validation** — commerce download redirects reject absolute URLs, protocol-relative paths (`//`), and `..` traversal
+- **Media delete hardening** — null byte rejection + `canonicalize()` verification ensures file is under uploads directory (defense-in-depth against symlinks)
+- **Template XSS prevention** — all `json_encode() | safe` usages in Tera templates chain `| replace(from="</", to="<\\/")` to prevent `</script>` breakout injection
+- **Error sanitization** — payment provider HTTP errors are logged server-side; clients receive generic "Payment provider request failed" messages
+- **Rate limiting** — likes (30/5min/IP), purchase lookups (10/15min/IP) in addition to login and comment rate limits
+- **Content-Disposition** — HTML/XHTML files served from uploads forced to `attachment` to prevent inline script execution
 
 ---
 

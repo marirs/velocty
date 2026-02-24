@@ -213,11 +213,20 @@ Velocty guides you through a 4-step setup wizard on first run:
 - **Multi-user auth guards** — AdminUser, EditorUser, AuthorUser, AuthenticatedUser with role-based route gating
 - **Login rate limiting** — in-memory IP-based enforcement, configurable attempts per 15 minutes
 - **Comment rate limiting** — in-memory enforcement, configurable per 15-minute window
+- **Like rate limiting** — 30 toggles per 5 minutes per IP
+- **Purchase lookup rate limiting** — 10 requests per 15 minutes per IP (prevents email enumeration)
 - **Login captcha** — reCAPTCHA v3, Cloudflare Turnstile, or hCaptcha
 - **Anti-spam services** — Akismet, CleanTalk, OOPSpam
 - **Firewall fairing** — bot detection, failed login tracking, auto-ban, XSS/SQLi/path traversal protection, rate limiting, geo-blocking, security headers
 - **Session expiry** — configurable (default 24h)
-- **Security headers** — X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy
+- **Security headers** — X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy, HSTS (`Strict-Transport-Security: max-age=31536000; includeSubDomains` when site URL is HTTPS)
+- **Constant-time comparison** — consolidated SHA-256 hash-then-compare for all secret comparisons (deploy keys, webhook signatures, HMAC tokens), preventing timing and length-leak side-channels
+- **Rate limiting** — login, comments, like toggles (30/5min per IP), and purchase lookups (10/15min per IP)
+- **Download path validation** — open redirect and path traversal prevention on commerce download redirects
+- **Media delete hardening** — filename validation + `canonicalize()` check to prevent symlink/encoding traversal
+- **Content-Disposition** — forced `attachment` for HTML/XHTML files served from uploads to prevent inline script execution
+- **Template XSS prevention** — all `json_encode() | safe` usages in Tera templates escape `</` to prevent `</script>` breakout
+- **Error sanitization** — payment provider errors logged server-side with generic messages returned to clients (no internal detail leakage)
 - **Image proxy** — all public `/uploads/` URLs rewritten to HMAC-signed `/img/<token>` paths, with zero-downtime key rotation and configurable grace period
 - **SVG sanitization** — uploaded SVGs are sanitized to strip `<script>`, event handlers, `<foreignObject>`, dangerous URIs, and IE conditional comments; SVGs served with restrictive CSP (`script-src 'none'`) as defense-in-depth
 
@@ -379,9 +388,10 @@ velocty/
 │   │   ├── sparkpost.rs         # SparkPost API
 │   │   └── smtp.rs              # Custom SMTP
 │   ├── security/                # Security module
-│   │   ├── mod.rs               # Captcha dispatch, spam dispatch, helpers
+│   │   ├── mod.rs               # Captcha dispatch, spam dispatch, constant-time comparison, helpers
 │   │   ├── auth.rs              # Auth guards (Admin/Editor/Author/Authenticated), sessions, password
-│   │   ├── firewall.rs          # Firewall fairing (bot/XSS/SQLi/geo-blocking/rate-limit)
+│   │   ├── firewall/            # Firewall module
+│   │   │   └── fairing.rs       # Firewall fairing (bot/XSS/SQLi/geo-blocking/rate-limit/HSTS)
 │   │   ├── mfa.rs               # TOTP secret, QR code, verify, recovery codes
 │   │   ├── passkey.rs           # WebAuthn config, credential storage, reg/auth state management
 │   │   ├── magic_link.rs        # Token gen, email send, verify, cleanup
