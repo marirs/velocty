@@ -209,16 +209,22 @@ pub fn destroy_session(store: &dyn Store, session_id: &str) -> Result<(), String
     store.session_delete(session_id)
 }
 
-pub fn set_session_cookie(cookies: &CookieJar<'_>, session_id: &str) {
-    set_session_cookie_secure(cookies, session_id, false);
-}
+/// Set the session cookie with proper security flags.
+///
+/// The `Secure` flag is derived from the site_url setting AND the
+/// site_environment setting — production sites always get Secure=true
+/// when configured with an HTTPS URL, preventing misconfiguration from
+/// leaking cookies over plaintext.
+pub fn set_session_cookie_secure(cookies: &CookieJar<'_>, session_id: &str, store: &dyn Store) {
+    let site_url = store.setting_get_or("site_url", "");
+    let env = store.setting_get_or("site_environment", "staging");
+    let is_secure = site_url.starts_with("https://") || env == "production";
 
-pub fn set_session_cookie_secure(cookies: &CookieJar<'_>, session_id: &str, secure: bool) {
     let mut cookie = Cookie::new(SESSION_COOKIE, session_id.to_string());
     cookie.set_http_only(true);
     cookie.set_same_site(rocket::http::SameSite::Strict);
     cookie.set_path("/");
-    if secure {
+    if is_secure {
         cookie.set_secure(true);
     }
     cookies.add_private(cookie);

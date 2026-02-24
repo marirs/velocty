@@ -312,7 +312,7 @@
         var el = document.createElement('div');
         el.className = 'alert alert-{{ flash_kind | default(value="info") }} alert-flash';
         var span = document.createElement('span');
-        span.textContent = {{ flash_msg | json_encode() | safe }};
+        span.textContent = {{ flash_msg | json_encode() | replace(from="</", to="<\\/") | safe }};
         var closeBtn = document.createElement('button');
         closeBtn.type = 'button';
         closeBtn.className = 'alert-close';

@@ -213,11 +213,21 @@ pub fn media_delete(
     filename: &str,
 ) -> Redirect {
     // Prevent path traversal — reject filenames containing path separators or ..
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') || filename.contains('\0') {
         log::warn!("Media delete: blocked path traversal attempt: {}", filename);
         return Redirect::to(format!("{}/media", admin_base(slug)));
     }
     let path = std::path::Path::new("website/site/uploads").join(filename);
+    // Verify canonical path is still under uploads dir (defense-in-depth against symlinks/encoding tricks)
+    let uploads_base = std::path::Path::new("website/site/uploads");
+    let safe = match (uploads_base.canonicalize(), path.canonicalize()) {
+        (Ok(base), Ok(canon)) => canon.starts_with(&base),
+        _ => false,
+    };
+    if !safe {
+        log::warn!("Media delete: canonicalize check failed for: {}", filename);
+        return Redirect::to(format!("{}/media", admin_base(slug)));
+    }
     if path.is_file() {
         let _ = std::fs::remove_file(&path);
         store.audit_log(

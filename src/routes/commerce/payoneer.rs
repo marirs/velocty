@@ -90,7 +90,8 @@ pub fn payoneer_create(
             }
         }
         Err(e) => {
-            return Json(json!({ "ok": false, "error": format!("Payoneer auth failed: {}", e) }))
+            log::error!("Payoneer auth failed: {}", e);
+            return Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
         }
     };
 
@@ -127,7 +128,10 @@ pub fn payoneer_create(
                 Json(json!({ "ok": false, "error": err }))
             }
         }
-        Err(e) => Json(json!({ "ok": false, "error": format!("Payoneer request failed: {}", e) })),
+        Err(e) => {
+            log::error!("Payoneer request failed: {}", e);
+            Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
+        }
     }
 }
 

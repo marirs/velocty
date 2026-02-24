@@ -81,7 +81,10 @@ pub fn mollie_create_payment(
                 Json(json!({ "ok": false, "error": err }))
             }
         }
-        Err(e) => Json(json!({ "ok": false, "error": format!("Mollie request failed: {}", e) })),
+        Err(e) => {
+            log::error!("Mollie request failed: {}", e);
+            Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
+        }
     }
 }
 

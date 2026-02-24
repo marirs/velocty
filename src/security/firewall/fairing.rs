@@ -311,6 +311,16 @@ impl Fairing for FirewallFairing {
                 "camera=(), microphone=(), geolocation=()",
             ));
             res.set_header(Header::new("X-XSS-Protection", "1; mode=block"));
+
+            // HSTS: only set when site_url starts with https to avoid breaking HTTP-only dev setups
+            let site_url = store.setting_get_or("site_url", "");
+            if site_url.starts_with("https://") {
+                // max-age=31536000 (1 year); includeSubDomains for full coverage
+                res.set_header(Header::new(
+                    "Strict-Transport-Security",
+                    "max-age=31536000; includeSubDomains",
+                ));
+            }
         }
     }
 }

@@ -60,7 +60,7 @@
                 <td class="text-muted utc-date" style="padding:8px;vertical-align:middle;font-size:12px">{{ user.last_login_at | default(value="Never") }}</td>
                 <td style="padding:8px;vertical-align:middle">
                     <div style="display:flex;gap:4px;flex-wrap:wrap">
-                        <button type="button" class="btn btn-sm" onclick='showEditModal({{ user | json_encode() | safe }}, {{ user.id == current_user.id }})' title="Edit">
+                        <button type="button" class="btn btn-sm" onclick='showEditModal({{ user | json_encode() | replace(from="</", to="<\\/") | safe }}, {{ user.id == current_user.id }})' title="Edit">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
                         {% if user.id != current_user.id %}

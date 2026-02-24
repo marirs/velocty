@@ -576,16 +576,9 @@ fn is_allowed_deploy_extension(path: &str) -> bool {
     ALLOWED.contains(&ext.as_str())
 }
 
-/// Constant-time comparison to prevent timing attacks on deploy keys.
+/// Constant-time comparison — delegates to the consolidated implementation.
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
+    crate::security::constant_time_eq(a, b)
 }
 
 fn collect_files(dir: &std::path::Path, prefix: &str, out: &mut Vec<String>) {

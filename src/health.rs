@@ -1,22 +1,21 @@
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::time::Instant;
 
 use crate::db::DbPool;
 use crate::store::Store;
 
 /// Boot instant — set once at startup via `init_uptime()`
-static mut BOOT_INSTANT: Option<Instant> = None;
+static BOOT_INSTANT: OnceLock<Instant> = OnceLock::new();
 
 pub fn init_uptime() {
-    unsafe {
-        BOOT_INSTANT = Some(Instant::now());
-    }
+    let _ = BOOT_INSTANT.set(Instant::now());
 }
 
 fn uptime_secs() -> u64 {
-    unsafe { BOOT_INSTANT.map(|b| b.elapsed().as_secs()).unwrap_or(0) }
+    BOOT_INSTANT.get().map(|b| b.elapsed().as_secs()).unwrap_or(0)
 }
 
 // ── Data Structures ─────────────────────────────────────────

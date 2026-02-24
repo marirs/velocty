@@ -3252,7 +3252,7 @@ const LIGHTBOX_JS: &str = r#"
                 var lid = likesEl.dataset.itemId;
                 if (!lid) return;
                 fetch('/api/like/' + lid, { method: 'POST' }).then(function(r){return r.json()}).then(function(d){
-                    likesEl.innerHTML = '&#9829; ' + d.count;
+                    likesEl.textContent = '\u2665 ' + parseInt(d.count, 10);
                     if (d.liked) likesEl.classList.add('liked');
                     else likesEl.classList.remove('liked');
                     var link = items[currentIndex];
@@ -3287,13 +3287,13 @@ const LIGHTBOX_JS: &str = r#"
         if (tagsEl) tagsEl.textContent = link.dataset.tags || '';
         if (likesEl) {
             var lk = link.dataset.likes || '0';
-            likesEl.innerHTML = '&#9829; ' + lk;
+            likesEl.textContent = '\u2665 ' + parseInt(lk, 10);
             likesEl.classList.remove('liked');
             var lid = link.dataset.id;
             if (lid) {
                 likesEl.dataset.itemId = lid;
                 fetch('/api/like/' + lid + '/status').then(function(r){return r.json()}).then(function(d){
-                    likesEl.innerHTML = '&#9829; ' + d.count;
+                    likesEl.textContent = '\u2665 ' + parseInt(d.count, 10);
                     if (d.liked) likesEl.classList.add('liked');
                     else likesEl.classList.remove('liked');
                 }).catch(function(){});
@@ -3304,10 +3304,16 @@ const LIGHTBOX_JS: &str = r#"
             var sell = gridItem ? gridItem.dataset.sell : 'false';
             var price = gridItem ? parseFloat(gridItem.dataset.price || '0') : 0;
             if (sell === 'true' && price > 0) {
-                buyEl.innerHTML = '<a href="' + link.href + '" class="lb-buy-btn" style="display:inline-block;padding:10px 20px;background:#E8913A;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">' + commerceCur + ' ' + price.toFixed(2) + ' &mdash; Buy</a>';
+                while (buyEl.firstChild) buyEl.removeChild(buyEl.firstChild);
+                var _ba = document.createElement('a');
+                _ba.href = link.href;
+                _ba.className = 'lb-buy-btn';
+                _ba.style.cssText = 'display:inline-block;padding:10px 20px;background:#E8913A;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px';
+                _ba.textContent = commerceCur + ' ' + price.toFixed(2) + ' \u2014 Buy';
+                buyEl.appendChild(_ba);
                 buyEl.style.display = '';
             } else {
-                buyEl.innerHTML = '';
+                while (buyEl.firstChild) buyEl.removeChild(buyEl.firstChild);
                 buyEl.style.display = 'none';
             }
         }

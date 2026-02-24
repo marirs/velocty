@@ -88,7 +88,10 @@ pub fn razorpay_create_order(
                 Json(json!({ "ok": false, "error": err }))
             }
         }
-        Err(e) => Json(json!({ "ok": false, "error": format!("Razorpay request failed: {}", e) })),
+        Err(e) => {
+            log::error!("Razorpay request failed: {}", e);
+            Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
+        }
     }
 }
 

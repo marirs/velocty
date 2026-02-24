@@ -97,16 +97,9 @@ fn hmac_signature(secret: &str, path: &str) -> String {
     hex::encode(&result[..8])
 }
 
-/// Constant-time comparison to prevent timing attacks
+/// Constant-time comparison — delegates to the consolidated implementation.
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
+    crate::security::constant_time_eq(a, b)
 }
 
 /// Detect MIME type from file extension

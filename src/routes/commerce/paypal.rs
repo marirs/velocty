@@ -114,7 +114,8 @@ pub fn paypal_capture_order(
             }
         },
         Err(e) => {
-            return Json(json!({ "ok": false, "error": format!("PayPal auth failed: {}", e) }))
+            log::error!("PayPal auth failed: {}", e);
+            return Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
         }
     };
 

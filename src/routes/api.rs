@@ -21,10 +21,19 @@ pub struct LikeResponse {
 #[post("/like/<id>")]
 pub fn like_toggle(
     store: &State<Arc<dyn Store>>,
+    limiter: &State<RateLimiter>,
     id: i64,
     client_ip: ClientIp,
 ) -> Json<LikeResponse> {
     let ip_hash = auth::hash_ip(&client_ip.0);
+
+    // Rate limit: 30 like toggles per 5 minutes per IP
+    let rate_key = format!("like:{}", ip_hash);
+    if !limiter.check_and_record(&rate_key, 30, std::time::Duration::from_secs(5 * 60)) {
+        let count = store.portfolio_find_by_id(id).map(|p| p.likes).unwrap_or(0);
+        let liked = store.like_exists(id, &ip_hash);
+        return Json(LikeResponse { liked, count });
+    }
 
     if store.like_exists(id, &ip_hash) {
         // Unlike

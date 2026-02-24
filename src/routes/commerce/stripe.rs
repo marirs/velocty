@@ -136,7 +136,10 @@ pub fn stripe_create_session(
                 Json(json!({ "ok": false, "error": err }))
             }
         }
-        Err(e) => Json(json!({ "ok": false, "error": format!("Stripe request failed: {}", e) })),
+        Err(e) => {
+            log::error!("Stripe request failed: {}", e);
+            Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
+        }
     }
 }
 

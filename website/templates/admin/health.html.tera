@@ -330,7 +330,7 @@ function humanBytes(b) {
 }
 
 // ── Report data ──
-var report = {{ report | json_encode() | safe }};
+var report = {{ report | json_encode() | replace(from="</", to="<\\/") | safe }};
 
 // Fill text values (safe setter for elements that may not exist on MongoDB)
 function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }

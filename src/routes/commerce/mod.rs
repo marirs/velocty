@@ -16,19 +16,8 @@ use serde_json::{json, Value};
 
 use crate::store::Store;
 
-// ── Security Helpers ────────────────────────────────────
-
-/// Constant-time comparison to prevent timing attacks on webhook signatures.
-pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
-}
+// Re-export constant_time_eq so payment provider submodules can use super::constant_time_eq
+pub use crate::security::constant_time_eq;
 
 // ── Shared Helpers ──────────────────────────────────────
 
@@ -301,12 +290,23 @@ pub fn download_file(
     // Increment download count
     let _ = s.download_token_increment(dl_token.id);
 
-    // Serve download_file_path if set, otherwise fall back to the featured image
+    // Serve download_file_path if set, otherwise fall back to the featured image.
+    // Only allow relative paths starting with / to prevent open redirects.
     let file_url = if !item.download_file_path.is_empty() {
         item.download_file_path.clone()
     } else {
         format!("/uploads/{}", item.image_path)
     };
+
+    // Validate: must be a relative path, not an absolute URL or protocol-relative
+    if !file_url.starts_with('/') || file_url.starts_with("//") {
+        return Err(Json(json!({ "ok": false, "error": "Invalid download path" })));
+    }
+    // Block path traversal
+    if file_url.contains("..") {
+        return Err(Json(json!({ "ok": false, "error": "Invalid download path" })));
+    }
+
     Ok(rocket::response::Redirect::to(file_url))
 }
 
@@ -373,9 +373,18 @@ pub struct CheckPurchaseRequest {
 #[post("/api/checkout/check", format = "json", data = "<body>")]
 pub fn check_purchase(
     store: &State<Arc<dyn Store>>,
+    limiter: &State<crate::rate_limit::RateLimiter>,
+    client_ip: crate::security::auth::ClientIp,
     body: Json<CheckPurchaseRequest>,
 ) -> Json<Value> {
     let s: &dyn Store = &**store.inner();
+
+    // Rate limit: 10 lookups per 15 minutes per IP to prevent email enumeration
+    let ip_hash = crate::security::auth::hash_ip(&client_ip.0);
+    let rate_key = format!("check_purchase:{}", ip_hash);
+    if !limiter.check_and_record(&rate_key, 10, std::time::Duration::from_secs(15 * 60)) {
+        return Json(json!({ "ok": false, "error": "Too many requests. Please try again later." }));
+    }
 
     // Find a completed order for this email + portfolio item
     match s.order_find_completed_by_email_and_portfolio(&body.email, body.portfolio_id) {

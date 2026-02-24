@@ -175,8 +175,7 @@ pub fn magic_link_verify(
             let _ = s.user_touch_last_login(user.id);
             match auth::create_session(s, user.id, None, None) {
                 Ok(session_id) => {
-                    let is_https = s.setting_get_or("site_url", "").starts_with("https://");
-                    auth::set_session_cookie_secure(cookies, &session_id, is_https);
+                    auth::set_session_cookie_secure(cookies, &session_id, s);
                     Ok(Redirect::to(format!("/{}", admin_slug.get())))
                 }
                 Err(_) => {

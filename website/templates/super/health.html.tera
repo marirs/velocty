@@ -291,7 +291,7 @@
         return b + ' B';
     }
     function setText(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
-    var report = {{ report | json_encode() | safe }};
+    var report = {{ report | json_encode() | replace(from="</", to="<\\/") | safe }};
     setText('disk-total', humanBytes(report.disk.total_bytes));
     setText('disk-free', humanBytes(report.disk.free_bytes));
     setText('disk-uploads', humanBytes(report.disk.uploads_size_bytes));

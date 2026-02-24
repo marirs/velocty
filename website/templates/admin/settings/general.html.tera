@@ -398,7 +398,7 @@ function showToast(msg, kind) {
 
 // ── Deploy Targets (staging only) ──
 var deployTargets = [];
-try { deployTargets = JSON.parse({{ settings.deploy_targets | default(value="[]") | json_encode() | safe }}); } catch(e) { deployTargets = []; }
+try { deployTargets = JSON.parse({{ settings.deploy_targets | default(value="[]") | json_encode() | replace(from="</", to="<\\/") | safe }}); } catch(e) { deployTargets = []; }
 
 function _escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function renderDeployTargets() {

@@ -11,9 +11,31 @@ pub mod password_reset;
 pub mod recaptcha;
 pub mod turnstile;
 
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
 use crate::store::Store;
+
+// ── Constant-Time Comparison ────────────────────────────
+
+/// Constant-time comparison that does NOT leak input lengths.
+///
+/// Both inputs are hashed with SHA-256 before comparing, so the comparison
+/// always operates on 32-byte digests regardless of the original lengths.
+/// This prevents timing side-channels from revealing the length of secrets
+/// (e.g. deploy keys) to an attacker.
+///
+/// For HMAC signature verification (where both sides are already fixed-length
+/// hex strings), this is also safe and adds negligible overhead.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    let ha = Sha256::digest(a);
+    let hb = Sha256::digest(b);
+    let mut diff = 0u8;
+    for (x, y) in ha.iter().zip(hb.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
 
 // ── Captcha Verification ──────────────────────────────
 

@@ -123,7 +123,10 @@ pub fn square_create_payment(
                 Json(json!({ "ok": false, "error": errors }))
             }
         }
-        Err(e) => Json(json!({ "ok": false, "error": format!("Square request failed: {}", e) })),
+        Err(e) => {
+            log::error!("Square request failed: {}", e);
+            Json(json!({ "ok": false, "error": "Payment provider request failed. Please try again." }))
+        }
     }
 }
 

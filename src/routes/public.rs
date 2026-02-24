@@ -23,6 +23,7 @@ pub struct FileResponse {
     pub content_type: String,
     pub cache_control: String,
     pub content_security_policy: Option<String>,
+    pub content_disposition: Option<String>,
 }
 
 impl<'r> Responder<'r, 'static> for FileResponse {
@@ -34,6 +35,9 @@ impl<'r> Responder<'r, 'static> for FileResponse {
             .header(Header::new("X-Content-Type-Options", "nosniff"));
         if let Some(csp) = self.content_security_policy {
             resp.header(Header::new("Content-Security-Policy", csp));
+        }
+        if let Some(cd) = self.content_disposition {
+            resp.header(Header::new("Content-Disposition", cd));
         }
         resp.sized_body(self.bytes.len(), Cursor::new(self.bytes))
             .ok()
@@ -545,11 +549,23 @@ fn serve_file_from_path(path: &str, cache_control: &str) -> Result<FileResponse,
         None
     };
 
+    // Force download for HTML files to prevent inline script execution
+    // SVGs are safe to render inline — they are sanitized at upload time and
+    // served with a restrictive CSP (default-src 'none').
+    let disposition = match mime {
+        "text/html" | "application/xhtml+xml" => {
+            let fname = canonical.file_name().and_then(|f| f.to_str()).unwrap_or("download");
+            Some(format!("attachment; filename=\"{}\"", fname))
+        }
+        _ => None,
+    };
+
     Ok(FileResponse {
         bytes,
         content_type: mime.to_string(),
         cache_control: cache_control.to_string(),
         content_security_policy: csp,
+        content_disposition: disposition,
     })
 }
 
