@@ -79,7 +79,10 @@ pub fn paypal_capture_order(
     }
 
     // Server-side verification: fetch order details from PayPal API
-    let client_id = settings.get("paypal_client_id").cloned().unwrap_or_default();
+    let client_id = settings
+        .get("paypal_client_id")
+        .cloned()
+        .unwrap_or_default();
     let secret = settings.get("paypal_secret").cloned().unwrap_or_default();
     if client_id.is_empty() || secret.is_empty() {
         return Json(json!({ "ok": false, "error": "PayPal credentials not configured" }));
@@ -99,16 +102,27 @@ pub fn paypal_capture_order(
         .form(&[("grant_type", "client_credentials")])
         .send();
     let access_token = match token_resp {
-        Ok(r) => match r.json::<Value>().ok().and_then(|v| v.get("access_token").and_then(|t| t.as_str()).map(|s| s.to_string())) {
+        Ok(r) => match r.json::<Value>().ok().and_then(|v| {
+            v.get("access_token")
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        }) {
             Some(t) => t,
-            None => return Json(json!({ "ok": false, "error": "Failed to get PayPal access token" })),
+            None => {
+                return Json(json!({ "ok": false, "error": "Failed to get PayPal access token" }))
+            }
         },
-        Err(e) => return Json(json!({ "ok": false, "error": format!("PayPal auth failed: {}", e) })),
+        Err(e) => {
+            return Json(json!({ "ok": false, "error": format!("PayPal auth failed: {}", e) }))
+        }
     };
 
     // Verify the PayPal order is COMPLETED/APPROVED
     let order_resp = client
-        .get(format!("{}/v2/checkout/orders/{}", api_base, body.paypal_order_id))
+        .get(format!(
+            "{}/v2/checkout/orders/{}",
+            api_base, body.paypal_order_id
+        ))
         .bearer_auth(&access_token)
         .send();
     let verified = match order_resp {

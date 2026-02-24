@@ -135,10 +135,8 @@ pub async fn import_velocty(
     // Extract uploads from ZIP to disk
     let mut files_extracted = 0u64;
     const ALLOWED_EXTS: &[&str] = &[
-        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "ico", "avif",
-        "mp4", "webm", "mov", "avi",
-        "woff2", "woff", "ttf", "otf",
-        "pdf",
+        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "ico", "avif", "mp4", "webm", "mov",
+        "avi", "woff2", "woff", "ttf", "otf", "pdf",
     ];
     for (path, data) in &zip_uploads {
         let dest = format!("website/site/{}", path);

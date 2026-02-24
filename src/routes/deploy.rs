@@ -565,10 +565,8 @@ fn is_safe_upload_path(path: &str) -> bool {
 /// Allowlist of file extensions permitted in deploy uploads.
 fn is_allowed_deploy_extension(path: &str) -> bool {
     const ALLOWED: &[&str] = &[
-        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "ico", "avif",
-        "mp4", "webm", "mov", "avi",
-        "woff2", "woff", "ttf", "otf",
-        "pdf",
+        "jpg", "jpeg", "png", "gif", "webp", "svg", "tiff", "ico", "avif", "mp4", "webm", "mov",
+        "avi", "woff2", "woff", "ttf", "otf", "pdf",
     ];
     let ext = Path::new(path)
         .extension()
