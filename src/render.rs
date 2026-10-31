@@ -191,13 +191,11 @@ fn render_with_shell(design: &Design, template_type: &str, context: &Value) -> S
                     ));
                 }
             }
-            "contact" => {
-                if contact_enabled {
-                    nav_links.push_str(&format!(
-                        "<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
-                        html_escape(&contact_label)
-                    ));
-                }
+            "contact" if contact_enabled => {
+                nav_links.push_str(&format!(
+                    "<a href=\"/contact\" class=\"nav-link\">{}</a>\n",
+                    html_escape(&contact_label)
+                ));
             }
             _ => {}
         }
