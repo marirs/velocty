@@ -52,7 +52,7 @@ pub fn generate_feed(store: &dyn Store) -> String {
     );
 
     for post in &posts {
-        let pub_date = post.published_at.map(&format_rfc2822).unwrap_or_default();
+        let pub_date = post.published_at.map(format_rfc2822).unwrap_or_default();
 
         let excerpt = post.excerpt.as_deref().unwrap_or("");
 
@@ -67,8 +67,8 @@ pub fn generate_feed(store: &dyn Store) -> String {
 "#,
             title = xml_escape(&post.title),
             url = xml_escape(&site_url),
-            blog_slug = &blog_slug,
-            slug = &post.slug,
+            blog_slug = blog_slug,
+            slug = post.slug,
             date = pub_date,
             desc = xml_escape(excerpt),
         ));
