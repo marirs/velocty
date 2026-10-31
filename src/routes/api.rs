@@ -91,19 +91,15 @@ pub fn comment_submit(
     // Check per-content-type setting
     let ct = form.content_type.as_deref().unwrap_or("post");
     match ct {
-        "post" => {
-            if s.setting_get_or("comments_on_blog", "false") != "true" {
-                return Json(
-                    json!({"success": false, "error": "Comments are disabled for blog posts"}),
-                );
-            }
+        "post" if s.setting_get_or("comments_on_blog", "false") != "true" => {
+            return Json(
+                json!({"success": false, "error": "Comments are disabled for blog posts"}),
+            );
         }
-        "portfolio" => {
-            if s.setting_get_or("comments_on_portfolio", "false") != "true" {
-                return Json(
-                    json!({"success": false, "error": "Comments are disabled for portfolio items"}),
-                );
-            }
+        "portfolio" if s.setting_get_or("comments_on_portfolio", "false") != "true" => {
+            return Json(
+                json!({"success": false, "error": "Comments are disabled for portfolio items"}),
+            );
         }
         _ => {}
     }
