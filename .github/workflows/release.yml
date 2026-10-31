@@ -27,21 +27,20 @@ jobs:
           - { variant: single-site, target: aarch64-apple-darwin,      os: macos-15,       archive: tar.gz }
           - { variant: multi-site,  target: aarch64-apple-darwin,      os: macos-15,       archive: tar.gz }
           # ── Linux GNU Intel ──
-          - { variant: single-site, target: x86_64-unknown-linux-gnu,  os: ubuntu-latest,  archive: tar.gz }
-          - { variant: multi-site,  target: x86_64-unknown-linux-gnu,  os: ubuntu-latest,  archive: tar.gz }
+          - { variant: single-site, target: x86_64-unknown-linux-gnu,  os: ubuntu-24.04,  archive: tar.gz }
+          - { variant: multi-site,  target: x86_64-unknown-linux-gnu,  os: ubuntu-24.04,  archive: tar.gz }
           # ── Linux GNU ARM ──
-          - { variant: single-site, target: aarch64-unknown-linux-gnu, os: ubuntu-latest,  archive: tar.gz, cross: true }
-          - { variant: multi-site,  target: aarch64-unknown-linux-gnu, os: ubuntu-latest,  archive: tar.gz, cross: true }
+          - { variant: single-site, target: aarch64-unknown-linux-gnu, os: ubuntu-24.04,  archive: tar.gz, cross: true }
+          - { variant: multi-site,  target: aarch64-unknown-linux-gnu, os: ubuntu-24.04,  archive: tar.gz, cross: true }
           # ── Windows GNU Intel ──
-          - { variant: single-site, target: x86_64-pc-windows-gnu,     os: ubuntu-latest,  archive: zip,    cross: true }
-          - { variant: multi-site,  target: x86_64-pc-windows-gnu,     os: ubuntu-latest,  archive: zip,    cross: true }
+          - { variant: single-site, target: x86_64-pc-windows-gnu,     os: ubuntu-24.04,  archive: zip,    cross: true }
+          - { variant: multi-site,  target: x86_64-pc-windows-gnu,     os: ubuntu-24.04,  archive: zip,    cross: true }
           # ── Windows ARM ──
           - { variant: single-site, target: aarch64-pc-windows-msvc,   os: windows-latest, archive: zip }
           - { variant: multi-site,  target: aarch64-pc-windows-msvc,   os: windows-latest, archive: zip }
 
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v7
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -52,7 +51,7 @@ jobs:
         run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Cache cargo registry & build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -60,7 +59,6 @@ jobs:
             target
           key: ${{ runner.os }}-${{ matrix.target }}-${{ matrix.variant }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-${{ matrix.target }}-${{ matrix.variant }}-cargo-
-
       - name: Set cargo features
         id: features
         shell: bash
@@ -114,23 +112,20 @@ jobs:
           echo "ASSET=${STAGING}.zip" >> "$GITHUB_ENV"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BINARY_NAME }}-${{ matrix.variant }}-${{ matrix.target }}
           path: ${{ env.ASSET }}
-
   release:
     name: Create GitHub Release
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v7
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
-
       - name: Generate checksums
         shell: bash
         run: |
@@ -140,7 +135,7 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           files: |
